@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+bun.lockb
+
+# Generated file for patching
+patch/index_modified.js
+patch/extras/*
