@@ -227,14 +227,17 @@ const Ergogen = () => {
                 options={exampleOptions}
                 value={selectedOption}
                 onChange={(newValue:any) => {
-                  if (newValue.__isNew__) {
+                  if (newValue?.__isNew__) {
                     fetchConfigFromUrl(newValue.value)
                       .then(configContext.setConfigInput)
+                      .catch((e) => {
+                        configContext.setError(`Failed to fetch config from GitHub: ${e.message}`)
+                      })
                   } else {
                     setSelectedOption(newValue)
                   }
                 }}
-                placeholder={"Paste a GitHub URL here, or select an example"}
+                placeholder={"Paste a github URL, or select an example here!"}
               />
               <StyledConfigEditor />
               <Button onClick={() => configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })}>Generate</Button>
