@@ -1,6 +1,8 @@
 import PcbPreview from "../atoms/PcbPreview";
 import SvgPreview from "../atoms/SvgPreview";
 import TextPreview from "../atoms/TextPreview";
+import JscadPreview from "../atoms/JscadPreview";
+import { useConfigContext } from "../context/ConfigContext";
 
 type Props = {
   previewExtension: string,
@@ -12,6 +14,7 @@ type Props = {
 };
 
 const FilePreview = ({ previewExtension, previewContent, previewKey, width = '100%', height = '100%', className }: Props) => {
+  const configContext = useConfigContext();
   const renderFilePreview = (extension: string) => {
     switch (extension) {
       case 'svg':
@@ -27,6 +30,11 @@ const FilePreview = ({ previewExtension, previewContent, previewKey, width = '10
           <TextPreview language="text" content={previewContent} />
         )
       case 'jscad':
+        if (configContext?.jscadPreview) {
+          return (
+            <JscadPreview jscad={previewContent} width={width} height={height} />
+          )
+        }
         return (
           <TextPreview language="javascript" content={previewContent} />
         )
