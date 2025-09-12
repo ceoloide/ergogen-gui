@@ -232,8 +232,8 @@ const Ergogen = () => {
       canvas.height = rect.height;
 
       const myConfetti = confetti.create(canvas, {
-        resize: true,
-        useWorker: true
+        resize: false,
+        useWorker: false
       });
 
       myConfetti({

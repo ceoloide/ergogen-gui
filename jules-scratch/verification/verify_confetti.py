@@ -14,6 +14,10 @@ def run(playwright):
     # Wait for the confetti animation
     page.wait_for_timeout(1000)
 
+    # Click it again to check for the error
+    generate_button.click()
+    page.wait_for_timeout(1000)
+
     # Take a screenshot
     page.screenshot(path="jules-scratch/verification/verification.png")
 
