@@ -1,5 +1,6 @@
 import { useEffect, useState, ChangeEvent } from "react";
 import styled from "styled-components";
+import confetti from "canvas-confetti";
 import Split from "react-split";
 import yaml from 'js-yaml';
 
@@ -209,6 +210,15 @@ const Ergogen = () => {
     }
   }
 
+  const handleGenerateClick = () => {
+    configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+  }
+
   return (<div>
     {configContext.error && <Error>{configContext.error?.toString()}</Error>}
     <FlexContainer>
@@ -240,7 +250,7 @@ const Ergogen = () => {
                 placeholder={"Paste a GitHub URL here, or select an example"}
               />
               <StyledConfigEditor />
-              <Button onClick={() => configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })}>Generate</Button>
+              <Button onClick={handleGenerateClick}>Generate</Button>
             </EditorContainer>
           </LeftSplitPane>
 
