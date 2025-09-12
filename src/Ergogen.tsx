@@ -1,4 +1,4 @@
-import { useEffect, useState, ChangeEvent } from "react";
+import { useEffect, useState, ChangeEvent, useRef } from "react";
 import styled from "styled-components";
 import confetti from "canvas-confetti";
 import Split from "react-split";
@@ -99,6 +99,12 @@ const RightSplitPane = styled.div`
     position: relative;
 `;
 
+const StyledCanvas = styled.canvas`
+  position: absolute;
+  pointer-events: none;
+  z-index: 9999;
+`;
+
 const findResult = (resultToFind: string, resultsToSearch: any): (any | undefined) => {
   if (resultsToSearch === null) return null;
   if (resultToFind === '') return resultsToSearch;
@@ -114,6 +120,8 @@ const findResult = (resultToFind: string, resultsToSearch: any): (any | undefine
 };
 
 const Ergogen = () => {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [preview, setPreviewKey] = useState({ key: "demo.svg", extension: "svg", content: "" });
   const [injectionToEdit, setInjectionToEdit] = useState({ key: -1, type: "", name: "", content: "" });
   const [selectedOption, setSelectedOption] = useState<ConfigOption | null>(null);
@@ -212,11 +220,28 @@ const Ergogen = () => {
 
   const handleGenerateClick = () => {
     configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
+    if (buttonRef.current && canvasRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const canvas = canvasRef.current;
+
+      canvas.style.top = `${rect.top}px`;
+      canvas.style.left = `${rect.left}px`;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      const myConfetti = confetti.create(canvas, {
+        resize: true,
+        useWorker: true
+      });
+
+      myConfetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { x: 0.5, y: 0.5 }
+      });
+    }
   }
 
   return (<div>
@@ -250,7 +275,7 @@ const Ergogen = () => {
                 placeholder={"Paste a GitHub URL here, or select an example"}
               />
               <StyledConfigEditor />
-              <Button onClick={handleGenerateClick}>Generate</Button>
+              <Button onClick={handleGenerateClick} ref={buttonRef}>Generate</Button>
             </EditorContainer>
           </LeftSplitPane>
 
@@ -299,7 +324,9 @@ const Ergogen = () => {
             </RightSplitPane>
           </StyledSplit>
         )}
-    </FlexContainer></div>
+    </FlexContainer>
+    <StyledCanvas ref={canvasRef} />
+  </div>
   );
 }
 

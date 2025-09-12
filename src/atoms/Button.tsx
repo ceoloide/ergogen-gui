@@ -54,21 +54,23 @@ padding: 0.2rem 0.4rem;
 font-size: 0.4rem;
 `;
 
-const styledButton = ({size, ...rest}: Props): JSX.Element => {
+const _styledButton = ({size, ...rest}: Props, ref: React.ForwardedRef<HTMLButtonElement>): JSX.Element => {
     switch(size){
         case "icon":
-            return <IconButton {...rest}/>;
+            return <IconButton {...rest} ref={ref} />;
         case "sm":
         case "small":
-            return <SmallButton {...rest}/>;
+            return <SmallButton {...rest} ref={ref} />;
         case "md":
         case "medium":
-            return <MediumButton {...rest}/>;
+            return <MediumButton {...rest} ref={ref} />;
         case "lg":
         case "large":
         default:
-            return <Button {...rest}/>;
+            return <Button {...rest} ref={ref} />;
     }
 };
+
+const styledButton = React.forwardRef(_styledButton);
 
 export default styledButton;
