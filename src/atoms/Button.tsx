@@ -4,7 +4,8 @@ import styled from "styled-components";
 type Props = {
     size?: string,
     children: React.ReactNode,
-    onClick?: React.MouseEventHandler<HTMLButtonElement> | undefined;
+    onClick?: React.MouseEventHandler<HTMLButtonElement> | undefined,
+    loading?: boolean,
 };
 
 const Button = styled.button`
@@ -37,6 +38,19 @@ const Button = styled.button`
     outline: 2px solid #fff;
     outline-offset: -5px;
   }
+
+  &.loading {
+    background-color: #218838;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 1em,
+      #1e7e34 1em,
+      #1e7e34 2em
+    );
+    background-size: 200% 200%;
+    animation: barberpole 10s linear infinite;
+  }
 `;
 
 const MediumButton = styled(Button)`
@@ -54,20 +68,22 @@ padding: 0.2rem 0.4rem;
 font-size: 0.4rem;
 `;
 
-const styledButton = ({size, ...rest}: Props): JSX.Element => {
+const styledButton = ({size, loading, ...rest}: Props): JSX.Element => {
+    const className = loading ? 'loading' : '';
+    const disabled = loading ? true : false;
     switch(size){
         case "icon":
-            return <IconButton {...rest}/>;
+            return <IconButton {...rest} className={className} disabled={disabled} />;
         case "sm":
         case "small":
-            return <SmallButton {...rest}/>;
+            return <SmallButton {...rest} className={className} disabled={disabled} />;
         case "md":
         case "medium":
-            return <MediumButton {...rest}/>;
+            return <MediumButton {...rest} className={className} disabled={disabled} />;
         case "lg":
         case "large":
         default:
-            return <Button {...rest}/>;
+            return <Button {...rest} className={className} disabled={disabled} />;
     }
 };
 

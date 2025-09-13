@@ -35,7 +35,8 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>,
   jscadPreview: boolean,
   setJscadPreview: Dispatch<SetStateAction<boolean>>,
-  experiment: string | null
+  experiment: string | null,
+  loading: boolean,
 };
 
 type ProcessOptions = {
@@ -66,6 +67,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
   const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:kicanvasPreview", true));
   const [jscadPreview, setJscadPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:jscadPreview", false));
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   // Save config to localStorage whenever it changes
   useEffect(() => {
@@ -143,6 +145,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         };
       }
 
+      setLoading(true)
       try {
         if (inputInjection !== undefined && Array.isArray(inputInjection)) {
           for (let i = 0; i < inputInjection.length; i++) {
@@ -174,6 +177,8 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
           setError(e.toString());
         }
         return;
+      } finally {
+        setLoading(false)
       }
 
       setResults(results);
@@ -231,6 +236,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         jscadPreview,
         setJscadPreview,
         experiment,
+        loading
       }}
     >
       {children}
