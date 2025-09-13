@@ -99,12 +99,6 @@ const RightSplitPane = styled.div`
     position: relative;
 `;
 
-const StyledCanvas = styled.canvas`
-  position: absolute;
-  pointer-events: none;
-  z-index: 9999;
-`;
-
 const findResult = (resultToFind: string, resultsToSearch: any): (any | undefined) => {
   if (resultsToSearch === null) return null;
   if (resultToFind === '') return resultsToSearch;
@@ -121,7 +115,6 @@ const findResult = (resultToFind: string, resultsToSearch: any): (any | undefine
 
 const Ergogen = () => {
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [preview, setPreviewKey] = useState({ key: "demo.svg", extension: "svg", content: "" });
   const [injectionToEdit, setInjectionToEdit] = useState({ key: -1, type: "", name: "", content: "" });
   const [selectedOption, setSelectedOption] = useState<ConfigOption | null>(null);
@@ -220,26 +213,14 @@ const Ergogen = () => {
 
   const handleGenerateClick = () => {
     configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })
-    if (buttonRef.current && canvasRef.current) {
+    if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const canvas = canvasRef.current;
-
-      canvas.style.top = `${rect.top}px`;
-      canvas.style.left = `${rect.left}px`;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-      canvas.width = rect.width;
-      canvas.height = rect.height;
-
-      const myConfetti = confetti.create(canvas, {
-        resize: false,
-        useWorker: false
-      });
-
-      myConfetti({
+      const x = (rect.left + rect.width / 2) / window.innerWidth;
+      const y = (rect.top + rect.height / 2) / window.innerHeight;
+      confetti({
         particleCount: 100,
         spread: 70,
-        origin: { x: 0.5, y: 0.5 }
+        origin: { x, y }
       });
     }
   }
@@ -325,7 +306,6 @@ const Ergogen = () => {
           </StyledSplit>
         )}
     </FlexContainer>
-    <StyledCanvas ref={canvasRef} />
   </div>
   );
 }
