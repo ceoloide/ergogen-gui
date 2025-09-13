@@ -45,6 +45,19 @@ const Error = styled.div`
   justify-content: space-between;
 `;
 
+const Warning = styled.div`
+  background: #ffecb3;
+  color: #664d03;
+  border: 1px solid #ffda6a;
+  padding: 1em;
+  margin: 0.5em 0 0.5em 0;
+  width: 100%;
+  min-height: 4em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
 const StyledFilePreview = styled(FilePreview)`
   height: 100%;
 `;
@@ -210,6 +223,7 @@ const Ergogen = () => {
   }
 
   return (<div>
+    {configContext.deprecationWarning && <Warning>{configContext.deprecationWarning}</Warning>}
     {configContext.error && <Error>{configContext.error?.toString()}</Error>}
     <FlexContainer>
       {!configContext.showSettings ?
