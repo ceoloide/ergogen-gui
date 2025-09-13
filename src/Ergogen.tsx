@@ -45,6 +45,19 @@ const Error = styled.div`
   justify-content: space-between;
 `;
 
+const Warning = styled.div`
+  background: #fffbe6;
+  color: #9a7d00;
+  border: 1px solid #fff1a6;
+  padding: 1em;
+  margin: 0.5em 0 0.5em 0;
+  width: 100%;
+  min-height: 4em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
 const StyledFilePreview = styled(FilePreview)`
   height: 100%;
 `;
@@ -210,6 +223,7 @@ const Ergogen = () => {
   }
 
   return (<div>
+    {configContext.deprecationWarning && <Warning>{configContext.deprecationWarning}</Warning>}
     {configContext.error && <Error>{configContext.error?.toString()}</Error>}
     <FlexContainer>
       {!configContext.showSettings ?

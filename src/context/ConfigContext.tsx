@@ -21,6 +21,7 @@ type ContextProps = {
   processInput: DebouncedFunc<(textInput: string | undefined, injectionInput: string[][] | undefined, options?: ProcessOptions) => Promise<void>>,
   error: string | null,
   setError: Dispatch<SetStateAction<string | null>>,
+  deprecationWarning: string | null,
   results: Results | null,
   showSettings: boolean,
   setShowSettings: Dispatch<SetStateAction<boolean>>,
@@ -57,6 +58,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
   const [configInput, setConfigInput] = useLocalStorage<string>(CONFIG_LOCAL_STORAGE_KEY, initialInput);
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>("ergogen:injection", initialInjectionInput);
   const [error, setError] = useState<string | null>(null);
+  const [deprecationWarning, setDeprecationWarning] = useState<string | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [debug, setDebug] = useState<boolean>(localStorageOrDefault("ergogen:config:debug", false));
   const [autoGen, setAutoGen] = useState<boolean>(localStorageOrDefault("ergogen:config:autoGen", true));
@@ -104,6 +106,31 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
       const [, parsedConfig] = parseConfig(textInput ?? '');
 
       setError(null);
+      setDeprecationWarning(null);
+
+      if (parsedConfig && parsedConfig.pcbs) {
+        const pcbs = Object.values(parsedConfig.pcbs) as any[];
+        let warningFound = false;
+        for (const pcb of pcbs) {
+          if (!pcb.template || pcb.template === 'kicad5') {
+            if (pcb.footprints) {
+              const footprints = Object.values(pcb.footprints) as any[];
+              for (const footprint of footprints) {
+                if (footprint && typeof footprint.what === 'string' && footprint.what.startsWith('ceoloide')) {
+                  setDeprecationWarning(
+                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
+                  );
+                  warningFound = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (warningFound) {
+            break;
+          }
+        }
+      }
 
       // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
       // a simplified preview.
@@ -189,6 +216,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         processInput,
         error,
         setError,
+        deprecationWarning,
         results,
         showSettings,
         setShowSettings,
