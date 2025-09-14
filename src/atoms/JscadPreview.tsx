@@ -1,33 +1,70 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { cameras, prepareRender, drawCommands, entitiesFromSolids } from '@jscad/regl-renderer'
+import { stlDeSerializer } from '@jscad/io'
 
-// De-facto dependency injection
-// See public/index.html
-declare const myjscad: any
 
 interface JscadPreviewProps {
-  jscad: string
+  jscad: string // This is actually an STL string
 }
 
-const JscadPreview: React.FC<JscadPreviewProps> = ({ jscad }) => {
+const JscadPreview: React.FC<JscadPreviewProps> = ({ jscad: stl }) => {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [entities, setEntities] = useState([])
 
   useEffect(() => {
-    console.log("JscadPreview: useEffect called")
-    if (containerRef.current) {
-      console.log("JscadPreview: containerRef.current is not null")
-      try {
-        const viewer = new myjscad.Viewer(containerRef.current, {
-          name: 'jscad-preview',
-          color: [0.2, 0.2, 0.2, 1],
-        })
-        console.log("JscadPreview: viewer created")
-        viewer.add(jscad)
-        console.log("JscadPreview: jscad added to viewer")
-      } catch (e) {
-        console.error("JscadPreview: error creating viewer", e)
-      }
+    if (!stl) {
+      setEntities([])
+      return
     }
-  }, [jscad])
+    try {
+      const solids = stlDeSerializer.deserialize({ output: 'geometry', addMetadata: false }, stl)
+      const entities = entitiesFromSolids({}, solids)
+      setEntities(entities)
+    } catch (e) {
+      console.error("Error deserializing STL", e)
+      setEntities([])
+    }
+  }, [stl])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return;
+
+    // cleanup previous canvas if any
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+
+    if (!entities.length) return;
+
+    const camera = { ...cameras.perspective.defaults, position: [150, 150, 200] }
+
+    const renderOptions = {
+        glOptions: { container },
+        camera,
+        drawCommands: {
+            drawGrid: drawCommands.drawGrid,
+            drawAxis: drawCommands.drawAxis,
+            drawMesh: drawCommands.drawMesh,
+        },
+        entities: [
+            {
+                visuals: { drawCmd: 'drawGrid', show: true, color: [0, 0, 0, 0.1] },
+                size: [200, 200],
+                ticks: [10, 1],
+            },
+            {
+                visuals: { drawCmd: 'drawAxis', show: true },
+            },
+            ...entities
+        ]
+    }
+    const render = prepareRender(renderOptions)
+
+    // For now, just a static render.
+    render(renderOptions)
+
+  }, [entities, containerRef])
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }
