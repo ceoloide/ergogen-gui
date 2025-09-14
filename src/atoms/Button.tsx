@@ -45,8 +45,8 @@ const Button = styled.button`
       -45deg,
       transparent,
       transparent 1em,
-      #1e7e34 1em,
-      #1e7e34 2em
+      #ffffff44 1em,
+      #ffffff44 2em
     );
     background-size: 200% 200%;
     animation: barberpole 10s linear infinite;

@@ -18,7 +18,7 @@ type ContextProps = {
   setConfigInput: Dispatch<SetStateAction<string | undefined>>,
   injectionInput: string[][] | undefined,
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>,
-  processInput: DebouncedFunc<(textInput: string | undefined, injectionInput: string[][] | undefined, options?: ProcessOptions) => Promise<void>>,
+  processInput: (textInput: string | undefined, injectionInput: string[][] | undefined, options?: ProcessOptions) => Promise<void>,
   error: string | null,
   setError: Dispatch<SetStateAction<string | null>>,
   deprecationWarning: string | null,
@@ -99,100 +99,97 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
     return [type, parsedConfig]
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const processInput = useCallback(
-    debounce(async (textInput: string | undefined, injectionInput: string[][] | undefined, options: ProcessOptions = { pointsonly: true }) => {
-      let results = null;
-      let inputConfig: string | {} = textInput ?? '';
-      let inputInjection: [][] | {} = injectionInput ?? '';
-      const [, parsedConfig] = parseConfig(textInput ?? '');
+  const process = async (textInput: string | undefined, injectionInput: string[][] | undefined, options: ProcessOptions = { pointsonly: true }) => {
+    let results = null;
+    let inputConfig: string | {} = textInput ?? '';
+    let inputInjection: [][] | {} = injectionInput ?? '';
+    const [, parsedConfig] = parseConfig(textInput ?? '');
 
-      setError(null);
-      setDeprecationWarning(null);
+    setError(null);
+    setDeprecationWarning(null);
 
-      if (parsedConfig && parsedConfig.pcbs) {
-        const pcbs = Object.values(parsedConfig.pcbs) as any[];
-        let warningFound = false;
-        for (const pcb of pcbs) {
-          if (!pcb.template || pcb.template === 'kicad5') {
-            if (pcb.footprints) {
-              const footprints = Object.values(pcb.footprints) as any[];
-              for (const footprint of footprints) {
-                if (footprint && typeof footprint.what === 'string' && footprint.what.startsWith('ceoloide')) {
-                  setDeprecationWarning(
-                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
-                  );
-                  warningFound = true;
-                  break;
-                }
+    if (parsedConfig && parsedConfig.pcbs) {
+      const pcbs = Object.values(parsedConfig.pcbs) as any[];
+      let warningFound = false;
+      for (const pcb of pcbs) {
+        if (!pcb.template || pcb.template === 'kicad5') {
+          if (pcb.footprints) {
+            const footprints = Object.values(pcb.footprints) as any[];
+            for (const footprint of footprints) {
+              if (footprint && typeof footprint.what === 'string' && footprint.what.startsWith('ceoloide')) {
+                setDeprecationWarning(
+                  'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
+                );
+                warningFound = true;
+                break;
               }
             }
           }
-          if (warningFound) {
-            break;
+        }
+        if (warningFound) {
+          break;
+        }
+      }
+    }
+
+    // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
+    // a simplified preview.
+    // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
+    if (parsedConfig?.points && options?.pointsonly) {
+      inputConfig = {
+        ...parsedConfig,
+        ['pcbs']: undefined,
+        ['cases']: undefined,
+      };
+    }
+
+    setLoading(true)
+    try {
+      if (inputInjection !== undefined && Array.isArray(inputInjection)) {
+        for (let i = 0; i < inputInjection.length; i++) {
+          let injection = inputInjection[i];
+          if (Array.isArray(injection) && injection.length === 3) {
+            const inj_type = injection[0];
+            const inj_name = injection[1];
+            const inj_text = injection[2];
+            const module_prefix = 'const module = {};\n\n'
+            const module_suffix = '\n\nreturn module.exports;'
+            const inj_value = new Function("require", module_prefix + inj_text + module_suffix)();
+            window.ergogen.inject(inj_type, inj_name, inj_value);
           }
         }
       }
+      results = await window.ergogen.process(
+        inputConfig,
+        true, // Set debug to true or no SVGs are generated
+        (m: string) => console.log(m) // logger
+      );
+    } catch (e: unknown) {
+      if (!e) return;
 
-      // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
-      // a simplified preview.
-      // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
-      if (parsedConfig?.points && options?.pointsonly) {
-        inputConfig = {
-          ...parsedConfig,
-          ['pcbs']: undefined,
-          ['cases']: undefined,
-        };
+      if (typeof e === "string") {
+        setError(e);
       }
-
-      setLoading(true)
-      try {
-        if (inputInjection !== undefined && Array.isArray(inputInjection)) {
-          for (let i = 0; i < inputInjection.length; i++) {
-            let injection = inputInjection[i];
-            if (Array.isArray(injection) && injection.length === 3) {
-              const inj_type = injection[0];
-              const inj_name = injection[1];
-              const inj_text = injection[2];
-              const module_prefix = 'const module = {};\n\n'
-              const module_suffix = '\n\nreturn module.exports;'
-              const inj_value = new Function("require", module_prefix + inj_text + module_suffix)();
-              window.ergogen.inject(inj_type, inj_name, inj_value);
-            }
-          }
-        }
-        results = await window.ergogen.process(
-          inputConfig,
-          true, // Set debug to true or no SVGs are generated
-          (m: string) => console.log(m) // logger
-        );
-      } catch (e: unknown) {
-        if (!e) return;
-
-        if (typeof e === "string") {
-          setError(e);
-        }
-        if (typeof e === "object") {
-          // @ts-ignore
-          setError(e.toString());
-        }
-        return;
-      } finally {
-        setLoading(false)
+      if (typeof e === "object") {
+        // @ts-ignore
+        setError(e.toString());
       }
+      return;
+    } finally {
+      setLoading(false)
+    }
 
-      setResults(results);
+    setResults(results);
+  }
 
-    }, 300),
-    [window.ergogen]
-  );
+  const debouncedProcess = useCallback(debounce(process, 300), [window.ergogen]);
 
   useEffect(() => {
     localStorage.setItem('ergogen:injection', JSON.stringify(injectionInput));
     if (autoGen) {
-      processInput(configInput, injectionInput, { pointsonly: !autoGen3D });
+      debouncedProcess(configInput, injectionInput, { pointsonly: !autoGen3D });
     }
-  }, [processInput, configInput, injectionInput, autoGen, autoGen3D]);
+  }, [debouncedProcess, configInput, injectionInput, autoGen, autoGen3D]);
 
   const queryParameters = new URLSearchParams(window.location.search);
   const experiment = queryParameters.get("exp");
@@ -218,7 +215,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         setConfigInput,
         injectionInput,
         setInjectionInput,
-        processInput,
+        processInput: process,
         error,
         setError,
         deprecationWarning,
