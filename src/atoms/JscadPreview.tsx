@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
+// @ts-ignore
 import { cameras, prepareRender, drawCommands, entitiesFromSolids } from '@jscad/regl-renderer'
+// @ts-ignore
 import { stlDeSerializer } from '@jscad/io'
 
 
@@ -9,7 +11,7 @@ interface JscadPreviewProps {
 
 const JscadPreview: React.FC<JscadPreviewProps> = ({ jscad: stl }) => {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [entities, setEntities] = useState([])
+  const [entities, setEntities] = useState<any[]>([])
 
   useEffect(() => {
     if (!stl) {
