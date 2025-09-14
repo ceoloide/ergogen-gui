@@ -254,7 +254,10 @@ const Ergogen = () => {
                 placeholder={"Paste a GitHub URL here, or select an example"}
               />
               <StyledConfigEditor />
-              <Button onClick={() => configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })}>Generate</Button>
+              <Button
+                onClick={() => configContext.processInput(configContext.configInput, configContext.injectionInput, { pointsonly: false })}
+                loading={configContext.loading}
+              >Generate</Button>
             </EditorContainer>
           </LeftSplitPane>
 
