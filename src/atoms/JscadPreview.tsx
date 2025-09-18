@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react'
 
 // De-facto dependency injection
 // See public/index.html
-declare const myjscad: any
 
 interface JscadPreviewProps {
   jscad: string
@@ -16,7 +15,7 @@ const JscadPreview: React.FC<JscadPreviewProps> = ({ jscad }) => {
     if (containerRef.current) {
       console.log("JscadPreview: containerRef.current is not null")
       try {
-        const viewer = new myjscad.Viewer(containerRef.current, {
+        const viewer = new (window as any).OpenJscad.Viewer(containerRef.current, {
           name: 'jscad-preview',
           color: [0.2, 0.2, 0.2, 1],
         })
