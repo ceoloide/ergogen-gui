@@ -32,7 +32,7 @@ const EditorContainer = styled.div`
 const ButtonContainer = styled.div`
   display: flex;
   gap: 0.5rem;
-  align-items: stretch;
+  align-items: center;
 `;
 
 const GrowButton = styled(Button)`

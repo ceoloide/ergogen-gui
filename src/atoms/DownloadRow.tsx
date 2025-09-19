@@ -33,7 +33,6 @@ const Buttons = styled.div`
     display: flex;
     gap: 10px;
     align-items: center;
-    padding-bottom: 5px;
 `;
 
 const StyledButton = styled(Button)`
