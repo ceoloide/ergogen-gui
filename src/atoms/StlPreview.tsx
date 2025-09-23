@@ -10,7 +10,7 @@ type Props = {
 
 const StlPreview = ({ previewContent }: Props) => {
   const geom = useMemo(() => new STLLoader().parse(previewContent), [previewContent]);
-  const ref = useRef();
+  const ref = useRef<THREE.Mesh>(null!);
 
   return (
     <Canvas camera={{ position: [0, 0, 200] }}>

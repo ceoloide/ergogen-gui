@@ -5,7 +5,6 @@ import debounce from "lodash.debounce";
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
 import { rebuildSolids } from '@jscad/core/code-evaluation/rebuildSolids';
-import { convertToBlob } from '@jscad/core/io/convertToBlob';
 // @ts-ignore
 import { serialize } from '@jscad/stl-serializer';
 
