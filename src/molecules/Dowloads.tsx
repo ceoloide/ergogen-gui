@@ -103,26 +103,6 @@ const Downloads = ({ setPreview }: Props) => {
         }
       )
     }
-    for (const [name, caseObj] of Object.entries(results.cases)) {
-      // @ts-ignore
-      if (caseObj.stl) {
-        downloads.push(
-          {
-            fileName: name,
-            extension: 'stl',
-            // @ts-ignore
-            content: caseObj.stl,
-            previewKey: `cases.${name}.stl`,
-            preview: {
-              key: `cases.${name}.stl`,
-              extension: 'stl',
-              // @ts-ignore
-              content: caseObj.stl
-            }
-          }
-        )
-      }
-    }
   }
 
   if (results?.cases) {
@@ -143,7 +123,26 @@ const Downloads = ({ setPreview }: Props) => {
         }
       )
     }
-
+    for (const [name, caseObj] of Object.entries(results.cases)) {
+      // @ts-ignore
+      if (caseObj.stl) {
+        downloads.push(
+          {
+            fileName: name,
+            extension: 'stl',
+            // @ts-ignore
+            content: caseObj.stl,
+            previewKey: `cases.${name}.stl`,
+            preview: {
+              key: `cases.${name}.stl`,
+              extension: 'stl',
+              // @ts-ignore
+              content: caseObj.stl
+            }
+          }
+        )
+      }
+    }
   }
 
   if (results?.pcbs) {
