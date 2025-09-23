@@ -44,7 +44,7 @@
     "start": "react-scripts --openssl-legacy-provider start",
     "build": "react-scripts --openssl-legacy-provider build",
     "postbuild": "yarn run build-ergogen",
-    "test": "react-scripts --openssl-legacy-provider test",
+    "test": "CI=true react-scripts test --env=jsdom",
     "eject": "react-scripts eject",
     "predeploy": "yarn run build",
     "deploy": "gh-pages -d build"
@@ -65,6 +65,11 @@
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
+    ]
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "/node_modules/(?!three).+\\.(js|jsx|mjs|cjs|ts|tsx)$"
     ]
   },
   "devDependencies": {
