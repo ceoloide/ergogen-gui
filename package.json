@@ -8,6 +8,8 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
+    "@jscad/io": "^2.4.12",
+    "@jscad/stl-serializer": "^2.1.21",
     "@monaco-editor/react": "^4.6.0",
     "@svgdotjs/svg.js": "^3.2.0",
     "@testing-library/jest-dom": "^6.4.2",
@@ -26,6 +28,7 @@
     "react-scripts": "5.0.1",
     "react-select": "^5.8.0",
     "react-split": "^2.0.14",
+    "react-stl-viewer": "^2.5.0",
     "react-use": "^17.5.0",
     "styled-components": "^6.1.8",
     "three-dxf": "^1.0.1",

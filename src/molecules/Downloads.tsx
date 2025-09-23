@@ -102,8 +102,25 @@ const Downloads = ({ setPreview }: Props) => {
           }
         }
       )
+      // @ts-ignore
+      if (caseObj.stl) {
+        downloads.push(
+          {
+            fileName: name,
+            extension: 'stl',
+            // @ts-ignore
+            content: caseObj.stl,
+            previewKey: `cases.${name}.stl`,
+            preview: {
+              key: `cases.${name}.stl`,
+              extension: 'stl',
+              // @ts-ignore
+              content: caseObj.stl
+            }
+          }
+        )
+      }
     }
-
   }
 
   if (results?.cases) {

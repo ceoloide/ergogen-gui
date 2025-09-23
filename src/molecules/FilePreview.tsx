@@ -1,3 +1,4 @@
+import { StlViewer } from "react-stl-viewer";
 import JscadPreview from "../atoms/JscadPreview";
 import PcbPreview from "../atoms/PcbPreview";
 import SvgPreview from "../atoms/SvgPreview";
@@ -37,6 +38,12 @@ const FilePreview = ({ previewExtension, previewContent, previewKey, width = '10
       case 'kicad_pcb':
         return (
           <PcbPreview pcb={previewContent} key={previewKey} />
+        )
+      case 'stl':
+        const blob = new Blob([previewContent], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        return (
+          <StlViewer url={url} style={{width: '100%', height: '100vh'}} />
         )
       default:
         return "No preview available";

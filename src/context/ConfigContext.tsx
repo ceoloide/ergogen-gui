@@ -4,6 +4,8 @@ import yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
+import { stlSerializer } from '@jscad/stl-serializer'
+import { deserialize } from '@jscad/io'
 
 type Props = {
   initialInput: string,
@@ -39,6 +41,8 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>,
   jscadPreview: boolean,
   setJscadPreview: Dispatch<SetStateAction<boolean>>,
+  generateStl: boolean,
+  setGenerateStl: Dispatch<SetStateAction<boolean>>,
   experiment: string | null
 };
 
@@ -70,6 +74,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
   const [autoGen3D, setAutoGen3D] = useState<boolean>(localStorageOrDefault("ergogen:config:autoGen3D", true));
   const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:kicanvasPreview", true));
   const [jscadPreview, setJscadPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:jscadPreview", false));
+  const [generateStl, setGenerateStl] = useState<boolean>(localStorageOrDefault("ergogen:config:generateStl", false));
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   
@@ -80,7 +85,8 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
     localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
     localStorage.setItem('ergogen:config:kicanvasPreview', JSON.stringify(kicanvasPreview));
     localStorage.setItem('ergogen:config:jscadPreview', JSON.stringify(jscadPreview));
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview]);
+    localStorage.setItem('ergogen:config:generateStl', JSON.stringify(generateStl));
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview, generateStl]);
 
   const parseConfig = (inputString: string): [string, { [key: string]: any[] }] => {
     let type = 'UNKNOWN';
@@ -182,11 +188,18 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         return;
       }
 
+      if (generateStl) {
+        for (const key of Object.keys(results.cases)) {
+          const a = (stlSerializer as any).serialize({binary: false}, deserialize({filename: `${key}.jscad`, output: 'geometry'}, results.cases[key].jscad))
+          results.cases[key].stl = a[0]
+        }
+      }
+
       setResults(results);
       setResultsVersion(v => v + 1)
 
     }, 300),
-    [(window as any).ergogen]
+    [(window as any).ergogen, generateStl]
   );
 
   useEffect(() => {
@@ -241,6 +254,8 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         setKicanvasPreview,
         jscadPreview,
         setJscadPreview,
+        generateStl,
+        setGenerateStl,
         experiment,
       }}
     >
