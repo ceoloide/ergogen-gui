@@ -31,7 +31,10 @@
     "three-dxf": "^1.0.1",
     "typescript": "^5.4.5",
     "web-vitals": "^3.5.2",
-    "yaml-js": "^0.3.1"
+    "yaml-js": "^0.3.1",
+    "three": "^0.164.1",
+    "@react-three/fiber": "^8.16.2",
+    "@react-three/drei": "^9.105.4"
   },
   "scripts": {
     "build-ergogen": "./patch/patch_ergogen.sh && cd node_modules/ergogen && yarn install && yarn run build && cp dist/ergogen.js ../../public/dependencies/ergogen.js",
@@ -78,6 +81,7 @@
     "eslint-plugin-jsx-a11y": "^6.8.0",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "gh-pages": "^6.1.1"
+    "gh-pages": "^6.1.1",
+    "@jscad/stl-serializer": "^0.1.3"
   }
 }

@@ -462,6 +462,7 @@ const Ergogen = () => {
                 <GenOption optionId={'autogen3d'} label={<>Auto-gen PCB, 3D <small>(slow)</small></>} setSelected={configContext.setAutoGen3D} checked={configContext.autoGen3D} />
                 <GenOption optionId={'kicanvasPreview'} label={<>KiCad Preview <small>(experimental)</small></>} setSelected={configContext.setKicanvasPreview} checked={configContext.kicanvasPreview} />
                 <GenOption optionId={'jscadPreview'} label={<>JSCAD Preview <small>(experimental)</small></>} setSelected={configContext.setJscadPreview} checked={configContext.jscadPreview} />
+                <GenOption optionId={'generateStl'} label={<>Generate STL files <small>(experimental)</small></>} setSelected={configContext.setGenerateStl} checked={configContext.generateStl} />
               </OptionContainer>
               <Injections setInjectionToEdit={setInjectionToEdit} deleteInjection={handleDeleteInjection} />
             </LeftSplitPane>
