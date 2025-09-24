@@ -81,7 +81,7 @@ const Injections = ({ setInjectionToEdit, deleteInjection }: Props) => {
       <StyledButton size={"small"}
         onClick={handleNewFootprint}
       >{/* @ts-ignore */}
-        <span class="material-symbols-outlined">add</span>
+        <span className="material-symbols-outlined">add</span>
       </StyledButton>
     </InjectionsContainer>
   );

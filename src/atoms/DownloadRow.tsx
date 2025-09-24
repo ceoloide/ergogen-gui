@@ -81,7 +81,8 @@ const DownloadRow = ({fileName, extension, content, preview, setPreview, setTabI
             <Buttons>
                 {preview && (
 
-                <StyledLinkButton 
+                <StyledLinkButton
+                        data-testid={`preview-button-${fileName}-${extension}`}
                         onClick={()=>{
                             setPreview(preview);
                             setTabIndex?.(0)

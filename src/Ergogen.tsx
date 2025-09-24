@@ -372,7 +372,7 @@ const Ergogen = () => {
   return (<ErgogenWrapper>
     {configContext.deprecationWarning && <Warning>{configContext.deprecationWarning}</Warning>}
     {configContext.error && <Error>{configContext.error?.toString()}</Error>}
-    {!configContext.showSettings && <SubHeaderContainer><OutlineIconButton>Config</OutlineIconButton><OutlineIconButton>Outputs</OutlineIconButton>
+    {!configContext.showSettings && <SubHeaderContainer><OutlineIconButton data-testid="config-button" onClick={() => configContext.setShowSettings(true)}>Config</OutlineIconButton><OutlineIconButton data-testid="outputs-button" onClick={() => configContext.setShowSettings(false)}>Outputs</OutlineIconButton>
               <StyledSelect
                 styles={customSelectStyles}
                 isClearable={false}
@@ -462,8 +462,10 @@ const Ergogen = () => {
                 <GenOption optionId={'autogen3d'} label={<>Auto-gen PCB, 3D <small>(slow)</small></>} setSelected={configContext.setAutoGen3D} checked={configContext.autoGen3D} />
                 <GenOption optionId={'kicanvasPreview'} label={<>KiCad Preview <small>(experimental)</small></>} setSelected={configContext.setKicanvasPreview} checked={configContext.kicanvasPreview} />
                 <GenOption optionId={'jscadPreview'} label={<>JSCAD Preview <small>(experimental)</small></>} setSelected={configContext.setJscadPreview} checked={configContext.jscadPreview} />
+                <GenOption optionId={'generateStl'} label={<>Generate STL files <small>(experimental)</small></>} setSelected={configContext.setGenerateStl} checked={configContext.generateStl} />
               </OptionContainer>
               <Injections setInjectionToEdit={setInjectionToEdit} deleteInjection={handleDeleteInjection} />
+              <Button onClick={() => configContext.setShowSettings(false)}>Back to Editor</Button>
             </LeftSplitPane>
             <RightSplitPane>
               <EditorContainer>

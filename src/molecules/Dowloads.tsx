@@ -122,7 +122,24 @@ const Downloads = ({ setPreview }: Props) => {
             content: caseObj.jscad
           }
         }
-      )
+      );
+      if (caseObj.stl) {
+        downloads.push(
+          {
+            fileName: name,
+            extension: 'stl',
+            // @ts-ignore
+            content: caseObj.stl,
+            previewKey: `cases.${name}.stl`,
+            preview: {
+              key: `cases.${name}.stl`,
+              extension: 'stl',
+              // @ts-ignore
+              content: caseObj.stl
+            }
+          }
+        )
+      }
     }
 
   }
