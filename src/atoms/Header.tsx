@@ -132,7 +132,7 @@ const Header = (): JSX.Element => {
                     <span className="material-symbols-outlined">description</span>
                     <span>Docs</span>
                 </StyledLinkButton>
-                <StyledLinkButton href="https://discord.gg/nbKcAZB" target="_blank" rel="noreferrer">
+                <StyledLinkButton href="https://discord.gg/nbKcAZB" target="_blank" rel="noreferrer" aria-label="discord">
                     <DiscordIcon />
                 </StyledLinkButton>
                 <AccentIconButton size="small" onClick={toggleSettings}><span className="material-symbols-outlined">
