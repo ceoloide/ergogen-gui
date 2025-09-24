@@ -1,10 +1,8 @@
 import React from 'react';
 import styled from "styled-components";
 
-type Props = {
-    size?: string,
-    children: React.ReactNode,
-    onClick?: React.MouseEventHandler<HTMLButtonElement> | undefined;
+type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    size?: string;
 };
 
 const Button = styled.button`

@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 import Header from './Header';
-import { ConfigContext, Config } from '../context/ConfigContext';
+import { ConfigContext } from '../context/ConfigContext';
 
 const mockSetConfig = jest.fn();
 const mockSetShowSettings = jest.fn();
@@ -11,20 +11,32 @@ const mockSetShowSettings = jest.fn();
 const renderWithContext = (showSettings: boolean) => {
   return render(
     <ConfigContext.Provider value={{
-      config: {} as Config,
-      setConfig: mockSetConfig,
+      configInput: '',
+      setConfigInput: jest.fn(),
+      injectionInput: [],
+      setInjectionInput: jest.fn(),
+      processInput: Object.assign(jest.fn(), { cancel: jest.fn(), flush: jest.fn() }),
+      error: null,
+      setError: jest.fn(),
+      deprecationWarning: null,
+      results: null,
+      resultsVersion: 0,
+      setResultsVersion: jest.fn(),
       showSettings: showSettings,
       setShowSettings: mockSetShowSettings,
-      error: '',
-      setError: jest.fn(),
-      loading: false,
-      setLoading: jest.fn(),
-      autoSync: false,
-      setAutoSync: jest.fn(),
-      gistId: '',
-      setGistId: jest.fn(),
-      pendingChanges: false,
-      setPendingChanges: jest.fn(),
+      showConfig: true,
+      setShowConfig: jest.fn(),
+      debug: false,
+      setDebug: jest.fn(),
+      autoGen: true,
+      setAutoGen: jest.fn(),
+      autoGen3D: true,
+      setAutoGen3D: jest.fn(),
+      kicanvasPreview: true,
+      setKicanvasPreview: jest.fn(),
+      jscadPreview: false,
+      setJscadPreview: jest.fn(),
+      experiment: null,
     }}>
       <Header />
     </ConfigContext.Provider>

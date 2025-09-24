@@ -7,7 +7,7 @@ describe('JscadPreview', () => {
   const mockViewer = jest.fn();
 
   beforeAll(() => {
-    global.myjscad = {
+    (global as any).myjscad = {
       Viewer: function() {
         return {
           add: mockAdd
