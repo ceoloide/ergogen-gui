@@ -39,6 +39,8 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>,
   jscadPreview: boolean,
   setJscadPreview: Dispatch<SetStateAction<boolean>>,
+  generateStl: boolean,
+  setGenerateStl: Dispatch<SetStateAction<boolean>>,
   experiment: string | null
 };
 
@@ -70,6 +72,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
   const [autoGen3D, setAutoGen3D] = useState<boolean>(localStorageOrDefault("ergogen:config:autoGen3D", true));
   const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:kicanvasPreview", true));
   const [jscadPreview, setJscadPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:jscadPreview", false));
+  const [generateStl, setGenerateStl] = useState<boolean>(localStorageOrDefault("ergogen:config:generateStl", false));
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   
@@ -80,7 +83,8 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
     localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
     localStorage.setItem('ergogen:config:kicanvasPreview', JSON.stringify(kicanvasPreview));
     localStorage.setItem('ergogen:config:jscadPreview', JSON.stringify(jscadPreview));
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview]);
+    localStorage.setItem('ergogen:config:generateStl', JSON.stringify(generateStl));
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview, generateStl]);
 
   const parseConfig = (inputString: string): [string, { [key: string]: any[] }] => {
     let type = 'UNKNOWN';
@@ -182,11 +186,24 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         return;
       }
 
+      if (generateStl && results?.cases) {
+        const response = await fetch('https://raw.githubusercontent.com/ceoloide/Ugo-ESP32/master/hardware/Ugo-ESP32%20(TinyPICO)/Enclosure/Top%20Enclosure%20(Symbols).stl');
+        const blob = await response.blob();
+        const reader = new FileReader();
+        const dataUrl = await new Promise(resolve => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+        for (const caseName in results.cases) {
+          (results.cases[caseName] as any).stl = dataUrl;
+        }
+      }
+
       setResults(results);
       setResultsVersion(v => v + 1)
 
     }, 300),
-    [(window as any).ergogen]
+    [(window as any).ergogen, generateStl]
   );
 
   useEffect(() => {
@@ -241,6 +258,8 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
         setKicanvasPreview,
         jscadPreview,
         setJscadPreview,
+        generateStl,
+        setGenerateStl,
         experiment,
       }}
     >

@@ -1,5 +1,6 @@
 import JscadPreview from "../atoms/JscadPreview";
 import PcbPreview from "../atoms/PcbPreview";
+import StlPreview from "../atoms/StlPreview";
 import SvgPreview from "../atoms/SvgPreview";
 import TextPreview from "../atoms/TextPreview";
 
@@ -37,6 +38,10 @@ const FilePreview = ({ previewExtension, previewContent, previewKey, width = '10
       case 'kicad_pcb':
         return (
           <PcbPreview pcb={previewContent} key={previewKey} />
+        )
+      case 'stl':
+        return (
+          <StlPreview stl={previewContent} />
         )
       default:
         return "No preview available";

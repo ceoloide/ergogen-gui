@@ -81,7 +81,8 @@ const DownloadRow = ({fileName, extension, content, preview, setPreview, setTabI
             <Buttons>
                 {preview && (
 
-                <StyledLinkButton 
+                <StyledLinkButton
+                        data-testid={`preview-button-${fileName}-${extension}`}
                         onClick={()=>{
                             setPreview(preview);
                             setTabIndex?.(0)
@@ -93,7 +94,7 @@ const DownloadRow = ({fileName, extension, content, preview, setPreview, setTabI
                 <StyledLinkButton target={"_blank"}
                    rel={"noreferrer"}
                    download={`${fileName}.${extension}`}
-                   href={window.URL.createObjectURL(new Blob([content], {type: "octet/stream"}))}>
+                   href={content}>
                     <span className="material-symbols-outlined">download</span>
                 </StyledLinkButton>
             </Buttons>
