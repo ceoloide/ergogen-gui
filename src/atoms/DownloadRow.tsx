@@ -94,7 +94,7 @@ const DownloadRow = ({fileName, extension, content, preview, setPreview, setTabI
                 <StyledLinkButton target={"_blank"}
                    rel={"noreferrer"}
                    download={`${fileName}.${extension}`}
-                   href={window.URL.createObjectURL(new Blob([content], {type: "octet/stream"}))}>
+                   href={content}>
                     <span className="material-symbols-outlined">download</span>
                 </StyledLinkButton>
             </Buttons>

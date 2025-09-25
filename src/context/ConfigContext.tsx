@@ -187,9 +187,15 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
       }
 
       if (generateStl && results?.cases) {
-        const sampleStl = await fetch('https://raw.githubusercontent.com/ceoloide/Ugo-ESP32/master/hardware/Ugo-ESP32%20(TinyPICO)/Enclosure/Top%20Enclosure%20(Symbols).stl').then(res => res.text());
+        const response = await fetch('https://raw.githubusercontent.com/ceoloide/Ugo-ESP32/master/hardware/Ugo-ESP32%20(TinyPICO)/Enclosure/Top%20Enclosure%20(Symbols).stl');
+        const blob = await response.blob();
+        const reader = new FileReader();
+        const dataUrl = await new Promise(resolve => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
         for (const caseName in results.cases) {
-          results.cases[caseName].stl = sampleStl;
+          (results.cases[caseName] as any).stl = dataUrl;
         }
       }
 

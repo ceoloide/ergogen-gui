@@ -8,9 +8,6 @@ const mockFetch = jest.fn();
 
 global.fetch = mockFetch;
 
-window.URL.createObjectURL = jest.fn();
-
-
 (window as any).ergogen = {
   process: mockErgogenProcess
 };
@@ -33,7 +30,7 @@ describe('Ergogen', () => {
       }
     });
     mockFetch.mockResolvedValue({
-      text: () => Promise.resolve('stl-content')
+      blob: () => Promise.resolve(new Blob(['stl-content']))
     });
   });
 

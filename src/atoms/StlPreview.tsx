@@ -5,8 +5,6 @@ type Props = {
 };
 
 const StlPreview = ({ stl }: Props) => {
-  const blob = new Blob([stl], { type: 'application/sla' });
-  const url = URL.createObjectURL(blob);
   return (
     <StlViewer
       style={{
@@ -15,7 +13,7 @@ const StlPreview = ({ stl }: Props) => {
         width: '100vw',
         height: '100vh',
       }}
-      url={url}
+      url={stl}
       orbitControls
     />
   )
