@@ -229,9 +229,6 @@ const StyledSplit = styled(Split)`
 const LeftSplitPane = styled.div`
     padding-right: 1rem;
     position: relative; 
-    @media (min-width: 640px) {
-      min-width: 300px;
-    }
 `;
 
 const RightSplitPane = styled.div`
@@ -263,6 +260,8 @@ const Ergogen = () => {
   const [preview, setPreviewKey] = useState({ key: "demo.svg", extension: "svg", content: "" });
   const [injectionToEdit, setInjectionToEdit] = useState({ key: -1, type: "", name: "", content: "" });
   const [selectedOption, setSelectedOption] = useState<ConfigOption | null>(null);
+  const [mainSplitSizes, setMainSplitSizes] = useState([30, 70]);
+  const [nestedSplitSizes, setNestedSplitSizes] = useState([70, 30]);
   const configContext = useConfigContext();
 
   useEffect(() => {
@@ -370,6 +369,26 @@ const Ergogen = () => {
     document.body.removeChild(element);
   }
 
+  const handleMainDrag = (newSizes: number[]) => {
+    if (newSizes[0] < 5) {
+      setMainSplitSizes([0, 100]);
+    } else if (newSizes[0] > 25 && newSizes[0] < 35) {
+      setMainSplitSizes([30, 70]);
+    } else {
+      setMainSplitSizes(newSizes);
+    }
+  };
+
+  const handleNestedDrag = (newSizes: number[]) => {
+    if (newSizes[1] < 5) {
+      setNestedSplitSizes([100, 0]);
+    } else if (newSizes[1] > 25 && newSizes[1] < 35) {
+      setNestedSplitSizes([70, 30]);
+    } else {
+      setNestedSplitSizes(newSizes);
+    }
+  };
+
   return (<ErgogenWrapper>
     {configContext.deprecationWarning && <Warning>{configContext.deprecationWarning}</Warning>}
     {configContext.error && <Error>{configContext.error?.toString()}</Error>}
@@ -395,11 +414,12 @@ const Ergogen = () => {
     <FlexContainer>
       {!configContext.showSettings ?
         (<StyledSplit
+          data-testid="main-split-container"
           direction={"horizontal"}
-          sizes={[30, 70]}
-          minSize={100}
+          sizes={mainSplitSizes}
+          minSize={0}
           gutterSize={5}
-          snapOffset={0}
+          onDrag={handleMainDrag}
         >
           <LeftSplitPane>
             <EditorContainer>
@@ -433,11 +453,12 @@ const Ergogen = () => {
 
           <RightSplitPane>
             <StyledSplit
+              data-testid="nested-split-container"
               direction={"horizontal"}
-              sizes={[70, 30]}
-              minSize={100}
+              sizes={nestedSplitSizes}
+              minSize={0}
               gutterSize={5}
-              snapOffset={0}
+              onDrag={handleNestedDrag}
             >
               <LeftSplitPane>
                 <StyledFilePreview data-testid="file-preview" previewExtension={preview.extension} previewKey={`${preview.key}-${configContext.resultsVersion}`} previewContent={preview.content} jscadPreview={configContext.jscadPreview} />
