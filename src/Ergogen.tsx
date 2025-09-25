@@ -465,7 +465,7 @@ const Ergogen = () => {
                 <GenOption optionId={'generateStl'} label={<>Generate STL files <small>(experimental)</small></>} setSelected={configContext.setGenerateStl} checked={configContext.generateStl} />
               </OptionContainer>
               <Injections setInjectionToEdit={setInjectionToEdit} deleteInjection={handleDeleteInjection} />
-              <Button onClick={() => configContext.setShowSettings(false)}>Back to Editor</Button>
+              <Button data-testid="back-to-editor-button" onClick={() => configContext.setShowSettings(false)}>Back to Editor</Button>
             </LeftSplitPane>
             <RightSplitPane>
               <EditorContainer>

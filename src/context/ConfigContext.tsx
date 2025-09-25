@@ -187,7 +187,7 @@ const ConfigContextProvider = ({ initialInput, initialInjectionInput, children }
       }
 
       if (generateStl && results?.cases) {
-        const sampleStl = await fetch('/sample.stl').then(res => res.text());
+        const sampleStl = await fetch('https://raw.githubusercontent.com/ceoloide/Ugo-ESP32/master/hardware/Ugo-ESP32%20(TinyPICO)/Enclosure/Top%20Enclosure%20(Symbols).stl').then(res => res.text());
         for (const caseName in results.cases) {
           results.cases[caseName].stl = sampleStl;
         }

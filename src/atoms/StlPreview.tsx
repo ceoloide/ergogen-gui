@@ -16,9 +16,7 @@ const StlPreview = ({ stl }: Props) => {
         height: '100vh',
       }}
       url={url}
-      groundColor="rgb(255, 255, 255)"
       orbitControls
-      shadows
     />
   )
 };

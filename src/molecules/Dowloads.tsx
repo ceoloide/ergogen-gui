@@ -123,19 +123,19 @@ const Downloads = ({ setPreview }: Props) => {
           }
         }
       );
-      if (caseObj.stl) {
+      if ((caseObj as any).stl) {
         downloads.push(
           {
             fileName: name,
             extension: 'stl',
             // @ts-ignore
-            content: caseObj.stl,
+            content: (caseObj as any).stl,
             previewKey: `cases.${name}.stl`,
             preview: {
               key: `cases.${name}.stl`,
               extension: 'stl',
               // @ts-ignore
-              content: caseObj.stl
+              content: (caseObj as any).stl
             }
           }
         )

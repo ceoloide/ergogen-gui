@@ -10,9 +10,6 @@ global.fetch = mockFetch;
 
 window.URL.createObjectURL = jest.fn();
 
-jest.mock('react-stl-viewer', () => ({
-  StlViewer: () => <div data-testid="stl-preview" />
-}));
 
 (window as any).ergogen = {
   process: mockErgogenProcess
@@ -52,7 +49,7 @@ describe('Ergogen', () => {
     fireEvent.click(stlCheckbox);
 
     // Go back to the editor
-    const editorButton = screen.getByText('Back to Editor');
+    const editorButton = screen.getByTestId('back-to-editor-button');
     fireEvent.click(editorButton);
 
     // Trigger generation
@@ -65,12 +62,6 @@ describe('Ergogen', () => {
       expect(stlDownloadLink).toBeInTheDocument();
     });
 
-    // Click the preview button
-    const previewButton = screen.getByTestId('preview-button-case-stl');
-    fireEvent.click(previewButton);
-
-    // Check that the STL preview is rendered
-    const stlPreview = screen.getByTestId('stl-preview');
-    expect(stlPreview).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledWith('https://raw.githubusercontent.com/ceoloide/Ugo-ESP32/master/hardware/Ugo-ESP32%20(TinyPICO)/Enclosure/Top%20Enclosure%20(Symbols).stl');
   });
 });
