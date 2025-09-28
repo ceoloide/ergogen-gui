@@ -69,10 +69,11 @@ const VersionText = styled.a`
 `;
 
 const LogoImage = styled.img`
-  height: 34px;
-  width: 34px;
+  height: 28px;
+  width: 28px;
   border-radius: 6px;
   margin-right: 16px;
+  border: 1px solid #3f3f3f;
 `;
 
 /**
