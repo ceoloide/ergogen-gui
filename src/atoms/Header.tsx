@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Button from "./Button";
 import styled from "styled-components";
 import {useConfigContext} from "../context/ConfigContext";
@@ -45,7 +45,7 @@ const RightContainer = styled.div`
  */
 const ErgogenLogo = styled.div`
     display: flex;
-    height: 18px;
+    align-items: center;
 `;
 
 /**
@@ -66,6 +66,13 @@ const VersionText = styled.a`
     color: #28a745;
     text-decoration: none;
     align-items: center;
+`;
+
+const LogoImage = styled.img`
+  height: 34px;
+  width: 34px;
+  border-radius: 6px;
+  margin-right: 16px;
 `;
 
 /**
@@ -174,7 +181,12 @@ const Header = (): JSX.Element => {
         <HeaderContainer>
             <LeftContainer>
                 {/* <LeftPanelButton onClick={() => window.location.reload()}><span className="material-symbols-outlined">left_panel_open</span></LeftPanelButton> */}
-                <ErgogenLogo><AppName>Ergogen</AppName><VersionText href="https://github.com/ergogen/ergogen" target="_blank" rel="noreferrer">v4.1.0</VersionText></ErgogenLogo>
+                <ErgogenLogo>
+                    <Link to="/">
+                        <LogoImage src="ergogen.png" alt="Ergogen Logo" />
+                    </Link>
+                    <AppName>Ergogen</AppName><VersionText href="https://github.com/ergogen/ergogen" target="_blank" rel="noreferrer">v4.1.0</VersionText>
+                </ErgogenLogo>
             </LeftContainer>
             <RightContainer>
                 {location.pathname === '/' &&
