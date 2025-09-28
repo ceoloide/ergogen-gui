@@ -76,6 +76,11 @@ const LogoImage = styled.img`
   border: 1px solid #3f3f3f;
 `;
 
+const LogoTextContainer = styled.div`
+  display: flex;
+  align-items: baseline;
+`;
+
 /**
  * A styled anchor tag that functions as a link button.
  */
@@ -186,7 +191,10 @@ const Header = (): JSX.Element => {
                     <Link to="/">
                         <LogoImage src="ergogen.png" alt="Ergogen Logo" />
                     </Link>
-                    <AppName>Ergogen</AppName><VersionText href="https://github.com/ergogen/ergogen" target="_blank" rel="noreferrer">v4.1.0</VersionText>
+                    <LogoTextContainer>
+                        <AppName>Ergogen</AppName>
+                        <VersionText href="https://github.com/ergogen/ergogen" target="_blank" rel="noreferrer">v4.1.0</VersionText>
+                    </LogoTextContainer>
                 </ErgogenLogo>
             </LeftContainer>
             <RightContainer>
