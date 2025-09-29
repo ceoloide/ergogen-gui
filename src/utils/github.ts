@@ -10,6 +10,47 @@ export const getRawUrl = (url: string) => {
     return rawUrl;
 };
 
+const fetchConfigFromGist = async (url: string): Promise<string> => {
+    const urlObject = new URL(url);
+    const pathSegments = urlObject.pathname.split('/').filter(Boolean);
+    const gistId = pathSegments.pop();
+
+    if (!gistId) {
+        throw new Error('Invalid Gist URL');
+    }
+
+    const apiUrl = `https://api.github.com/gists/${gistId}`;
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch Gist information: ${response.statusText}`);
+    }
+
+    const gistData = await response.json();
+    const files = Object.values(gistData.files) as any[];
+
+    if (files.length === 0) {
+        throw new Error('Gist has no files');
+    }
+
+    // Prioritize YAML files
+    let file = files.find(f => f.filename.endsWith('.yaml') || f.filename.endsWith('.yml'));
+
+    // If no YAML file, take the first file
+    if (!file) {
+        file = files[0];
+    }
+
+    const rawUrl = file.raw_url;
+    const fileResponse = await fetch(rawUrl);
+
+    if (!fileResponse.ok) {
+        throw new Error(`Failed to fetch file content: ${fileResponse.statusText}`);
+    }
+
+    return fileResponse.text();
+}
+
 /**
  * Fetches a configuration file (`config.yaml`) from a given GitHub URL.
  * It handles repository root URLs and direct file URLs, automatically trying common branches ('main', 'master')
@@ -26,6 +67,10 @@ export const fetchConfigFromUrl = async (url: string): Promise<string> => {
         newUrl = `https://github.com/${newUrl}`;
     } else if (!newUrl.match(/^(https?:\/\/)/i)) {
         newUrl = `https://${newUrl}`;
+    }
+
+    if (newUrl.includes('gist.github.com')) {
+        return fetchConfigFromGist(newUrl);
     }
 
     const baseUrl = newUrl.endsWith('/') ? newUrl.slice(0, -1) : newUrl;

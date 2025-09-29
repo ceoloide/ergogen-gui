@@ -188,10 +188,10 @@ const Welcome = () => {
         </OptionBox>
         <OptionBox>
           <h2>From GitHub</h2>
-          <p>Link to a YAML config file on GitHub, or simply a repo like "user/repo".</p>
+          <p>Link to a YAML config file on GitHub, a Gist, or simply a repo like "user/repo".</p>
           <GitHubInputContainer>
             <Input
-              placeholder="github.com/ceoloide/corney-island"
+              placeholder="GitHub repo, Gist, or direct file URL"
               value={githubInput}
               onChange={(e) => setGithubInput(e.target.value)}
               disabled={isLoading}
