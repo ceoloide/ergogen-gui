@@ -290,6 +290,13 @@ const RightSplitPane = styled.div`
     position: relative;
 `;
 
+const DownloadsPane = styled.div`
+    padding-left: 1rem;
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+`;
+
 /**
  * Recursively finds a nested property within an object using a dot-separated string.
  * @param {string} resultToFind - The dot-separated path to the desired property (e.g., "outlines.top.svg").
@@ -503,9 +510,9 @@ const Ergogen = () => {
               <LeftSplitPane>
                 <StyledFilePreview data-testid="file-preview" previewExtension={preview.extension} previewKey={`${preview.key}-${configContext.resultsVersion}`} previewContent={preview.content} jscadPreview={configContext.jscadPreview} />
               </LeftSplitPane>
-              <RightSplitPane>
+              <DownloadsPane>
                 <Downloads setPreview={setPreviewKey} previewKey={preview.key} />
-              </RightSplitPane>
+              </DownloadsPane>
             </StyledSplit>
           </RightSplitPane>
         </StyledSplit>) : (

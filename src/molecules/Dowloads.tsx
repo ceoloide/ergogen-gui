@@ -23,7 +23,6 @@ const Title = styled.h3`
 const DownloadsContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
   overflow-y: auto;
 `;
 
