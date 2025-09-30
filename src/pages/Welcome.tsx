@@ -7,6 +7,7 @@ import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl } from '../utils/github';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import Settings from '../organisms/Settings';
 
 // Styled Components
 const WelcomePageWrapper = styled.div`
@@ -168,38 +169,46 @@ const Welcome = () => {
       });
   };
 
-  return (
-  <WelcomePageWrapper>
-    <WelcomeContainer>
-      <Header>Welcome to Ergogen Web UI</Header>
-      <SubHeader>
-        A web-based interface for Ergogen, the ergonomic keyboard generator.
-        <br />
-        Start a new design below.
-      </SubHeader>
+  if (configContext?.showSettings) {
+    return (
+      <WelcomePageWrapper>
+        <Settings />
+      </WelcomePageWrapper>
+    )
+  }
 
-      <OptionsContainer>
-        <OptionBox>
-          <h2>Start Fresh</h2>
-          <p>Begin with a completely blank slate.</p>
-          <Button onClick={() => handleSelectExample(EmptyYAML.value)}>
-            Empty Configuration
-          </Button>
-        </OptionBox>
-        <OptionBox>
-          <h2>From GitHub</h2>
-          <p>Link to a YAML config file on GitHub, or simply a repo like "user/repo".</p>
-          <GitHubInputContainer>
-            <Input
-              placeholder="github.com/ceoloide/corney-island"
-              value={githubInput}
-              onChange={(e) => setGithubInput(e.target.value)}
-              disabled={isLoading}
-            />
-            <Button onClick={handleGitHub} disabled={isLoading || !githubInput}>
-              {isLoading ? 'Loading...' : 'Load'}
+  return (
+    <WelcomePageWrapper>
+      <WelcomeContainer>
+        <Header>Welcome to Ergogen Web UI</Header>
+        <SubHeader>
+          A web-based interface for Ergogen, the ergonomic keyboard generator.
+          <br />
+          Start a new design below.
+        </SubHeader>
+
+        <OptionsContainer>
+          <OptionBox>
+            <h2>Start Fresh</h2>
+            <p>Begin with a completely blank slate.</p>
+            <Button onClick={() => handleSelectExample(EmptyYAML.value)}>
+              Empty Configuration
             </Button>
-          </GitHubInputContainer>
+          </OptionBox>
+          <OptionBox>
+            <h2>From GitHub</h2>
+            <p>Link to a YAML config file on GitHub, or simply a repo like "user/repo".</p>
+            <GitHubInputContainer>
+              <Input
+                placeholder="github.com/ceoloide/corney-island"
+                value={githubInput}
+                onChange={(e) => setGithubInput(e.target.value)}
+                disabled={isLoading}
+              />
+              <Button onClick={handleGitHub} disabled={isLoading || !githubInput}>
+                {isLoading ? 'Loading...' : 'Load'}
+              </Button>
+            </GitHubInputContainer>
           </OptionBox>
         </OptionsContainer>
 

@@ -4,21 +4,14 @@ import Split from "react-split";
 import yaml from 'js-yaml';
 
 import ConfigEditor from "./molecules/ConfigEditor";
-import InjectionEditor from "./molecules/InjectionEditor";
 import Downloads from "./molecules/Downloads";
-import Injections from "./molecules/Injections";
 import FilePreview from "./molecules/FilePreview";
 
 import { useConfigContext } from "./context/ConfigContext";
 import Button from "./atoms/Button";
 import DownloadButton from "./atoms/DownloadButton";
 import DownloadIcon from "./atoms/DownloadIcon";
-import Input from "./atoms/Input";
-import { Injection } from "./atoms/InjectionRow";
-import CreatableSelect from "react-select/creatable";
-import { StylesConfig } from 'react-select';
-import GenOption from "./atoms/GenOption";
-import { fetchConfigFromUrl } from "./utils/github";
+import Settings from "./organisms/Settings";
 
 /**
  * A container for a sub-header, designed to be displayed on smaller screens.
@@ -180,71 +173,6 @@ const StyledConfigEditor = styled(ConfigEditor)`
 `;
 
 /**
- * A container for settings and options.
- */
-const OptionContainer = styled.div`
-  display: inline-grid;
-  justify-content: space-between;
-`;
-
-/**
- * A styled CreatableSelect component from `react-select`.
- */
-const StyledSelect = styled(CreatableSelect)`
-    color: black;
-    white-space: nowrap;
-    width: 100%;
-    
-  @media (min-width: 640px) {
-    padding: 0 0 10px 0;
-  }
-`;
-
-/**
- * Custom styles object for the `react-select` component to match the application's theme.
- */
-const customSelectStyles: StylesConfig = {
-  // Styles for the main input control
-  control: (provided, state) => ({
-    ...provided,
-    border: '1px solid #3f3f3f',
-    color: 'white',
-    borderRadius: '6px',
-    minHeight: '34px',
-    height: '34px',
-    fontSize: '13px',
-    lineHeight: '16px',
-    backgroundColor: 'transparent',
-    fontFamily: '\'Roboto\', sans-serif',
-    '&:hover': {
-      backgroundColor: '3f3f3f',
-    },
-  }),
-
-  // Styles for the container that holds the value or placeholder
-  valueContainer: (provided) => ({
-    ...provided,
-    height: '34px',
-    padding: '0px 12px',
-  }),
-
-  // Styles for the text of the selected value
-  singleValue: (provided) => ({
-    ...provided,
-    color: 'white',
-    whiteSpace: 'nowrap',
-  }),
-
-  indicatorSeparator: () => ({
-    display: 'none', // Hides the vertical line separator
-  }),
-  indicatorsContainer: (provided) => ({
-    ...provided,
-    height: '34px',
-  }),
-};
-
-/**
  * A styled version of the `react-split` component, providing resizable panes.
  */
 // @ts-ignore
@@ -334,55 +262,10 @@ const Ergogen = () => {
   const [preview, setPreviewKey] = useState({ key: "demo.svg", extension: "svg", content: "" });
 
   /**
-   * State for the custom injection currently being edited in the settings panel.
-   * @type {Injection}
-   */
-  const [injectionToEdit, setInjectionToEdit] = useState({ key: -1, type: "", name: "", content: "" });
-
-  /**
    * State for the selected example from the dropdown menu.
    * @type {ConfigOption | null}
    */
   const configContext = useConfigContext();
-
-  /**
-   * Effect to handle changes to the injection being edited.
-   * It updates the main injection list in the context when an injection is created or modified.
-   */
-  useEffect(() => {
-    if (injectionToEdit.key === -1) return;
-    if (injectionToEdit.name === "") return;
-    if (injectionToEdit.content === "") return;
-    const editedInjection = [injectionToEdit.type, injectionToEdit.name, injectionToEdit.content];
-    let injections: string[][] = [];
-    if (Array.isArray(configContext?.injectionInput)) {
-      injections = [...configContext.injectionInput];
-    }
-    const nextIndex = injections.length;
-    if (nextIndex === 0 || nextIndex === injectionToEdit.key) {
-      // This is a new injection to add
-      injections.push(editedInjection);
-      setInjectionToEdit({ ...injectionToEdit, key: nextIndex });
-    } else {
-      const existingInjection = injections[injectionToEdit.key];
-      if (
-        existingInjection[0] === injectionToEdit.type
-        && existingInjection[1] === injectionToEdit.name
-        && existingInjection[2] === injectionToEdit.content
-      ) {
-        // Nothing was changed
-        return;
-      }
-      injections = injections.map((existingInjection, i) => {
-        if (i === injectionToEdit.key) {
-          return editedInjection;
-        } else {
-          return existingInjection;
-        }
-      })
-    }
-    configContext?.setInjectionInput(injections);
-  }, [configContext, injectionToEdit]);
 
   if (!configContext) return null;
   let result = null;
@@ -416,37 +299,6 @@ const Ergogen = () => {
   }
 
   /**
-   * Handles changes to the name input field for the injection being edited.
-   * @param {ChangeEvent<HTMLInputElement>} e - The input change event.
-   */
-  const handleInjectionNameChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newInjectionToEdit = {
-      ...injectionToEdit,
-      name: e.target.value
-    };
-    setInjectionToEdit(newInjectionToEdit);
-  }
-
-  /**
-   * Handles the deletion of a custom injection from the list.
-   * @param {Injection} injectionToDelete - The injection object to be deleted.
-   */
-  const handleDeleteInjection = (injectionToDelete: Injection) => {
-    if (!Array.isArray(configContext?.injectionInput)) return;
-    const injections = [...configContext.injectionInput].filter((e, i) => { return i !== injectionToDelete.key })
-    // @ts-ignore
-    configContext.setInjectionInput(injections);
-    // Reset or re-index the currently edited injection if it was affected by the deletion.
-    if (injectionToEdit.key === injectionToDelete.key) {
-      const emptyInjection = { key: -1, type: "", name: "", content: "" };
-      setInjectionToEdit(emptyInjection);
-    } else if (injectionToEdit.key >= injectionToDelete.key) {
-      const reIndexedInjection = { ...injectionToEdit, key: injectionToEdit.key - 1 };
-      setInjectionToEdit(reIndexedInjection);
-    }
-  }
-
-  /**
    * Triggers a browser download of the current configuration as a 'config.yaml' file.
    */
   const handleDownload = () => {
@@ -468,7 +320,7 @@ const Ergogen = () => {
     {configContext.error && <Error>{configContext.error?.toString()}</Error>}
     {!configContext.showSettings && <SubHeaderContainer>
               <OutlineIconButton className={configContext.showConfig ? 'active' : ''} onClick={() => configContext.setShowConfig(true)}>Config</OutlineIconButton>
-              <OutlineIconButton className={!configContext.showConfig ? 'active' : ''} onClick={() => configContext.setShowConfig(false)}>Outputs</OutlineIconButton>
+              <OutlineIconButton className={!config.showConfig ? 'active' : ''} onClick={() => configContext.setShowConfig(false)}>Outputs</OutlineIconButton>
             </SubHeaderContainer>}
     <FlexContainer>
       {!configContext.showSettings ?
@@ -509,33 +361,7 @@ const Ergogen = () => {
             </StyledSplit>
           </RightSplitPane>
         </StyledSplit>) : (
-          <StyledSplit
-            direction={"horizontal"}
-            sizes={[40, 60]}
-            minSize={100}
-            gutterSize={10}
-            snapOffset={0}
-          >
-            <LeftSplitPane>
-              <OptionContainer>
-                <h3>Options</h3>
-                <GenOption optionId={'autogen'} label={'Auto-generate'} setSelected={configContext.setAutoGen} checked={configContext.autoGen} />
-                <GenOption optionId={'debug'} label={'Debug'} setSelected={configContext.setDebug} checked={configContext.debug} />
-                <GenOption optionId={'autogen3d'} label={<>Auto-gen PCB, 3D <small>(slow)</small></>} setSelected={configContext.setAutoGen3D} checked={configContext.autoGen3D} />
-                <GenOption optionId={'kicanvasPreview'} label={<>KiCad Preview <small>(experimental)</small></>} setSelected={configContext.setKicanvasPreview} checked={configContext.kicanvasPreview} />
-                <GenOption optionId={'jscadPreview'} label={<>JSCAD Preview <small>(experimental)</small></>} setSelected={configContext.setJscadPreview} checked={configContext.jscadPreview} />
-              </OptionContainer>
-              <Injections setInjectionToEdit={setInjectionToEdit} deleteInjection={handleDeleteInjection} />
-            </LeftSplitPane>
-            <RightSplitPane>
-              <EditorContainer>
-                <h4>Footprint name</h4>
-                <Input value={injectionToEdit.name} onChange={handleInjectionNameChange} disabled={injectionToEdit.key === -1} />
-                <h4>Footprint code</h4>
-                <InjectionEditor injection={injectionToEdit} setInjection={setInjectionToEdit} options={{ readOnly: injectionToEdit.key === -1 }} />
-              </EditorContainer>
-            </RightSplitPane>
-          </StyledSplit>
+          <Settings />
         )}
     </FlexContainer></ErgogenWrapper>
   );
