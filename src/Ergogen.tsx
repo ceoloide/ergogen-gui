@@ -19,6 +19,7 @@ import CreatableSelect from "react-select/creatable";
 import { StylesConfig } from 'react-select';
 import GenOption from "./atoms/GenOption";
 import { fetchConfigFromUrl } from "./utils/github";
+import Banner from "./atoms/Banner";
 
 /**
  * A container for a sub-header, designed to be displayed on smaller screens.
@@ -130,38 +131,6 @@ const ErgogenWrapper = styled.div`
   height: 100%;
   overflow: hidden; 
   padding: 0;
-`;
-
-/**
- * A styled component for displaying error messages.
- */
-const Error = styled.div`
-  background: #ff6d6d;
-  color: #a31111;
-  border: 1px solid #a31111;
-  padding: 1em;
-  margin: 0.5em 0 0.5em 0;
-  width: 100%;
-  min-height: 4em;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-/**
- * A styled component for displaying warning messages.
- */
-const Warning = styled.div`
-  background: #ffc107;
-  color: #000000;
-  border: 1px solid #e0a800;
-  padding: 1em;
-  margin: 0.5em 0 0.5em 0;
-  width: 100%;
-  min-height: 4em;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 `;
 
 /**
@@ -389,6 +358,15 @@ const Ergogen = () => {
   }, [configContext, injectionToEdit]);
 
   if (!configContext) return null;
+
+  const handleWarningDismiss = () => {
+    configContext.setDeprecationWarning(null);
+  };
+
+  const handleErrorDismiss = () => {
+    configContext.setError(null);
+  };
+
   let result = null;
   if (configContext.results) {
     result = findResult(preview.key, configContext.results);
@@ -480,8 +458,22 @@ const Ergogen = () => {
                 </OutlineIconButton>
               )}
             </SubHeaderContainer>}
-    {configContext.deprecationWarning && <Warning>{configContext.deprecationWarning}</Warning>}
-    {configContext.error && <Error>{configContext.error?.toString()}</Error>}
+    {configContext.deprecationWarning && (
+      <Banner
+        type="warning"
+        message={configContext.deprecationWarning}
+        onDismiss={handleWarningDismiss}
+        topOffset={configContext.error ? '100px' : '20px'}
+      />
+    )}
+    {configContext.error && (
+      <Banner
+        type="error"
+        message={configContext.error.toString()}
+        onDismiss={handleErrorDismiss}
+        topOffset="20px"
+      />
+    )}
     <FlexContainer>
       {!configContext.showSettings ?
         (<StyledSplit
