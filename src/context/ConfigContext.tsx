@@ -4,6 +4,7 @@ import yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
+import { isDesktop } from '../utils/platform';
 
 /**
  * Props for the ConfigContextProvider component.
@@ -61,6 +62,8 @@ type Results = { [key: string]: any | Results };
  * @property {boolean} jscadPreview - Flag to enable the JSCAD 3D preview.
  * @property {Dispatch<SetStateAction<boolean>>} setJscadPreview - Function to toggle the JSCAD preview.
  * @property {string | null} experiment - The value of any 'exp' query parameter.
+ * @property {number} autogenDelay - The debounce delay for auto-generation.
+ * @property {Dispatch<SetStateAction<number>>} setAutogenDelay - Function to set the auto-generation delay.
  */
 type ContextProps = {
   configInput: string | undefined,
@@ -93,7 +96,9 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>,
   jscadPreview: boolean,
   setJscadPreview: Dispatch<SetStateAction<boolean>>,
-  experiment: string | null
+  experiment: string | null,
+  autogenDelay: number,
+  setAutogenDelay: Dispatch<SetStateAction<number>>
 };
 
 /**
@@ -149,6 +154,7 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
   const [autoGen3D, setAutoGen3D] = useState<boolean>(localStorageOrDefault("ergogen:config:autoGen3D", true));
   const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:kicanvasPreview", true));
   const [jscadPreview, setJscadPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:jscadPreview", false));
+  const [autogenDelay, setAutogenDelay] = useState<number>(localStorageOrDefault("ergogen:config:autoGenDebounce", isDesktop() ? 750 : 1250));
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
@@ -165,7 +171,8 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
     localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
     localStorage.setItem('ergogen:config:kicanvasPreview', JSON.stringify(kicanvasPreview));
     localStorage.setItem('ergogen:config:jscadPreview', JSON.stringify(jscadPreview));
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview]);
+    localStorage.setItem('ergogen:config:autoGenDebounce', JSON.stringify(autogenDelay));
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview, autogenDelay]);
 
   /**
    * Parses a string as either JSON or YAML.
@@ -280,7 +287,7 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
   /**
    * A debounced version of runGeneration for auto-generation.
    */
-  const processInput = useCallback(debounce(runGeneration, 300), [runGeneration]);
+  const processInput = useCallback(debounce(runGeneration, autogenDelay), [runGeneration, autogenDelay]);
 
   /**
    * An immediate version for the "Generate" button that cancels any pending auto-generations.
@@ -359,6 +366,8 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
     jscadPreview,
     setJscadPreview,
     experiment,
+    autogenDelay,
+    setAutogenDelay
   }), [
     configInput,
     setConfigInput,
@@ -391,6 +400,8 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
     jscadPreview,
     setJscadPreview,
     experiment,
+    autogenDelay,
+    setAutogenDelay
   ]);
 
   return (

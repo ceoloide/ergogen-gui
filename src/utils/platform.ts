@@ -63,3 +63,7 @@ export function isMobile() {
   }
   return false;
 }
+
+export function isDesktop() {
+  return !isMobile();
+}
