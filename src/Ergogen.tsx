@@ -18,6 +18,8 @@ import { Injection } from "./atoms/InjectionRow";
 import CreatableSelect from "react-select/creatable";
 import { StylesConfig } from 'react-select';
 import GenOption from "./atoms/GenOption";
+import InputOption from "./atoms/InputOption";
+import InputOption from "./atoms/InputOption";
 import { fetchConfigFromUrl } from "./utils/github";
 
 /**
@@ -532,6 +534,7 @@ const Ergogen = () => {
               <OptionContainer>
                 <h3>Options</h3>
                 <GenOption optionId={'autogen'} label={'Auto-generate'} setSelected={configContext.setAutoGen} checked={configContext.autoGen} />
+                <InputOption optionId={'autoGenDelay'} label={'Auto-generate delay (ms)'} setValue={configContext.setAutoGenDelay} value={configContext.autoGenDelay} type="number" />
                 <GenOption optionId={'debug'} label={'Debug'} setSelected={configContext.setDebug} checked={configContext.debug} />
                 <GenOption optionId={'autogen3d'} label={<>Auto-gen PCB, 3D <small>(slow)</small></>} setSelected={configContext.setAutoGen3D} checked={configContext.autoGen3D} />
                 <GenOption optionId={'kicanvasPreview'} label={<>KiCad Preview <small>(experimental)</small></>} setSelected={configContext.setKicanvasPreview} checked={configContext.kicanvasPreview} />

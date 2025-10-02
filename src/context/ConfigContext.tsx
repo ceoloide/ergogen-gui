@@ -4,6 +4,7 @@ import yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
+import {isMobile} from 'react-device-detect';
 
 /**
  * Props for the ConfigContextProvider component.
@@ -51,6 +52,8 @@ type Results = { [key: string]: any | Results };
  * @property {Dispatch<SetStateAction<boolean>>} setDebug - Function to set debug mode.
  * @property {boolean} autoGen - Flag to enable automatic regeneration of previews.
  * @property {Dispatch<SetStateAction<boolean>>} setAutoGen - Function to toggle auto-generation.
+ * @property {number} autoGenDelay - The debounce delay for auto-generation, in milliseconds.
+ * @property {Dispatch<SetStateAction<number>>} setAutoGenDelay - Function to set the auto-generation delay.
  * @property {boolean} autoGen3D - Flag to enable automatic regeneration of 3D previews.
  * @property {Dispatch<SetStateAction<boolean>>} setAutoGen3D - Function to toggle 3D auto-generation.
  * @property {boolean} kicanvasPreview - Flag to enable the KiCanvas preview for PCBs.
@@ -81,6 +84,8 @@ type ContextProps = {
   setDebug: Dispatch<SetStateAction<boolean>>,
   autoGen: boolean,
   setAutoGen: Dispatch<SetStateAction<boolean>>,
+  autoGenDelay: number,
+  setAutoGenDelay: Dispatch<SetStateAction<number>>,
   autoGen3D: boolean,
   setAutoGen3D: Dispatch<SetStateAction<boolean>>,
   kicanvasPreview: boolean,
@@ -140,6 +145,7 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
   const [resultsVersion, setResultsVersion] = useState<number>(0);
   const [debug, setDebug] = useState<boolean>(localStorageOrDefault("ergogen:config:debug", false));
   const [autoGen, setAutoGen] = useState<boolean>(localStorageOrDefault("ergogen:config:autoGen", true));
+  const [autoGenDelay, setAutoGenDelay] = useState<number>(localStorageOrDefault("ergogen:config:autoGenDelay", isMobile ? 1500 : 400));
   const [autoGen3D, setAutoGen3D] = useState<boolean>(localStorageOrDefault("ergogen:config:autoGen3D", true));
   const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:kicanvasPreview", true));
   const [jscadPreview, setJscadPreview] = useState<boolean>(localStorageOrDefault("ergogen:config:jscadPreview", false));
@@ -153,10 +159,11 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
   useEffect(() => {
     localStorage.setItem('ergogen:config:debug', JSON.stringify(debug));
     localStorage.setItem('ergogen:config:autoGen', JSON.stringify(autoGen));
+    localStorage.setItem('ergogen:config:autoGenDelay', JSON.stringify(autoGenDelay));
     localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
     localStorage.setItem('ergogen:config:kicanvasPreview', JSON.stringify(kicanvasPreview));
     localStorage.setItem('ergogen:config:jscadPreview', JSON.stringify(jscadPreview));
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview]);
+  }, [debug, autoGen, autoGenDelay, autoGen3D, kicanvasPreview, jscadPreview]);
 
   /**
    * Parses a string as either JSON or YAML.
@@ -270,8 +277,8 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
       setResults(results);
       setResultsVersion(v => v + 1)
 
-    }, 300),
-    [(window as any).ergogen]
+    }, autoGenDelay),
+    [(window as any).ergogen, autoGenDelay]
   );
 
   /**
@@ -329,6 +336,8 @@ const ConfigContextProvider = ({ configInput, setConfigInput, initialInjectionIn
         setDebug,
         autoGen,
         setAutoGen,
+        autoGenDelay,
+        setAutoGenDelay,
         autoGen3D,
         setAutoGen3D,
         kicanvasPreview,
