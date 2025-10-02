@@ -1,7 +1,6 @@
-import {Editor, useMonaco} from "@monaco-editor/react";
-import React, {useEffect} from "react";
+import {Editor} from "@monaco-editor/react";
+import React, {useCallback, useEffect} from "react";
 import {useConfigContext} from "../context/ConfigContext";
-import {registerErgogenLanguage} from "../utils/ergogen-language";
 
 /**
  * Defines the options for the Monaco Editor instance.
@@ -35,30 +34,24 @@ type Props = {
  */
 const ConfigEditor = ({className, options, "data-testid": dataTestId}: Props) => {
     const configContext = useConfigContext();
-    const monaco = useMonaco();
 
     // @ts-ignore
     const {configInput, setConfigInput} = configContext;
-
-    // Register the custom Ergogen language for syntax highlighting
-    useEffect(() => {
-        registerErgogenLanguage(monaco);
-    }, [monaco]);
 
     /**
      * Handles changes in the editor's content.
      * Updates the global configuration state if the input is valid.
      * @param {string | undefined} textInput - The new text content from the editor.
      */
-    const handleChange = async (textInput: string | undefined) => {
+    const handleChange = useCallback(async (textInput: string | undefined) => {
         if(!textInput) return null;
 
         setConfigInput(textInput);
-    }
+    }, [setConfigInput]);
 
     useEffect(() => {
         handleChange(configInput);
-    }, [configInput]);
+    }, [configInput, handleChange]);
 
     return (
         <div className={className} data-testid={dataTestId}>

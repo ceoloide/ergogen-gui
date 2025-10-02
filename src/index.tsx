@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import styled from "styled-components";
 import './index.css';
 import App from './App';
+import { loader } from '@monaco-editor/react';
+import { registerErgogenLanguage } from './utils/ergogen-language';
 
 /**
  * The main container for the entire application.
@@ -23,12 +25,16 @@ const AppContainer = styled.div`
 // wrapping it with the router.
 const container = document.getElementById('root');
 const root = createRoot(container!); // createRoot(container!) if you use TypeScript
-root.render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <AppContainer>
-        <App />
-      </AppContainer>
-    </BrowserRouter>
-  </React.StrictMode>
-);
+
+loader.init().then((monaco) => {
+  registerErgogenLanguage(monaco);
+  root.render(
+    <React.StrictMode>
+      <BrowserRouter>
+        <AppContainer>
+          <App />
+        </AppContainer>
+      </BrowserRouter>
+    </React.StrictMode>
+  );
+});
