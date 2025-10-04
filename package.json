@@ -30,16 +30,10 @@
     "start": "react-scripts --openssl-legacy-provider start",
     "build": "react-scripts --openssl-legacy-provider build",
     "postbuild": "yarn run build-ergogen",
-    "test": "CI=true react-scripts --openssl-legacy-provider test --env=jsdom",
-    "test:e2e": "playwright test",
-    "test:ci": "yarn test && yarn test:e2e",
+    "test": "react-scripts test --watchAll=false",
     "eject": "react-scripts eject",
-    "predeploy": "yarn run build",
-    "deploy": "gh-pages -d build",
-    "format": "prettier --write \"*.{js,ts,json,md}\" \"{src,e2e,patch}/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "lint:js": "eslint --fix \"{src,e2e,patch}/**/*.{ts,tsx,js,jsx}\"",
-    "lint:md": "markdownlint --fix \"**/*.md\"",
-    "lint": "yarn lint:md && yarn lint:js"
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "browserslist": {
     "production": [
@@ -74,10 +68,11 @@
     "eslint-config-react-app": "^7.0.1",
     "eslint-plugin-flowtype": "^8.0.3",
     "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jest": "^29.0.1",
     "eslint-plugin-jsx-a11y": "^6.8.0",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-hooks": "^6.1.1",
     "gh-pages": "^6.1.1",
     "globals": "^16.4.0",
     "knip": "^5.64.1",

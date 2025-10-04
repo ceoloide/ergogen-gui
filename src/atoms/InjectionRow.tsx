@@ -1,5 +1,4 @@
-import Button from './Button';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 
 /**
  * Interface representing a code injection.
@@ -22,11 +21,13 @@ export interface Injection {
  * @property {Injection} injection - The injection object to display.
  * @property {(injection: Injection) => void} setInjectionToEdit - Function to set the injection to be edited.
  * @property {(injection: Injection) => void} deleteInjection - Function to delete the injection.
+ * @property {string} previewKey - The key of the currently active preview.
  */
 type Props = {
   injection: Injection;
   setInjectionToEdit: (injection: Injection) => void;
   deleteInjection: (injection: Injection) => void;
+  previewKey: string;
 };
 
 /**
@@ -35,15 +36,21 @@ type Props = {
 const Row = styled.div`
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5em;
+  align-items: center;
+  padding-bottom: 0.75rem;
 `;
 
 /**
  * A styled div for displaying the injection name, with ellipsis for overflow.
  */
-const InjectionName = styled.div`
+const InjectionName = styled.div<{ $active: boolean }>`
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: ${(props) =>
+    props.$active ? '2px solid #28a745' : '2px solid transparent'};
+  border-top: 2px solid transparent;
 `;
 
 /**
@@ -51,13 +58,39 @@ const InjectionName = styled.div`
  */
 const Buttons = styled.div`
   white-space: nowrap;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+`;
+
+const buttonStyles = css`
+  background-color: #222222;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 16px;
+  gap: 6px;
+
+  .material-symbols-outlined {
+    font-size: 16px !important;
+  }
+
+  &:hover {
+    background-color: #3f3f3f;
+  }
 `;
 
 /**
- * A styled button with a right margin.
+ * A styled button with a dark background.
  */
-const StyledButton = styled(Button)`
-  margin-right: 0.5em;
+const StyledLinkButton = styled.a`
+  ${buttonStyles}
 `;
 
 /**
@@ -70,35 +103,39 @@ const InjectionRow = ({
   injection,
   setInjectionToEdit,
   deleteInjection,
+  previewKey,
 }: Props): JSX.Element => {
   return (
     <Row>
-      <InjectionName>{injection.name}</InjectionName>
+      <InjectionName
+        data-testid="injection-name"
+        $active={previewKey === injection.name}
+        onClick={() => setInjectionToEdit(injection)}
+      >
+        {injection.name}
+      </InjectionName>
       <Buttons>
-        <StyledButton size={'icon'} onClick={() => deleteInjection(injection)}>
-          {/* @ts-ignore */}
-          <span className="material-symbols-outlined">delete</span>
-        </StyledButton>
-        <StyledButton
-          size={'icon'}
-          onClick={() => setInjectionToEdit(injection)}
+        <StyledLinkButton
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            deleteInjection(injection);
+          }}
+          aria-label="delete injection"
         >
-          {/* @ts-ignore */}
-          <span className="material-symbols-outlined">edit</span>
-        </StyledButton>
-        <a
+          <span className="material-symbols-outlined">delete</span>
+        </StyledLinkButton>
+        <StyledLinkButton
           target={'_blank'}
           rel={'noreferrer'}
           download={`${injection.name.split('/').reverse()[0]}.js`}
           href={window.URL.createObjectURL(
             new Blob([injection.content], { type: 'octet/stream' })
           )}
+          aria-label="download injection"
         >
-          <Button size={'icon'}>
-            {/* @ts-ignore */}
-            <span className="material-symbols-outlined">download</span>
-          </Button>
-        </a>
+          <span className="material-symbols-outlined">download</span>
+        </StyledLinkButton>
       </Buttons>
     </Row>
   );

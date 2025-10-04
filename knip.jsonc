@@ -1,12 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": [
-    "src/index.tsx",
-    "**/*.test.{ts,tsx}"
-  ],
-  "project": [
-    "src/**/*.{ts,tsx}"
-  ],
+  "entry": ["src/index.tsx", "**/*.test.{ts,tsx}"],
+  "project": ["src/**/*.{ts,tsx}"],
   "ignoreDependencies": [
     "@babel/plugin-proposal-private-property-in-object",
     "@testing-library/jest-dom",
@@ -21,6 +16,6 @@
     "eslint-plugin-import",
     "eslint-plugin-jsx-a11y",
     "eslint-plugin-prettier",
-    "markdownlint"
-  ]
+    "markdownlint",
+  ],
 }

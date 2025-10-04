@@ -46,6 +46,7 @@ const GenOption = ({
         id={optionId}
         checked={checked}
         onChange={(e) => setSelected(e.target.checked)}
+        data-testid={`option-${optionId}`}
       />
       <label htmlFor={optionId}>{label}</label>
     </OptionContainer>

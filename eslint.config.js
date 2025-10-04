@@ -4,6 +4,7 @@ import reactRecommended from 'eslint-plugin-react/configs/recommended.js';
 import prettierConfig from 'eslint-config-prettier';
 import eslint from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
+import jest from 'eslint-plugin-jest';
 
 export default tseslint.config(
   {
@@ -27,8 +28,8 @@ export default tseslint.config(
       'react-hooks': reactHooks,
     },
     rules: {
-      // 'react-hooks/rules-of-hooks': 'error',
-      // 'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       'react/react-in-jsx-scope': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -43,6 +44,16 @@ export default tseslint.config(
       globals: {
         ...globals.browser,
         ...globals.node,
+      },
+    },
+  },
+  {
+    files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.js'],
+    ...jest.configs['flat/recommended'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+        ...globals.browser,
       },
     },
   }

@@ -15,6 +15,9 @@ import { isMacOS } from './utils/platform';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
 import GenOption from './atoms/GenOption';
+import OutlineIconButton from './atoms/OutlineIconButton';
+import GrowButton from './atoms/GrowButton';
+import Title from './atoms/Title';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -70,39 +73,6 @@ const Spacer = styled.div`
 `;
 
 /**
- * A styled button with an outline, used for secondary actions.
- */
-const OutlineIconButton = styled.button`
-    background-color: transparent;
-    transition: color .15s ease-in-out,
-    background-color .15s ease-in-out,
-    border-color .15s ease-in-out,
-    box-shadow .15s ease-in-out;
-    border: 1px solid #3f3f3f;
-    border-radius: 6px;
-    color: white;
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    text-decoration: none;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 16px;
-    gap: 6px
-    height: 34px;
-    font-family: 'Roboto', sans-serif;
-
-    .material-symbols-outlined {
-        font-size: 16px !important;
-    }
-
-    &:hover,
-    &.active {
-        background-color: #3f3f3f;
-    }
-`;
-
-/**
  * A styled button with a green background, used for primary actions on mobile.
  */
 const GenerateIconButton = styled.button`
@@ -152,33 +122,6 @@ const ButtonContainer = styled.div`
 
   @media (max-width: 639px) {
     display: none;
-  }
-`;
-
-/**
- * A button that expands to fill the available horizontal space.
- */
-const GrowButton = styled.button`
-  background-color: #239923;
-  transition: background-color 0.15s ease-in-out;
-  border: none;
-  border-radius: 6px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  cursor: pointer;
-  height: 34px;
-  font-family: 'Roboto', sans-serif;
-  flex-grow: 1;
-
-  .material-symbols-outlined {
-    font-size: 16px !important;
-  }
-
-  &:hover {
-    background-color: #1e8e1e;
   }
 `;
 
@@ -442,7 +385,6 @@ const Ergogen = () => {
     const injections = [...configContext.injectionInput].filter((e, i) => {
       return i !== injectionToDelete.key;
     });
-    // @ts-ignore
     configContext.setInjectionInput(injections);
     // Reset or re-index the currently edited injection if it was affected by the deletion.
     if (injectionToEdit.key === injectionToDelete.key) {
@@ -606,7 +548,7 @@ const Ergogen = () => {
           >
             <LeftSplitPane>
               <OptionContainer>
-                <h3>Options</h3>
+                <Title>Options</Title>
                 <GenOption
                   optionId={'autogen'}
                   label={'Auto-generate'}
@@ -653,17 +595,19 @@ const Ergogen = () => {
               <Injections
                 setInjectionToEdit={setInjectionToEdit}
                 deleteInjection={handleDeleteInjection}
+                injectionToEdit={injectionToEdit}
               />
             </LeftSplitPane>
             <RightSplitPane>
               <EditorContainer>
-                <h4>Footprint name</h4>
+                <Title as="h4">Footprint name</Title>
                 <Input
                   value={injectionToEdit.name}
                   onChange={handleInjectionNameChange}
                   disabled={injectionToEdit.key === -1}
+                  data-testid="footprint-name-input"
                 />
-                <h4>Footprint code</h4>
+                <Title as="h4">Footprint code</Title>
                 <InjectionEditor
                   injection={injectionToEdit}
                   setInjection={setInjectionToEdit}
