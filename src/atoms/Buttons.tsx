@@ -178,6 +178,35 @@ const GenerateButton = styled.button<Props>`
   ${generateButtonStyles}
 `;
 
+const downloadRowButtonStyles = css`
+  background-color: #222222;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 16px;
+  gap: 6px;
+  height: 34px;
+  font-family: 'Roboto', sans-serif;
+
+  .material-symbols-outlined {
+    font-size: 16px !important;
+  }
+
+  &:hover {
+    background-color: #3f3f3f;
+  }
+`;
+
+const DownloadRowButton = styled.a<Props>`
+  ${downloadRowButtonStyles}
+`;
+
 export {
   Button,
   DownloadButton,
@@ -185,4 +214,5 @@ export {
   AccentButton,
   DarkLinkButton,
   GenerateButton,
+  DownloadRowButton,
 };

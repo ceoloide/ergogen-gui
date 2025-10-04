@@ -1,5 +1,5 @@
 import styled from 'styled-components';
-import { DarkLinkButton } from './Buttons';
+import { DownloadRowButton } from './Buttons';
 
 export interface Preview {
   extension: string;
@@ -77,9 +77,9 @@ const DownloadRow = ({
         {fileName}.{extension}
       </FileName>
       <Buttons>
-        <DarkLinkButton onClick={handleDownload}>
+        <DownloadRowButton onClick={handleDownload}>
           <span className="material-symbols-outlined">download</span>
-        </DarkLinkButton>
+        </DownloadRowButton>
       </Buttons>
     </Row>
   );
