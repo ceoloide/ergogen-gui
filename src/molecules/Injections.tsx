@@ -1,5 +1,5 @@
 import InjectionRow from '../atoms/InjectionRow';
-import Button from '../atoms/Button';
+import { Button } from '../atoms/Buttons';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
