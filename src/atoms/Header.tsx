@@ -3,10 +3,7 @@ import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import DiscordIcon from './DiscordIcon';
 import GithubIcon from './GithubIcon';
-import {
-  AccentButton,
-  OutlineLinkButton,
-} from './Buttons';
+import { AccentButton, OutlineButton } from './Buttons';
 
 const HeaderContainer = styled.header`
   width: 100%;
@@ -58,12 +55,11 @@ const VersionText = styled.a`
   align-items: center;
 `;
 
-const DocsButton = styled(OutlineLinkButton)`
+const DocsButton = styled(OutlineButton)`
   @media (max-width: 639px) {
     .material-symbols-outlined {
       margin-right: 0;
     }
-
     span:not(.material-symbols-outlined) {
       display: none;
     }
@@ -121,6 +117,7 @@ const Header = (): JSX.Element => {
           </AccentButton>
         )}
         <DocsButton
+          as="a"
           href="https://docs.ergogen.xyz/"
           target="_blank"
           rel="noreferrer"
@@ -128,25 +125,27 @@ const Header = (): JSX.Element => {
           <span className="material-symbols-outlined">description</span>
           <span>Docs</span>
         </DocsButton>
-        <OutlineLinkButton
+        <OutlineButton
+          as="a"
           href="https://discord.gg/nbKcAZB"
           target="_blank"
           rel="noreferrer"
         >
           <DiscordIcon />
-        </OutlineLinkButton>
-        <OutlineLinkButton
+        </OutlineButton>
+        <OutlineButton
+          as="a"
           href="https://github.com/ceoloide/ergogen-gui"
           target="_blank"
           rel="noreferrer"
         >
           <GithubIcon />
-        </OutlineLinkButton>
-        <OutlineLinkButton as="button" onClick={toggleSettings}>
+        </OutlineButton>
+        <OutlineButton onClick={toggleSettings}>
           <span className="material-symbols-outlined">
             {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
           </span>
-        </OutlineLinkButton>
+        </OutlineButton>
       </RightContainer>
     </HeaderContainer>
   );

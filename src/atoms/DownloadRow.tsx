@@ -59,6 +59,8 @@ const DownloadRow = ({
     element.download = `${fileName}.${extension}`;
     document.body.appendChild(element);
     element.click();
+    URL.revokeObjectURL(element.href);
+    document.body.removeChild(element);
   };
 
   const handlePreview = () => {

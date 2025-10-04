@@ -15,9 +15,8 @@ import { isMacOS } from './utils/platform';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
 import GenOption from './atoms/GenOption';
-import { OutlineLinkButton, GenerateButton } from './atoms/Buttons';
+import { OutlineButton, GenerateButton } from './atoms/Buttons';
 
-// Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
   display: inline-flex;
   align-items: center;
@@ -34,7 +33,7 @@ const ShortcutKey = styled.span`
   box-sizing: border-box;
   user-select: none;
 `;
-// Utility to get the correct shortcut for the user's OS
+
 function getShortcutLabel() {
   return (
     <>
@@ -97,9 +96,6 @@ const ErgogenWrapper = styled.div`
   padding: 0;
 `;
 
-/**
- * A styled version of the FilePreview component.
- */
 const StyledFilePreview = styled(FilePreview)`
   height: 100%;
 `;
@@ -109,25 +105,16 @@ const ScrollablePanelContainer = styled.div`
   overflow-y: auto;
 `;
 
-/**
- * A styled version of the ConfigEditor component.
- */
 const StyledConfigEditor = styled(ConfigEditor)`
   position: relative;
   flex-grow: 1;
 `;
 
-/**
- * A container for settings and options.
- */
 const OptionContainer = styled.div`
   display: inline-grid;
   justify-content: space-between;
 `;
 
-/**
- * A styled version of the `react-split` component, providing resizable panes.
- */
 const StyledSplit = styled(Split)`
   width: 100%;
   height: 100%;
@@ -137,7 +124,6 @@ const StyledSplit = styled(Split)`
   .gutter {
     background-color: #3f3f3f;
     border-radius: 0.15rem;
-
     background-repeat: no-repeat;
     background-position: 50%;
 
@@ -152,9 +138,6 @@ const StyledSplit = styled(Split)`
   }
 `;
 
-/**
- * A container for the left pane in a split layout.
- */
 const LeftSplitPane = styled.div`
   position: relative;
   @media (min-width: 640px) {
@@ -162,19 +145,10 @@ const LeftSplitPane = styled.div`
   }
 `;
 
-/**
- * A container for the right pane in a split layout.
- */
 const RightSplitPane = styled.div`
   position: relative;
 `;
 
-/**
- * Recursively finds a nested property within an object using a dot-separated string.
- * @param {string} resultToFind - The dot-separated path to the desired property (e.g., "outlines.top.svg").
- * @param {any} resultsToSearch - The object to search within.
- * @returns {any | undefined} The found property value, or undefined if not found.
- */
 const findResult = (
   resultToFind: string,
   resultsToSearch: any
@@ -189,37 +163,19 @@ const findResult = (
     : undefined;
 };
 
-/**
- * A flex container that allows its children to wrap and grow.
- */
 const FlexContainer = styled.div`
   display: flex;
   height: 100%;
   width: 100%;
 `;
 
-/**
- * The main component of the Ergogen application.
- * It orchestrates the layout, state management, and interaction between the config editor,
- * previews, download lists, and settings panels.
- *
- * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
- */
 const Ergogen = () => {
-  /**
-   * State for the currently displayed file preview.
-   * @type {{key: string, extension: string, content: string}}
-   */
   const [preview, setPreviewKey] = useState({
     key: 'demo.svg',
     extension: 'svg',
     content: '',
   });
 
-  /**
-   * State for the custom injection currently being edited in the settings panel.
-   * @type {Injection}
-   */
   const [injectionToEdit, setInjectionToEdit] = useState({
     key: -1,
     type: '',
@@ -227,10 +183,6 @@ const Ergogen = () => {
     content: '',
   });
 
-  /**
-   * State for the selected example from the dropdown menu.
-   * @type {ConfigOption | null}
-   */
   const configContext = useConfigContext();
 
   useHotkeys(
@@ -250,10 +202,6 @@ const Ergogen = () => {
     }
   );
 
-  /**
-   * Effect to handle changes to the injection being edited.
-   * It updates the main injection list in the context when an injection is created or modified.
-   */
   useEffect(() => {
     if (injectionToEdit.key === -1) return;
     if (injectionToEdit.name === '') return;
@@ -269,7 +217,6 @@ const Ergogen = () => {
     }
     const nextIndex = injections.length;
     if (nextIndex === 0 || nextIndex === injectionToEdit.key) {
-      // This is a new injection to add
       injections.push(editedInjection);
       setInjectionToEdit({ ...injectionToEdit, key: nextIndex });
     } else {
@@ -279,7 +226,6 @@ const Ergogen = () => {
         existingInjection[1] === injectionToEdit.name &&
         existingInjection[2] === injectionToEdit.content
       ) {
-        // Nothing was changed
         return;
       }
       injections = injections.map((existingInjection, i) => {
@@ -297,14 +243,12 @@ const Ergogen = () => {
   let result = null;
   if (configContext.results) {
     result = findResult(preview.key, configContext.results);
-    // Fallback to the default demo SVG if the current preview key is not found.
     if (result === undefined && preview.key !== 'demo.svg') {
       preview.key = 'demo.svg';
       preview.extension = 'svg';
       result = findResult(preview.key, configContext.results);
     }
 
-    // Process the result based on the file extension to format it for the preview component.
     switch (preview.extension) {
       case 'svg':
       case 'kicad_pcb':
@@ -324,10 +268,6 @@ const Ergogen = () => {
     }
   }
 
-  /**
-   * Handles changes to the name input field for the injection being edited.
-   * @param {ChangeEvent<HTMLInputElement>} e - The input change event.
-   */
   const handleInjectionNameChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newInjectionToEdit = {
       ...injectionToEdit,
@@ -336,18 +276,12 @@ const Ergogen = () => {
     setInjectionToEdit(newInjectionToEdit);
   };
 
-  /**
-   * Handles the deletion of a custom injection from the list.
-   * @param {Injection} injectionToDelete - The injection object to be deleted.
-   */
   const handleDeleteInjection = (injectionToDelete: Injection) => {
     if (!Array.isArray(configContext?.injectionInput)) return;
     const injections = [...configContext.injectionInput].filter((e, i) => {
       return i !== injectionToDelete.key;
     });
-    // @ts-ignore
     configContext.setInjectionInput(injections);
-    // Reset or re-index the currently edited injection if it was affected by the deletion.
     if (injectionToEdit.key === injectionToDelete.key) {
       const emptyInjection = { key: -1, type: '', name: '', content: '' };
       setInjectionToEdit(emptyInjection);
@@ -360,9 +294,6 @@ const Ergogen = () => {
     }
   };
 
-  /**
-   * Triggers a browser download of the current configuration as a 'config.yaml' file.
-   */
   const handleDownload = () => {
     if (configContext.configInput === undefined) {
       return;
@@ -381,20 +312,18 @@ const Ergogen = () => {
     <ErgogenWrapper>
       {!configContext.showSettings && (
         <SubHeaderContainer>
-          <OutlineLinkButton
-            as="button"
+          <OutlineButton
             className={configContext.showConfig ? 'active' : ''}
             onClick={() => configContext.setShowConfig(true)}
           >
             Config
-          </OutlineLinkButton>
-          <OutlineLinkButton
-            as="button"
+          </OutlineButton>
+          <OutlineButton
             className={!configContext.showConfig ? 'active' : ''}
             onClick={() => configContext.setShowConfig(false)}
           >
             Outputs
-          </OutlineLinkButton>
+          </OutlineButton>
           <Spacer />
           {configContext.showConfig && (
             <>
@@ -409,14 +338,13 @@ const Ergogen = () => {
               >
                 <span className="material-symbols-outlined">refresh</span>
               </GenerateButton>
-              <OutlineLinkButton as="button" onClick={handleDownload}>
+              <OutlineButton onClick={handleDownload}>
                 <span className="material-symbols-outlined">download</span>
-              </OutlineLinkButton>
+              </OutlineButton>
             </>
           )}
           {!configContext.showConfig && (
-            <OutlineLinkButton
-              as="button"
+            <OutlineButton
               onClick={() =>
                 configContext.setShowDownloads(!configContext.showDownloads)
               }
@@ -426,7 +354,7 @@ const Ergogen = () => {
                   ? 'expand_content'
                   : 'collapse_content'}
               </span>
-            </OutlineLinkButton>
+            </OutlineButton>
           )}
         </SubHeaderContainer>
       )}
@@ -467,9 +395,9 @@ const Ergogen = () => {
                       <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
                     </span>
                   </GrowButton>
-                  <OutlineLinkButton as="button" onClick={handleDownload}>
+                  <OutlineButton onClick={handleDownload}>
                     <span className="material-symbols-outlined">download</span>
-                  </OutlineLinkButton>
+                  </OutlineButton>
                 </ButtonContainer>
               </EditorContainer>
             </LeftSplitPane>
