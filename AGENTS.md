@@ -16,10 +16,22 @@ This project is a React-based web interface for the [Ergogen](https://github.com
 - Try to make tests fast, for example by mocking heavy operations or other similar things when appropriate.
 - Use `yarn knip` to tidy up dependencies before finishing. Always ignore unusued files warning for files in the `patch` of `public` directories.
 - Use `yarn format` and `yarn lint` to check and fix formatting errors before finishing and committing files. You MUST always run `yarn format` before committing any file.
+- Global test setup for Jest should be placed in `src/setupTests.js`. This file is automatically loaded by the test runner and does not require manual configuration.
 
 ## Design principles
 
 - When writing unit tests, follow the "Arrange, Act, Assert" pattern and clearly delineate the three.
+- Components should be accessible. Use semantic HTML and ARIA attributes (e.g., `aria-label`) where appropriate to ensure a good user experience for everyone, including users of assistive technologies. This also improves testability.
+- Tests should be robust and user-centric. Prefer selecting elements by user-facing attributes (like accessible name, text, or role) over implementation details (like class names or DOM structure). Use `data-testid` for elements where no other stable, user-facing selector is available.
+
+## Development environment
+
+### Linting and formatting
+
+- The project uses ESLint for linting and Prettier for formatting.
+- All ESLint configuration is managed in the `eslint.config.js` file at the root of the project. This is the single source of truth for linting rules.
+- The `eslintConfig` key in `package.json` is deprecated for this project and must not be used.
+- The configuration in `eslint.config.js` includes specific settings for test files (e.g., `*.test.tsx`, `setupTests.js`) to provide the necessary Jest globals and rules.
 
 ## Coding principles
 
@@ -28,3 +40,50 @@ This project is a React-based web interface for the [Ergogen](https://github.com
   - The change addresses **just one thing**. This is usally just one part of a feature, rather than the whole feature at once.
   - The change should include related test code.
   - The commit description should explain what the committed changes aim to address. Avoid repeating the same general context, and focus on information that makes it possible for the reviewer to understand the change and the reasoning behind it. Briefly call out things that will be implemented at a later stage, but avoid including too much future planning.
+
+## Knowledge base
+
+Your task is to record important information in this file (`AGENTS.md`), which acts as a knowledge base. Analyze your chat history and `AGENTS.md` sections to propose changes, adidtions, or deletions. These changes will inform future actions in the same repository for the same user.
+
+### Categories
+
+When creating proposals for the knowledge base, primarily focus on extracting information from these categories:
+
+- **User Preferences & Instructions**
+  - **Directives**: Record direct, persistent commands from the user that shold act as rules for future tasks (e.g., "Always add type hints", "Do not run tests unless asked").
+  - **Style & Conventions**: Document explicity preferences for programming languages, frameworks, libraries, coding styles, and formatting rules. Not they shouldn't be task specific but things that can apply for entire codebase.
+- **Repository & Project Context**
+  - **Purpose & Architecture**: Summarize the repository's primary purpose and architectural patterns (e.g., "microservices architecture").
+- **Environment & Execution**
+  - **Setup Commands**: Detail the exact, sequential commands required to set up the development environment and install all dependencies if they are proven useful.
+  - **Execution Commands**: List the commands needed to build, test, and run the project (e.g., `yarn build`, `yarn test`) if they are proven useful.
+
+### Guiding Principles
+
+- **Concise & Factual**: Each proposal must be a concise, verifiable fact. Avoid assumptions. Ask the user if you need additional details.
+- **Quality over quantity**: Be extremely cautious when creating proposals. Prioritize creating fewer, high-quality proposal for the knowledge base over a wide range of mediocre ones. When in doubt about whether a piece of information should be stored, do not store it.
+- **Filter for long-term relevance**: Record information that has long-term relevance. DO NOT record temporary, task-specific details or the exact feature request.
+  - **Example**:
+    - **DO record**: "The project uses Yarn for dependency management"
+    - **DO NOT record**: "The user wants to refactor button style rules"
+    - **DO NOT record**: "I have completed the task to create a new welcome page for the web app."
+
+## Future Tasks
+
+### TASK-001: Eliminate Magic Values in Tests
+
+**Context:** During a refactoring of the `InjectionRow.tsx` component, the test suite was improved to check for the presence of a green highlight when a row is active. The test currently asserts that the border color is a hardcoded hex value (`#28a745`).
+
+**Task:** Refactor the test to remove this "magic value." This can be achieved by defining theme colors in a central location (e.g., a `theme.ts` file), exporting them, and importing the color variable into both the `InjectionRow.tsx` component and its test file, `InjectionRow.test.tsx`.
+
+### TASK-002: Adopt a Stricter TDD Process
+
+**Context:** The development process for recent changes has been more "test-supported refactoring" than pure Test-Driven Development (TDD). While tests were written and improved, they were not always written _before_ the implementation.
+
+**Task:** For all future changes, adhere strictly to the "Red-Green-Refactor" TDD cycle. Before implementing any new feature or bug fix, first write a failing test that clearly defines the expected outcome. Then, write the minimum amount of code required to make the test pass. Finally, refactor the code while ensuring the tests continue to pass.
+
+### TASK-003: Add Test Coverage for Download Functionality
+
+**Context:** The test suite for the `InjectionRow.tsx` component currently lacks coverage for the download link. While other interactions (delete, select) are tested, there is no test to verify that the download link is correctly configured.
+
+**Task:** Add a test to `InjectionRow.test.tsx` that asserts the download link has the correct `aria-label`, `download` filename, and `href` attributes. This will prevent regressions in the download functionality.
