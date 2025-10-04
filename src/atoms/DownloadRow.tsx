@@ -1,27 +1,12 @@
 import styled from 'styled-components';
+import { DarkLinkButton } from './Buttons';
 
-/**
- * Interface for a preview object.
- * @interface Preview
- * @property {string} extension - The file extension of the preview content.
- * @property {string} key - A unique key for the preview.
- * @property {string} content - The content of the preview.
- */
 export interface Preview {
   extension: string;
   key: string;
   content: string;
 }
 
-/**
- * Props for the DownloadRow component.
- * @typedef {object} Props
- * @property {string} fileName - The name of the file to be downloaded.
- * @property {string} extension - The file extension.
- * @property {string} content - The content of the file.
- * @property {Preview} [preview] - An optional preview object. If provided, a preview button is shown.
- * @property {(preview: Preview) => void} setPreview - Function to set the active preview.
- */
 type Props = {
   fileName: string;
   extension: string;
@@ -31,9 +16,6 @@ type Props = {
   previewKey: string;
 };
 
-/**
- * A styled div for the row layout.
- */
 const Row = styled.div`
   display: flex;
   justify-content: space-between;
@@ -45,9 +27,6 @@ const Row = styled.div`
   }
 `;
 
-/**
- * A styled div for displaying the file name, with ellipsis for overflow.
- */
 const FileName = styled.div<{ active: boolean; hasPreview: boolean }>`
   overflow: hidden;
   text-overflow: ellipsis;
@@ -58,9 +37,6 @@ const FileName = styled.div<{ active: boolean; hasPreview: boolean }>`
   border-top: 2px solid transparent;
 `;
 
-/**
- * A styled div to contain the action buttons.
- */
 const Buttons = styled.div`
   white-space: nowrap;
   display: flex;
@@ -68,40 +44,6 @@ const Buttons = styled.div`
   align-items: center;
 `;
 
-/**
- * A styled anchor tag that looks like a button.
- * Used for preview and download actions.
- */
-const StyledLinkButton = styled.a`
-    background-color: #222222;
-    border: none;
-    border-radius: 6px;
-    color: white;
-    display: flex;
-    align-items: center;
-    padding: 4px 6px;
-    text-decoration: none;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 16px;
-    gap: 6px
-    height: 34px;
-
-    .material-symbols-outlined {
-        font-size: 16px !important;
-    }
-
-    &:hover {
-        background-color: #3f3f3f;
-    }
-`;
-
-/**
- * A component that displays a file name and provides buttons for previewing and downloading.
- *
- * @param {Props} props - The props for the component.
- * @returns {JSX.Element} A row with the file name and action buttons.
- */
 const DownloadRow = ({
   fileName,
   extension,
@@ -135,9 +77,9 @@ const DownloadRow = ({
         {fileName}.{extension}
       </FileName>
       <Buttons>
-        <StyledLinkButton onClick={handleDownload}>
+        <DarkLinkButton onClick={handleDownload}>
           <span className="material-symbols-outlined">download</span>
-        </StyledLinkButton>
+        </DarkLinkButton>
       </Buttons>
     </Row>
   );

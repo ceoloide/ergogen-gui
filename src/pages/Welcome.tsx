@@ -5,7 +5,7 @@ import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl } from '../utils/github';
-import Button from '../atoms/Button';
+import { Button } from '../atoms/Buttons';
 import Input from '../atoms/Input';
 
 // Styled Components

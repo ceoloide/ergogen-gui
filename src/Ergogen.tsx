@@ -15,6 +15,7 @@ import { isMacOS } from './utils/platform';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
 import GenOption from './atoms/GenOption';
+import { OutlineLinkButton, GenerateButton } from './atoms/Buttons';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -42,9 +43,6 @@ function getShortcutLabel() {
   );
 }
 
-/**
- * A container for a sub-header, designed to be displayed on smaller screens.
- */
 const SubHeaderContainer = styled.div`
   width: 100%;
   height: 3em;
@@ -62,76 +60,10 @@ const SubHeaderContainer = styled.div`
   }
 `;
 
-/**
- * A spacer component that grows to fill available space in a flex container.
- */
 const Spacer = styled.div`
   flex-grow: 1;
 `;
 
-/**
- * A styled button with an outline, used for secondary actions.
- */
-const OutlineIconButton = styled.button`
-    background-color: transparent;
-    transition: color .15s ease-in-out,
-    background-color .15s ease-in-out,
-    border-color .15s ease-in-out,
-    box-shadow .15s ease-in-out;
-    border: 1px solid #3f3f3f;
-    border-radius: 6px;
-    color: white;
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    text-decoration: none;
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 16px;
-    gap: 6px
-    height: 34px;
-    font-family: 'Roboto', sans-serif;
-
-    .material-symbols-outlined {
-        font-size: 16px !important;
-    }
-
-    &:hover,
-    &.active {
-        background-color: #3f3f3f;
-    }
-`;
-
-/**
- * A styled button with a green background, used for primary actions on mobile.
- */
-const GenerateIconButton = styled.button`
-  background-color: #239923;
-  transition: background-color 0.15s ease-in-out;
-  border: none;
-  border-radius: 6px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  cursor: pointer;
-  height: 34px;
-  font-family: 'Roboto', sans-serif;
-  padding: 8px 12px !important;
-
-  .material-symbols-outlined {
-    font-size: 16px !important;
-  }
-
-  &:hover {
-    background-color: #1e8e1e;
-  }
-`;
-
-/**
- * A container for editor components, ensuring it fills available space.
- */
 const EditorContainer = styled.div`
   position: relative;
   height: 100%;
@@ -141,9 +73,6 @@ const EditorContainer = styled.div`
   flex-grow: 1;
 `;
 
-/**
- * A container for action buttons, hidden on smaller screens.
- */
 const ButtonContainer = styled.div`
   display: flex;
   gap: 10px;
@@ -155,36 +84,10 @@ const ButtonContainer = styled.div`
   }
 `;
 
-/**
- * A button that expands to fill the available horizontal space.
- */
-const GrowButton = styled.button`
-  background-color: #239923;
-  transition: background-color 0.15s ease-in-out;
-  border: none;
-  border-radius: 6px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
-  cursor: pointer;
-  height: 34px;
-  font-family: 'Roboto', sans-serif;
+const GrowButton = styled(GenerateButton)`
   flex-grow: 1;
-
-  .material-symbols-outlined {
-    font-size: 16px !important;
-  }
-
-  &:hover {
-    background-color: #1e8e1e;
-  }
 `;
 
-/**
- * The main wrapper for the entire Ergogen application UI.
- */
 const ErgogenWrapper = styled.div`
   display: flex;
   flex-direction: column;
@@ -478,22 +381,24 @@ const Ergogen = () => {
     <ErgogenWrapper>
       {!configContext.showSettings && (
         <SubHeaderContainer>
-          <OutlineIconButton
+          <OutlineLinkButton
+            as="button"
             className={configContext.showConfig ? 'active' : ''}
             onClick={() => configContext.setShowConfig(true)}
           >
             Config
-          </OutlineIconButton>
-          <OutlineIconButton
+          </OutlineLinkButton>
+          <OutlineLinkButton
+            as="button"
             className={!configContext.showConfig ? 'active' : ''}
             onClick={() => configContext.setShowConfig(false)}
           >
             Outputs
-          </OutlineIconButton>
+          </OutlineLinkButton>
           <Spacer />
           {configContext.showConfig && (
             <>
-              <GenerateIconButton
+              <GenerateButton
                 onClick={() =>
                   configContext.generateNow(
                     configContext.configInput,
@@ -503,14 +408,15 @@ const Ergogen = () => {
                 }
               >
                 <span className="material-symbols-outlined">refresh</span>
-              </GenerateIconButton>
-              <OutlineIconButton onClick={handleDownload}>
+              </GenerateButton>
+              <OutlineLinkButton as="button" onClick={handleDownload}>
                 <span className="material-symbols-outlined">download</span>
-              </OutlineIconButton>
+              </OutlineLinkButton>
             </>
           )}
           {!configContext.showConfig && (
-            <OutlineIconButton
+            <OutlineLinkButton
+              as="button"
               onClick={() =>
                 configContext.setShowDownloads(!configContext.showDownloads)
               }
@@ -520,7 +426,7 @@ const Ergogen = () => {
                   ? 'expand_content'
                   : 'collapse_content'}
               </span>
-            </OutlineIconButton>
+            </OutlineLinkButton>
           )}
         </SubHeaderContainer>
       )}
@@ -561,9 +467,9 @@ const Ergogen = () => {
                       <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
                     </span>
                   </GrowButton>
-                  <OutlineIconButton onClick={handleDownload}>
+                  <OutlineLinkButton as="button" onClick={handleDownload}>
                     <span className="material-symbols-outlined">download</span>
-                  </OutlineIconButton>
+                  </OutlineLinkButton>
                 </ButtonContainer>
               </EditorContainer>
             </LeftSplitPane>

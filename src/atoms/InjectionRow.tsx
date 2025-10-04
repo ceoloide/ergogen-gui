@@ -1,4 +1,4 @@
-import Button from './Button';
+import { Button } from './Buttons';
 import styled from 'styled-components';
 
 /**
