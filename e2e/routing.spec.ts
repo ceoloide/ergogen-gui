@@ -91,7 +91,7 @@ test.describe('Routing and Welcome Page', () => {
     }).toPass();
   });
 
-  test('navigating directly to /new shows the welcome page', async ({
+  test('navigating directly to /new shows the welcome page after redirect', async ({
     page,
   }) => {
     await page.goto('/new');
