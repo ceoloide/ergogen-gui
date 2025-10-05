@@ -165,6 +165,7 @@ const StyledConfigEditor = styled(ConfigEditor)`
 const OptionContainer = styled.div`
   display: inline-grid;
   justify-content: space-between;
+  padding: 10px;
 `;
 
 /**
@@ -555,62 +556,64 @@ const Ergogen = () => {
             snapOffset={0}
           >
             <LeftSplitPane>
-              <OptionContainer>
-                <Title>Options</Title>
-                <GenOption
-                  optionId={'autogen'}
-                  label={'Auto-generate'}
-                  setSelected={configContext.setAutoGen}
-                  checked={configContext.autoGen}
-                  aria-label="Enable auto-generate"
+              <ScrollablePanelContainer>
+                <OptionContainer>
+                  <Title>Options</Title>
+                  <GenOption
+                    optionId={'autogen'}
+                    label={'Auto-generate'}
+                    setSelected={configContext.setAutoGen}
+                    checked={configContext.autoGen}
+                    aria-label="Enable auto-generate"
+                  />
+                  <GenOption
+                    optionId={'debug'}
+                    label={'Debug'}
+                    setSelected={configContext.setDebug}
+                    checked={configContext.debug}
+                    aria-label="Enable debug mode"
+                  />
+                  <GenOption
+                    optionId={'autogen3d'}
+                    label={
+                      <>
+                        Auto-gen PCB, 3D <small>(slow)</small>
+                      </>
+                    }
+                    setSelected={configContext.setAutoGen3D}
+                    checked={configContext.autoGen3D}
+                    aria-label="Enable auto-generate PCB and 3D (slow)"
+                  />
+                  <GenOption
+                    optionId={'kicanvasPreview'}
+                    label={
+                      <>
+                        KiCad Preview <small>(experimental)</small>
+                      </>
+                    }
+                    setSelected={configContext.setKicanvasPreview}
+                    checked={configContext.kicanvasPreview}
+                    aria-label="Enable KiCad preview (experimental)"
+                  />
+                  <GenOption
+                    optionId={'jscadPreview'}
+                    label={
+                      <>
+                        JSCAD Preview <small>(experimental)</small>
+                      </>
+                    }
+                    setSelected={configContext.setJscadPreview}
+                    checked={configContext.jscadPreview}
+                    aria-label="Enable JSCAD preview (experimental)"
+                  />
+                </OptionContainer>
+                <Injections
+                  setInjectionToEdit={setInjectionToEdit}
+                  deleteInjection={handleDeleteInjection}
+                  injectionToEdit={injectionToEdit}
+                  data-testid="injections-container"
                 />
-                <GenOption
-                  optionId={'debug'}
-                  label={'Debug'}
-                  setSelected={configContext.setDebug}
-                  checked={configContext.debug}
-                  aria-label="Enable debug mode"
-                />
-                <GenOption
-                  optionId={'autogen3d'}
-                  label={
-                    <>
-                      Auto-gen PCB, 3D <small>(slow)</small>
-                    </>
-                  }
-                  setSelected={configContext.setAutoGen3D}
-                  checked={configContext.autoGen3D}
-                  aria-label="Enable auto-generate PCB and 3D (slow)"
-                />
-                <GenOption
-                  optionId={'kicanvasPreview'}
-                  label={
-                    <>
-                      KiCad Preview <small>(experimental)</small>
-                    </>
-                  }
-                  setSelected={configContext.setKicanvasPreview}
-                  checked={configContext.kicanvasPreview}
-                  aria-label="Enable KiCad preview (experimental)"
-                />
-                <GenOption
-                  optionId={'jscadPreview'}
-                  label={
-                    <>
-                      JSCAD Preview <small>(experimental)</small>
-                    </>
-                  }
-                  setSelected={configContext.setJscadPreview}
-                  checked={configContext.jscadPreview}
-                  aria-label="Enable JSCAD preview (experimental)"
-                />
-              </OptionContainer>
-              <Injections
-                setInjectionToEdit={setInjectionToEdit}
-                deleteInjection={handleDeleteInjection}
-                injectionToEdit={injectionToEdit}
-                data-testid="injections-container"
-              />
+              </ScrollablePanelContainer>
             </LeftSplitPane>
             <RightSplitPane>
               <EditorContainer>

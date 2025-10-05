@@ -12,6 +12,7 @@ const InjectionsContainer = styled.div`
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  padding: 10px;
 `;
 
 // Use the shared Title component from atoms
