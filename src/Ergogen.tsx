@@ -165,7 +165,11 @@ const StyledConfigEditor = styled(ConfigEditor)`
 const OptionContainer = styled.div`
   display: inline-grid;
   justify-content: space-between;
-  padding: 10px;
+  padding: 0.5rem;
+
+  @media (min-width: 640px) {
+    padding: 1rem;
+  }
 `;
 
 /**
