@@ -90,4 +90,12 @@ test.describe('Routing and Welcome Page', () => {
       expect(parsed).toContain('points:');
     }).toPass();
   });
+
+  test('navigating directly to /new shows the welcome page', async ({
+    page,
+  }) => {
+    await page.goto('/new');
+    await expect(page).toHaveURL(/.*\/new/);
+    await expect(page.getByText('Welcome to Ergogen Web UI')).toBeVisible();
+  });
 });

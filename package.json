@@ -1,7 +1,6 @@
 {
   "name": "ergogen-gui",
   "version": "0.2.0",
-  "homepage": "https://ergogen.ceoloide.com/",
   "bugs": {
     "url": "https://github.com/ceoloide/ergogen-gui/issues"
   },
