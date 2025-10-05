@@ -531,7 +531,7 @@ const Ergogen = () => {
                     previewExtension={preview.extension}
                     previewKey={`${preview.key}-${configContext.resultsVersion}`}
                     previewContent={preview.content}
-                    jscadPreview={configContext.jscadPreview}
+                    jscadPreview={configContext.settings?.jscadPreview}
                   />
                 </LeftSplitPane>
                 <RightSplitPane>
@@ -560,15 +560,19 @@ const Ergogen = () => {
                 <GenOption
                   optionId={'autogen'}
                   label={'Auto-generate'}
-                  setSelected={configContext.setAutoGen}
-                  checked={configContext.autoGen}
+                  setSelected={(v) =>
+                    configContext.setSettings((s) => ({ ...s!, autoGen: v }))
+                  }
+                  checked={configContext.settings?.autoGen ?? false}
                   aria-label="Enable auto-generate"
                 />
                 <GenOption
                   optionId={'debug'}
                   label={'Debug'}
-                  setSelected={configContext.setDebug}
-                  checked={configContext.debug}
+                  setSelected={(v) =>
+                    configContext.setSettings((s) => ({ ...s!, debug: v }))
+                  }
+                  checked={configContext.settings?.debug ?? false}
                   aria-label="Enable debug mode"
                 />
                 <GenOption
@@ -578,8 +582,10 @@ const Ergogen = () => {
                       Auto-gen PCB, 3D <small>(slow)</small>
                     </>
                   }
-                  setSelected={configContext.setAutoGen3D}
-                  checked={configContext.autoGen3D}
+                  setSelected={(v) =>
+                    configContext.setSettings((s) => ({ ...s!, autoGen3D: v }))
+                  }
+                  checked={configContext.settings?.autoGen3D ?? false}
                   aria-label="Enable auto-generate PCB and 3D (slow)"
                 />
                 <GenOption
@@ -589,8 +595,13 @@ const Ergogen = () => {
                       KiCad Preview <small>(experimental)</small>
                     </>
                   }
-                  setSelected={configContext.setKicanvasPreview}
-                  checked={configContext.kicanvasPreview}
+                  setSelected={(v) =>
+                    configContext.setSettings((s) => ({
+                      ...s!,
+                      kicanvasPreview: v,
+                    }))
+                  }
+                  checked={configContext.settings?.kicanvasPreview ?? false}
                   aria-label="Enable KiCad preview (experimental)"
                 />
                 <GenOption
@@ -600,8 +611,13 @@ const Ergogen = () => {
                       JSCAD Preview <small>(experimental)</small>
                     </>
                   }
-                  setSelected={configContext.setJscadPreview}
-                  checked={configContext.jscadPreview}
+                  setSelected={(v) =>
+                    configContext.setSettings((s) => ({
+                      ...s!,
+                      jscadPreview: v,
+                    }))
+                  }
+                  checked={configContext.settings?.jscadPreview ?? false}
                   aria-label="Enable JSCAD preview (experimental)"
                 />
               </OptionContainer>

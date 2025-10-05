@@ -14,6 +14,15 @@ import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
 
+// Strongly-typed shape for Ergogen settings
+export type Settings = {
+  debug: boolean;
+  autoGen: boolean;
+  autoGen3D: boolean;
+  kicanvasPreview: boolean;
+  jscadPreview: boolean;
+};
+
 // Strongly-typed shape for Ergogen results used in the UI
 export type DemoOutput = {
   dxf?: string;
@@ -134,16 +143,8 @@ type ContextProps = {
   setShowConfig: Dispatch<SetStateAction<boolean>>;
   showDownloads: boolean;
   setShowDownloads: Dispatch<SetStateAction<boolean>>;
-  debug: boolean;
-  setDebug: Dispatch<SetStateAction<boolean>>;
-  autoGen: boolean;
-  setAutoGen: Dispatch<SetStateAction<boolean>>;
-  autoGen3D: boolean;
-  setAutoGen3D: Dispatch<SetStateAction<boolean>>;
-  kicanvasPreview: boolean;
-  setKicanvasPreview: Dispatch<SetStateAction<boolean>>;
-  jscadPreview: boolean;
-  setJscadPreview: Dispatch<SetStateAction<boolean>>;
+  settings: Settings | undefined;
+  setSettings: Dispatch<SetStateAction<Settings | undefined>>;
   experiment: string | null;
 };
 
@@ -205,44 +206,22 @@ const ConfigContextProvider = ({
   );
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
-  const [debug, setDebug] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:debug', false)
-  );
-  const [autoGen, setAutoGen] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:autoGen', true)
-  );
-  const [autoGen3D, setAutoGen3D] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:autoGen3D', true)
-  );
-  const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:kicanvasPreview', true)
-  );
-  const [jscadPreview, setJscadPreview] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:jscadPreview', false)
-  );
+  const [settings, setSettings] = useLocalStorage<Settings>('ergogen:settings', {
+    debug: localStorageOrDefault('ergogen:config:debug', false),
+    autoGen: localStorageOrDefault('ergogen:config:autoGen', true),
+    autoGen3D: localStorageOrDefault('ergogen:config:autoGen3D', true),
+    kicanvasPreview: localStorageOrDefault(
+      'ergogen:config:kicanvasPreview',
+      true
+    ),
+    jscadPreview: localStorageOrDefault('ergogen:config:jscadPreview', false),
+  });
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
 
   const clearError = useCallback(() => setError(null), []);
   const clearWarning = useCallback(() => setDeprecationWarning(null), []);
-
-  /**
-   * Effect to save user settings to local storage whenever they change.
-   */
-  useEffect(() => {
-    localStorage.setItem('ergogen:config:debug', JSON.stringify(debug));
-    localStorage.setItem('ergogen:config:autoGen', JSON.stringify(autoGen));
-    localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
-    localStorage.setItem(
-      'ergogen:config:kicanvasPreview',
-      JSON.stringify(kicanvasPreview)
-    );
-    localStorage.setItem(
-      'ergogen:config:jscadPreview',
-      JSON.stringify(jscadPreview)
-    );
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, jscadPreview]);
 
   /**
    * Parses a string as either JSON or YAML.
@@ -425,10 +404,12 @@ const ConfigContextProvider = ({
    */
   useEffect(() => {
     localStorage.setItem('ergogen:injection', JSON.stringify(injectionInput));
-    if (autoGen) {
-      processInput(configInput, injectionInput, { pointsonly: !autoGen3D });
+    if (settings?.autoGen) {
+      processInput(configInput, injectionInput, {
+        pointsonly: !settings?.autoGen3D,
+      });
     }
-  }, [configInput, injectionInput, autoGen, autoGen3D, processInput]);
+  }, [configInput, injectionInput, settings, processInput]);
 
   const experiment = useMemo(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -457,16 +438,8 @@ const ConfigContextProvider = ({
       setShowConfig,
       showDownloads,
       setShowDownloads,
-      debug,
-      setDebug,
-      autoGen,
-      setAutoGen,
-      autoGen3D,
-      setAutoGen3D,
-      kicanvasPreview,
-      setKicanvasPreview,
-      jscadPreview,
-      setJscadPreview,
+      settings,
+      setSettings,
       experiment,
     }),
     [
@@ -490,16 +463,8 @@ const ConfigContextProvider = ({
       setShowConfig,
       showDownloads,
       setShowDownloads,
-      debug,
-      setDebug,
-      autoGen,
-      setAutoGen,
-      autoGen3D,
-      setAutoGen3D,
-      kicanvasPreview,
-      setKicanvasPreview,
-      jscadPreview,
-      setJscadPreview,
+      settings,
+      setSettings,
       experiment,
     ]
   );

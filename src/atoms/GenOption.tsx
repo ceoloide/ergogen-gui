@@ -14,7 +14,7 @@ type Props = {
   optionId: string;
   label: React.ReactNode;
   checked: boolean;
-  setSelected: Dispatch<SetStateAction<boolean>>;
+  setSelected: (value: boolean) => void;
   'aria-label'?: string;
 };
 

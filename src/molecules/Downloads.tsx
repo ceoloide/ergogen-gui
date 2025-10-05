@@ -186,11 +186,11 @@ const Downloads = ({
         extension: 'kicad_pcb',
         content: pcb,
         previewKey:
-          configContext.kicanvasPreview && version > 20240101
+          configContext.settings?.kicanvasPreview && version > 20240101
             ? `pcbs.${name}`
             : '',
         preview:
-          configContext.kicanvasPreview && version > 20240101
+          configContext.settings?.kicanvasPreview && version > 20240101
             ? {
                 key: `pcbs.${name}`,
                 extension: 'kicad_pcb',
@@ -205,7 +205,7 @@ const Downloads = ({
     <DownloadsContainer data-testid={dataTestId}>
       <Title>Outputs</Title>
       {downloads.map((download, i) => {
-        if (!configContext.debug) {
+        if (!configContext.settings?.debug) {
           if (download.fileName.startsWith('_')) return false;
 
           // Ignore the following combinations of file names and extensions:
