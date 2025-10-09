@@ -353,88 +353,102 @@ const ConfigContextProvider = ({
    * Handler for messages received from the Ergogen worker.
    * Processes success, error, and warning responses from the worker.
    */
-  const handleWorkerMessage = (event: MessageEvent<WorkerResponse>) => {
-    const response = event.data;
-    console.log('<<< Received message from worker:', response.type);
+  const handleWorkerMessage = useCallback(
+    (event: MessageEvent<WorkerResponse>) => {
+      const response = event.data;
+      console.log('<<< Received message from worker:', response.type);
 
-    if (response.type === 'error') {
-      // Handle error response
-      console.error('--- Worker error:', response.error);
-      setError(response.error);
-    } else if (response.type === 'success') {
-      // Handle success response
-      console.log('--- Worker success, processing results and warnings...');
+      if (response.type === 'error') {
+        // Handle error response
+        console.error('--- Worker error:', response.error);
+        setError(response.error);
+      } else if (response.type === 'success') {
+        // Handle success response
+        console.log('--- Worker success, processing results and warnings...');
 
-      // Check for warnings and display them
-      if (response.warnings && response.warnings.length > 0) {
-        console.log(
-          `--- Worker returned ${response.warnings.length} warning(s)`
-        );
-        // Combine with any existing deprecation warnings
-        const existingWarning = deprecationWarning;
-        if (existingWarning) {
-          setDeprecationWarning(
-            `${existingWarning}\n${response.warnings.join('\n')}`
+        // Check for warnings and display them
+        if (response.warnings && response.warnings.length > 0) {
+          console.log(
+            `--- Worker returned ${response.warnings.length} warning(s)`
           );
-        } else {
-          setDeprecationWarning(response.warnings.join('\n'));
-        }
-      }
-
-      // Process and set the Ergogen results
-      if (response.results) {
-        console.log('Setting Ergogen results from worker');
-
-        // Increment config version for new results
-        configVersionRef.current += 1;
-        const currentVersion = configVersionRef.current;
-        console.log(`--- New config version: ${currentVersion}`);
-
-        // Clear any pending conversions from previous config versions
-        pendingConversionsRef.current = [];
-        isConvertingRef.current = false;
-
-        // Add pending STL placeholders to the results if STL preview is enabled
-        if (stlPreview && (response.results as Results).cases) {
-          const casesWithStl: Record<string, CaseOutput> = {};
-          for (const [name, caseObj] of Object.entries(
-            (response.results as Results).cases as Record<string, CaseOutput>
-          )) {
-            casesWithStl[name] = {
-              ...caseObj,
-              stl: undefined, // Mark as pending
-            };
+          // Combine with any existing deprecation warnings
+          const existingWarning = deprecationWarning;
+          if (existingWarning) {
+            setDeprecationWarning(
+              `${existingWarning}\n${response.warnings.join('\n')}`
+            );
+          } else {
+            setDeprecationWarning(response.warnings.join('\n'));
           }
-          (response.results as Results).cases = casesWithStl;
+        }
 
-          // Queue JSCAD to STL conversions
-          for (const [caseName, caseObj] of Object.entries(casesWithStl)) {
-            if (caseObj.jscad) {
-              console.log(`--- Queuing JSCAD conversion for case: ${caseName}`);
-              pendingConversionsRef.current.push({
-                caseName,
-                jscadScript: caseObj.jscad,
-              });
+        // Process and set the Ergogen results
+        if (response.results) {
+          console.log('Setting Ergogen results from worker');
+
+          // Increment config version for new results
+          configVersionRef.current += 1;
+          const currentVersion = configVersionRef.current;
+          console.log(`--- New config version: ${currentVersion}`);
+
+          // Clear any pending conversions from previous config versions
+          pendingConversionsRef.current = [];
+          isConvertingRef.current = false;
+
+          // Add pending STL placeholders to the results if STL preview is enabled
+          if (stlPreview && (response.results as Results).cases) {
+            const casesWithStl: Record<string, CaseOutput> = {};
+            for (const [name, caseObj] of Object.entries(
+              (response.results as Results).cases as Record<string, CaseOutput>
+            )) {
+              casesWithStl[name] = {
+                ...caseObj,
+                stl: undefined, // Mark as pending
+              };
+            }
+            (response.results as Results).cases = casesWithStl;
+
+            // Queue JSCAD to STL conversions
+            for (const [caseName, caseObj] of Object.entries(casesWithStl)) {
+              if (caseObj.jscad) {
+                console.log(
+                  `--- Queuing JSCAD conversion for case: ${caseName}`
+                );
+                pendingConversionsRef.current.push({
+                  caseName,
+                  jscadScript: caseObj.jscad,
+                });
+              }
             }
           }
+
+          setResults(response.results as Results);
+          setResultsVersion((v) => v + 1);
+
+          // Start processing conversions
+          if (stlPreview && pendingConversionsRef.current.length > 0) {
+            console.log(
+              `--- Starting JSCAD conversion queue (${pendingConversionsRef.current.length} items)`
+            );
+            processNextConversion();
+          }
         }
 
-        setResults(response.results as Results);
-        setResultsVersion((v) => v + 1);
-
-        // Start processing conversions
-        if (stlPreview && pendingConversionsRef.current.length > 0) {
-          console.log(
-            `--- Starting JSCAD conversion queue (${pendingConversionsRef.current.length} items)`
-          );
-          processNextConversion();
-        }
+        // Stop loading state
+        setIsGenerating(false);
       }
-
-      // Stop loading state
-      setIsGenerating(false);
-    }
-  };
+    },
+    [
+      stlPreview,
+      processNextConversion,
+      deprecationWarning,
+      setError,
+      setDeprecationWarning,
+      setResults,
+      setResultsVersion,
+      setIsGenerating,
+    ]
+  );
 
   /**
    * Effect to initialize the workers early in the component lifecycle.
@@ -482,8 +496,7 @@ const ConfigContextProvider = ({
         console.log('JSCAD worker terminated');
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handleJscadWorkerMessage]); // handleWorkerMessage is defined inline and doesn't need to be a dependency
+  }, [handleJscadWorkerMessage, handleWorkerMessage]);
 
   /**
    * Effect to save user settings to local storage whenever they change.
@@ -641,16 +654,7 @@ const ConfigContextProvider = ({
         return;
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      parseConfig,
-      setError,
-      setDeprecationWarning,
-      setIsGenerating,
-      stlPreview,
-      processNextConversion,
-      resultsVersion,
-    ]
+    [parseConfig, setError, setDeprecationWarning, setIsGenerating, resultsVersion]
   );
 
   /**

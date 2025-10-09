@@ -149,7 +149,7 @@ test.describe('Ergogen Configuration Processing', () => {
     await expect(jscadFilePreview).toBeVisible({ timeout: 5000 });
     await shoot('after-jscad-file-preview-visible');
   });
-  test.skip('loads A. dux STL previews', async ({ page }) => {
+  test('loads A. dux STL previews', async ({ page }) => {
     const shoot = makeShooter(page, test.info());
     // Set A. dux config directly in local storage
     await page.addInitScript(
