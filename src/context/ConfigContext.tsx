@@ -654,13 +654,7 @@ const ConfigContextProvider = ({
         return;
       }
     },
-    [
-      parseConfig,
-      setError,
-      setDeprecationWarning,
-      setIsGenerating,
-      resultsVersion,
-    ]
+    [parseConfig, setError, setDeprecationWarning, setIsGenerating]
   );
 
   /**
