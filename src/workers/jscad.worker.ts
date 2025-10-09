@@ -5,8 +5,13 @@ import { JscadWorkerRequest } from './jscad.worker.types';
 
 console.log('<-> JSCAD worker module starting...');
 
+// Initialize myjscad object before loading the library
+// This matches the initialization in the main HTML file
+// @ts-expect-error - defining global myjscad object
+self.myjscad = {};
+
 // Import the openjscad library
-// This will load the myjscad global object
+// This will populate the myjscad global object
 try {
   // @ts-expect-error - importScripts is available in web workers
   importScripts('/dependencies/openjscad.js');
