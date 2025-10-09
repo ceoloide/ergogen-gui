@@ -5,13 +5,26 @@ import { JscadWorkerRequest } from './jscad.worker.types';
 
 console.log('<-> JSCAD worker module starting...');
 
+// Create minimal mock of document object for openjscad.js
+// The library expects document.getElementById but we don't need the viewer in worker context
+(self as any).document = {
+  getElementById: () => null,
+  createElement: () => ({}),
+  implementation: {},
+  location: { href: '' },
+  addEventListener: () => {},
+};
+
+// Create window alias for self since openjscad.js expects window.myjscad
+// In a web worker, window doesn't exist, so we alias it to self
+(self as any).window = self;
+
 // Initialize myjscad object before loading the library
 // This matches the initialization in the main HTML file
-// @ts-expect-error - defining global myjscad object
-self.myjscad = {};
+(self as any).myjscad = {};
 
 // Import the openjscad library
-// This will populate the myjscad global object
+// This will populate the myjscad global object via window.myjscad
 try {
   // @ts-expect-error - importScripts is available in web workers
   importScripts('/dependencies/openjscad.js');
