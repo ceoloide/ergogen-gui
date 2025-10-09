@@ -24,13 +24,10 @@ export default tseslint.config(
     },
   },
   prettierConfig,
-  {
+  ...reactHooks.configs['flat/recommended'].map((config) => ({
+    ...config,
     files: ['src/**/*.{ts,tsx}'],
-    plugins: {
-      'react-hooks': reactHooks,
-    },
-    rules: reactHooks.configs.recommended.rules,
-  },
+  })),
   {
     files: ['src/**/*.{ts,tsx}'],
     plugins: {
@@ -60,7 +57,9 @@ export default tseslint.config(
   },
   {
     files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.js'],
-    ...jest.configs['flat/recommended'],
+    plugins: {
+      jest: jest,
+    },
     languageOptions: {
       globals: {
         ...globals.jest,
@@ -69,6 +68,7 @@ export default tseslint.config(
       },
     },
     rules: {
+      ...jest.configs['flat/recommended'].rules,
       '@typescript-eslint/no-require-imports': 'off',
     },
   }

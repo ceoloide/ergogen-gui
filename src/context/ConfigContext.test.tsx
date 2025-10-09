@@ -4,6 +4,7 @@ import { render, waitFor } from '@testing-library/react';
 // Mock the worker factory to prevent worker creation in tests
 jest.mock('../workers/workerFactory', () => ({
   createErgogenWorker: () => null,
+  createJscadWorker: () => null,
 }));
 
 // Mock ergogen globally

@@ -14,9 +14,12 @@ import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
-import { convertJscadToStl } from '../utils/jscad';
-import { createErgogenWorker } from '../workers/workerFactory';
+import {
+  createErgogenWorker,
+  createJscadWorker,
+} from '../workers/workerFactory';
 import type { WorkerResponse } from '../workers/ergogen.worker.types';
+import type { JscadWorkerResponse } from '../workers/jscad.worker.types';
 
 // Strongly-typed shape for Ergogen results used in the UI
 type DemoOutput = {
@@ -226,8 +229,20 @@ const ConfigContextProvider = ({
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Worker ref to hold the Ergogen worker instance
+  // Worker refs to hold the worker instances
   const workerRef = useRef<Worker | null>(null);
+  const jscadWorkerRef = useRef<Worker | null>(null);
+
+  // Config version tracking to prevent race conditions
+  const configVersionRef = useRef<number>(0);
+
+  // Queue for pending JSCAD to STL conversions
+  const pendingConversionsRef = useRef<
+    Array<{ caseName: string; jscadScript: string }>
+  >([]);
+
+  // Track if a conversion is currently in progress
+  const isConvertingRef = useRef<boolean>(false);
 
   useEffect(() => {
     console.log('--- ConfigContextProvider mounted ---');
@@ -238,6 +253,101 @@ const ConfigContextProvider = ({
 
   const clearError = useCallback(() => setError(null), []);
   const clearWarning = useCallback(() => setDeprecationWarning(null), []);
+
+  /**
+   * Processes the next pending JSCAD to STL conversion from the queue.
+   * This ensures sequential processing to avoid race conditions.
+   */
+  const processNextConversion = useCallback(() => {
+    // If already converting or no pending conversions, return
+    if (isConvertingRef.current || pendingConversionsRef.current.length === 0) {
+      return;
+    }
+
+    const conversion = pendingConversionsRef.current.shift();
+    if (!conversion || !jscadWorkerRef.current) {
+      return;
+    }
+
+    isConvertingRef.current = true;
+    const currentVersion = configVersionRef.current;
+
+    console.log(
+      `>>> Sending JSCAD conversion request for case: ${conversion.caseName}, version: ${currentVersion}`
+    );
+
+    jscadWorkerRef.current.postMessage({
+      type: 'convert',
+      jscadScript: conversion.jscadScript,
+      caseName: conversion.caseName,
+      requestId: `jscad-convert-${conversion.caseName}-${currentVersion}-${Date.now()}`,
+      configVersion: currentVersion,
+    });
+  }, []);
+
+  /**
+   * Handler for messages received from the JSCAD worker.
+   * Processes success and error responses from the worker.
+   */
+  const handleJscadWorkerMessage = useCallback(
+    (event: MessageEvent<JscadWorkerResponse>) => {
+      const response = event.data;
+      console.log(
+        `<<< Received message from JSCAD worker: ${response.type}, case: ${response.caseName}`
+      );
+
+      isConvertingRef.current = false;
+
+      // Check if this response is for the current config version
+      if (response.configVersion !== configVersionRef.current) {
+        console.log(
+          `--- Ignoring JSCAD response for old config version ${response.configVersion} (current: ${configVersionRef.current})`
+        );
+        // Process next conversion even though we're discarding this one
+        processNextConversion();
+        return;
+      }
+
+      if (response.type === 'error') {
+        console.error(
+          `--- JSCAD worker error for case ${response.caseName}:`,
+          response.error
+        );
+        // Continue with next conversion even if this one failed
+        processNextConversion();
+        return;
+      }
+
+      if (response.type === 'success') {
+        console.log(
+          `--- JSCAD worker success for case ${response.caseName}, STL ${response.stl ? 'generated' : 'is null'}`
+        );
+
+        // Update results with the new STL for this specific case
+        setResults((prevResults) => {
+          if (!prevResults?.cases) return prevResults;
+
+          return {
+            ...prevResults,
+            cases: {
+              ...prevResults.cases,
+              [response.caseName]: {
+                ...prevResults.cases[response.caseName],
+                stl: response.stl ?? undefined,
+              },
+            },
+          };
+        });
+
+        // Increment version to trigger re-render
+        setResultsVersion((v) => v + 1);
+
+        // Process next conversion in the queue
+        processNextConversion();
+      }
+    },
+    [processNextConversion]
+  );
 
   /**
    * Handler for messages received from the Ergogen worker.
@@ -275,6 +385,15 @@ const ConfigContextProvider = ({
       if (response.results) {
         console.log('Setting Ergogen results from worker');
 
+        // Increment config version for new results
+        configVersionRef.current += 1;
+        const currentVersion = configVersionRef.current;
+        console.log(`--- New config version: ${currentVersion}`);
+
+        // Clear any pending conversions from previous config versions
+        pendingConversionsRef.current = [];
+        isConvertingRef.current = false;
+
         // Add pending STL placeholders to the results if STL preview is enabled
         if (stlPreview && (response.results as Results).cases) {
           const casesWithStl: Record<string, CaseOutput> = {};
@@ -287,47 +406,29 @@ const ConfigContextProvider = ({
             };
           }
           (response.results as Results).cases = casesWithStl;
-        }
 
-        // Convert JSCAD cases to STL format asynchronously only if stlPreview is enabled
-        if (stlPreview && results && (results as Results).cases) {
-          const casesList = Object.entries(
-            (results as Results).cases as Record<string, CaseOutput>
-          );
-
-          // Convert each JSCAD to STL asynchronously
-          // Use a copy of the caseName in the closure to avoid reference issues
-          for (const [caseName, caseObj] of casesList) {
+          // Queue JSCAD to STL conversions
+          for (const [caseName, caseObj] of Object.entries(casesWithStl)) {
             if (caseObj.jscad) {
-              // Capture caseName in an IIFE to ensure proper closure
-              ((name) => {
-                convertJscadToStl(caseObj.jscad!).then((stl) => {
-                  // Update results with the new STL for this specific case
-                  setResults((prevResults) => {
-                    if (!prevResults?.cases) return prevResults;
-
-                    return {
-                      ...prevResults,
-                      cases: {
-                        ...prevResults.cases,
-                        [name]: {
-                          ...prevResults.cases[name],
-                          stl: stl ?? undefined,
-                        },
-                      },
-                    };
-                  });
-
-                  // Increment version to trigger re-render
-                  setResultsVersion((v) => v + 1);
-                });
-              })(caseName);
+              console.log(`--- Queuing JSCAD conversion for case: ${caseName}`);
+              pendingConversionsRef.current.push({
+                caseName,
+                jscadScript: caseObj.jscad,
+              });
             }
           }
         }
 
         setResults(response.results as Results);
         setResultsVersion((v) => v + 1);
+
+        // Start processing conversions
+        if (stlPreview && pendingConversionsRef.current.length > 0) {
+          console.log(
+            `--- Starting JSCAD conversion queue (${pendingConversionsRef.current.length} items)`
+          );
+          processNextConversion();
+        }
       }
 
       // Stop loading state
@@ -336,11 +437,11 @@ const ConfigContextProvider = ({
   };
 
   /**
-   * Effect to initialize the Ergogen worker early in the component lifecycle.
-   * This prevents race conditions by ensuring the worker is ready before any generation requests.
+   * Effect to initialize the workers early in the component lifecycle.
+   * This prevents race conditions by ensuring the workers are ready before any generation requests.
    */
   useEffect(() => {
-    // Initialize worker if not already created
+    // Initialize Ergogen worker if not already created
     if (!workerRef.current) {
       console.log('Initializing Ergogen worker...');
       workerRef.current = createErgogenWorker();
@@ -353,7 +454,20 @@ const ConfigContextProvider = ({
       }
     }
 
-    // Cleanup function to terminate the worker when component unmounts
+    // Initialize JSCAD worker if not already created
+    if (!jscadWorkerRef.current) {
+      console.log('Initializing JSCAD worker...');
+      jscadWorkerRef.current = createJscadWorker();
+
+      if (jscadWorkerRef.current) {
+        jscadWorkerRef.current.onmessage = handleJscadWorkerMessage;
+        console.log('JSCAD worker initialized successfully');
+      } else {
+        console.warn('Failed to initialize JSCAD worker');
+      }
+    }
+
+    // Cleanup function to terminate the workers when component unmounts
     return () => {
       if (workerRef.current) {
         console.log('Terminating Ergogen worker...');
@@ -361,8 +475,15 @@ const ConfigContextProvider = ({
         workerRef.current = null;
         console.log('Ergogen worker terminated');
       }
+      if (jscadWorkerRef.current) {
+        console.log('Terminating JSCAD worker...');
+        jscadWorkerRef.current.terminate();
+        jscadWorkerRef.current = null;
+        console.log('JSCAD worker terminated');
+      }
     };
-  }, []); // Empty dependency array ensures this runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleJscadWorkerMessage]); // handleWorkerMessage is defined inline and doesn't need to be a dependency
 
   /**
    * Effect to save user settings to local storage whenever they change.
@@ -422,7 +543,6 @@ const ConfigContextProvider = ({
       if (!textInput) {
         return;
       }
-      let results = null;
       let inputConfig: string | object = textInput ?? '';
       const inputInjection: string[][] | undefined = injectionInput;
       const [, parsedConfig] = parseConfig(textInput ?? '');
@@ -521,7 +641,16 @@ const ConfigContextProvider = ({
         return;
       }
     },
-    [parseConfig, setError, setDeprecationWarning, setIsGenerating, stlPreview]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      parseConfig,
+      setError,
+      setDeprecationWarning,
+      setIsGenerating,
+      stlPreview,
+      processNextConversion,
+      resultsVersion,
+    ]
   );
 
   /**

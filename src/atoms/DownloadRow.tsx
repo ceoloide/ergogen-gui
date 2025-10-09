@@ -108,6 +108,39 @@ const StyledLinkButton = styled.a<{ disabled?: boolean }>`
 `;
 
 /**
+ * A styled button for showing pending conversion status.
+ * Similar to StyledLinkButton but with a spinning animation.
+ */
+const StyledPendingButton = styled.div`
+  background-color: ${theme.colors.background};
+  border: none;
+  border-radius: 6px;
+  color: ${theme.colors.white};
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  cursor: default;
+  font-size: ${theme.fontSizes.bodySmall};
+  line-height: 16px;
+  gap: 6px;
+  height: 34px;
+
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconMedium} !important;
+    animation: spin 1.5s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
+/**
  * A component that displays a file name and provides buttons for previewing and downloading.
  *
  * @param {Props} props - The props for the component.
@@ -155,14 +188,22 @@ const DownloadRow = ({
         {fileName}.{extension}
       </FileName>
       <Buttons>
-        <StyledLinkButton
-          onClick={handleDownload}
-          disabled={isDisabled}
-          aria-label={`Download ${fileName}.${extension}`}
-          data-testid={testId && `${testId}-download`}
-        >
-          <span className="material-symbols-outlined">download</span>
-        </StyledLinkButton>
+        {isDisabled ? (
+          <StyledPendingButton
+            aria-label={`Generating ${fileName}.${extension}`}
+            data-testid={testId && `${testId}-pending`}
+          >
+            <span className="material-symbols-outlined">progress_activity</span>
+          </StyledPendingButton>
+        ) : (
+          <StyledLinkButton
+            onClick={handleDownload}
+            aria-label={`Download ${fileName}.${extension}`}
+            data-testid={testId && `${testId}-download`}
+          >
+            <span className="material-symbols-outlined">download</span>
+          </StyledLinkButton>
+        )}
       </Buttons>
     </Row>
   );
