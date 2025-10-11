@@ -15,6 +15,7 @@ self.onerror = (error) => {
   self.postMessage({
     type: 'error',
     error: `JSCAD worker error: ${errorMessage}`,
+    configVersion: -1, // Version is unknown
   });
   return true; // Prevent default error handling
 };
@@ -146,16 +147,15 @@ const initializationPromise = (async () => {
  * Main worker message handler.
  */
 self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
-  // Wait for the initialization to complete before processing any message
   await initializationPromise;
 
-  const { type, jscad, requestId } = event.data || {};
+  const { type, jscadScripts, configVersion } = event.data || {};
 
   if (initializationError) {
     const response: JscadWorkerResponse = {
       type: 'error',
       error: `JSCAD library initialization failed: ${initializationError}`,
-      requestId,
+      configVersion,
     };
     self.postMessage(response);
     return;
@@ -169,30 +169,36 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
     const response: JscadWorkerResponse = {
       type: 'error',
       error: `Unknown message type: ${type}`,
-      requestId,
+      configVersion,
     };
     self.postMessage(response);
     return;
   }
+
   try {
-    if (!jscad || jscad.trim() === '') {
-      throw new Error('JSCAD script is empty.');
-    }
+    const results: { name: string; stl: string }[] = [];
+    for (const { name, script } of jscadScripts) {
+      if (!script || script.trim() === '') {
+        console.warn(`JSCAD script for ${name} is empty, skipping.`);
+        continue;
+      }
 
-    // This logic is adapted from the original convertJscadToStl utility function.
-    jscadInstance.setup();
-    await jscadInstance.compile(jscad);
-    const output = jscadInstance.generateOutput('stla', null); // 'stla' for ASCII STL
-    const stlContent = output.asBuffer().toString();
+      jscadInstance.setup();
+      await jscadInstance.compile(script);
+      const output = jscadInstance.generateOutput('stla', null);
+      const stlContent = output.asBuffer().toString();
 
-    if (!stlContent || stlContent.trim() === '') {
-      throw new Error('Generated STL content is empty.');
+      if (!stlContent || stlContent.trim() === '') {
+        throw new Error(`Generated STL for ${name} is empty.`);
+      }
+
+      results.push({ name, stl: stlContent });
     }
 
     const response: JscadWorkerResponse = {
       type: 'success',
-      stl: stlContent,
-      requestId,
+      results,
+      configVersion,
     };
     self.postMessage(response);
   } catch (error: unknown) {
@@ -200,11 +206,10 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
     const response: JscadWorkerResponse = {
       type: 'error',
       error: `JSCAD to STL conversion failed: ${errorMessage}`,
-      requestId,
+      configVersion,
     };
     self.postMessage(response);
   }
 };
 
-// Export empty object to satisfy TypeScript's module requirement
 export {};
