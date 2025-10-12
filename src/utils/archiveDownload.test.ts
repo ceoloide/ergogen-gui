@@ -16,11 +16,12 @@ const createMockZip = () => {
   return mockZip;
 };
 
-global.JSZip = jest
+// Mock the globals
+(global as unknown as { JSZip: jest.Mock }).JSZip = jest
   .fn()
-  .mockImplementation(() => createMockZip()) as unknown as typeof JSZip;
+  .mockImplementation(() => createMockZip());
 
-global.saveAs = jest.fn();
+(global as unknown as { saveAs: jest.Mock }).saveAs = jest.fn();
 
 describe('archiveDownload', () => {
   beforeEach(() => {
@@ -29,8 +30,10 @@ describe('archiveDownload', () => {
     mockFolder.mockClear();
     mockFile.mockClear();
     mockGenerateAsync.mockClear();
-    (global.JSZip as jest.Mock).mockImplementation(() => createMockZip());
-    (global.saveAs as jest.Mock).mockClear();
+    (global as unknown as { JSZip: jest.Mock }).JSZip.mockImplementation(() =>
+      createMockZip()
+    );
+    (global as unknown as { saveAs: jest.Mock }).saveAs.mockClear();
   });
 
   describe('generateArchive', () => {
@@ -52,7 +55,9 @@ describe('archiveDownload', () => {
       );
 
       // Assert
-      expect(global.JSZip).not.toHaveBeenCalled();
+      expect(
+        (global as unknown as { JSZip: jest.Mock }).JSZip
+      ).not.toHaveBeenCalled();
     });
 
     it('should not generate archive when results is null', async () => {
@@ -73,7 +78,9 @@ describe('archiveDownload', () => {
       );
 
       // Assert
-      expect(global.JSZip).not.toHaveBeenCalled();
+      expect(
+        (global as unknown as { JSZip: jest.Mock }).JSZip
+      ).not.toHaveBeenCalled();
     });
 
     it('should add config.yaml and demo.svg to root', async () => {
@@ -501,7 +508,9 @@ describe('archiveDownload', () => {
         compression: 'DEFLATE',
         compressionOptions: { level: 9 },
       });
-      expect(global.saveAs).toHaveBeenCalledWith(
+      expect(
+        (global as unknown as { saveAs: jest.Mock }).saveAs
+      ).toHaveBeenCalledWith(
         mockBlob,
         expect.stringMatching(/^ergogen-\d{4}-\d{2}-\d{2}\.zip$/)
       );
