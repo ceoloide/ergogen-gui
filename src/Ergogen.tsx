@@ -13,6 +13,7 @@ import FilePreview from './molecules/FilePreview';
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
 import { isMacOS } from './utils/platform';
+import { generateArchive } from './utils/archiveDownload';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
 import GenOption from './atoms/GenOption';
@@ -412,6 +413,19 @@ const Ergogen = () => {
     document.body.removeChild(element);
   };
 
+  /**
+   * Triggers a download of all generated outputs as a zip archive.
+   */
+  const handleDownloadArchive = async () => {
+    await generateArchive(
+      configContext.configInput,
+      configContext.injectionInput,
+      configContext.results,
+      configContext.debug,
+      configContext.stlPreview
+    );
+  };
+
   return (
     <ErgogenWrapper>
       {!configContext.showSettings && (
@@ -460,9 +474,11 @@ const Ergogen = () => {
           {!configContext.showConfig && (
             <>
               <OutlineIconButton
+                onClick={handleDownloadArchive}
+                disabled={configContext.isGenerating}
                 aria-label="Download archive of all generated files"
                 data-testid="mobile-download-outputs-button"
-                >
+              >
                 <span className="material-symbols-outlined">archive</span>
               </OutlineIconButton>
               <OutlineIconButton

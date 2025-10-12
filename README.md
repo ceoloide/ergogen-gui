@@ -76,10 +76,10 @@ In addition to automatic deployments on pushes to `main`, the workflow can be tr
 
 To manually trigger a deployment:
 
-1.  Navigate to your repository on GitHub.
-2.  Click on the **Actions** tab.
-3.  In the list of workflows on the left, select **GitHub Pages**.
-4.  Click the **Run workflow** button, choose the branch you want to deploy from, and confirm by clicking **Run workflow** again.
+1. Navigate to your repository on GitHub.
+2. Click on the **Actions** tab.
+3. In the list of workflows on the left, select **GitHub Pages**.
+4. Click the **Run workflow** button, choose the branch you want to deploy from, and confirm by clicking **Run workflow** again.
 
 ### Custom Domain Configuration
 

@@ -44,6 +44,15 @@ const OutlineIconButton = styled.button<Props>`
   &.active {
     background-color: ${theme.colors.buttonHover};
   }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:disabled:hover {
+    background-color: transparent;
+  }
 `;
 
 export default OutlineIconButton;
