@@ -1,24 +1,58 @@
-/**
- * Converts a standard GitHub file URL to its corresponding raw content URL.
- * @param {string} url - The GitHub URL (e.g., "https://github.com/user/repo/blob/main/file.txt").
- * @returns {string} The raw content URL (e.g., "https://raw.githubusercontent.com/user/repo/main/file.txt").
- */
-const getRawUrl = (url: string) => {
-  const rawUrl = url
-    .replace('github.com', 'raw.githubusercontent.com')
-    .replace('/blob/', '/');
-  return rawUrl;
+// src/utils/github.ts
+
+type Injection = [string, string];
+
+type GithubFile = {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  download_url: string;
 };
 
-/**
- * Fetches a configuration file (`config.yaml`) from a given GitHub URL.
- * It handles repository root URLs and direct file URLs, automatically trying common branches ('main', 'master')
- * and locations (`/config.yaml`, `/ergogen/config.yaml`).
- * @param {string} url - The GitHub URL to fetch the configuration from.
- * @returns {Promise<string>} A promise that resolves with the text content of the configuration file.
- * @throws {Error} Throws an error if the fetch fails for all attempted locations.
- */
-export const fetchConfigFromUrl = async (url: string): Promise<string> => {
+const GITHUB_API_URL = 'https://api.github.com';
+
+const getRepoAndPathFromUrl = (url: string) => {
+  const urlObject = new URL(url);
+  const pathParts = urlObject.pathname.split('/').filter(Boolean);
+  if (pathParts.length < 2) {
+    throw new Error('Invalid GitHub URL');
+  }
+  const repo = pathParts.slice(0, 2).join('/');
+  const path = pathParts.slice(3).join('/');
+  return { repo, path };
+};
+
+const fetchGithubApi = async (url: string) => {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/vnd.github.v3+json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub API error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+const getRepoContents = async (
+  repo: string,
+  path: string = ''
+): Promise<GithubFile[]> => {
+  const url = `${GITHUB_API_URL}/repos/${repo}/contents/${path}`;
+  return fetchGithubApi(url);
+};
+
+const getFileContent = async (url: string) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.text();
+};
+
+export const fetchConfigFromUrl = async (
+  url: string
+): Promise<{ config: string; injections: Injection[] }> => {
   let newUrl = url.trim();
 
   const repoPattern = /^[a-zA-Z0-9-]+\/[a-zA-Z0-9_.-]+$/;
@@ -28,95 +62,104 @@ export const fetchConfigFromUrl = async (url: string): Promise<string> => {
     newUrl = `https://${newUrl}`;
   }
 
-  const baseUrl = newUrl.endsWith('/') ? newUrl.slice(0, -1) : newUrl;
+  const urlObject = new URL(newUrl);
+  const { repo, path } = getRepoAndPathFromUrl(newUrl);
 
-  /**
-   * Checks if a given URL points to the root of a GitHub repository.
-   * @param {string} url - The URL to check.
-   * @returns {boolean} True if the URL is a GitHub repository root, false otherwise.
-   */
-  const isRepoRoot = (url: string) => {
+  if (path.endsWith('.yaml') || path.endsWith('.yml')) {
+    const downloadUrl = `https://raw.githubusercontent.com/${repo}/HEAD/${path}`;
+    const config = await getFileContent(downloadUrl);
+    return { config, injections: [] };
+  }
+
+  // Breadth-First Search
+  const queue: string[] = [path];
+  const visited: Set<string> = new Set([path]);
+  let yamlFiles: GithubFile[] = [];
+  let configYaml: GithubFile | null = null;
+
+  while (queue.length > 0) {
+    const currentPath = queue.shift()!;
+    const contents = await getRepoContents(repo, currentPath);
+
+    for (const item of contents) {
+      if (item.type === 'dir') {
+        if (!visited.has(item.path)) {
+          queue.push(item.path);
+          visited.add(item.path);
+        }
+      } else if (item.name.endsWith('.yaml') || item.name.endsWith('.yml')) {
+        if (item.name === 'config.yaml' || item.name === 'config.yml') {
+          if (!configYaml) {
+            configYaml = item;
+          }
+        }
+        yamlFiles.push(item);
+      }
+    }
+  }
+
+  const targetFile = configYaml || yamlFiles[0];
+
+  if (!targetFile) {
+    throw new Error('No YAML file found in the repository.');
+  }
+
+  const config = await getFileContent(targetFile.download_url);
+
+  const injections: Injection[] = [];
+  if (targetFile.name === 'config.yaml' || targetFile.name === 'config.yml') {
+    const configFileDir = targetFile.path.substring(
+      0,
+      targetFile.path.lastIndexOf('/')
+    );
+    const repoContents = await getRepoContents(repo, configFileDir);
+    const footprintsFolder = repoContents.find(
+      (item) => item.name === 'footprints' && item.type === 'dir'
+    );
+
+    if (footprintsFolder) {
+      const processDirectory = async (
+        currentRepo: string,
+        currentPath: string,
+        basePath: string
+      ) => {
+        const contents = await getRepoContents(currentRepo, currentPath);
+        for (const item of contents) {
+          if (item.type === 'dir') {
+            await processDirectory(currentRepo, item.path, basePath);
+          } else if (item.name.endsWith('.js')) {
+            const content = await getFileContent(item.download_url);
+            const injectionName = item.path
+              .substring(basePath.length + 1)
+              .replace('.js', '');
+            injections.push([injectionName, content]);
+          }
+        }
+      };
+      await processDirectory(repo, footprintsFolder.path, footprintsFolder.path);
+    }
+
+    // Handle .gitmodules
     try {
-      const urlObject = new URL(url);
-      if (urlObject.hostname !== 'github.com') {
-        return false;
-      }
-
-      const pathSegments = urlObject.pathname.split('/').filter(Boolean);
-      if (pathSegments.length !== 2) {
-        return false;
-      }
-
-      const reservedFirstSegments = [
-        'topics',
-        'trending',
-        'sponsors',
-        'issues',
-        'pulls',
-        'new',
-        'orgs',
-        'users',
-        'search',
-        'marketplace',
-        'explore',
-        'settings',
-        'notifications',
-        'discussions',
-        'codespaces',
-        'organizations',
-      ];
-      if (reservedFirstSegments.includes(pathSegments[0].toLowerCase())) {
-        return false;
-      }
-
-      return true;
-    } catch (_e) {
-      return false;
-    }
-  };
-
-  // If the URL is not a repository root, assume it's a direct file link.
-  if (!isRepoRoot(baseUrl)) {
-    const response = await fetch(getRawUrl(baseUrl));
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.text();
-  }
-
-  /**
-   * Attempts to fetch `config.yaml` from standard locations within a specific branch of a repository.
-   * @param {string} branch - The branch to check (e.g., 'main', 'master').
-   * @returns {Promise<string>} A promise that resolves with the file content if found.
-   * @throws {Error} Throws an error if the file cannot be fetched from any location in the branch.
-   */
-  const fetchWithBranch = async (branch: string): Promise<string> => {
-    // First, try the root directory
-    const firstUrl = getRawUrl(`${baseUrl}/blob/${branch}/config.yaml`);
-    let response = await fetch(firstUrl);
-
-    if (response.ok) {
-      return response.text();
-    }
-
-    // If not found, try the /ergogen/ directory
-    if (response.status === 400 || response.status === 404) {
-      const secondUrl = getRawUrl(
-        `${baseUrl}/blob/${branch}/ergogen/config.yaml`
+      const gitmodulesContent = await getFileContent(
+        `https://raw.githubusercontent.com/${repo}/HEAD/.gitmodules`
       );
-      response = await fetch(secondUrl);
-      if (response.ok) {
-        return response.text();
-      }
-    }
-    // If still not found or another error occurred, throw.
-    throw new Error(`HTTP error! status: ${response.status}`);
-  };
+      const submoduleRegex =
+        /\[submodule "([^"]+)"\]\s+path\s*=\s*([^\s]+)\s+url\s*=\s*([^\s]+)/g;
+      let match;
+      while ((match = submoduleRegex.exec(gitmodulesContent)) !== null) {
+        const path = match[2];
+        const url = match[3];
 
-  // Try fetching from the 'main' branch first, then fall back to 'master'.
-  try {
-    return await fetchWithBranch('main');
-  } catch (_e) {
-    return await fetchWithBranch('master');
+        if (footprintsFolder && path.startsWith(footprintsFolder.path)) {
+          const submoduleRepo = new URL(url).pathname.substring(1).replace('.git', '');
+          await processDirectory(submoduleRepo, '', path);
+        }
+      }
+    } catch (e) {
+      // .gitmodules not found or parsing failed, ignore
+    }
   }
+
+  return { config, injections };
 };

@@ -14,6 +14,7 @@ import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
+import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import {
   createErgogenWorker,
   createJscadWorker,
@@ -241,6 +242,15 @@ const ConfigContextProvider = ({
   // Config version tracking
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
+
+  // State for conflict resolution
+  type Resolution = 'skip' | 'overwrite' | 'keep-both';
+  type Injection = [string, string];
+  const [conflictingInjection, setConflictingInjection] =
+    useState<Injection | null>(null);
+  const [injectionQueue, setInjectionQueue] = useState<Injection[]>([]);
+  const [applyToAllResolution, setApplyToAllResolution] =
+    useState<Resolution | null>(null);
 
   useEffect(() => {
     console.log('--- ConfigContextProvider mounted ---');
@@ -563,14 +573,78 @@ const ConfigContextProvider = ({
   /**
    * Effect to process the input configuration on the initial load.
    */
+  const handleResolveConflict = (
+    resolution: Resolution,
+    applyToAll: boolean
+  ) => {
+    if (!conflictingInjection) return;
+
+    if (applyToAll) {
+      setApplyToAllResolution(resolution);
+    }
+
+    let updatedInjections = [...(injectionInput || [])];
+    const existingIndex = updatedInjections.findIndex(
+      (inj) => inj[0] === conflictingInjection[0]
+    );
+
+    if (resolution === 'overwrite') {
+      if (existingIndex !== -1) {
+        updatedInjections[existingIndex] = conflictingInjection;
+      } else {
+        updatedInjections.push(conflictingInjection);
+      }
+    } else if (resolution === 'keep-both') {
+      let newName = conflictingInjection[0];
+      let counter = 1;
+      while (
+        updatedInjections.some((inj) => inj[0] === `${newName}_${counter}`)
+      ) {
+        counter++;
+      }
+      updatedInjections.push([
+        `${newName}_${counter}`,
+        conflictingInjection[1],
+      ]);
+    } // 'skip' does nothing
+
+    setInjectionInput(updatedInjections);
+    setConflictingInjection(null);
+    setInjectionQueue((prevQueue) => prevQueue.slice(1));
+  };
+
+  const processNextInjection = () => {
+    if (injectionQueue.length === 0) return;
+
+    const nextInjection = injectionQueue[0];
+    const remainingInjections = injectionQueue.slice(1);
+
+    const isConflict = (injectionInput || []).some(
+      (inj) => inj[0] === nextInjection[0]
+    );
+
+    if (isConflict) {
+      if (applyToAllResolution) {
+        handleResolveConflict(applyToAllResolution, false); // Apply the saved resolution
+        setInjectionQueue(remainingInjections); // Move to the next one
+      } else {
+        setConflictingInjection(nextInjection); // Show dialog
+      }
+    } else {
+      setInjectionInput((prev) => [...(prev || []), nextInjection]);
+      setInjectionQueue(remainingInjections);
+    }
+  };
+
   useEffect(() => {
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
     if (githubUrl) {
       fetchConfigFromUrl(githubUrl)
-        .then((data) => {
-          setConfigInput(data);
-          generateNow(data, injectionInput, { pointsonly: false });
+        .then(({ config, injections }) => {
+          setConfigInput(config);
+          setInjectionQueue(injections);
+          generateNow(config, injectionInput, { pointsonly: false });
         })
         .catch((e) => {
           setError(`Failed to fetch config from GitHub: ${e.message}`);
@@ -580,6 +654,13 @@ const ConfigContextProvider = ({
     }
     // eslint-disable-next-line
   }, []);
+
+  useEffect(() => {
+    if (injectionQueue.length > 0 && !conflictingInjection) {
+      processNextInjection();
+    }
+    // eslint-disable-next-line
+  }, [injectionQueue, conflictingInjection, injectionInput]);
 
   /**
    * Effect to process the input configuration whenever it or the auto-generation settings change.
@@ -673,6 +754,12 @@ const ConfigContextProvider = ({
   return (
     <ConfigContext.Provider value={contextValue}>
       {children}
+      {conflictingInjection && (
+        <ConflictResolutionDialog
+          injectionName={conflictingInjection[0]}
+          onResolve={handleResolveConflict}
+        />
+      )}
     </ConfigContext.Provider>
   );
 };

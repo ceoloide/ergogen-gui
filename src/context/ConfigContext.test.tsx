@@ -95,7 +95,7 @@ describe('ConfigContextProvider', () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
+      'https://raw.githubusercontent.com/ceoloide/corney-island/HEAD/main/ergogen/config.yaml'
     );
 
     fetchSpy.mockRestore();
@@ -128,7 +128,7 @@ describe('ConfigContextProvider', () => {
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
+      'https://raw.githubusercontent.com/ceoloide/corney-island/HEAD/main/ergogen/config.yaml'
     );
 
     fetchSpy.mockRestore();
