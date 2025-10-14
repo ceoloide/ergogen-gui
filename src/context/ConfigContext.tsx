@@ -285,7 +285,11 @@ const ConfigContextProvider = ({
           const newResults = response.results as Results;
           let willConvertStl = false;
 
-          if (stlPreview && newResults.cases && Object.keys(newResults.cases).length > 0) {
+          if (
+            stlPreview &&
+            newResults.cases &&
+            Object.keys(newResults.cases).length > 0
+          ) {
             // Mark STL as pending for all cases that have JSCAD
             for (const name of Object.keys(newResults.cases)) {
               const caseObj = newResults.cases[name];

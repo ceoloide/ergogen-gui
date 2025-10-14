@@ -96,7 +96,7 @@ export type GitHubFootprint = {
 /**
  * Represents the result of loading from GitHub, including config and footprints.
  */
-export type GitHubLoadResult = {
+type GitHubLoadResult = {
   config: string;
   footprints: GitHubFootprint[];
   configPath: string;

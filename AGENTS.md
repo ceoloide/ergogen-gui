@@ -59,7 +59,7 @@ The `CHANGELOG.md` file tracks user-facing changes to the application in reverse
 
 **Title**: Use format "## Brief Feature Title"
 
-**Date**: Use format "_Month DD, YYYY_"
+**Date**: Use format "Month DD, YYYY"
 
 **Image**: Use format: ![A description of a screenshot of the feature.](./public/images/changelog/placeholder.png)
 
@@ -68,15 +68,18 @@ The `CHANGELOG.md` file tracks user-facing changes to the application in reverse
 **Middle Paragraphs**: Explain how the feature solves the problem. Focus on benefits and user experience, avoiding technical jargon. Keep the total entry under 300 words (maximum 500 words).
 
 **What changed section**: End with a bulleted list under "**What changed:**" that provides specific details:
+
 - Use present tense and active voice
 - Focus on user-visible changes, not implementation details
 - Keep bullets concise (one line each)
 - Highlight the most impactful changes first
 
 **Example structure:**
+
 ```markdown
 ## Feature Title
-_Month DD, YYYY-
+
+Month DD, YYYY
 
 ![A description of a screenshot of the feature.](./public/images/changelog/placeholder.png)
 
@@ -94,12 +97,14 @@ _Month DD, YYYY-
 ### When to Add Changelog Entries
 
 Add an entry for:
+
 - New user-facing features
 - Significant improvements to existing features
 - Bug fixes that notably impact user experience
 - Changes to workflows or user interactions
 
 Skip entries for:
+
 - Internal refactoring without user-visible changes
 - Dependency updates
 - Minor bug fixes

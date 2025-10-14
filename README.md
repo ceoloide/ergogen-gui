@@ -76,16 +76,16 @@ The deployment workflow is designed to be flexible for forks and custom domains.
 
 To configure the deployment URL for your repository:
 
-1.  Go to your repository on GitHub.
-1.  Navigate to **Settings** > **Secrets and variables** > **Actions**.
-1.  Select the **Variables** tab and click **New repository variable**.
-1.  For the **Name**, enter `PUBLIC_URL`.
-1.  For the **Value**, enter the relative path where the application will be hosted. For example:
-    - For a custom domain: `https://ergogen.xyz` enter `/`
-    - For a standard GitHub Pages site: `https://<username>.github.io/<repository-name>` enter `/<repository-name>`
-1.  Click **New repository variable** again.
-1.  For the **Name**, enter `REACT_APP_GTAG_ID`.
-2.  For the **Value**, enter your Google Tag ID to capture Google Analytics for the site.
+1. Go to your repository on GitHub.
+1. Navigate to **Settings** > **Secrets and variables** > **Actions**.
+1. Select the **Variables** tab and click **New repository variable**.
+1. For the **Name**, enter `PUBLIC_URL`.
+1. For the **Value**, enter the relative path where the application will be hosted. For example:
+   - For a custom domain: `https://ergogen.xyz` enter `/`
+   - For a standard GitHub Pages site: `https://<username>.github.io/<repository-name>` enter `/<repository-name>`
+1. Click **New repository variable** again.
+1. For the **Name**, enter `REACT_APP_GTAG_ID`.
+1. For the **Value**, enter your Google Tag ID to capture Google Analytics for the site.
 
 If the `PUBLIC_URL` variable is not set, the workflow will automatically use `/` as the default value.
 

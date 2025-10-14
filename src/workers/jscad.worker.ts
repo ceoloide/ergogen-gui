@@ -56,8 +56,7 @@ function getBasePath() {
     const { origin, pathname } = (self as any).location;
     // Remove "/static/..." if present
     const staticIndex = pathname.indexOf('/static/');
-    const base =
-      staticIndex > 0 ? pathname.substring(0, staticIndex) : '';
+    const base = staticIndex > 0 ? pathname.substring(0, staticIndex) : '';
     return `${origin}${base}`;
   }
   return '';
@@ -222,4 +221,4 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
 };
 
 // Export empty object to satisfy TypeScript's module requirement
-export { };
+export {};

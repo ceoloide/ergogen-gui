@@ -6,7 +6,7 @@ export type ConflictResolution = 'skip' | 'overwrite' | 'keep-both';
 /**
  * Result of checking for a conflict.
  */
-export type ConflictCheckResult =
+type ConflictCheckResult =
   | { hasConflict: false }
   | { hasConflict: true; conflictingName: string };
 

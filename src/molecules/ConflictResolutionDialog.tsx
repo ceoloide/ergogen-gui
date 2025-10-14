@@ -6,7 +6,7 @@ import Button from '../atoms/Button';
 /**
  * Props for the ConflictResolutionDialog component.
  */
-export type ConflictResolutionDialogProps = {
+type ConflictResolutionDialogProps = {
   footprintName: string;
   onResolve: (
     action: 'skip' | 'overwrite' | 'keep-both',
