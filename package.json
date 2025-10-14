@@ -1,9 +1,7 @@
 {
   "name": "ergogen-gui",
-  "version": "0.2.0",
-  "bugs": {
-    "url": "https://github.com/ceoloide/ergogen-gui/issues"
-  },
+  "version": "0.4.0",
+  "description": "A web-based GUI for Ergogen, the ergonomic keyboard layout generator.",
   "license": "MIT",
   "private": false,
   "dependencies": {
@@ -30,7 +28,7 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
-    "build-ergogen": "./patch/patch_ergogen.sh && cd node_modules/ergogen && yarn install && yarn run build && cp dist/ergogen.js ../../public/dependencies/ergogen.js",
+    "build-ergogen": "./patch/patch_ergogen.sh && cd node_modules/ergogen && npm install && npm run build && cp dist/ergogen.js ../../public/dependencies/ergogen.js",
     "postinstall": "yarn run build-ergogen",
     "start": "react-scripts --openssl-legacy-provider start",
     "build": "react-scripts --openssl-legacy-provider build",

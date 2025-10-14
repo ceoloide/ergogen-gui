@@ -2,13 +2,13 @@
 <html lang="en">
 
 <head><!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-46F2L343EK"></script>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=%REACT_APP_GTAG_ID%"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
 
-    gtag('config', 'G-46F2L343EK');
+    gtag('config', '%REACT_APP_GTAG_ID%');
   </script>
   <meta charset="utf-8" />
   <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
@@ -16,23 +16,13 @@
   <link rel="icon" sizes="192x192" href="%PUBLIC_URL%/ergogen.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#000000" />
-  <meta name="description" content="Ergogen" />
+  <meta name="description" content="Ergogen Web GUI" />
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="canonical" href="https://ergogen.ceoloide.com/" />
-  <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto&display=swap">
   <link rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=settings,visibility,download,edit,delete,add,close,keyboard,keyboard_alt,archive" />
-  <style>
-    .material-symbols-outlined {
-      font-variation-settings:
-        'FILL' 1,
-        'wght' 0,
-        'GRAD' -25,
-        'opsz' 20
-    }
-  </style>
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:psz,wght,FILL,GRAD@48,400,0,0&family=Nunito:wght@300;400;500;600;700&icon_names=add,add_2,archive,close,collapse_content,delete,description,download,edit,expand_content,keyboard,keyboard_alt,refresh,settings,visibility" />
   <title>Ergogen</title>
   <style>
     html,
@@ -46,25 +36,12 @@
 <body style="background: #2d2d2d;">
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <div id="root"></div>
-  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
-    integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
-    crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/3.14.0/js-yaml.min.js"
-    integrity="sha512-ia9gcZkLHA+lkNST5XlseHz/No5++YBneMsDp1IZRJSbi1YqQvBeskJuG1kR+PH1w7E0bFgEZegcj0EwpXQnww=="
-    crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/8.1.1/math.js"
-    integrity="sha512-OFr0yNTrn4TBOCW8hAkqVRjN45OYD4C3Zv3JA+/UFDW7rEjt7RV89OfUinLg/9GzHbUWYq1+jXzgVV/UsZWJHQ=="
-    crossorigin="anonymous"></script>
   <script src="%PUBLIC_URL%/dependencies/maker.js"></script>
   <script>
     makerjs = require('makerjs')
   </script>
   <script src="%PUBLIC_URL%/dependencies/bezier.js"></script>
   <script src="%PUBLIC_URL%/dependencies/hull.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.panzoom/4.0.0/panzoom.min.js"
-    integrity="sha512-9P4403el58YclVUmhMst5Bzpcy+i0V0F0wiMlrkTDgmVqYXhF+tccpnhGIHKzKPXKaTF0Q4J9UEhu2i6PckJWg=="
-    crossorigin="anonymous"></script>
   <script>
     myjscad = {}
   </script>

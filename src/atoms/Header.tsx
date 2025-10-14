@@ -237,7 +237,7 @@ const Header = (): JSX.Element => {
             aria-label="Go to home page"
             data-testid="logo-button"
           >
-            <LogoImage src={'ergogen.png'} alt="Ergogen logo" />
+            <LogoImage src={`${process.env.PUBLIC_URL}/ergogen.png`} alt="Ergogen logo" />
           </LogoButton>
           <AppName>Ergogen</AppName>
           <VersionText

@@ -68,32 +68,30 @@ The Ergogen GUI is divided into three main sections: the configuration editor on
 
 ## Deployment to GitHub Pages
 
-This repository includes a GitHub Actions workflow to automatically build and deploy the application to GitHub Pages.
+This repository includes a GitHub Actions workflow to automatically build and deploy the application to GitHub Pages whenever changes are pushed to the `main` branch.
 
-### Manual Deployment
+### Dynamic Deployment URL
 
-In addition to automatic deployments on pushes to `main`, the workflow can be triggered manually from the GitHub Actions tab. This is particularly useful for deploying changes that don't involve a code commit, such as updating static assets in the `/public` directory.
+The deployment workflow is designed to be flexible for forks and custom domains. It uses a repository variable to set the correct `PUBLIC_URL` during the build process. This ensures that all asset paths are generated correctly for the environment where the application will be hosted.
 
-To manually trigger a deployment:
+To configure the deployment URL for your repository:
 
-1. Navigate to your repository on GitHub.
-2. Click on the **Actions** tab.
-3. In the list of workflows on the left, select **GitHub Pages**.
-4. Click the **Run workflow** button, choose the branch you want to deploy from, and confirm by clicking **Run workflow** again.
+1.  Go to your repository on GitHub.
+1.  Navigate to **Settings** > **Secrets and variables** > **Actions**.
+1.  Select the **Variables** tab and click **New repository variable**.
+1.  For the **Name**, enter `PUBLIC_URL`.
+1.  For the **Value**, enter the relative path where the application will be hosted. For example:
+    - For a custom domain: `https://ergogen.xyz` enter `/`
+    - For a standard GitHub Pages site: `https://<username>.github.io/<repository-name>` enter `/<repository-name>`
+1.  Click **New repository variable** again.
+1.  For the **Name**, enter `REACT_APP_GTAG_ID`.
+2.  For the **Value**, enter your Google Tag ID to capture Google Analytics for the site.
 
-### Custom Domain Configuration
+If the `PUBLIC_URL` variable is not set, the workflow will automatically use `/` as the default value.
 
-The deployment workflow supports configuring a custom domain via a repository variable. This allows forks of this repository to be deployed to their own custom domains.
+### Troubleshooting GitHub Pages
 
-To configure a custom domain for your deployment:
-
-1. Navigate to your repository on GitHub.
-2. Go to **Settings** > **Secrets and variables** > **Actions**.
-3. Select the **Variables** tab and click **New repository variable**.
-4. For the **Name**, enter `CNAME_DOMAIN`.
-5. For the **Value**, enter your custom domain (e.g., `your.domain.com`).
-
-When the workflow runs on the `main` branch, it will generate a `CNAME` file with the value of this variable. If the `CNAME_DOMAIN` variable is not set, no `CNAME` file will be created, and the site will be deployed to the default GitHub Pages URL (`<username>.github.io/<repository-name>`).
+If you are having issues deploying after forking this repository, try renaming the `deploy.yaml` workflow configuration to any other name. This should prompt GitHub to load the new configuration and get unstuck.
 
 ## Project Structure
 
