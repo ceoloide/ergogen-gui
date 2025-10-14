@@ -163,7 +163,7 @@ test.describe('GitHub Loading', () => {
     }
   });
 
-  test.skip('should accumulate footprints from sequential loads and reset conflict dialog', async ({
+  test('should accumulate footprints from sequential loads and reset conflict dialog', async ({
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
@@ -218,8 +218,23 @@ test.describe('GitHub Loading', () => {
     await loadButton.click();
     await shoot('second-repo-loading');
 
+    // Wait for logs
+    await page.waitForTimeout(10000);
+    await shoot('second-repo-loaded-injections');
+
+    // Resolve conflict dialog if it appears
+    const conflictDialog = page.getByTestId('conflict-dialog-dialog');
+    await expect(conflictDialog).toBeVisible();
+    const conflictSkipButton = page.getByTestId('conflict-dialog-skip');
+    await conflictSkipButton.click();
+    const applyToAllCheckbox = page.getByTestId('conflict-dialog-apply-to-all');
+    await applyToAllCheckbox.click();
+    const conflictOverwriteButton = page.getByTestId('conflict-dialog-overwrite');
+    await conflictOverwriteButton.click();
+
     // Wait for the config to be loaded
-    await expect(page).toHaveURL(/.*\/$/, { timeout: 30000 });
+
+    await expect(page).toHaveURL(/.*\/$/, { timeout: 10000 });
     await shoot('second-repo-loaded');
 
     // Open settings and verify both footprints are present
