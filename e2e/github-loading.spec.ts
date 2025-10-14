@@ -229,7 +229,9 @@ test.describe('GitHub Loading', () => {
     await conflictSkipButton.click();
     const applyToAllCheckbox = page.getByTestId('conflict-dialog-apply-to-all');
     await applyToAllCheckbox.click();
-    const conflictOverwriteButton = page.getByTestId('conflict-dialog-overwrite');
+    const conflictOverwriteButton = page.getByTestId(
+      'conflict-dialog-overwrite'
+    );
     await conflictOverwriteButton.click();
 
     // Wait for the config to be loaded
