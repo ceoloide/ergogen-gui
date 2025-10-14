@@ -287,19 +287,19 @@ const Header = (): JSX.Element => {
           <span>Docs</span>
         </DocsButton>
         <StyledLinkButton
-          href="https://discord.gg/nbKcAZB"
+          href="https://discord.ergogen.xyz"
           target="_blank"
           rel="noreferrer"
-          aria-label="Join Discord community"
+          aria-label="Join the Discord community"
           data-testid="discord-button"
         >
           <DiscordIcon />
         </StyledLinkButton>
         <StyledLinkButton
-          href="https://github.com/ceoloide/ergogen-gui"
+          href="https://github.com/ergogen"
           target="_blank"
           rel="noreferrer"
-          aria-label="View GitHub repository"
+          aria-label="View the GitHub repositories"
           data-testid="github-button"
         >
           <GithubIcon />
