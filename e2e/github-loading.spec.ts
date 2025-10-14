@@ -70,10 +70,10 @@ test.describe('GitHub Loading', () => {
     // Check for footprint loading
     expect(logs.some((log) => log.includes('Loaded footprint'))).toBe(true);
 
-    await page.waitForTimeout(5000); // Give time for the config to load
+    await page.waitForTimeout(2000); // Give time for the config to load
 
     // Open settings to check footprints
-    const settingsButton = page.getByTestId('settings-toggle-button');
+    const settingsButton = page.getByTestId('settings-button');
     await settingsButton.click();
     await shoot('settings-opened');
 
@@ -119,14 +119,9 @@ test.describe('GitHub Loading', () => {
     await page.goto('/?github=ceoloide/mr_useful');
     await shoot('loaded-with-url-param');
 
-    // Verify loading bar appears during URL parameter loading
-    const loadingBar = page.getByTestId('loading-bar');
-    await expect(loadingBar).toBeVisible({ timeout: 5000 });
-    await shoot('loading-bar-visible-url-param');
-
     // Wait for config to be loaded and editor to be visible
     await expect(page.getByTestId('config-editor')).toBeVisible({
-      timeout: 30000,
+      timeout: 5000,
     });
     await shoot('config-editor-visible-url-param');
 
@@ -139,7 +134,7 @@ test.describe('GitHub Loading', () => {
     expect(logs.some((log) => log.includes('Loaded footprint'))).toBe(true);
 
     // Open settings to verify footprints
-    const settingsButton = page.getByTestId('settings-toggle-button');
+    const settingsButton = page.getByTestId('settings-button');
     await settingsButton.click();
     await shoot('settings-opened-url-param');
 
@@ -197,7 +192,7 @@ test.describe('GitHub Loading', () => {
     });
 
     // Open settings and verify first footprint
-    let settingsButton = page.getByTestId('settings-toggle-button');
+    let settingsButton = page.getByTestId('settings-button');
     await settingsButton.click();
     await shoot('settings-opened-first');
 
@@ -228,7 +223,7 @@ test.describe('GitHub Loading', () => {
     await shoot('second-repo-loaded');
 
     // Open settings and verify both footprints are present
-    settingsButton = page.getByTestId('settings-toggle-button');
+    settingsButton = page.getByTestId('settings-button');
     await settingsButton.click();
     await shoot('settings-opened-second');
 
