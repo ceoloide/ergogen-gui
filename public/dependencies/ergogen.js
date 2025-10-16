@@ -471,9 +471,6 @@
 		all: true,
 		include: [
 			"src/**/*.js"
-		],
-		exclude: [
-			"src/templates/kicad8.js"
 		]
 	};
 	var require$$8 = {
