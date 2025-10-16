@@ -45,7 +45,7 @@ jobs:
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       - name: Conditionally create CNAME
         if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
-        run: echo "${{ vars.CNAME_DOMAIN }}" > ./public/CNAME
+        run: echo "${{ vars.CNAME_DOMAIN }}" > ./build/CNAME
         env:
           CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
       - name: Deploy
