@@ -43,14 +43,17 @@ jobs:
         env:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+      - name: Conditionally create CNAME
+        if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
+        run: echo "${{ vars.CNAME_DOMAIN }}" > ./public/CNAME
+        env:
+          CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
-          cname: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN || '' }}
           allow_empty_commit: true
           full_commit_message: ${{ github.event.head_commit.message }}
-        env:
-          CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
+          force_orphan: true
