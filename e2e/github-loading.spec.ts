@@ -14,7 +14,6 @@ test.describe('GitHub Loading', () => {
       const text = msg.text();
       if (text.startsWith('[GitHub]')) {
         logs.push(text);
-        console.log(text); // Also output to test log
       }
       if (text.startsWith('[GitHub Rate Limit]')) {
         rateLimitLogs.push(text);
@@ -169,9 +168,6 @@ test.describe('GitHub Loading', () => {
     const shoot = makeShooter(page, test.info());
     page.on('console', (msg) => {
       const text = msg.text();
-      if (text.startsWith('[GitHub]')) {
-        console.log(text);
-      }
       if (text.startsWith('[GitHub Rate Limit]')) {
         console.log(text);
       }
