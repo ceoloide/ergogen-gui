@@ -24,7 +24,8 @@ self.onerror = (error) => {
  * Main worker message handler.
  */
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { type, inputConfig, injectionInput, requestId } = event.data || {};
+  const { type, inputConfig, injectionInput, requestId, options } =
+    event.data || {};
 
   console.log(
     `<<< Ergogen worker received a message: ${JSON.stringify(event.data)}`
@@ -73,7 +74,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     console.log('<-> Running Ergogen in worker');
     const results = await ergogen.process(
       inputConfig,
-      true, // Set debug to true or no SVGs are generated
+      { debug: true, svg: true }, // Debug option enabled to ensure `demo.dxf` is generated
       (m: string) => console.log(m) // logger
     );
     console.log('>>> Ergogen finished in worker');

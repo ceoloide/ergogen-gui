@@ -14530,12 +14530,13 @@
 
 		const version = require$$8.version;
 
-		const process = async (raw, debug=false, logger=()=>{}) => {
+		const process = async (raw, options={}, logger=()=>{}) => {
 
 		    const prefix = 'Interpreting format: ';
 		    let empty = true;
 		    let [config, format] = io.interpret(raw, logger);
 		    let suffix = format;
+		    let { debug = false, svg = false } = options;
 		    // KLE conversion warrants automaticly engaging debug mode
 		    // as, usually, we're only interested in the points anyway
 		    if (format == 'KLE') {
@@ -14586,7 +14587,7 @@
 		    results.outlines = {};
 		    for (const [name, outline] of Object.entries(outlines)) {
 		        if (!debug && name.startsWith('_')) continue
-		        results.outlines[name] = io.twodee(outline, debug);
+		        results.outlines[name] = io.twodee(outline, svg || debug);
 		        empty = false;
 		    }
 
@@ -14610,7 +14611,7 @@
 
 		    if (!debug && empty) {
 		        logger('Output would be empty, rerunning in debug mode...');
-		        return process(raw, true, () => {})
+		        return process(raw, {debug: true, svg}, () => {})
 		    }
 		    return results
 		};

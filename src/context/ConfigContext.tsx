@@ -522,6 +522,10 @@ const ConfigContextProvider = ({
             inputConfig,
             injectionInput: inputInjection,
             requestId: `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`,
+            options: {
+              debug: debug,
+              svg: true,
+            },
           });
         } else {
           console.error('Worker not available for processing request.');

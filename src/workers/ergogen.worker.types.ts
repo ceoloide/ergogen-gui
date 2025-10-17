@@ -8,6 +8,9 @@ export type WorkerRequest = {
   injectionInput?: string[][];
   /** Unique id to correlate requests and responses */
   requestId: string;
+  options: {
+    debug: boolean;
+  };
 };
 
 export type WorkerResponse =
