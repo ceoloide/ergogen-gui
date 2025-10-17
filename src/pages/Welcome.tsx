@@ -149,6 +149,9 @@ const Welcome = () => {
   );
   const [currentConflict, setCurrentConflict] = useState<string | null>(null);
   const [pendingConfig, setPendingConfig] = useState<string | null>(null);
+  const [injectionsAtConflict, setInjectionsAtConflict] = useState<
+    string[][] | null
+  >(null);
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -208,6 +211,7 @@ const Welcome = () => {
       setCurrentConflict(currentFootprint.name);
       setPendingFootprints(footprints);
       setPendingConfig(config);
+      setInjectionsAtConflict(injectionsToUse ?? null);
       return;
     }
 
@@ -255,7 +259,7 @@ const Welcome = () => {
     // Merge with current injections state
     const mergedInjections = mergeInjections(
       [currentFootprint],
-      configContext.injectionInput,
+      injectionsAtConflict || configContext.injectionInput,
       action
     );
 
@@ -279,6 +283,7 @@ const Welcome = () => {
       // Clean up state only after all footprints are processed
       setPendingFootprints([]);
       setPendingConfig(null);
+      setInjectionsAtConflict(null);
     }
   };
 
@@ -286,6 +291,7 @@ const Welcome = () => {
     setCurrentConflict(null);
     setPendingFootprints([]);
     setPendingConfig(null);
+    setInjectionsAtConflict(null);
     setIsLoading(false);
     // Show error message that loading was cancelled
     if (configContext) {
@@ -304,6 +310,7 @@ const Welcome = () => {
     setCurrentConflict(null);
     setPendingFootprints([]);
     setPendingConfig(null);
+    setInjectionsAtConflict(null);
 
     fetchConfigFromUrl(githubInput)
       .then(async (result) => {

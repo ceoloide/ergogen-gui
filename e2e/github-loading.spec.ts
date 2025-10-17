@@ -167,6 +167,15 @@ test.describe('GitHub Loading', () => {
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
+    page.on('console', (msg) => {
+      const text = msg.text();
+      if (text.startsWith('[GitHub]')) {
+        console.log(text);
+      }
+      if (text.startsWith('[GitHub Rate Limit]')) {
+        console.log(text);
+      }
+    });
 
     // Navigate to the welcome page
     await page.goto('/new');
@@ -223,7 +232,7 @@ test.describe('GitHub Loading', () => {
     await shoot('second-repo-loaded-injections');
 
     // Resolve conflict dialog if it appears
-    const conflictDialog = page.getByTestId('conflict-dialog-dialog');
+    const conflictDialog = page.getByTestId('conflict-dialog-box');
     await expect(conflictDialog).toBeVisible();
     const conflictSkipButton = page.getByTestId('conflict-dialog-skip');
     await conflictSkipButton.click();

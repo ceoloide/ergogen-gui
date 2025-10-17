@@ -543,7 +543,7 @@ const ConfigContextProvider = ({
         return;
       }
     },
-    [parseConfig, setError, setDeprecationWarning, setIsGenerating]
+    [parseConfig, setError, setDeprecationWarning, setIsGenerating, debug]
   );
 
   /**

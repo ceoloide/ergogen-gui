@@ -24,8 +24,7 @@ self.onerror = (error) => {
  * Main worker message handler.
  */
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { type, inputConfig, injectionInput, requestId, options } =
-    event.data || {};
+  const { type, inputConfig, injectionInput, requestId } = event.data || {};
 
   console.log(
     `<<< Ergogen worker received a message: ${JSON.stringify(event.data)}`
