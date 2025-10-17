@@ -5,7 +5,6 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? 'list' : 'html',
   use: {
     baseURL: 'http://localhost:3000',
