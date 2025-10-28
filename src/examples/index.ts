@@ -1,6 +1,7 @@
 import Absolem from './absolem';
 import Atreus from './atreus';
 import Adux from './adux';
+import CorneyIsland from './corney-island';
 import EmptyYAML from './empty_yaml';
 import Wubbo from './wubbo';
 import Sweeplike from './sweeplike';
@@ -47,7 +48,7 @@ const emptyExamples = [EmptyYAML];
 
 const simpleExamples = [Absolem, Atreus];
 
-const completeExamples = [Adux, Sweeplike, Reviung41, Tiny20];
+const completeExamples = [Adux, CorneyIsland, Sweeplike, Reviung41, Tiny20];
 
 const miscExamples = [Wubbo, Alpha, Plank];
 

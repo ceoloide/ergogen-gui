@@ -5,7 +5,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const ADux: ConfigExample = {
-  label: 'A. dux',
+  label: 'A. Dux',
   author: 'tapioki',
   value: `meta:
   engine: 4.1.0

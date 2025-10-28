@@ -5,7 +5,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const Sweeplike: ConfigExample = {
-  label: 'Sweep-like (minimal)',
+  label: 'Sweep-like',
   author: 'jcmkk3',
   value: `meta:
   engine: 4.1.0

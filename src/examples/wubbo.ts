@@ -6,7 +6,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const Wubbo: ConfigExample = {
-  label: 'Wubbo (outlines, switchplate)',
+  label: 'Wubbo',
   author: 'cache.works',
   value: `meta:
   engine: 4.1.0

@@ -6,7 +6,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const Reviung41: ConfigExample = {
-  label: 'Reviung41 (simplified)',
+  label: 'Reviung41',
   author: 'jcmkk3',
   value: `meta:
   engine: 4.1.0

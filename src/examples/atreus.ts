@@ -6,7 +6,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const Atreus: ConfigExample = {
-  label: 'Atreus (simplified)',
+  label: 'Atreus',
   author: 'MrZealot',
   value: `points:
   zones:

@@ -6,7 +6,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const Alpha: ConfigExample = {
-  label: 'Alpha (staggered bottom row)',
+  label: 'Alpha',
   author: 'jcmkk3',
   value: `points:
   mirror:

@@ -116,15 +116,13 @@ const ExampleCard = styled.div`
   }
 `;
 
-const PlaceholderImage = styled.div`
+const ExampleImage = styled.img`
   width: 100%;
   height: 150px;
+  object-fit: contain;
+  padding: 8px;
+  box-sizing: border-box;
   background-color: ${theme.colors.backgroundLighter};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${theme.colors.textDarkest};
-  font-style: italic;
 `;
 
 const ExampleName = styled.div`
@@ -418,9 +416,10 @@ const Welcome = () => {
               aria-label={`Load ${example.label} example`}
               data-testid={`example-${example.label.toLowerCase().replace(/\s+/g, '-')}`}
             >
-              <PlaceholderImage>
-                <span>Placeholder</span>
-              </PlaceholderImage>
+              <ExampleImage
+                src={`/images/previews/${example.label.toLowerCase().replace(/[\s()]/g, '_')}.svg`}
+                alt={`${example.label} preview`}
+              />
               <ExampleName>{example.label}</ExampleName>
             </ExampleCard>
           ))}

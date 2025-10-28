@@ -6,7 +6,7 @@ import { ConfigExample } from './index';
  * @type {ConfigExample}
  */
 const Plank: ConfigExample = {
-  label: 'Plank (ortholinear, 2u space)',
+  label: 'Plank',
   author: 'cache.works',
   value: `meta:
   engine: 4.1.0
