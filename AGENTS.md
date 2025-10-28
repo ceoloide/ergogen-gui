@@ -34,6 +34,11 @@ This project is a React-based web interface for the [Ergogen](https://github.com
 - **Centralized Theming**: All colors and other theme-related properties (e.g., font sizes, spacing) should be centralized in `src/theme/theme.ts`. Components should import and use variables from this theme file instead of using hardcoded values.
 - **Styled Components for Styling**: All styling, including global styles, should be managed using `styled-components`. Global styles should be defined in a `GlobalStyle` component to ensure consistency and encapsulation within the React component architecture, avoiding the use of separate CSS files like `index.css`.
 
+## Architecture
+
+- **GitHub Pages Hosting**: The application is hosted on GitHub Pages, which only serves static files. This means that client-side routing needs a workaround to handle direct navigation to sub-paths.
+- **404-based Redirect**: To handle client-side routing on GitHub Pages, a custom `public/404.html` file is used. This file contains a script that captures the requested path from `window.location.pathname`, stores it in `sessionStorage`, and then redirects the user to the root of the application (`/`). The main `App.tsx` component then reads this path from `sessionStorage` on load and navigates the user to the correct client-side route.
+
 ## Development environment
 
 ### Linting and formatting
