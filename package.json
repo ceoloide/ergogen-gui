@@ -29,10 +29,12 @@
   },
   "scripts": {
     "build-ergogen": "./patch/patch_ergogen.sh && cd node_modules/ergogen && npm install && npm run build && cp dist/ergogen.js ../../public/dependencies/ergogen.js",
+    "generate-previews": "ts-node --project scripts/tsconfig.json scripts/generate-previews.js",
     "postinstall": "yarn run build-ergogen",
+    "prestart": "yarn run generate-previews",
     "start": "react-scripts --openssl-legacy-provider start",
+    "prebuild": "yarn run build-ergogen && yarn run generate-previews",
     "build": "react-scripts --openssl-legacy-provider build",
-    "postbuild": "yarn run build-ergogen",
     "test:unit": "CI=true react-scripts --openssl-legacy-provider test --env=jsdom",
     "test:e2e": "CI=true playwright test",
     "test": "yarn test:unit && yarn test:e2e",
@@ -88,6 +90,7 @@
     "markdownlint-cli": "^0.45.0",
     "prettier": "^3.6.2",
     "three-stdlib": "^2.36.0",
+    "ts-node": "^10.9.2",
     "typescript-eslint": "^8.45.0"
   },
   "knip": {
