@@ -7,6 +7,11 @@ import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
 import {
+  loadConfigFromLocalFolder,
+  LocalFootprint,
+  isFileSystemAccessSupported,
+} from '../utils/localFiles';
+import {
   checkForConflict,
   mergeInjections,
   ConflictResolution,
@@ -142,9 +147,9 @@ const Welcome = () => {
   const [githubInput, setGithubInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
-  const [pendingFootprints, setPendingFootprints] = useState<GitHubFootprint[]>(
-    []
-  );
+  const [pendingFootprints, setPendingFootprints] = useState<
+    (GitHubFootprint | LocalFootprint)[]
+  >([]);
   const [currentConflict, setCurrentConflict] = useState<string | null>(null);
   const [pendingConfig, setPendingConfig] = useState<string | null>(null);
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
@@ -172,7 +177,7 @@ const Welcome = () => {
   };
 
   const processFootprints = async (
-    footprints: GitHubFootprint[],
+    footprints: (GitHubFootprint | LocalFootprint)[],
     config: string,
     resolution: ConflictResolution | null = null,
     currentInjections?: string[][]
@@ -341,6 +346,44 @@ const Welcome = () => {
       });
   };
 
+  const handleLocalFolder = async () => {
+    if (!configContext) return;
+    const { setError, clearError, setIsGenerating } = configContext;
+    setIsLoading(true);
+    setIsGenerating(true); // Show progress bar during local loading
+    clearError();
+
+    // Reset any pending conflict resolution state from previous loads
+    setCurrentConflict(null);
+    setPendingFootprints([]);
+    setPendingConfig(null);
+    setInjectionsAtConflict(null);
+
+    try {
+      const result = await loadConfigFromLocalFolder();
+      
+      if (result === null) {
+        // User cancelled the picker
+        setIsLoading(false);
+        setIsGenerating(false);
+        return;
+      }
+
+      // Process footprints with conflict resolution
+      await processFootprints(result.footprints, result.config);
+    } catch (error) {
+      setError(
+        `Failed to load from local folder: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      // Ensure we reset loading state and don't navigate
+      setIsLoading(false);
+      setIsGenerating(false);
+    } finally {
+      setIsLoading(false);
+      // Note: isGenerating will be reset by generateNow or needs explicit reset on error
+    }
+  };
+
   return (
     <WelcomePageWrapper>
       {currentConflict && (
@@ -395,6 +438,25 @@ const Welcome = () => {
                 {isLoading ? 'Loading...' : 'Load'}
               </Button>
             </GitHubInputContainer>
+          </OptionBox>
+          <OptionBox>
+            <h2>From Local Folder</h2>
+            <p>
+              Select a folder containing config.yaml and optionally a footprints
+              folder. Works in modern browsers that support the File System Access API.
+            </p>
+            <Button
+              onClick={handleLocalFolder}
+              disabled={isLoading || !isFileSystemAccessSupported()}
+              aria-label="Load configuration from local folder"
+              data-testid="local-folder-button"
+            >
+              {isLoading
+                ? 'Loading...'
+                : !isFileSystemAccessSupported()
+                  ? 'Not Supported'
+                  : 'Select Folder'}
+            </Button>
           </OptionBox>
         </OptionsContainer>
 
