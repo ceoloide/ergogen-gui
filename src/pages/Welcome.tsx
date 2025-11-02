@@ -99,6 +99,31 @@ const HiddenFileInput = styled.input`
   display: none;
 `;
 
+const DragOverlay = styled.div<{ $isDragging: boolean }>`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  display: ${(props) => (props.$isDragging ? 'flex' : 'none')};
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+`;
+
+const DragOverlayContent = styled.div`
+  border: 3px dashed ${theme.colors.primary};
+  border-radius: 16px;
+  padding: 4rem;
+  background-color: ${theme.colors.backgroundLight};
+  text-align: center;
+  font-size: ${theme.fontSizes.xl};
+  color: ${theme.colors.white};
+  font-weight: ${theme.fontWeights.semiBold};
+`;
+
 const ExamplesGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -156,6 +181,8 @@ const Welcome = () => {
     string[][] | null
   >(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = React.useRef(0);
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -347,11 +374,8 @@ const Welcome = () => {
       });
   };
 
-  const handleLocalFile = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file || !configContext) return;
+  const processFile = async (file: File) => {
+    if (!configContext) return;
 
     const { setError, clearError, setIsGenerating } = configContext;
     setIsLoading(true);
@@ -384,12 +408,72 @@ const Welcome = () => {
     }
   };
 
+  const handleLocalFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await processFile(file);
+  };
+
   const handleFileButtonClick = () => {
     fileInputRef.current?.click();
   };
 
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+
+    if (isLoading) return;
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      await processFile(file);
+    }
+  };
+
   return (
-    <WelcomePageWrapper>
+    <WelcomePageWrapper
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <DragOverlay $isDragging={isDragging}>
+        <DragOverlayContent>
+          Drop your file here
+          <br />
+          <span style={{ fontSize: theme.fontSizes.lg, opacity: 0.8 }}>
+            (.yaml, .json, .zip, or .ekb)
+          </span>
+        </DragOverlayContent>
+      </DragOverlay>
       {currentConflict && (
         <ConflictResolutionDialog
           footprintName={currentConflict}
