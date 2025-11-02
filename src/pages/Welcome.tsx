@@ -563,6 +563,16 @@ const Welcome = () => {
                 placeholder="github.com/ceoloide/corney-island"
                 value={githubInput}
                 onChange={(e) => setGithubInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' &&
+                    !isLoading &&
+                    githubInput.trim() !== ''
+                  ) {
+                    e.preventDefault();
+                    handleGitHub();
+                  }
+                }}
                 disabled={isLoading}
                 aria-label="GitHub repository URL"
                 data-testid="github-input"
