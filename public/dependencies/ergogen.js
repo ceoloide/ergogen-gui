@@ -592,7 +592,8 @@
 		    return [config, format]
 		};
 
-		io.twodee = (model, debug) => {
+		io.twodee = (model, options) => {
+		    const {debug, svg} = options;
 		    const assembly = makerjs.model.originate({
 		        models: {
 		            export: u.deepcopy(model)
@@ -605,7 +606,9 @@
 		    };
 		    if (debug) {
 		        result.yaml = assembly;
-		        result.svg = makerjs.exporter.toSVG(assembly);
+		    }
+		    if (debug || svg) {
+		      result.svg = makerjs.exporter.toSVG(assembly);
 		    }
 		    return result
 		};
@@ -1969,7 +1972,7 @@
 
 		            // process keys that are common to all part declarations
 		            const operation = u[a.in(part.operation || 'add', `${name}.operation`, ['add', 'subtract', 'intersect', 'stack'])];
-		            const what = a.in(part.what || 'outline', `${name}.what`, ['rectangle', 'circle', 'polygon', 'outline', 'path', 'hull']);
+		            const what = a.in(part.what || 'outline', `${name}.what`, ['rectangle', 'circle', 'polygon', 'outline', 'bezier', 'hull', 'path']);
 		            const bound = !!part.bound;
 		            const asym = a.asym(part.asym || 'source', `${name}.asym`);
 
@@ -6819,7 +6822,7 @@
 		    designator: 'PWR',
 		    side: 'F',
 		    reversible: false,
-		    invert_behavior: true,
+		    invert_behavior: false,
 		    include_silkscreen: true,
 		    include_courtyard: false,
 		    switch_3dmodel_filename: '',
@@ -14579,7 +14582,7 @@
 		    }
 		    if (debug) {
 		        results.points = points;
-		        results.demo = io.twodee(points_lib.visualize(points, units), debug);
+		        results.demo = io.twodee(points_lib.visualize(points, units), {debug, svg});
 		    }
 
 		    logger('Generating outlines...');
@@ -14587,7 +14590,7 @@
 		    results.outlines = {};
 		    for (const [name, outline] of Object.entries(outlines)) {
 		        if (!debug && name.startsWith('_')) continue
-		        results.outlines[name] = io.twodee(outline, svg || debug);
+		        results.outlines[name] = io.twodee(outline, {debug, svg});
 		        empty = false;
 		    }
 
