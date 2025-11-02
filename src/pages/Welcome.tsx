@@ -133,7 +133,16 @@ const GitHubInputContainer = styled.div`
   display: flex;
   gap: 0.5rem;
   width: 100%;
-  max-width: 400px;
+  min-width: 0;
+
+  input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  button {
+    flex-shrink: 0;
+  }
 `;
 
 const HiddenFileInput = styled.input`
