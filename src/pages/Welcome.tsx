@@ -11,6 +11,7 @@ import {
   mergeInjections,
   ConflictResolution,
 } from '../utils/injections';
+import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
@@ -92,6 +93,44 @@ const GitHubInputContainer = styled.div`
   gap: 0.5rem;
   width: 100%;
   max-width: 400px;
+`;
+
+const FileInputContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 400px;
+`;
+
+const FileInput = styled.input`
+  padding: 0.5rem;
+  border: 1px solid ${theme.colors.border};
+  border-radius: 4px;
+  background-color: ${theme.colors.backgroundLighter};
+  color: ${theme.colors.text};
+  font-size: ${theme.fontSizes.base};
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &::file-selector-button {
+    padding: 0.5rem 1rem;
+    margin-right: 1rem;
+    border: 1px solid ${theme.colors.border};
+    border-radius: 4px;
+    background-color: ${theme.colors.backgroundLight};
+    color: ${theme.colors.text};
+    cursor: pointer;
+    font-size: ${theme.fontSizes.base};
+
+    &:hover {
+      background-color: ${theme.colors.buttonHover};
+    }
+  }
 `;
 
 const ExamplesGrid = styled.div`
@@ -341,6 +380,42 @@ const Welcome = () => {
       });
   };
 
+  const handleLocalFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !configContext) return;
+
+    const { setError, clearError, setIsGenerating } = configContext;
+    setIsLoading(true);
+    setIsGenerating(true); // Show progress bar during file loading
+    clearError();
+
+    // Reset any pending conflict resolution state from previous loads
+    setCurrentConflict(null);
+    setPendingFootprints([]);
+    setPendingConfig(null);
+    setInjectionsAtConflict(null);
+
+    // Reset the file input so the same file can be selected again
+    event.target.value = '';
+
+    try {
+      const result = await loadLocalFile(file);
+
+      // Process footprints with conflict resolution
+      await processFootprints(result.footprints, result.config);
+    } catch (error) {
+      setError(
+        `Failed to load local file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      // Ensure we reset loading state and don't navigate
+      setIsLoading(false);
+      setIsGenerating(false);
+    } finally {
+      setIsLoading(false);
+      // Note: isGenerating will be reset by generateNow or needs explicit reset on error
+    }
+  };
+
   return (
     <WelcomePageWrapper>
       {currentConflict && (
@@ -395,6 +470,23 @@ const Welcome = () => {
                 {isLoading ? 'Loading...' : 'Load'}
               </Button>
             </GitHubInputContainer>
+          </OptionBox>
+          <OptionBox>
+            <h2>From Local File</h2>
+            <p>
+              Load a configuration from your computer. Supports *.yaml, *.json,
+              *.zip, and *.ekb files.
+            </p>
+            <FileInputContainer>
+              <FileInput
+                type="file"
+                accept=".yaml,.yml,.json,.zip,.ekb"
+                onChange={handleLocalFile}
+                disabled={isLoading}
+                aria-label="Select local file to load"
+                data-testid="local-file-input"
+              />
+            </FileInputContainer>
           </OptionBox>
         </OptionsContainer>
 
