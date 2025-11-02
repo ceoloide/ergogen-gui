@@ -107,7 +107,7 @@ const FileInputLabel = styled.label`
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: ${theme.colors.accentHover};
+    background-color: ${theme.colors.accentDark};
   }
 
   &:active {
