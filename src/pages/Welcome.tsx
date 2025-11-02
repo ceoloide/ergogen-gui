@@ -88,9 +88,11 @@ const OptionsContainer = styled.div`
   gap: 2rem;
   margin-bottom: 3rem;
   justify-content: center;
+  flex-wrap: wrap;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     flex-direction: column;
+    gap: 1.5rem;
   }
 `;
 
@@ -100,13 +102,19 @@ const OptionBox = styled.div`
   border-radius: 8px;
   border: 1px solid ${theme.colors.border};
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
+    width: 100%;
     padding: 1.5rem 1rem;
+  }
+
+  @media (min-width: 901px) {
+    max-width: 350px;
   }
 
   h2 {
