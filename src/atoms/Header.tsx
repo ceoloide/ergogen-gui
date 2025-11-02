@@ -247,10 +247,10 @@ const Header = (): JSX.Element => {
             href="https://github.com/ergogen/ergogen"
             target="_blank"
             rel="noreferrer"
-            aria-label="View Ergogen v4.2.0 on GitHub"
+            aria-label="View Ergogen v4.2.1 on GitHub"
             data-testid="version-link"
           >
-            v4.2.0
+            v4.2.1
           </VersionText>
         </ErgogenLogo>
       </LeftContainer>
