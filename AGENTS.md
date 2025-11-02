@@ -204,6 +204,15 @@ When loading footprints from GitHub, the application checks for naming conflicts
 - **`src/molecules/ConflictResolutionDialog.tsx`**: React component for the conflict resolution UI
 - **`src/pages/Welcome.tsx`**: Orchestrates the loading process, handles conflicts sequentially, and manages dialog state
 
+## Local File Loading
+
+- The welcome page has a "From a File" action that reuses the GitHub loading flow for local inputs. Users can select `.yaml`, `.yml`, `.json`, `.zip`, or `.ekb` files.
+- `src/utils/localFileLoader.ts` normalizes local files: plain text files are returned as-is, while `.zip`/`.ekb` archives must contain a root-level `config.yaml`. If present, all `.js` files under a `footprints/` directory are loaded as injections with names derived from their relative path.
+- Archives missing `config.yaml` throw an explicit error so the UI can display "Failed to load local file: ?" with the root cause.
+- `src/pages/Welcome.tsx` wires the new helper into the existing conflict-resolution workflow, so footprint naming clashes trigger the same skip/overwrite/keep-both dialog as GitHub loads.
+- `src/utils/localFileLoader.test.ts` and `src/pages/Welcome.test.tsx` cover YAML/JSON handling, archive parsing, error cases, and the UI wiring.
+- Template folders inside archives are currently ignored by design.
+
 ### GitHub API Rate Limiting
 
 The GitHub loading functionality uses unauthenticated requests, which are subject to GitHub's rate limits:
@@ -306,3 +315,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 5. Implementing fallback to unauthenticated requests if no token is provided
 6. Adding clear documentation on how to create a GitHub personal access token with appropriate permissions (public_repo scope)
 7. Handling token expiration and invalid token errors gracefully
+
+### [TASK-009] Support Nested Configs in Local Archives
+
+**Context:** The new local loader expects archives to store `config.yaml` at the root, matching current `.ekb` exports. Some community bundles keep configuration files one level deeper, which the loader now rejects with a "missing config" error.
+
+**Task:** Extend `loadLocalConfigFile` to search for `config.yaml` in a small set of common subdirectories (e.g., `/ergogen/`) while retaining the fast path for root-level files and keeping error messaging clear when nothing is found.

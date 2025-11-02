@@ -1,5 +1,22 @@
 # Changelog
 
+## Load Configs From Local Files
+
+November 02, 2025
+
+![Selecting a local Ergogen archive with the new load button.](./public/images/changelog/placeholder.png)
+
+You told us that sharing designs over GitHub was overkill when the file was already sitting on your desktop. Until now, the only workaround was to copy and paste YAML manually, which meant losing any custom footprints the project depended on.
+
+The welcome screen now includes a "Load File" option that understands Ergogen configurations in plain YAML/JSON as well as zipped `.zip` and `.ekb` archives. Drop in an archive and the app automatically imports the `config.yaml` along with every footprint under the `footprints` folder, prompting you when a footprint name collides with something you've already loaded. If the archive is missing the required `config.yaml`, you'll get a clear error so you can fix it right away.
+
+**What changed:**
+
+- **Local file loader**: New button on the welcome screen accepts `.yaml`, `.yml`, `.json`, `.zip`, and `.ekb` files
+- **Archive footprint import**: Automatically loads footprint scripts from the `footprints` directory inside local archives
+- **Conflict resolutions reused**: Existing skip/overwrite/keep-both dialog now appears for locally loaded footprints too
+- **Helpful errors**: Archives missing a root `config.yaml` surface a direct explanation instead of failing silently
+
 ## Load Keyboards Directly from GitHub
 
 October 13, 2025

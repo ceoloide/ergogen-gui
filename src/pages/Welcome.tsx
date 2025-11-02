@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -11,6 +11,7 @@ import {
   mergeInjections,
   ConflictResolution,
 } from '../utils/injections';
+import { loadLocalConfigFile } from '../utils/localFileLoader';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
@@ -150,6 +151,7 @@ const Welcome = () => {
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
     string[][] | null
   >(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -341,6 +343,45 @@ const Welcome = () => {
       });
   };
 
+  const handleLocalFileButtonClick = () => {
+    if (isLoading) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleLocalFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (!configContext) return;
+
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const { clearError, setError, setIsGenerating } = configContext;
+    setIsLoading(true);
+    setIsGenerating(true);
+    clearError();
+
+    setCurrentConflict(null);
+    setPendingFootprints([]);
+    setPendingConfig(null);
+    setInjectionsAtConflict(null);
+
+    try {
+      const result = await loadLocalConfigFile(file);
+      await processFootprints(result.footprints, result.config);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Failed to load local file: ${message}`);
+      setIsGenerating(false);
+    } finally {
+      setIsLoading(false);
+      event.target.value = '';
+    }
+  };
+
   return (
     <WelcomePageWrapper>
       {currentConflict && (
@@ -395,6 +436,26 @@ const Welcome = () => {
                 {isLoading ? 'Loading...' : 'Load'}
               </Button>
             </GitHubInputContainer>
+          </OptionBox>
+          <OptionBox>
+            <h2>From a File</h2>
+            <p>Upload a configuration from your computer.</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".yaml,.yml,.json,.zip,.ekb"
+              onChange={handleLocalFileChange}
+              style={{ display: 'none' }}
+              data-testid="local-file-input"
+            />
+            <Button
+              onClick={handleLocalFileButtonClick}
+              disabled={isLoading}
+              aria-label="Load configuration from local file"
+              data-testid="local-file-load-button"
+            >
+              {isLoading ? 'Loading...' : 'Load File'}
+            </Button>
           </OptionBox>
         </OptionsContainer>
 
