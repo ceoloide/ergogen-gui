@@ -419,6 +419,30 @@ const Welcome = () => {
             </Button>
           </OptionBox>
           <OptionBox>
+            <h2>From Local File</h2>
+            <p>
+              Load a configuration from your computer. Supports *.yaml, *.json,
+              *.zip, and *.ekb files.
+            </p>
+            <HiddenFileInput
+              ref={fileInputRef}
+              type="file"
+              accept=".yaml,.yml,.json,.zip,.ekb"
+              onChange={handleLocalFile}
+              disabled={isLoading}
+              aria-label="Select local file to load"
+              data-testid="local-file-input"
+            />
+            <Button
+              onClick={handleFileButtonClick}
+              disabled={isLoading}
+              aria-label="Select local file to load"
+              data-testid="local-file-button"
+            >
+              {isLoading ? 'Loading...' : 'Choose File'}
+            </Button>
+          </OptionBox>
+          <OptionBox>
             <h2>From GitHub</h2>
             <p>
               Link to a YAML config file on GitHub, or simply a repo like
@@ -442,30 +466,6 @@ const Welcome = () => {
                 {isLoading ? 'Loading...' : 'Load'}
               </Button>
             </GitHubInputContainer>
-          </OptionBox>
-          <OptionBox>
-            <h2>From Local File</h2>
-            <p>
-              Load a configuration from your computer. Supports *.yaml, *.json,
-              *.zip, and *.ekb files.
-            </p>
-            <HiddenFileInput
-              ref={fileInputRef}
-              type="file"
-              accept=".yaml,.yml,.json,.zip,.ekb"
-              onChange={handleLocalFile}
-              disabled={isLoading}
-              aria-label="Select local file to load"
-              data-testid="local-file-input"
-            />
-            <Button
-              onClick={handleFileButtonClick}
-              disabled={isLoading}
-              aria-label="Select local file to load"
-              data-testid="local-file-button"
-            >
-              {isLoading ? 'Loading...' : 'Choose File'}
-            </Button>
           </OptionBox>
         </OptionsContainer>
 
