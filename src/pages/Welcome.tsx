@@ -6,6 +6,7 @@ import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
+import { loadLocalFile, LocalFootprint } from '../utils/localFiles';
 import {
   checkForConflict,
   mergeInjections,
@@ -94,6 +95,10 @@ const GitHubInputContainer = styled.div`
   max-width: 400px;
 `;
 
+const HiddenFileInput = styled.input`
+  display: none;
+`;
+
 const ExamplesGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -142,14 +147,15 @@ const Welcome = () => {
   const [githubInput, setGithubInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
-  const [pendingFootprints, setPendingFootprints] = useState<GitHubFootprint[]>(
-    []
-  );
+  const [pendingFootprints, setPendingFootprints] = useState<
+    GitHubFootprint[] | LocalFootprint[]
+  >([]);
   const [currentConflict, setCurrentConflict] = useState<string | null>(null);
   const [pendingConfig, setPendingConfig] = useState<string | null>(null);
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
     string[][] | null
   >(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -172,7 +178,7 @@ const Welcome = () => {
   };
 
   const processFootprints = async (
-    footprints: GitHubFootprint[],
+    footprints: GitHubFootprint[] | LocalFootprint[],
     config: string,
     resolution: ConflictResolution | null = null,
     currentInjections?: string[][]
@@ -341,6 +347,47 @@ const Welcome = () => {
       });
   };
 
+  const handleLocalFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !configContext) return;
+
+    const { setError, clearError, setIsGenerating } = configContext;
+    setIsLoading(true);
+    setIsGenerating(true);
+    clearError();
+
+    // Reset any pending conflict resolution state from previous loads
+    setCurrentConflict(null);
+    setPendingFootprints([]);
+    setPendingConfig(null);
+    setInjectionsAtConflict(null);
+
+    try {
+      const result = await loadLocalFile(file);
+
+      // Process footprints with conflict resolution
+      await processFootprints(result.footprints, result.config);
+    } catch (error) {
+      setError(
+        `Failed to load file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      setIsLoading(false);
+      setIsGenerating(false);
+    } finally {
+      setIsLoading(false);
+      // Reset file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <WelcomePageWrapper>
       {currentConflict && (
@@ -369,6 +416,28 @@ const Welcome = () => {
               data-testid="empty-config-button"
             >
               Empty Configuration
+            </Button>
+          </OptionBox>
+          <OptionBox>
+            <h2>From Local File</h2>
+            <p>
+              Upload a YAML, JSON, ZIP, or EKB file from your computer. Archives
+              can include footprints.
+            </p>
+            <HiddenFileInput
+              ref={fileInputRef}
+              type="file"
+              accept=".yaml,.yml,.json,.zip,.ekb"
+              onChange={handleLocalFile}
+              data-testid="file-input"
+            />
+            <Button
+              onClick={handleFileButtonClick}
+              disabled={isLoading}
+              aria-label="Load configuration from local file"
+              data-testid="file-load-button"
+            >
+              {isLoading ? 'Loading...' : 'Choose File'}
             </Button>
           </OptionBox>
           <OptionBox>
