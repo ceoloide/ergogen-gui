@@ -11,6 +11,7 @@ import {
   mergeInjections,
   ConflictResolution,
 } from '../utils/injections';
+import { loadFromLocalFile, LocalFootprint } from '../utils/localFiles';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
@@ -94,6 +95,37 @@ const GitHubInputContainer = styled.div`
   max-width: 400px;
 `;
 
+const FileInputLabel = styled.label`
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background-color: ${theme.colors.accent};
+  color: ${theme.colors.white};
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: ${theme.fontSizes.base};
+  font-weight: ${theme.fontWeights.semiBold};
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: ${theme.colors.accentHover};
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  input[type='file'] {
+    display: none;
+  }
+`;
+
+const FileName = styled.div`
+  margin-top: 0.5rem;
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textDark};
+  word-break: break-all;
+`;
+
 const ExamplesGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -142,9 +174,10 @@ const Welcome = () => {
   const [githubInput, setGithubInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
-  const [pendingFootprints, setPendingFootprints] = useState<GitHubFootprint[]>(
-    []
-  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [pendingFootprints, setPendingFootprints] = useState<
+    GitHubFootprint[] | LocalFootprint[]
+  >([]);
   const [currentConflict, setCurrentConflict] = useState<string | null>(null);
   const [pendingConfig, setPendingConfig] = useState<string | null>(null);
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
@@ -172,7 +205,7 @@ const Welcome = () => {
   };
 
   const processFootprints = async (
-    footprints: GitHubFootprint[],
+    footprints: GitHubFootprint[] | LocalFootprint[],
     config: string,
     resolution: ConflictResolution | null = null,
     currentInjections?: string[][]
@@ -341,6 +374,43 @@ const Welcome = () => {
       });
   };
 
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !configContext) return;
+
+    const { setError, clearError, setIsGenerating } = configContext;
+    setSelectedFile(file);
+    setIsLoading(true);
+    setIsGenerating(true); // Show progress bar during file loading
+    clearError();
+
+    // Reset any pending conflict resolution state from previous loads
+    setCurrentConflict(null);
+    setPendingFootprints([]);
+    setPendingConfig(null);
+    setInjectionsAtConflict(null);
+
+    try {
+      // Load the file
+      const result = await loadFromLocalFile(file);
+
+      // Process footprints with conflict resolution
+      await processFootprints(result.footprints, result.config);
+    } catch (e) {
+      const errorMessage =
+        e instanceof Error ? e.message : 'Unknown error occurred';
+      setError(`Failed to load file: ${errorMessage}`);
+      setIsLoading(false);
+      setIsGenerating(false);
+      setSelectedFile(null);
+    } finally {
+      // Reset file input to allow re-selecting the same file
+      event.target.value = '';
+    }
+  };
+
   return (
     <WelcomePageWrapper>
       {currentConflict && (
@@ -395,6 +465,33 @@ const Welcome = () => {
                 {isLoading ? 'Loading...' : 'Load'}
               </Button>
             </GitHubInputContainer>
+          </OptionBox>
+          <OptionBox>
+            <h2>From Local File</h2>
+            <p>
+              Upload a YAML, JSON, ZIP, or EKB file containing your
+              configuration.
+            </p>
+            <FileInputLabel>
+              <input
+                type="file"
+                accept=".yaml,.yml,.json,.zip,.ekb"
+                onChange={handleFileSelect}
+                disabled={isLoading}
+                aria-label="Upload configuration file"
+                data-testid="file-input"
+              />
+              {isLoading && selectedFile
+                ? 'Loading...'
+                : selectedFile
+                  ? 'Choose Another File'
+                  : 'Choose File'}
+            </FileInputLabel>
+            {selectedFile && !isLoading && (
+              <FileName data-testid="selected-file-name">
+                {selectedFile.name}
+              </FileName>
+            )}
           </OptionBox>
         </OptionsContainer>
 
