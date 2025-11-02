@@ -114,7 +114,7 @@ const DragOverlay = styled.div<{ $isDragging: boolean }>`
 `;
 
 const DragOverlayContent = styled.div`
-  border: 3px dashed ${theme.colors.primary};
+  border: 3px dashed ${theme.colors.accent};
   border-radius: 16px;
   padding: 4rem;
   background-color: ${theme.colors.backgroundLight};
