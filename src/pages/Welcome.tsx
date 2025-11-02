@@ -17,13 +17,46 @@ import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 
 // Styled Components
-const WelcomePageWrapper = styled.div`
+const WelcomePageWrapper = styled.div<{ isDragging?: boolean }>`
   background-color: ${theme.colors.background};
   color: ${theme.colors.white};
   flex-grow: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition: border-color 0.2s ease;
+
+  ${(props) =>
+    props.isDragging &&
+    `
+    border: 3px dashed ${theme.colors.accent};
+    border-radius: 8px;
+  `}
+`;
+
+const DropOverlay = styled.div<{ isVisible: boolean }>`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: ${(props) => (props.isVisible ? 'flex' : 'none')};
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  pointer-events: none;
+`;
+
+const DropMessage = styled.div`
+  background-color: ${theme.colors.backgroundLight};
+  border: 3px dashed ${theme.colors.accent};
+  border-radius: 8px;
+  padding: 2rem;
+  font-size: ${theme.fontSizes.h3};
+  color: ${theme.colors.text};
+  text-align: center;
 `;
 
 const WelcomeContainer = styled.div`
@@ -155,6 +188,7 @@ const Welcome = () => {
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
     string[][] | null
   >(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -352,9 +386,9 @@ const Welcome = () => {
     fileInputRef.current?.click();
   };
 
-  const handleLocalFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !configContext) return;
+  // Shared function to process a file
+  const processFile = async (file: File) => {
+    if (!configContext) return;
 
     const { setError, clearError, setIsGenerating } = configContext;
     setIsLoading(true);
@@ -366,9 +400,6 @@ const Welcome = () => {
     setPendingFootprints([]);
     setPendingConfig(null);
     setInjectionsAtConflict(null);
-
-    // Reset the file input so the same file can be selected again
-    event.target.value = '';
 
     try {
       const result = await loadLocalFile(file);
@@ -388,8 +419,79 @@ const Welcome = () => {
     }
   };
 
+  const handleLocalFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset the file input so the same file can be selected again
+    event.target.value = '';
+
+    await processFile(file);
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if we're actually leaving the wrapper element
+    const currentTarget = e.currentTarget as HTMLElement;
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    
+    // Only hide drag state if we're leaving the wrapper (not moving to a child)
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const acceptedExtensions = ['.yaml', '.yml', '.json', '.zip', '.ekb'];
+    
+    // Find the first valid file
+    const validFile = files.find((file) => {
+      const fileName = file.name.toLowerCase();
+      return acceptedExtensions.some((ext) => fileName.endsWith(ext));
+    });
+
+    if (validFile) {
+      await processFile(validFile);
+    } else if (files.length > 0) {
+      // Show error if files were dropped but none were valid
+      if (configContext) {
+        configContext.setError(
+          'Invalid file type. Accepted formats: *.yaml, *.json, *.zip, *.ekb'
+        );
+      }
+    }
+  };
+
   return (
-    <WelcomePageWrapper>
+    <WelcomePageWrapper
+      isDragging={isDragging}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      data-testid="welcome-page-wrapper"
+    >
+      <DropOverlay isVisible={isDragging}>
+        <DropMessage>Drop file here to load configuration</DropMessage>
+      </DropOverlay>
       {currentConflict && (
         <ConflictResolutionDialog
           footprintName={currentConflict}
