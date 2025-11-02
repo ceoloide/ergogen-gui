@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -95,42 +95,8 @@ const GitHubInputContainer = styled.div`
   max-width: 400px;
 `;
 
-const FileInputContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 400px;
-`;
-
-const FileInput = styled.input`
-  padding: 0.5rem;
-  border: 1px solid ${theme.colors.border};
-  border-radius: 4px;
-  background-color: ${theme.colors.backgroundLighter};
-  color: ${theme.colors.text};
-  font-size: ${theme.fontSizes.base};
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  &::file-selector-button {
-    padding: 0.5rem 1rem;
-    margin-right: 1rem;
-    border: 1px solid ${theme.colors.border};
-    border-radius: 4px;
-    background-color: ${theme.colors.backgroundLight};
-    color: ${theme.colors.text};
-    cursor: pointer;
-    font-size: ${theme.fontSizes.base};
-
-    &:hover {
-      background-color: ${theme.colors.buttonHover};
-    }
-  }
+const HiddenFileInput = styled.input`
+  display: none;
 `;
 
 const ExamplesGrid = styled.div`
@@ -380,6 +346,12 @@ const Welcome = () => {
       });
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleLocalFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !configContext) return;
@@ -477,16 +449,23 @@ const Welcome = () => {
               Load a configuration from your computer. Supports *.yaml, *.json,
               *.zip, and *.ekb files.
             </p>
-            <FileInputContainer>
-              <FileInput
-                type="file"
-                accept=".yaml,.yml,.json,.zip,.ekb"
-                onChange={handleLocalFile}
-                disabled={isLoading}
-                aria-label="Select local file to load"
-                data-testid="local-file-input"
-              />
-            </FileInputContainer>
+            <HiddenFileInput
+              ref={fileInputRef}
+              type="file"
+              accept=".yaml,.yml,.json,.zip,.ekb"
+              onChange={handleLocalFile}
+              disabled={isLoading}
+              aria-label="Select local file to load"
+              data-testid="local-file-input"
+            />
+            <Button
+              onClick={handleFileButtonClick}
+              disabled={isLoading}
+              aria-label="Select local file to load"
+              data-testid="local-file-button"
+            >
+              {isLoading ? 'Loading...' : 'Choose File'}
+            </Button>
           </OptionBox>
         </OptionsContainer>
 
