@@ -59,15 +59,11 @@ const readFileAsArrayBuffer = (file: File): Promise<ArrayBuffer> => {
 /**
  * Loads footprints from a footprints folder in a zip archive.
  * @param zip - The JSZip instance containing the archive.
- * @param basePath - The base path for the footprints folder (e.g., 'footprints').
  * @returns A promise that resolves with an array of footprints.
  */
-const loadFootprintsFromZip = async (
-  zip: JSZip,
-  basePath: string
-): Promise<LocalFootprint[]> => {
+const loadFootprintsFromZip = async (zip: JSZip): Promise<LocalFootprint[]> => {
   const footprints: LocalFootprint[] = [];
-  const footprintsPath = basePath ? `${basePath}/` : 'footprints/';
+  const footprintsPath = 'footprints/';
 
   // Iterate through all files in the zip
   for (const [relativePath, zipEntry] of Object.entries(zip.files)) {
@@ -121,7 +117,7 @@ const loadFromArchive = async (file: File): Promise<LocalFileLoadResult> => {
   console.log('[LocalFile] Config loaded from archive');
 
   // Load footprints if the footprints folder exists
-  const footprints = await loadFootprintsFromZip(zip, 'footprints');
+  const footprints = await loadFootprintsFromZip(zip);
   console.log(
     `[LocalFile] Loaded ${footprints.length} footprints from archive`
   );
