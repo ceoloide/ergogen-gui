@@ -19,36 +19,49 @@ const App = () => {
 
   // Check for shared config in hash fragment first (highest priority)
   // This must happen before localStorage initialization
-  const sharedConfig = getConfigFromHash();
+  const hashResult = getConfigFromHash();
   let initialConfig = '';
   let initialInjectionInput: string[][] = [];
+  let hashError: string | null = null;
 
-  if (sharedConfig) {
-    // Use shared config from hash fragment - this takes priority over localStorage
-    initialConfig = sharedConfig.config;
-    // Handle injections: if present (even if empty array), overwrite existing ones
-    // If undefined, keep existing injections (not present in shared config)
-    if (sharedConfig.injections !== undefined) {
-      initialInjectionInput = sharedConfig.injections;
-      // Store in localStorage so useLocalStorage picks it up and overwrites existing injections
-      // This ensures injections from shared config take precedence (like GitHub loading)
+  if (hashResult) {
+    if (hashResult.success) {
+      // Use shared config from hash fragment - this takes priority over localStorage
+      const sharedConfig = hashResult.config;
+      initialConfig = sharedConfig.config;
+      // Handle injections: if present (even if empty array), overwrite existing ones
+      // If undefined, keep existing injections (not present in shared config)
+      if (sharedConfig.injections !== undefined) {
+        initialInjectionInput = sharedConfig.injections;
+        // Store in localStorage so useLocalStorage picks it up and overwrites existing injections
+        // This ensures injections from shared config take precedence (like GitHub loading)
+        localStorage.setItem(
+          'ergogen:injection',
+          JSON.stringify(initialInjectionInput)
+        );
+      }
+      // Temporarily store in localStorage so useLocalStorage picks it up
+      // This ensures the config persists if user navigates away and comes back
       localStorage.setItem(
-        'ergogen:injection',
-        JSON.stringify(initialInjectionInput)
+        CONFIG_LOCAL_STORAGE_KEY,
+        JSON.stringify(initialConfig)
+      );
+      // Clear the hash fragment after reading it
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search
+      );
+    } else {
+      // Store error message to display after ConfigContext is available
+      hashError = hashResult.message;
+      // Clear the hash fragment to prevent retrying on navigation
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + window.location.search
       );
     }
-    // Temporarily store in localStorage so useLocalStorage picks it up
-    // This ensures the config persists if user navigates away and comes back
-    localStorage.setItem(
-      CONFIG_LOCAL_STORAGE_KEY,
-      JSON.stringify(initialConfig)
-    );
-    // Clear the hash fragment after reading it
-    window.history.replaceState(
-      null,
-      '',
-      window.location.pathname + window.location.search
-    );
   } else {
     // Since we changed the local storage key for the Ergogen config, we need to always check for the legacy key first and migrate it if it exists.
     // This migration code can be removed in a future release once we are confident most users have migrated.
@@ -90,6 +103,7 @@ const App = () => {
       configInput={configInput}
       setConfigInput={setConfigInput}
       initialInjectionInput={initialInjectionInput}
+      hashError={hashError}
     >
       <AppContent />
     </ConfigContextProvider>

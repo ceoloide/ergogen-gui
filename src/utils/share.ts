@@ -35,23 +35,97 @@ export const encodeConfig = (
 };
 
 /**
+ * Result of decoding a shared configuration.
+ */
+export type DecodeResult =
+  | { success: true; config: ShareableConfig }
+  | {
+      success: false;
+      error: 'DECODE_ERROR' | 'VALIDATION_ERROR';
+      message: string;
+    };
+
+/**
  * Decodes and decompresses a shared keyboard configuration from a URI fragment.
  *
  * @param encodedString - The encoded and compressed string from URI fragment
- * @returns The decoded ShareableConfig object, or null if decoding fails
+ * @returns A DecodeResult indicating success or failure with error details
  */
-export const decodeConfig = (encodedString: string): ShareableConfig | null => {
+export const decodeConfig = (encodedString: string): DecodeResult => {
   try {
     const decompressed = decompressFromEncodedURIComponent(encodedString);
     if (!decompressed) {
-      return null;
+      return {
+        success: false,
+        error: 'DECODE_ERROR',
+        message:
+          'The shared configuration link is invalid or corrupted. The encoded data could not be decompressed.',
+      };
     }
 
-    const parsed = JSON.parse(decompressed) as ShareableConfig;
-    return parsed;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(decompressed);
+    } catch (_parseError) {
+      return {
+        success: false,
+        error: 'DECODE_ERROR',
+        message:
+          'The shared configuration link is invalid or corrupted. The decompressed data is not valid JSON.',
+      };
+    }
+
+    // Validate the structure
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      !('config' in parsed) ||
+      typeof (parsed as { config: unknown }).config !== 'string'
+    ) {
+      return {
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message:
+          'The shared configuration link does not contain a valid configuration. The decoded data is missing required fields or has an invalid structure.',
+      };
+    }
+
+    const shareableConfig = parsed as ShareableConfig;
+
+    // Validate injections if present
+    if (
+      'injections' in shareableConfig &&
+      shareableConfig.injections !== undefined
+    ) {
+      if (
+        !Array.isArray(shareableConfig.injections) ||
+        !shareableConfig.injections.every(
+          (inj) =>
+            Array.isArray(inj) &&
+            inj.length === 3 &&
+            typeof inj[0] === 'string' &&
+            typeof inj[1] === 'string' &&
+            typeof inj[2] === 'string'
+        )
+      ) {
+        return {
+          success: false,
+          error: 'VALIDATION_ERROR',
+          message:
+            'The shared configuration link contains invalid injections data. Injections must be an array of [type, name, content] tuples.',
+        };
+      }
+    }
+
+    return { success: true, config: shareableConfig };
   } catch (error) {
     console.error('Failed to decode shared config:', error);
-    return null;
+    return {
+      success: false,
+      error: 'DECODE_ERROR',
+      message:
+        'The shared configuration link is invalid or corrupted. An unexpected error occurred while decoding.',
+    };
   }
 };
 
@@ -74,9 +148,9 @@ export const createShareableUri = (
 /**
  * Extracts and decodes configuration from the current page's hash fragment.
  *
- * @returns The decoded ShareableConfig object, or null if no valid fragment exists
+ * @returns A DecodeResult indicating success or failure with error details, or null if no hash fragment exists
  */
-export const getConfigFromHash = (): ShareableConfig | null => {
+export const getConfigFromHash = (): DecodeResult | null => {
   const hash = window.location.hash;
   if (!hash || hash.length <= 1) {
     return null;

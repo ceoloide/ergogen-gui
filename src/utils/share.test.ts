@@ -5,6 +5,7 @@ import {
   getConfigFromHash,
   ShareableConfig,
 } from './share';
+import { compressToEncodedURIComponent } from 'lz-string';
 
 describe('share utilities', () => {
   const testConfig = 'points:\n  - [0, 0]';
@@ -32,27 +33,66 @@ describe('share utilities', () => {
     it('decodes config without injections', () => {
       const encoded = encodeConfig(testConfig);
       const decoded = decodeConfig(encoded);
-      expect(decoded).not.toBeNull();
-      expect(decoded?.config).toBe(testConfig);
-      expect(decoded?.injections).toBeUndefined();
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.config).toBe(testConfig);
+        expect(decoded.config.injections).toBeUndefined();
+      }
     });
 
     it('decodes config with injections', () => {
       const encoded = encodeConfig(testConfig, testInjections);
       const decoded = decodeConfig(encoded);
-      expect(decoded).not.toBeNull();
-      expect(decoded?.config).toBe(testConfig);
-      expect(decoded?.injections).toEqual(testInjections);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.config).toBe(testConfig);
+        expect(decoded.config.injections).toEqual(testInjections);
+      }
     });
 
-    it('returns null for invalid encoded string', () => {
+    it('returns decode error for invalid encoded string', () => {
       const decoded = decodeConfig('invalid-encoded-string');
-      expect(decoded).toBeNull();
+      expect(decoded.success).toBe(false);
+      if (!decoded.success) {
+        expect(decoded.error).toBe('DECODE_ERROR');
+        expect(decoded.message).toBeTruthy();
+      }
     });
 
-    it('returns null for empty string', () => {
+    it('returns decode error for empty string', () => {
       const decoded = decodeConfig('');
-      expect(decoded).toBeNull();
+      expect(decoded.success).toBe(false);
+      if (!decoded.success) {
+        expect(decoded.error).toBe('DECODE_ERROR');
+        expect(decoded.message).toBeTruthy();
+      }
+    });
+
+    it('returns validation error for invalid object structure', () => {
+      // Create a valid encoded string but with invalid structure
+      const invalidObject = JSON.stringify({ notConfig: 'test' });
+      const encoded = compressToEncodedURIComponent(invalidObject);
+      const decoded = decodeConfig(encoded);
+      expect(decoded.success).toBe(false);
+      if (!decoded.success) {
+        expect(decoded.error).toBe('VALIDATION_ERROR');
+        expect(decoded.message).toBeTruthy();
+      }
+    });
+
+    it('returns validation error for invalid injections structure', () => {
+      // Create a config with invalid injections
+      const invalidConfig = JSON.stringify({
+        config: testConfig,
+        injections: 'not-an-array',
+      });
+      const encoded = compressToEncodedURIComponent(invalidConfig);
+      const decoded = decodeConfig(encoded);
+      expect(decoded.success).toBe(false);
+      if (!decoded.success) {
+        expect(decoded.error).toBe('VALIDATION_ERROR');
+        expect(decoded.message).toBeTruthy();
+      }
     });
   });
 
@@ -105,7 +145,12 @@ describe('share utilities', () => {
       window.location.hash = `#${encoded}`;
       const decoded = getConfigFromHash();
       expect(decoded).not.toBeNull();
-      expect(decoded?.config).toBe(testConfig);
+      if (decoded) {
+        expect(decoded.success).toBe(true);
+        if (decoded.success) {
+          expect(decoded.config.config).toBe(testConfig);
+        }
+      }
     });
 
     it('decodes config with injections from hash fragment', () => {
@@ -113,14 +158,26 @@ describe('share utilities', () => {
       window.location.hash = `#${encoded}`;
       const decoded = getConfigFromHash();
       expect(decoded).not.toBeNull();
-      expect(decoded?.config).toBe(testConfig);
-      expect(decoded?.injections).toEqual(testInjections);
+      if (decoded) {
+        expect(decoded.success).toBe(true);
+        if (decoded.success) {
+          expect(decoded.config.config).toBe(testConfig);
+          expect(decoded.config.injections).toEqual(testInjections);
+        }
+      }
     });
 
-    it('returns null for invalid hash fragment', () => {
+    it('returns decode error for invalid hash fragment', () => {
       window.location.hash = '#invalid';
       const decoded = getConfigFromHash();
-      expect(decoded).toBeNull();
+      expect(decoded).not.toBeNull();
+      if (decoded) {
+        expect(decoded.success).toBe(false);
+        if (!decoded.success) {
+          expect(decoded.error).toBe('DECODE_ERROR');
+          expect(decoded.message).toBeTruthy();
+        }
+      }
     });
   });
 
@@ -134,16 +191,21 @@ describe('share utilities', () => {
       const encoded = encodeConfig(original.config, original.injections);
       const decoded = decodeConfig(encoded);
 
-      expect(decoded).not.toBeNull();
-      expect(decoded?.config).toBe(original.config);
-      expect(decoded?.injections).toEqual(original.injections);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.config).toBe(original.config);
+        expect(decoded.config.injections).toEqual(original.injections);
+      }
     });
 
     it('handles large configurations', () => {
       const largeConfig = 'points:\n' + Array(100).fill('[0, 0]').join('\n');
       const encoded = encodeConfig(largeConfig);
       const decoded = decodeConfig(encoded);
-      expect(decoded?.config).toBe(largeConfig);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.config).toBe(largeConfig);
+      }
     });
   });
 });
