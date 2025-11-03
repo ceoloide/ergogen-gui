@@ -211,7 +211,7 @@ const DialogBox = styled.div`
 const CloseButton = styled.button`
   position: absolute;
   top: 1rem;
-  left: 1rem;
+  right: 1rem;
   background: none;
   border: none;
   color: ${theme.colors.textDark};
@@ -239,7 +239,7 @@ const Title = styled.h2`
   margin: 0 0 1rem 0;
   font-size: ${theme.fontSizes.h3};
   color: ${theme.colors.text};
-  padding-right: 2rem;
+  padding-right: 3rem;
 `;
 
 const Message = styled.p`
