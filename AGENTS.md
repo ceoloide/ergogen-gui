@@ -347,3 +347,53 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 5. Implementing fallback to unauthenticated requests if no token is provided
 6. Adding clear documentation on how to create a GitHub personal access token with appropriate permissions (public_repo scope)
 7. Handling token expiration and invalid token errors gracefully
+
+### [TASK-009] Add Template Folder Support to Local File Loading
+
+**Context:** The local file loading implementation currently supports extracting footprints from ZIP/EKB archives, but EKB archives can also contain a `template` folder with custom templates. The user mentioned this in the requirements, but it was not implemented.
+
+**Task:** Extend `loadLocalFile` in `src/utils/localFiles.ts` to extract and load template files from the `template` folder in archives, similar to how footprints are handled. This should:
+
+1. Extract all `.js` files from the `template` folder recursively
+2. Generate template names from relative paths (e.g., `template/custom/case.js` becomes `custom/case`)
+3. Add templates as injections with type `'template'` instead of `'footprint'`
+4. Integrate with the existing conflict resolution system
+5. Update tests to cover template extraction
+6. Update documentation in AGENTS.md
+
+### [TASK-010] Improve Local File Loading User Feedback
+
+**Context:** When users select a file via the button or drag-and-drop, there's no immediate feedback showing which file was selected before it starts loading. This can be confusing, especially if the file name is long or if the user wants to confirm their selection.
+
+**Task:** Enhance the local file loading UI to provide better feedback:
+
+1. Display the selected file name next to or below the "Choose File" button after selection
+2. Show file size and type information for selected files
+3. Add a visual indicator when a file is being processed (e.g., disable button, show spinner)
+4. Consider showing a preview of archive contents (number of footprints, templates) before loading
+5. Add E2E tests for the drag-and-drop functionality to ensure it works correctly in different browsers
+
+### [TASK-011] Add File Size Limits and Better Error Handling for Archives
+
+**Context:** The current implementation doesn't enforce any file size limits, which could lead to performance issues or browser crashes with very large archives. Additionally, error messages for corrupted or invalid archives could be more specific.
+
+**Task:** Improve robustness of local file loading:
+
+1. Add configurable file size limits (e.g., 50MB for archives, 10MB for text files) with clear error messages
+2. Implement better error handling for corrupted ZIP files (catch JSZip errors and provide user-friendly messages)
+3. Add validation for archive structure before processing (check if it's a valid ZIP, has required files)
+4. Handle edge cases like empty archives, archives with only footprints but no config.yaml (currently throws error, could be more graceful)
+5. Add timeout handling for very large files
+6. Update error messages to be more actionable (e.g., "The archive appears to be corrupted. Please verify the file and try again.")
+
+### [TASK-012] Unify File Loading Logic Between GitHub and Local Sources
+
+**Context:** Currently, GitHub loading (`src/utils/github.ts`) and local file loading (`src/utils/localFiles.ts`) have similar concerns (extracting config, footprints, handling conflicts) but separate implementations. The conflict resolution and footprint processing logic is shared, but the extraction logic could potentially be unified.
+
+**Task:** Refactor to reduce duplication and create a more maintainable architecture:
+
+1. Extract common footprint/template extraction logic into shared utilities
+2. Create a unified interface for file loading results that both GitHub and local loading can use
+3. Consider creating an abstraction layer that handles the common flow: extract ? validate ? resolve conflicts ? merge
+4. Ensure both loading methods use the same validation and error handling patterns
+5. Update tests to verify both paths work consistently
