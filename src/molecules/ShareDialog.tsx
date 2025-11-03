@@ -12,6 +12,55 @@ type ShareDialogProps = {
 };
 
 /**
+ * Copies text to the clipboard with fallback support.
+ * Sets the copied state and manages timeout for resetting it.
+ *
+ * @param text - The text to copy to the clipboard
+ * @param setCopied - State setter function to update copied status
+ * @param timeoutRef - Ref to store the timeout ID for cleanup
+ */
+const copyToClipboardWithFallback = async (
+  text: string,
+  setCopied: (value: boolean) => void,
+  timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>
+): Promise<void> => {
+  try {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    // Reset after 2.5 seconds
+    timeoutRef.current = setTimeout(() => {
+      setCopied(false);
+    }, 2500);
+  } catch (error) {
+    console.error('Failed to copy shareable URI to clipboard:', error);
+    // Fallback: try using the older execCommand API
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        setCopied(false);
+      }, 2500);
+    } catch (fallbackError) {
+      console.error('Fallback copy method also failed:', fallbackError);
+    }
+  }
+};
+
+/**
  * A dialog component that displays a shareable link and allows copying it to the clipboard.
  */
 const ShareDialog: React.FC<ShareDialogProps> = ({
@@ -25,43 +74,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
 
   // Auto-copy on mount
   useEffect(() => {
-    const performCopy = async () => {
-      try {
-        await navigator.clipboard.writeText(shareLink);
-        setCopied(true);
-        // Clear any existing timeout
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        // Reset after 2.5 seconds
-        timeoutRef.current = setTimeout(() => {
-          setCopied(false);
-        }, 2500);
-      } catch (error) {
-        console.error('Failed to copy shareable URI to clipboard:', error);
-        // Fallback: try using the older execCommand API
-        try {
-          const textArea = document.createElement('textarea');
-          textArea.value = shareLink;
-          textArea.style.position = 'fixed';
-          textArea.style.opacity = '0';
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-          setCopied(true);
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-          }
-          timeoutRef.current = setTimeout(() => {
-            setCopied(false);
-          }, 2500);
-        } catch (fallbackError) {
-          console.error('Fallback copy method also failed:', fallbackError);
-        }
-      }
-    };
-    performCopy();
+    copyToClipboardWithFallback(shareLink, setCopied, timeoutRef);
   }, [shareLink]); // Copy when shareLink changes (on mount)
 
   // Handle Esc key press
@@ -86,41 +99,8 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
     }
   }, []);
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(shareLink);
-      setCopied(true);
-      // Clear any existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      // Reset after 2.5 seconds
-      timeoutRef.current = setTimeout(() => {
-        setCopied(false);
-      }, 2500);
-    } catch (error) {
-      console.error('Failed to copy shareable URI to clipboard:', error);
-      // Fallback: try using the older execCommand API
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = shareLink;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        setCopied(true);
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-        timeoutRef.current = setTimeout(() => {
-          setCopied(false);
-        }, 2500);
-      } catch (fallbackError) {
-        console.error('Fallback copy method also failed:', fallbackError);
-      }
-    }
+  const copyToClipboard = () => {
+    copyToClipboardWithFallback(shareLink, setCopied, timeoutRef);
   };
 
   // Cleanup timeout on unmount
