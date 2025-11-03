@@ -255,12 +255,14 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to set error from hash fragment decoding if present.
+   * This handles errors from initial page load with invalid shared configurations.
    */
   useEffect(() => {
     if (hashError) {
       setError(hashError);
     }
-  }, [hashError, setError]);
+     
+  }, [hashError]); // setError is stable from useState, doesn't need to be in deps
 
   const clearError = useCallback(() => setError(null), []);
   const clearWarning = useCallback(() => setDeprecationWarning(null), []);
@@ -585,8 +587,14 @@ const ConfigContextProvider = ({
    * Effect to process the input configuration on the initial load.
    * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
    * Note: Hash fragment loading (including injections) is handled in App.tsx by storing in localStorage.
+   * If there's a hashError, skip initial generation to prevent clearing the error.
    */
   useEffect(() => {
+    // If there's a hash error, don't run initial generation (error will be displayed)
+    if (hashError) {
+      return;
+    }
+
     // Check for GitHub URL parameter
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
