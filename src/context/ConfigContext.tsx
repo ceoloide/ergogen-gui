@@ -573,6 +573,48 @@ const ConfigContextProvider = ({
    * Effect to process the input configuration on the initial load.
    */
   useEffect(() => {
+    // Check for hash fragment first (higher priority than query params)
+    const hashFragment = window.location.hash.slice(1); // Remove the '#' prefix
+    if (hashFragment) {
+      console.log('[ConfigContext] Loading from hash fragment');
+      import('../utils/share')
+        .then(({ decodeConfigFromUri }) => {
+          const decoded = decodeConfigFromUri(hashFragment);
+          if (decoded) {
+            console.log(
+              '[ConfigContext] Successfully decoded config from hash'
+            );
+            setConfigInput(decoded.config);
+            if (decoded.injections && decoded.injections.length > 0) {
+              setInjectionInput(decoded.injections);
+              generateNow(decoded.config, decoded.injections, {
+                pointsonly: false,
+              });
+            } else {
+              generateNow(decoded.config, injectionInput, {
+                pointsonly: false,
+              });
+            }
+            // Clear the hash to avoid re-loading on page refresh
+            window.history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search
+            );
+          } else {
+            console.error('[ConfigContext] Failed to decode hash fragment');
+            setError(
+              'Failed to load configuration from shared link. The link may be corrupted.'
+            );
+          }
+        })
+        .catch((error) => {
+          console.error('[ConfigContext] Error loading share utils:', error);
+          setError('Failed to load configuration from shared link.');
+        });
+      return;
+    }
+
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
     if (githubUrl) {

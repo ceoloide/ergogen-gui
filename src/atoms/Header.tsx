@@ -3,8 +3,10 @@ import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import DiscordIcon from './DiscordIcon';
 import GithubIcon from './GithubIcon';
+import ShareIcon from './ShareIcon';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
+import { createShareableUri } from '../utils/share';
 
 /**
  * A styled container for the entire header.
@@ -227,6 +229,25 @@ const Header = (): JSX.Element => {
     );
   };
 
+  const handleShare = async () => {
+    if (!configContext?.configInput) {
+      return;
+    }
+
+    try {
+      const shareableUri = createShareableUri(
+        configContext.configInput,
+        configContext.injectionInput
+      );
+      await navigator.clipboard.writeText(shareableUri);
+      // TODO: Show a success notification to the user
+      console.log('Shareable URI copied to clipboard:', shareableUri);
+    } catch (error) {
+      console.error('Failed to copy shareable URI to clipboard:', error);
+      // TODO: Show an error notification to the user
+    }
+  };
+
   return (
     <HeaderContainer>
       <LeftContainer>
@@ -274,6 +295,16 @@ const Header = (): JSX.Element => {
             data-testid="header-download-outputs-button"
           >
             <span className="material-symbols-outlined">archive</span>
+          </ArchiveIconButton>
+        )}
+        {location.pathname === '/' && (
+          <ArchiveIconButton
+            onClick={handleShare}
+            disabled={!configContext?.configInput}
+            aria-label="Share configuration via link"
+            data-testid="header-share-button"
+          >
+            <ShareIcon />
           </ArchiveIconButton>
         )}
         <DocsButton
