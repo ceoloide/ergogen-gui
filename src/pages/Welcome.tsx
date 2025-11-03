@@ -436,7 +436,9 @@ const Welcome = () => {
     }
   };
 
-  const handleLocalFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocalFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -464,7 +466,7 @@ const Welcome = () => {
     // Check if we're actually leaving the wrapper element
     const currentTarget = e.currentTarget as HTMLElement;
     const relatedTarget = e.relatedTarget as HTMLElement | null;
-    
+
     // Only hide drag state if we're leaving the wrapper (not moving to a child)
     if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
       setIsDragging(false);
@@ -478,7 +480,7 @@ const Welcome = () => {
 
     const files = Array.from(e.dataTransfer.files);
     const acceptedExtensions = ['.yaml', '.yml', '.json', '.zip', '.ekb'];
-    
+
     // Find the first valid file
     const validFile = files.find((file) => {
       const fileName = file.name.toLowerCase();

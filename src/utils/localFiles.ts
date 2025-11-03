@@ -4,7 +4,7 @@ import { GitHubFootprint } from './github';
 /**
  * Result of loading a local file.
  */
-export type LocalFileLoadResult = {
+type LocalFileLoadResult = {
   config: string;
   footprints: GitHubFootprint[];
 };
@@ -42,7 +42,6 @@ const extractFootprintName = (path: string): string => {
   name = name.replace(/\.js$/, '');
   return name;
 };
-
 
 /**
  * Loads a zip or ekb archive and extracts config.yaml and footprints.

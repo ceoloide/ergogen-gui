@@ -21,7 +21,8 @@ const createMockFileReader = (fileContent: string, shouldError = false) => {
 
     readAsText(_file: File) {
       // Simulate async reading
-      const schedule = (typeof setImmediate !== 'undefined' ? setImmediate : setTimeout);
+      const schedule =
+        typeof setImmediate !== 'undefined' ? setImmediate : setTimeout;
       schedule(() => {
         if (shouldError) {
           if (this.onerror) {
@@ -57,8 +58,18 @@ const createMockZipFile = async (
   for (const [path, content] of Object.entries(files)) {
     zip.file(path, content);
   }
-  const blob = await zip.generateAsync({ type: 'blob' });
-  return new File([blob], name, { type: 'application/zip' });
+  const arrayBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+  const blob = new Blob([arrayBuffer], { type: 'application/zip' });
+  const file = new File([blob], name, { type: 'application/zip' });
+  // Ensure arrayBuffer method exists (it should on real File objects)
+  if (!file.arrayBuffer) {
+    // Polyfill for test environment - store the arrayBuffer and return it
+    (file as any).__arrayBuffer = arrayBuffer;
+    file.arrayBuffer = async () => {
+      return (file as any).__arrayBuffer;
+    };
+  }
+  return file;
 };
 
 describe('localFiles utilities', () => {
@@ -115,7 +126,11 @@ describe('localFiles utilities', () => {
       it('loads a JSON file successfully', async () => {
         // Arrange
         const fileContent = '{"points": [[0, 0]]}';
-        const file = createMockFile('config.json', fileContent, 'application/json');
+        const file = createMockFile(
+          'config.json',
+          fileContent,
+          'application/json'
+        );
         global.FileReader = jest.fn(
           () => new (createMockFileReader(fileContent))()
         ) as any;
@@ -316,8 +331,18 @@ describe('localFiles utilities', () => {
             subfolder.file('nested.js', 'nested content');
           }
         }
-        const blob = await zip.generateAsync({ type: 'blob' });
-        const zipFile = new File([blob], 'test.zip', { type: 'application/zip' });
+        const arrayBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+        const blob = new Blob([arrayBuffer], { type: 'application/zip' });
+        const zipFile = new File([blob], 'test.zip', {
+          type: 'application/zip',
+        });
+        // Ensure arrayBuffer method exists
+        if (!zipFile.arrayBuffer) {
+          (zipFile as any).__arrayBuffer = arrayBuffer;
+          zipFile.arrayBuffer = async () => {
+            return (zipFile as any).__arrayBuffer;
+          };
+        }
 
         // Act
         const result = await loadLocalFile(zipFile);
