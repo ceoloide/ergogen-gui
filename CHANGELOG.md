@@ -1,5 +1,24 @@
 # Changelog
 
+## Load Configurations from Local Files
+
+November 2, 2025
+
+![The welcome page showing the new "From Local File" option with drag and drop support.](./public/images/changelog/placeholder.png)
+
+Working with keyboard configurations used to mean you could only start from scratch or load from GitHub. If you had a configuration file saved on your computer, you'd need to copy and paste it manually – and forget about loading custom footprints that way!
+
+Now you can load entire keyboard configurations directly from your computer. Simply click the "Choose File" button or drag and drop any supported file onto the page. The app accepts YAML and JSON configuration files, as well as ZIP and EKB archives that include both the configuration and custom footprints.
+
+When loading archives, the app automatically extracts custom footprints from the `footprints` folder, just like when loading from GitHub. If you already have footprints with the same names, you'll see the same friendly conflict resolution dialog to choose how to handle duplicates.
+
+**What changed:**
+
+- **Local file loading**: Load configurations directly from your computer using YAML, JSON, ZIP, or EKB files
+- **Drag and drop support**: Drop files anywhere on the welcome page for quick loading
+- **Archive support**: ZIP and EKB archives automatically extract configurations and footprints
+- **Conflict resolution**: Same interactive dialog for handling duplicate footprints as GitHub loading
+
 ## Load Keyboards Directly from GitHub
 
 October 13, 2025

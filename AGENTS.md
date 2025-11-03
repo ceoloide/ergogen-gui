@@ -158,6 +158,47 @@ The application offloads long-running, computationally intensive tasks to Web Wo
 
 Communication with the workers is managed through a standard message-passing system (`postMessage` and `onmessage`), with the main application thread and workers exchanging data as needed.
 
+## Local File Loading
+
+The application supports loading Ergogen configurations from local files on the user's computer. This includes support for multiple file formats and drag-and-drop functionality.
+
+### Supported File Types
+
+- **YAML/JSON files** (`.yaml`, `.yml`, `.json`): Direct configuration files that are loaded as text
+- **ZIP archives** (`.zip`): Archives containing `config.yaml` in the root and optionally a `footprints` folder
+- **EKB archives** (`.ekb`): Ergogen keyboard archives (essentially ZIP files with a different extension)
+
+### Archive Structure
+
+When loading ZIP or EKB archives, the application expects:
+
+- **`config.yaml`** (required): Must be present in the root directory of the archive
+- **`footprints/` folder** (optional): Contains `.js` files organized in subfolders
+  - Footprint names are derived from the relative path under `footprints`, excluding the `.js` extension
+  - Example: `footprints/ceoloide/utility_text.js` becomes `ceoloide/utility_text`
+  - Example: `footprints/logo_mr_useful.js` becomes `logo_mr_useful`
+
+### Drag and Drop
+
+Users can drag and drop files anywhere on the welcome page to load them. Visual feedback includes:
+
+- Dashed border around the page when dragging
+- Overlay message indicating drop target
+- Automatic file type validation
+- Error messages for invalid file types or missing config.yaml
+
+### Conflict Resolution
+
+When loading footprints from local archives, the same conflict resolution system used for GitHub loading applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints.
+
+### Implementation Files
+
+- **`src/utils/localFiles.ts`**: Contains `loadLocalFile` function that handles all file types:
+  - `loadTextFile`: Reads YAML/JSON files using FileReader
+  - `loadZipArchive`: Extracts config.yaml and footprints from ZIP/EKB archives using JSZip
+  - `extractFootprintName`: Generates footprint names from file paths
+- **`src/pages/Welcome.tsx`**: Integrates local file loading with drag-and-drop handlers and conflict resolution
+
 ## GitHub Integration
 
 The application supports loading Ergogen configurations directly from GitHub repositories. This feature has been extended to include automatic footprint loading.
@@ -202,7 +243,7 @@ When loading footprints from GitHub, the application checks for naming conflicts
   - `bfsForYamlFiles`: Performs breadth-first search to find YAML files in repository
 - **`src/utils/injections.ts`**: Utility functions for conflict detection (`checkForConflict`), unique name generation (`generateUniqueName`), and merging injections (`mergeInjections`)
 - **`src/molecules/ConflictResolutionDialog.tsx`**: React component for the conflict resolution UI
-- **`src/pages/Welcome.tsx`**: Orchestrates the loading process, handles conflicts sequentially, and manages dialog state
+- **`src/pages/Welcome.tsx`**: Orchestrates the loading process (both GitHub and local files), handles conflicts sequentially, and manages dialog state. Also includes drag-and-drop handlers for local file loading
 
 ### GitHub API Rate Limiting
 
@@ -306,3 +347,53 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 5. Implementing fallback to unauthenticated requests if no token is provided
 6. Adding clear documentation on how to create a GitHub personal access token with appropriate permissions (public_repo scope)
 7. Handling token expiration and invalid token errors gracefully
+
+### [TASK-009] Add Template Folder Support to Local File Loading
+
+**Context:** The local file loading implementation currently supports extracting footprints from ZIP/EKB archives, but EKB archives can also contain a `template` folder with custom templates. The user mentioned this in the requirements, but it was not implemented.
+
+**Task:** Extend `loadLocalFile` in `src/utils/localFiles.ts` to extract and load template files from the `template` folder in archives, similar to how footprints are handled. This should:
+
+1. Extract all `.js` files from the `template` folder recursively
+2. Generate template names from relative paths (e.g., `template/custom/case.js` becomes `custom/case`)
+3. Add templates as injections with type `'template'` instead of `'footprint'`
+4. Integrate with the existing conflict resolution system
+5. Update tests to cover template extraction
+6. Update documentation in AGENTS.md
+
+### [TASK-010] Improve Local File Loading User Feedback
+
+**Context:** When users select a file via the button or drag-and-drop, there's no immediate feedback showing which file was selected before it starts loading. This can be confusing, especially if the file name is long or if the user wants to confirm their selection.
+
+**Task:** Enhance the local file loading UI to provide better feedback:
+
+1. Display the selected file name next to or below the "Choose File" button after selection
+2. Show file size and type information for selected files
+3. Add a visual indicator when a file is being processed (e.g., disable button, show spinner)
+4. Consider showing a preview of archive contents (number of footprints, templates) before loading
+5. Add E2E tests for the drag-and-drop functionality to ensure it works correctly in different browsers
+
+### [TASK-011] Add File Size Limits and Better Error Handling for Archives
+
+**Context:** The current implementation doesn't enforce any file size limits, which could lead to performance issues or browser crashes with very large archives. Additionally, error messages for corrupted or invalid archives could be more specific.
+
+**Task:** Improve robustness of local file loading:
+
+1. Add configurable file size limits (e.g., 50MB for archives, 10MB for text files) with clear error messages
+2. Implement better error handling for corrupted ZIP files (catch JSZip errors and provide user-friendly messages)
+3. Add validation for archive structure before processing (check if it's a valid ZIP, has required files)
+4. Handle edge cases like empty archives, archives with only footprints but no config.yaml (currently throws error, could be more graceful)
+5. Add timeout handling for very large files
+6. Update error messages to be more actionable (e.g., "The archive appears to be corrupted. Please verify the file and try again.")
+
+### [TASK-012] Unify File Loading Logic Between GitHub and Local Sources
+
+**Context:** Currently, GitHub loading (`src/utils/github.ts`) and local file loading (`src/utils/localFiles.ts`) have similar concerns (extracting config, footprints, handling conflicts) but separate implementations. The conflict resolution and footprint processing logic is shared, but the extraction logic could potentially be unified.
+
+**Task:** Refactor to reduce duplication and create a more maintainable architecture:
+
+1. Extract common footprint/template extraction logic into shared utilities
+2. Create a unified interface for file loading results that both GitHub and local loading can use
+3. Consider creating an abstraction layer that handles the common flow: extract ? validate ? resolve conflicts ? merge
+4. Ensure both loading methods use the same validation and error handling patterns
+5. Update tests to verify both paths work consistently

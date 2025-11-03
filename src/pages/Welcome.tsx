@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -11,18 +11,52 @@ import {
   mergeInjections,
   ConflictResolution,
 } from '../utils/injections';
+import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 
 // Styled Components
-const WelcomePageWrapper = styled.div`
+const WelcomePageWrapper = styled.div<{ isDragging?: boolean }>`
   background-color: ${theme.colors.background};
   color: ${theme.colors.white};
   flex-grow: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  position: relative;
+  transition: border-color 0.2s ease;
+
+  ${(props) =>
+    props.isDragging &&
+    `
+    border: 3px dashed ${theme.colors.accent};
+    border-radius: 8px;
+  `}
+`;
+
+const DropOverlay = styled.div<{ isVisible: boolean }>`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: ${(props) => (props.isVisible ? 'flex' : 'none')};
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  pointer-events: none;
+`;
+
+const DropMessage = styled.div`
+  background-color: ${theme.colors.backgroundLight};
+  border: 3px dashed ${theme.colors.accent};
+  border-radius: 8px;
+  padding: 2rem;
+  font-size: ${theme.fontSizes.h3};
+  color: ${theme.colors.text};
+  text-align: center;
 `;
 
 const WelcomeContainer = styled.div`
@@ -54,9 +88,11 @@ const OptionsContainer = styled.div`
   gap: 2rem;
   margin-bottom: 3rem;
   justify-content: center;
+  flex-wrap: wrap;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
     flex-direction: column;
+    gap: 1.5rem;
   }
 `;
 
@@ -66,13 +102,19 @@ const OptionBox = styled.div`
   border-radius: 8px;
   border: 1px solid ${theme.colors.border};
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
+    width: 100%;
     padding: 1.5rem 1rem;
+  }
+
+  @media (min-width: 901px) {
+    max-width: 350px;
   }
 
   h2 {
@@ -91,7 +133,20 @@ const GitHubInputContainer = styled.div`
   display: flex;
   gap: 0.5rem;
   width: 100%;
-  max-width: 400px;
+  min-width: 0;
+
+  input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  button {
+    flex-shrink: 0;
+  }
+`;
+
+const HiddenFileInput = styled.input`
+  display: none;
 `;
 
 const ExamplesGrid = styled.div`
@@ -150,6 +205,7 @@ const Welcome = () => {
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
     string[][] | null
   >(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -341,8 +397,120 @@ const Welcome = () => {
       });
   };
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Shared function to process a file
+  const processFile = async (file: File) => {
+    if (!configContext) return;
+
+    const { setError, clearError, setIsGenerating } = configContext;
+    setIsLoading(true);
+    setIsGenerating(true); // Show progress bar during file loading
+    clearError();
+
+    // Reset any pending conflict resolution state from previous loads
+    setCurrentConflict(null);
+    setPendingFootprints([]);
+    setPendingConfig(null);
+    setInjectionsAtConflict(null);
+
+    try {
+      const result = await loadLocalFile(file);
+
+      // Process footprints with conflict resolution
+      await processFootprints(result.footprints, result.config);
+    } catch (error) {
+      setError(
+        `Failed to load local file: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      // Ensure we reset loading state and don't navigate
+      setIsLoading(false);
+      setIsGenerating(false);
+    } finally {
+      setIsLoading(false);
+      // Note: isGenerating will be reset by generateNow or needs explicit reset on error
+    }
+  };
+
+  const handleLocalFile = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset the file input so the same file can be selected again
+    event.target.value = '';
+
+    await processFile(file);
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if we're actually leaving the wrapper element
+    const currentTarget = e.currentTarget as HTMLElement;
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+
+    // Only hide drag state if we're leaving the wrapper (not moving to a child)
+    if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const acceptedExtensions = ['.yaml', '.yml', '.json', '.zip', '.ekb'];
+
+    // Find the first valid file
+    const validFile = files.find((file) => {
+      const fileName = file.name.toLowerCase();
+      return acceptedExtensions.some((ext) => fileName.endsWith(ext));
+    });
+
+    if (validFile) {
+      await processFile(validFile);
+    } else if (files.length > 0) {
+      // Show error if files were dropped but none were valid
+      if (configContext) {
+        configContext.setError(
+          'Invalid file type. Accepted formats: *.yaml, *.json, *.zip, *.ekb'
+        );
+      }
+    }
+  };
+
   return (
-    <WelcomePageWrapper>
+    <WelcomePageWrapper
+      isDragging={isDragging}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      data-testid="welcome-page-wrapper"
+    >
+      <DropOverlay isVisible={isDragging}>
+        <DropMessage>Drop file here to load configuration</DropMessage>
+      </DropOverlay>
       {currentConflict && (
         <ConflictResolutionDialog
           footprintName={currentConflict}
@@ -372,6 +540,30 @@ const Welcome = () => {
             </Button>
           </OptionBox>
           <OptionBox>
+            <h2>From Local File</h2>
+            <p>
+              Load a configuration from your computer. Supports *.yaml, *.json,
+              *.zip, and *.ekb files.
+            </p>
+            <HiddenFileInput
+              ref={fileInputRef}
+              type="file"
+              accept=".yaml,.yml,.json,.zip,.ekb"
+              onChange={handleLocalFile}
+              disabled={isLoading}
+              aria-label="Select local file to load"
+              data-testid="local-file-input"
+            />
+            <Button
+              onClick={handleFileButtonClick}
+              disabled={isLoading}
+              aria-label="Select local file to load"
+              data-testid="local-file-button"
+            >
+              {isLoading ? 'Loading...' : 'Choose File'}
+            </Button>
+          </OptionBox>
+          <OptionBox>
             <h2>From GitHub</h2>
             <p>
               Link to a YAML config file on GitHub, or simply a repo like
@@ -382,6 +574,16 @@ const Welcome = () => {
                 placeholder="github.com/ceoloide/corney-island"
                 value={githubInput}
                 onChange={(e) => setGithubInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (
+                    e.key === 'Enter' &&
+                    !isLoading &&
+                    githubInput.trim() !== ''
+                  ) {
+                    e.preventDefault();
+                    handleGitHub();
+                  }
+                }}
                 disabled={isLoading}
                 aria-label="GitHub repository URL"
                 data-testid="github-input"
