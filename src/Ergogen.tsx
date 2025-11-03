@@ -21,6 +21,7 @@ import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { createZip } from './utils/zip';
+import { createShareableUri } from './utils/share';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -434,6 +435,40 @@ const Ergogen = () => {
     );
   };
 
+  /**
+   * Creates a shareable URI with the current configuration and copies it to the clipboard.
+   */
+  const handleShare = async () => {
+    if (!configContext.configInput) {
+      return;
+    }
+
+    const shareableUri = createShareableUri(
+      configContext.configInput,
+      configContext.injectionInput
+    );
+
+    try {
+      await navigator.clipboard.writeText(shareableUri);
+      // Optionally show a toast notification, but for now we'll just silently copy
+    } catch (error) {
+      console.error('Failed to copy shareable URI to clipboard:', error);
+      // Fallback: try using the older execCommand API
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = shareableUri;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch (fallbackError) {
+        console.error('Fallback copy method also failed:', fallbackError);
+      }
+    }
+  };
+
   return (
     <ErgogenWrapper>
       {!configContext.showSettings && (
@@ -476,6 +511,13 @@ const Ergogen = () => {
                 data-testid="mobile-download-button"
               >
                 <span className="material-symbols-outlined">download</span>
+              </OutlineIconButton>
+              <OutlineIconButton
+                onClick={handleShare}
+                aria-label="Share configuration"
+                data-testid="mobile-share-button"
+              >
+                <span className="material-symbols-outlined">share</span>
               </OutlineIconButton>
             </>
           )}
@@ -557,6 +599,13 @@ const Ergogen = () => {
                     data-testid="download-config-button"
                   >
                     <span className="material-symbols-outlined">download</span>
+                  </OutlineIconButton>
+                  <OutlineIconButton
+                    onClick={handleShare}
+                    aria-label="Share configuration"
+                    data-testid="share-config-button"
+                  >
+                    <span className="material-symbols-outlined">share</span>
                   </OutlineIconButton>
                 </ButtonContainer>
               </EditorContainer>
