@@ -279,6 +279,7 @@ const ShareInput = styled.input`
 const CopyButton = styled.button`
   white-space: nowrap;
   flex-shrink: 0;
+  min-width: 105px;
   display: flex;
   align-items: center;
   justify-content: center;
