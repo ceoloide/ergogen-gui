@@ -105,9 +105,10 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
 
   // Cleanup timeout on unmount
   useEffect(() => {
+    const currentTimeoutRef = timeoutRef;
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      if (currentTimeoutRef.current) {
+        clearTimeout(currentTimeoutRef.current);
       }
     };
   }, []);
