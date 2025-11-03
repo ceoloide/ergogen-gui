@@ -250,6 +250,7 @@ const Message = styled.p`
 
 const InputContainer = styled.div`
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   align-items: stretch;
 `;
@@ -279,7 +280,7 @@ const ShareInput = styled.input`
 const CopyButton = styled.button`
   white-space: nowrap;
   flex-shrink: 0;
-  min-width: 105px;
+  width: 125px;
   display: flex;
   align-items: center;
   justify-content: center;
