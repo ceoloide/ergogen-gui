@@ -1,5 +1,5 @@
-import { useEffect, useState, ChangeEvent } from 'react';
-import styled from 'styled-components';
+import { useEffect, useState, useRef, ChangeEvent } from 'react';
+import styled, { keyframes } from 'styled-components';
 import Split from 'react-split';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -39,6 +39,57 @@ const ShortcutKey = styled.span`
   color: ${theme.colors.white};
   box-sizing: border-box;
   user-select: none;
+`;
+
+// Animation for toast notification
+const slideIn = keyframes`
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+`;
+
+const slideOut = keyframes`
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+`;
+
+// Toast notification component
+const ToastNotification = styled.div<{ $visible: boolean }>`
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: ${theme.colors.backgroundLight};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  padding: 12px 20px;
+  color: ${theme.colors.white};
+  font-family: ${theme.fonts.body};
+  font-size: ${theme.fontSizes.bodyMedium};
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: ${(props) => (props.$visible ? slideIn : slideOut)} 0.3s ease-out;
+  pointer-events: ${(props) => (props.$visible ? 'auto' : 'none')};
+  opacity: ${(props) => (props.$visible ? 1 : 0)};
+
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconMedium} !important;
+    color: ${theme.colors.accent};
+  }
 `;
 // Utility to get the correct shortcut for the user's OS
 function getShortcutLabel() {
@@ -267,6 +318,16 @@ const Ergogen = () => {
    */
   const configContext = useConfigContext();
 
+  /**
+   * State for showing the share notification toast.
+   */
+  const [showShareNotification, setShowShareNotification] = useState(false);
+
+  /**
+   * Ref to store the notification timeout ID for cleanup.
+   */
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useHotkeys(
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
     () => {
@@ -283,6 +344,17 @@ const Ergogen = () => {
       preventDefault: true,
     }
   );
+
+  /**
+   * Cleanup timeout on unmount to prevent memory leaks.
+   */
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Effect to handle changes to the injection being edited.
@@ -448,9 +520,10 @@ const Ergogen = () => {
       configContext.injectionInput
     );
 
+    let copied = false;
     try {
       await navigator.clipboard.writeText(shareableUri);
-      // Optionally show a toast notification, but for now we'll just silently copy
+      copied = true;
     } catch (error) {
       console.error('Failed to copy shareable URI to clipboard:', error);
       // Fallback: try using the older execCommand API
@@ -463,14 +536,37 @@ const Ergogen = () => {
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
+        copied = true;
       } catch (fallbackError) {
         console.error('Fallback copy method also failed:', fallbackError);
       }
+    }
+
+    // Show notification if copy was successful
+    if (copied) {
+      setShowShareNotification(true);
+      // Clear any existing timeout
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+      // Set new timeout to hide notification
+      notificationTimeoutRef.current = setTimeout(() => {
+        setShowShareNotification(false);
+      }, 2000); // Hide after 2 seconds
     }
   };
 
   return (
     <ErgogenWrapper>
+      <ToastNotification
+        $visible={showShareNotification}
+        role="alert"
+        aria-live="polite"
+        data-testid="share-notification"
+      >
+        <span className="material-symbols-outlined">check_circle</span>
+        <span>Configuration link copied to clipboard</span>
+      </ToastNotification>
       {!configContext.showSettings && (
         <SubHeaderContainer>
           <OutlineIconButton
