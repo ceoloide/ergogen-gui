@@ -321,8 +321,10 @@ const Ergogen = () => {
 
   /**
    * State for showing the share notification toast.
+   * We track both visibility and whether the component should be mounted.
    */
   const [showShareNotification, setShowShareNotification] = useState(false);
+  const [shouldMountNotification, setShouldMountNotification] = useState(false);
 
   /**
    * Ref to store the notification timeout ID for cleanup.
@@ -354,6 +356,16 @@ const Ergogen = () => {
       if (notificationTimeoutRef.current) {
         clearTimeout(notificationTimeoutRef.current);
       }
+    };
+  }, []);
+
+  /**
+   * Reset notification state when component unmounts to prevent flashing on remount.
+   */
+  useEffect(() => {
+    return () => {
+      setShowShareNotification(false);
+      setShouldMountNotification(false);
     };
   }, []);
 
@@ -552,7 +564,11 @@ const Ergogen = () => {
 
     // Show notification if copy was successful
     if (copied) {
-      setShowShareNotification(true);
+      setShouldMountNotification(true);
+      // Use requestAnimationFrame to ensure the component is mounted before animating
+      requestAnimationFrame(() => {
+        setShowShareNotification(true);
+      });
       // Clear any existing timeout
       if (notificationTimeoutRef.current) {
         clearTimeout(notificationTimeoutRef.current);
@@ -560,21 +576,27 @@ const Ergogen = () => {
       // Set new timeout to hide notification
       notificationTimeoutRef.current = setTimeout(() => {
         setShowShareNotification(false);
+        // Unmount after animation completes (0.3s slideOut animation)
+        setTimeout(() => {
+          setShouldMountNotification(false);
+        }, 300);
       }, 2000); // Hide after 2 seconds
     }
   };
 
   return (
     <ErgogenWrapper>
-      <ToastNotification
-        $visible={showShareNotification}
-        role="alert"
-        aria-live="polite"
-        data-testid="share-notification"
-      >
-        <span className="material-symbols-outlined">check_circle</span>
-        <span>Configuration link copied to clipboard</span>
-      </ToastNotification>
+      {shouldMountNotification && (
+        <ToastNotification
+          $visible={showShareNotification}
+          role="alert"
+          aria-live="polite"
+          data-testid="share-notification"
+        >
+          <span className="material-symbols-outlined">check_circle</span>
+          <span>Configuration link copied to clipboard</span>
+        </ToastNotification>
+      )}
       {!configContext.showSettings && (
         <SubHeaderContainer>
           <OutlineIconButton
