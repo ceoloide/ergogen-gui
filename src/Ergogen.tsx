@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, ChangeEvent } from 'react';
-import styled, { keyframes } from 'styled-components';
+import { useEffect, useState, ChangeEvent } from 'react';
+import styled from 'styled-components';
 import Split from 'react-split';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -9,6 +9,7 @@ import InjectionEditor from './molecules/InjectionEditor';
 import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
+import ShareDialog from './molecules/ShareDialog';
 
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
@@ -41,57 +42,6 @@ const ShortcutKey = styled.span`
   user-select: none;
 `;
 
-// Animation for toast notification
-// Note: We need to preserve translateX(-50%) for centering while animating translateY
-const slideIn = keyframes`
-  from {
-    transform: translate(-50%, -100%);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
-`;
-
-const slideOut = keyframes`
-  from {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
-  to {
-    transform: translate(-50%, -100%);
-    opacity: 0;
-  }
-`;
-
-// Toast notification component
-const ToastNotification = styled.div<{ $visible: boolean }>`
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  background-color: ${theme.colors.backgroundLight};
-  border: 1px solid ${theme.colors.border};
-  border-radius: 6px;
-  padding: 12px 20px;
-  color: ${theme.colors.white};
-  font-family: ${theme.fonts.body};
-  font-size: ${theme.fontSizes.bodyMedium};
-  z-index: 10000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: ${(props) => (props.$visible ? slideIn : slideOut)} 0.3s ease-out;
-  pointer-events: ${(props) => (props.$visible ? 'auto' : 'none')};
-  opacity: ${(props) => (props.$visible ? 1 : 0)};
-  transform: translate(-50%, 0);
-
-  .material-symbols-outlined {
-    font-size: ${theme.fontSizes.iconMedium} !important;
-    color: ${theme.colors.accent};
-  }
-`;
 // Utility to get the correct shortcut for the user's OS
 function getShortcutLabel() {
   return (
@@ -323,13 +273,8 @@ const Ergogen = () => {
    * State for showing the share notification toast.
    * We track both visibility and whether the component should be mounted.
    */
-  const [showShareNotification, setShowShareNotification] = useState(false);
-  const [shouldMountNotification, setShouldMountNotification] = useState(false);
-
-  /**
-   * Ref to store the notification timeout ID for cleanup.
-   */
-  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareLink, setShareLink] = useState('');
 
   useHotkeys(
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
@@ -347,27 +292,6 @@ const Ergogen = () => {
       preventDefault: true,
     }
   );
-
-  /**
-   * Cleanup timeout on unmount to prevent memory leaks.
-   */
-  useEffect(() => {
-    return () => {
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  /**
-   * Reset notification state when component unmounts to prevent flashing on remount.
-   */
-  useEffect(() => {
-    return () => {
-      setShowShareNotification(false);
-      setShouldMountNotification(false);
-    };
-  }, []);
 
   /**
    * Effect to handle changes to the injection being edited.
@@ -521,10 +445,10 @@ const Ergogen = () => {
   };
 
   /**
-   * Creates a shareable URI with the current configuration and copies it to the clipboard.
+   * Creates a shareable URI with the current configuration and shows a dialog.
    * Includes all current injections (footprints, templates, etc.) in the shared URI.
    */
-  const handleShare = async () => {
+  const handleShare = () => {
     if (!configContext.configInput) {
       return;
     }
@@ -540,62 +464,18 @@ const Ergogen = () => {
       injectionsToShare
     );
 
-    let copied = false;
-    try {
-      await navigator.clipboard.writeText(shareableUri);
-      copied = true;
-    } catch (error) {
-      console.error('Failed to copy shareable URI to clipboard:', error);
-      // Fallback: try using the older execCommand API
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = shareableUri;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        copied = true;
-      } catch (fallbackError) {
-        console.error('Fallback copy method also failed:', fallbackError);
-      }
-    }
-
-    // Show notification if copy was successful
-    if (copied) {
-      setShouldMountNotification(true);
-      // Use requestAnimationFrame to ensure the component is mounted before animating
-      requestAnimationFrame(() => {
-        setShowShareNotification(true);
-      });
-      // Clear any existing timeout
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current);
-      }
-      // Set new timeout to hide notification
-      notificationTimeoutRef.current = setTimeout(() => {
-        setShowShareNotification(false);
-        // Unmount after animation completes (0.3s slideOut animation)
-        setTimeout(() => {
-          setShouldMountNotification(false);
-        }, 300);
-      }, 2000); // Hide after 2 seconds
-    }
+    setShareLink(shareableUri);
+    setShowShareDialog(true);
   };
 
   return (
     <ErgogenWrapper>
-      {shouldMountNotification && (
-        <ToastNotification
-          $visible={showShareNotification}
-          role="alert"
-          aria-live="polite"
-          data-testid="share-notification"
-        >
-          <span className="material-symbols-outlined">check_circle</span>
-          <span>Configuration link copied to clipboard</span>
-        </ToastNotification>
+      {showShareDialog && (
+        <ShareDialog
+          shareLink={shareLink}
+          onClose={() => setShowShareDialog(false)}
+          data-testid="share-dialog"
+        />
       )}
       {!configContext.showSettings && (
         <SubHeaderContainer>
