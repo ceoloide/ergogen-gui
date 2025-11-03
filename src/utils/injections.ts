@@ -110,3 +110,64 @@ export const mergeInjections = (
 
   return result;
 };
+
+/**
+ * Merges new injection arrays into existing injections.
+ * For each injection in the new array:
+ * - If an injection with the same type and name exists, it overwrites it
+ * - If no injection with the same type and name exists, it adds it
+ * - Existing injections not present in the new array are kept intact
+ * @param newInjections - Array of new injections to merge (format: [type, name, content][])
+ * @param existingInjections - The current array of injections
+ * @returns The merged array of injections
+ */
+export const mergeInjectionArrays = (
+  newInjections: string[][],
+  existingInjections: string[][] | undefined
+): string[][] => {
+  const result = existingInjections ? [...existingInjections] : [];
+
+  // Process each new injection
+  for (const newInj of newInjections) {
+    // Validate injection format
+    if (!Array.isArray(newInj) || newInj.length !== 3) {
+      console.warn(
+        '[mergeInjectionArrays] Skipping invalid injection format:',
+        newInj
+      );
+      continue;
+    }
+
+    const [type, name, content] = newInj;
+    if (
+      typeof type !== 'string' ||
+      typeof name !== 'string' ||
+      typeof content !== 'string'
+    ) {
+      console.warn(
+        '[mergeInjectionArrays] Skipping injection with invalid types:',
+        newInj
+      );
+      continue;
+    }
+
+    // Find existing injection with same type and name
+    const existingIndex = result.findIndex(
+      (inj) =>
+        Array.isArray(inj) &&
+        inj.length === 3 &&
+        inj[0] === type &&
+        inj[1] === name
+    );
+
+    if (existingIndex !== -1) {
+      // Overwrite existing injection
+      result[existingIndex] = [type, name, content];
+    } else {
+      // Add new injection
+      result.push([type, name, content]);
+    }
+  }
+
+  return result;
+};

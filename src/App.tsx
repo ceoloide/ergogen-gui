@@ -13,6 +13,7 @@ import ConfigContextProvider, {
 } from './context/ConfigContext';
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
 import { getConfigFromHash } from './utils/share';
+import { mergeInjectionArrays } from './utils/injections';
 
 const App = () => {
   // Synchronously get the initial value to avoid race conditions on first render.
@@ -29,12 +30,22 @@ const App = () => {
       // Use shared config from hash fragment - this takes priority over localStorage
       const sharedConfig = hashResult.config;
       initialConfig = sharedConfig.config;
-      // Handle injections: if present (even if empty array), overwrite existing ones
+      // Handle injections: merge shared injections with existing ones
       // If undefined, keep existing injections (not present in shared config)
       if (sharedConfig.injections !== undefined) {
-        initialInjectionInput = sharedConfig.injections;
-        // Store in localStorage so useLocalStorage picks it up and overwrites existing injections
-        // This ensures injections from shared config take precedence (like GitHub loading)
+        // Get existing injections from localStorage
+        const existingInjectionsJson =
+          localStorage.getItem('ergogen:injection');
+        const existingInjections: string[][] | undefined =
+          existingInjectionsJson
+            ? JSON.parse(existingInjectionsJson)
+            : undefined;
+        // Merge: shared injections overwrite existing ones with same type+name, but keep others
+        initialInjectionInput = mergeInjectionArrays(
+          sharedConfig.injections,
+          existingInjections
+        );
+        // Store merged result in localStorage so useLocalStorage picks it up
         localStorage.setItem(
           'ergogen:injection',
           JSON.stringify(initialInjectionInput)
@@ -142,14 +153,21 @@ const AppContent = () => {
 
       if (hashResult.success) {
         const sharedConfig = hashResult.config;
-        // Update config and injections
+        // Update config
         configContext.setConfigInput(sharedConfig.config);
+        // Merge injections: shared injections overwrite existing ones with same type+name, but keep others
+        const mergedInjections = sharedConfig.injections
+          ? mergeInjectionArrays(
+              sharedConfig.injections,
+              configContext.injectionInput
+            )
+          : configContext.injectionInput;
         if (sharedConfig.injections !== undefined) {
-          configContext.setInjectionInput(sharedConfig.injections);
-          // Store in localStorage to persist
+          configContext.setInjectionInput(mergedInjections);
+          // Store merged result in localStorage to persist
           localStorage.setItem(
             'ergogen:injection',
-            JSON.stringify(sharedConfig.injections)
+            JSON.stringify(mergedInjections)
           );
         }
         // Store config in localStorage
@@ -157,12 +175,10 @@ const AppContent = () => {
           CONFIG_LOCAL_STORAGE_KEY,
           JSON.stringify(sharedConfig.config)
         );
-        // Generate with the new config
-        configContext.generateNow(
-          sharedConfig.config,
-          sharedConfig.injections || configContext.injectionInput,
-          { pointsonly: false }
-        );
+        // Generate with the new config and merged injections
+        configContext.generateNow(sharedConfig.config, mergedInjections, {
+          pointsonly: false,
+        });
         // Clear the hash fragment after loading
         window.history.replaceState(
           null,
