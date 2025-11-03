@@ -10,7 +10,7 @@ Working with keyboard configurations used to mean you could only start from scra
 
 Now you can load entire keyboard configurations directly from your computer. Simply click the "Choose File" button or drag and drop any supported file onto the page. The app accepts YAML and JSON configuration files, as well as ZIP and EKB archives that include both the configuration and custom footprints.
 
-When loading archives, the app automatically extracts custom footprints from the `footprints` folder, just like when loading from GitHub. If you already have footprints with the same names, you'll see the same friendly conflict resolution dialog to choose how to handle duplicates. Press Enter in the GitHub input field to quickly load repositories, and enjoy improved responsive layouts that work smoothly across all screen sizes.
+When loading archives, the app automatically extracts custom footprints from the `footprints` folder, just like when loading from GitHub. If you already have footprints with the same names, you'll see the same friendly conflict resolution dialog to choose how to handle duplicates.
 
 **What changed:**
 
@@ -18,8 +18,6 @@ When loading archives, the app automatically extracts custom footprints from the
 - **Drag and drop support**: Drop files anywhere on the welcome page for quick loading
 - **Archive support**: ZIP and EKB archives automatically extract configurations and footprints
 - **Conflict resolution**: Same interactive dialog for handling duplicate footprints as GitHub loading
-- **Keyboard shortcuts**: Press Enter in the GitHub input to load repositories faster
-- **Better responsive design**: Improved card layouts that adapt smoothly to different screen sizes
 
 ## Load Keyboards Directly from GitHub
 
