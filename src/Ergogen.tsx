@@ -42,24 +42,25 @@ const ShortcutKey = styled.span`
 `;
 
 // Animation for toast notification
+// Note: We need to preserve translateX(-50%) for centering while animating translateY
 const slideIn = keyframes`
   from {
-    transform: translateY(-100%);
+    transform: translate(-50%, -100%);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 `;
 
 const slideOut = keyframes`
   from {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
   to {
-    transform: translateY(-100%);
+    transform: translate(-50%, -100%);
     opacity: 0;
   }
 `;
@@ -69,7 +70,6 @@ const ToastNotification = styled.div<{ $visible: boolean }>`
   position: fixed;
   top: 20px;
   left: 50%;
-  transform: translateX(-50%);
   background-color: ${theme.colors.backgroundLight};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
@@ -85,6 +85,7 @@ const ToastNotification = styled.div<{ $visible: boolean }>`
   animation: ${(props) => (props.$visible ? slideIn : slideOut)} 0.3s ease-out;
   pointer-events: ${(props) => (props.$visible ? 'auto' : 'none')};
   opacity: ${(props) => (props.$visible ? 1 : 0)};
+  transform: translate(-50%, 0);
 
   .material-symbols-outlined {
     font-size: ${theme.fontSizes.iconMedium} !important;
