@@ -261,7 +261,6 @@ const ConfigContextProvider = ({
     if (hashError) {
       setError(hashError);
     }
-     
   }, [hashError]); // setError is stable from useState, doesn't need to be in deps
 
   const clearError = useCallback(() => setError(null), []);

@@ -55,6 +55,11 @@ const App = () => {
     } else {
       // Store error message to display after ConfigContext is available
       hashError = hashResult.message;
+      console.error('[App] Failed to load shared configuration from hash', {
+        error: hashResult.error,
+        message: hashResult.message,
+        hashLength: window.location.hash.length,
+      });
       // Clear the hash fragment to prevent retrying on navigation
       window.history.replaceState(
         null,
@@ -166,6 +171,14 @@ const AppContent = () => {
         );
       } else {
         // Show error message
+        console.error(
+          '[App] Failed to load shared configuration from hash (hashchange)',
+          {
+            error: hashResult.error,
+            message: hashResult.message,
+            hashLength: window.location.hash.length,
+          }
+        );
         configContext.setError(hashResult.message);
         // Clear the hash fragment to prevent retrying
         window.history.replaceState(

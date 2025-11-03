@@ -46,15 +46,28 @@ export type DecodeResult =
     };
 
 /**
+ * Checks if debug mode is enabled via URL parameter.
+ */
+const isDebugMode = (): boolean => {
+  const queryParameters = new URLSearchParams(window.location.search);
+  return queryParameters.get('debug') !== null;
+};
+
+/**
  * Decodes and decompresses a shared keyboard configuration from a URI fragment.
  *
  * @param encodedString - The encoded and compressed string from URI fragment
  * @returns A DecodeResult indicating success or failure with error details
  */
 export const decodeConfig = (encodedString: string): DecodeResult => {
+  const debug = isDebugMode();
+
   try {
     const decompressed = decompressFromEncodedURIComponent(encodedString);
     if (!decompressed) {
+      console.error(
+        '[Share] DECODE_ERROR: Failed to decompress encoded string'
+      );
       return {
         success: false,
         error: 'DECODE_ERROR',
@@ -66,7 +79,12 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
     let parsed: unknown;
     try {
       parsed = JSON.parse(decompressed);
-    } catch (_parseError) {
+    } catch (parseError) {
+      console.error('[Share] DECODE_ERROR: Failed to parse decompressed JSON', {
+        parseError,
+        decompressedLength: decompressed.length,
+        decompressedPreview: decompressed.substring(0, 100),
+      });
       return {
         success: false,
         error: 'DECODE_ERROR',
@@ -82,6 +100,14 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
       !('config' in parsed) ||
       typeof (parsed as { config: unknown }).config !== 'string'
     ) {
+      console.error('[Share] VALIDATION_ERROR: Invalid object structure', {
+        parsed,
+        hasConfig: parsed && typeof parsed === 'object' && 'config' in parsed,
+        configType:
+          parsed && typeof parsed === 'object' && 'config' in parsed
+            ? typeof (parsed as { config: unknown }).config
+            : 'N/A',
+      });
       return {
         success: false,
         error: 'VALIDATION_ERROR',
@@ -108,6 +134,13 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
             typeof inj[2] === 'string'
         )
       ) {
+        console.error(
+          '[Share] VALIDATION_ERROR: Invalid injections structure',
+          {
+            injections: shareableConfig.injections,
+            isArray: Array.isArray(shareableConfig.injections),
+          }
+        );
         return {
           success: false,
           error: 'VALIDATION_ERROR',
@@ -117,9 +150,23 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
       }
     }
 
+    // Debug logging: log the decoded object when debug mode is enabled
+    if (debug) {
+      console.log('[Share] DEBUG: Decoded configuration object', {
+        configLength: shareableConfig.config.length,
+        hasInjections: shareableConfig.injections !== undefined,
+        injectionsCount: shareableConfig.injections?.length ?? 0,
+        fullObject: shareableConfig,
+      });
+    }
+
     return { success: true, config: shareableConfig };
   } catch (error) {
-    console.error('Failed to decode shared config:', error);
+    console.error('[Share] DECODE_ERROR: Unexpected error during decoding', {
+      error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+    });
     return {
       success: false,
       error: 'DECODE_ERROR',
