@@ -167,16 +167,18 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
             data-testid={dataTestId && `${dataTestId}-input`}
             aria-label="Share link"
           />
-          <CopyButton
-            onClick={copyToClipboard}
-            data-testid={dataTestId && `${dataTestId}-copy`}
-            aria-label={copied ? 'Link copied' : 'Copy link'}
-          >
-            <span className="material-symbols-outlined">
-              {copied ? 'check' : 'content_copy'}
-            </span>
-            {copied ? 'Link copied' : 'Copy link'}
-          </CopyButton>
+          <ButtonWrapper>
+            <CopyButton
+              onClick={copyToClipboard}
+              data-testid={dataTestId && `${dataTestId}-copy`}
+              aria-label={copied ? 'Link copied' : 'Copy link'}
+            >
+              <span className="material-symbols-outlined">
+                {copied ? 'check' : 'content_copy'}
+              </span>
+              {copied ? 'Link copied' : 'Copy link'}
+            </CopyButton>
+          </ButtonWrapper>
         </InputContainer>
       </DialogBox>
     </Overlay>
@@ -253,6 +255,16 @@ const InputContainer = styled.div`
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: stretch;
+`;
+
+const ButtonWrapper = styled.div`
+  display: flex;
+  justify-content: center;
+  width: 100%;
+
+  @media (min-width: 500px) {
+    width: auto;
+  }
 `;
 
 const ShareInput = styled.input`
