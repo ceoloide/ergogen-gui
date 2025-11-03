@@ -26,9 +26,16 @@ const App = () => {
   if (sharedConfig) {
     // Use shared config from hash fragment - this takes priority over localStorage
     initialConfig = sharedConfig.config;
-    // Also set injections if present
-    if (sharedConfig.injections && sharedConfig.injections.length > 0) {
+    // Handle injections: if present (even if empty array), overwrite existing ones
+    // If undefined, keep existing injections (not present in shared config)
+    if (sharedConfig.injections !== undefined) {
       initialInjectionInput = sharedConfig.injections;
+      // Store in localStorage so useLocalStorage picks it up and overwrites existing injections
+      // This ensures injections from shared config take precedence (like GitHub loading)
+      localStorage.setItem(
+        'ergogen:injection',
+        JSON.stringify(initialInjectionInput)
+      );
     }
     // Temporarily store in localStorage so useLocalStorage picks it up
     // This ensures the config persists if user navigates away and comes back

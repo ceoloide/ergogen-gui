@@ -572,6 +572,7 @@ const ConfigContextProvider = ({
   /**
    * Effect to process the input configuration on the initial load.
    * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
+   * Note: Hash fragment loading (including injections) is handled in App.tsx by storing in localStorage.
    */
   useEffect(() => {
     // Check for GitHub URL parameter

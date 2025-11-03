@@ -510,15 +510,22 @@ const Ergogen = () => {
 
   /**
    * Creates a shareable URI with the current configuration and copies it to the clipboard.
+   * Includes all current injections (footprints, templates, etc.) in the shared URI.
    */
   const handleShare = async () => {
     if (!configContext.configInput) {
       return;
     }
 
+    // Include all injections if present
+    const injectionsToShare =
+      configContext.injectionInput && configContext.injectionInput.length > 0
+        ? configContext.injectionInput
+        : undefined;
+
     const shareableUri = createShareableUri(
       configContext.configInput,
-      configContext.injectionInput
+      injectionsToShare
     );
 
     let copied = false;

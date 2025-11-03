@@ -14,7 +14,7 @@ export interface ShareableConfig {
 
 /**
  * Encodes and compresses a keyboard configuration for sharing via URI.
- * Currently encodes only the config, but structured to support injections in the future.
+ * Includes both config and injections (footprints, templates, etc.) when present.
  *
  * @param config - The YAML/JSON configuration string
  * @param injections - Optional array of injections (footprints, templates, etc.)
@@ -26,7 +26,7 @@ export const encodeConfig = (
 ): string => {
   const shareableConfig: ShareableConfig = {
     config,
-    // Injections will be included when provided in the future
+    // Include all injections if present
     ...(injections && injections.length > 0 ? { injections } : {}),
   };
 
