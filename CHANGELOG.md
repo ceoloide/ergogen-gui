@@ -4,7 +4,7 @@
 
 November 2, 2025
 
-![The welcome page showing the new "From Local File" option with drag and drop support.](./public/images/changelog/placeholder.png)
+![The welcome page showing the new "From Local File" option with drag and drop support.](./public/images/changelog/2025-11-02.png)
 
 Working with keyboard configurations used to mean you could only start from scratch or load from GitHub. If you had a configuration file saved on your computer, you'd need to copy and paste it manually – and forget about loading custom footprints that way!
 
