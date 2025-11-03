@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
-import OutlineIconButton from '../atoms/OutlineIconButton';
 
 /**
  * Props for the ShareDialog component.
@@ -277,9 +276,41 @@ const ShareInput = styled.input`
   }
 `;
 
-const CopyButton = styled(OutlineIconButton)`
+const CopyButton = styled.button`
   white-space: nowrap;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: ${theme.colors.accent};
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: ${theme.colors.white};
+  font-family: ${theme.fonts.body};
+  font-size: ${theme.fontSizes.base};
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease-in-out,
+    transform 0.15s ease-in-out;
+
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconMedium} !important;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.accentDark};
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 export default ShareDialog;
