@@ -14,7 +14,6 @@ import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
-import { getConfigFromHash } from '../utils/share';
 import {
   createErgogenWorker,
   createJscadWorker,
@@ -572,34 +571,9 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to process the input configuration on the initial load.
-   * Checks for shared config in hash fragment first, then GitHub URL parameter.
+   * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
    */
   useEffect(() => {
-    // Check for shared config in hash fragment (highest priority)
-    const sharedConfig = getConfigFromHash();
-    if (sharedConfig) {
-      console.log('[ConfigContext] Loading from hash fragment');
-      if (sharedConfig.injections && sharedConfig.injections.length > 0) {
-        // Merge injections if present
-        setInjectionInput(sharedConfig.injections);
-        setConfigInput(sharedConfig.config);
-        generateNow(sharedConfig.config, sharedConfig.injections, {
-          pointsonly: false,
-        });
-      } else {
-        // Just load config without injections
-        setConfigInput(sharedConfig.config);
-        generateNow(sharedConfig.config, injectionInput, { pointsonly: false });
-      }
-      // Clear the hash fragment after loading to prevent reloading on navigation
-      window.history.replaceState(
-        null,
-        '',
-        window.location.pathname + window.location.search
-      );
-      return;
-    }
-
     // Check for GitHub URL parameter
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');

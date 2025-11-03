@@ -12,32 +12,62 @@ import ConfigContextProvider, {
   useConfigContext,
 } from './context/ConfigContext';
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
+import { getConfigFromHash } from './utils/share';
 
 const App = () => {
   // Synchronously get the initial value to avoid race conditions on first render.
 
-  // Since we changed the local storage key for the Ergogen config, we need to always check for the legacy key first and migrate it if it exists.
-  // This migration code can be removed in a future release once we are confident most users have migrated.
-  const legacyStoredConfigValue = localStorage.getItem('LOCAL_STORAGE_CONFIG');
-  const legacyInitialConfig = legacyStoredConfigValue
-    ? JSON.parse(legacyStoredConfigValue)
-    : '';
-  if (legacyInitialConfig) {
-    // The user has a legacy configuration we need to import once, overriding the current initialConfig and then removing the legacy local storage key and value.
-    localStorage.removeItem('LOCAL_STORAGE_CONFIG');
+  // Check for shared config in hash fragment first (highest priority)
+  // This must happen before localStorage initialization
+  const sharedConfig = getConfigFromHash();
+  let initialConfig = '';
+  let initialInjectionInput: string[][] = [];
+
+  if (sharedConfig) {
+    // Use shared config from hash fragment - this takes priority over localStorage
+    initialConfig = sharedConfig.config;
+    // Also set injections if present
+    if (sharedConfig.injections && sharedConfig.injections.length > 0) {
+      initialInjectionInput = sharedConfig.injections;
+    }
+    // Temporarily store in localStorage so useLocalStorage picks it up
+    // This ensures the config persists if user navigates away and comes back
     localStorage.setItem(
       CONFIG_LOCAL_STORAGE_KEY,
-      JSON.stringify(legacyInitialConfig)
+      JSON.stringify(initialConfig)
     );
-    if (window.gtag) {
-      window.gtag('event', 'legacy_config_migrated', {
-        event_category: 'config',
-      });
+    // Clear the hash fragment after reading it
+    window.history.replaceState(
+      null,
+      '',
+      window.location.pathname + window.location.search
+    );
+  } else {
+    // Since we changed the local storage key for the Ergogen config, we need to always check for the legacy key first and migrate it if it exists.
+    // This migration code can be removed in a future release once we are confident most users have migrated.
+    const legacyStoredConfigValue = localStorage.getItem(
+      'LOCAL_STORAGE_CONFIG'
+    );
+    const legacyInitialConfig = legacyStoredConfigValue
+      ? JSON.parse(legacyStoredConfigValue)
+      : '';
+    if (legacyInitialConfig) {
+      // The user has a legacy configuration we need to import once, overriding the current initialConfig and then removing the legacy local storage key and value.
+      localStorage.removeItem('LOCAL_STORAGE_CONFIG');
+      localStorage.setItem(
+        CONFIG_LOCAL_STORAGE_KEY,
+        JSON.stringify(legacyInitialConfig)
+      );
+      if (window.gtag) {
+        window.gtag('event', 'legacy_config_migrated', {
+          event_category: 'config',
+        });
+      }
     }
-  }
 
-  const storedConfigValue = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
-  const initialConfig = storedConfigValue ? JSON.parse(storedConfigValue) : '';
+    const storedConfigValue = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
+    initialConfig = storedConfigValue ? JSON.parse(storedConfigValue) : '';
+  }
 
   // The useLocalStorage hook now manages the config state in the App component.
   // This ensures that any component that updates the config will trigger a re-render here,
@@ -52,7 +82,7 @@ const App = () => {
     <ConfigContextProvider
       configInput={configInput}
       setConfigInput={setConfigInput}
-      initialInjectionInput={[]}
+      initialInjectionInput={initialInjectionInput}
     >
       <AppContent />
     </ConfigContextProvider>
