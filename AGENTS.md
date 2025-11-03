@@ -158,6 +158,47 @@ The application offloads long-running, computationally intensive tasks to Web Wo
 
 Communication with the workers is managed through a standard message-passing system (`postMessage` and `onmessage`), with the main application thread and workers exchanging data as needed.
 
+## Local File Loading
+
+The application supports loading Ergogen configurations from local files on the user's computer. This includes support for multiple file formats and drag-and-drop functionality.
+
+### Supported File Types
+
+- **YAML/JSON files** (`.yaml`, `.yml`, `.json`): Direct configuration files that are loaded as text
+- **ZIP archives** (`.zip`): Archives containing `config.yaml` in the root and optionally a `footprints` folder
+- **EKB archives** (`.ekb`): Ergogen keyboard archives (essentially ZIP files with a different extension)
+
+### Archive Structure
+
+When loading ZIP or EKB archives, the application expects:
+
+- **`config.yaml`** (required): Must be present in the root directory of the archive
+- **`footprints/` folder** (optional): Contains `.js` files organized in subfolders
+  - Footprint names are derived from the relative path under `footprints`, excluding the `.js` extension
+  - Example: `footprints/ceoloide/utility_text.js` becomes `ceoloide/utility_text`
+  - Example: `footprints/logo_mr_useful.js` becomes `logo_mr_useful`
+
+### Drag and Drop
+
+Users can drag and drop files anywhere on the welcome page to load them. Visual feedback includes:
+
+- Dashed border around the page when dragging
+- Overlay message indicating drop target
+- Automatic file type validation
+- Error messages for invalid file types or missing config.yaml
+
+### Conflict Resolution
+
+When loading footprints from local archives, the same conflict resolution system used for GitHub loading applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints.
+
+### Implementation Files
+
+- **`src/utils/localFiles.ts`**: Contains `loadLocalFile` function that handles all file types:
+  - `loadTextFile`: Reads YAML/JSON files using FileReader
+  - `loadZipArchive`: Extracts config.yaml and footprints from ZIP/EKB archives using JSZip
+  - `extractFootprintName`: Generates footprint names from file paths
+- **`src/pages/Welcome.tsx`**: Integrates local file loading with drag-and-drop handlers and conflict resolution
+
 ## GitHub Integration
 
 The application supports loading Ergogen configurations directly from GitHub repositories. This feature has been extended to include automatic footprint loading.
@@ -202,7 +243,7 @@ When loading footprints from GitHub, the application checks for naming conflicts
   - `bfsForYamlFiles`: Performs breadth-first search to find YAML files in repository
 - **`src/utils/injections.ts`**: Utility functions for conflict detection (`checkForConflict`), unique name generation (`generateUniqueName`), and merging injections (`mergeInjections`)
 - **`src/molecules/ConflictResolutionDialog.tsx`**: React component for the conflict resolution UI
-- **`src/pages/Welcome.tsx`**: Orchestrates the loading process, handles conflicts sequentially, and manages dialog state
+- **`src/pages/Welcome.tsx`**: Orchestrates the loading process (both GitHub and local files), handles conflicts sequentially, and manages dialog state. Also includes drag-and-drop handlers for local file loading
 
 ### GitHub API Rate Limiting
 
