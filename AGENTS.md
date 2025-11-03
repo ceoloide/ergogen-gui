@@ -273,6 +273,113 @@ The GitHub loading functionality uses unauthenticated requests, which are subjec
 - UI for token configuration
 - Fallback to unauthenticated requests if no token is provided
 
+## Configuration Sharing
+
+The application supports sharing keyboard configurations via URL hash fragments. Users can generate a shareable link that contains both the configuration and all custom injections (footprints, templates, etc.), allowing recipients to load the complete setup with a single click.
+
+### Share Link Format
+
+Shareable links use the format: `https://ergogen.io/#<encoded-config>` where the hash fragment contains:
+
+- The keyboard configuration (YAML/JSON string)
+- All custom injections (footprints, templates, etc.) as an optional array
+
+The configuration and injections are compressed and URL-encoded using `lz-string`'s `compressToEncodedURIComponent` function for efficient transmission.
+
+### Sharing Process
+
+1. **Generation**: When the user clicks the share button, the app:
+   - Collects the current configuration and all injections
+   - Encodes them into a `ShareableConfig` object (with optional `injections` field)
+   - Compresses and URL-encodes the JSON representation
+   - Constructs a full URL with the encoded data in the hash fragment
+   - Displays a `ShareDialog` with the link
+
+2. **Auto-copy**: The share link is automatically copied to the clipboard when the dialog opens
+
+3. **Dialog UI**: The `ShareDialog` component provides:
+   - A read-only input field showing the shareable link
+   - A "Copy link" button with visual feedback (changes to "Link copied" with check icon for 2.5 seconds)
+   - Close button (X) in the top right corner
+   - Keyboard support (Escape key closes the dialog)
+   - Responsive layout that wraps the button to a new line on narrow screens
+
+### Loading Shared Configurations
+
+When a user navigates to a URL with a hash fragment:
+
+1. **Initial Load**: On page load, `App.tsx` synchronously checks for a hash fragment before initializing localStorage:
+   - Extracts and decodes the hash fragment
+   - Validates the structure (must have `config` as string, optional `injections` as `string[][]`)
+   - If valid, sets initial config and merges injections, storing both in localStorage
+   - If invalid, stores error message for display via the error banner
+   - Clears the hash fragment after processing
+
+2. **Hash Change Events**: When navigating to a shared URL while already on the page:
+   - `AppContent` component listens for `hashchange` events
+   - Repeats the same extraction, validation, and loading process
+   - Updates the configuration state and triggers regeneration
+
+3. **Injection Merging**: When loading shared configurations, injections are merged intelligently:
+   - Uses `mergeInjectionArrays` utility function
+   - Shared injections overwrite existing ones with the same type and name
+   - New injections are added if they don't exist
+   - Existing injections not present in the shared config are preserved
+   - This differs from GitHub loading, which uses the `overwrite` strategy
+
+### Error Handling
+
+The share system provides comprehensive error handling:
+
+- **Decode Errors**: Invalid or corrupted encoded strings display: "The shared configuration link is invalid or corrupted. The encoded data could not be decompressed."
+- **Validation Errors**: Valid strings with invalid structure display: "The shared configuration link does not contain a valid configuration. The decoded data is missing required fields or has an invalid structure."
+- **Console Logging**: All errors are logged to the console with `[Share]` prefix for debugging
+- **Debug Mode**: Adding `?debug` to the URL enables debug logging that shows the decoded configuration object in the console
+
+### Implementation Files
+
+- **`src/utils/share.ts`**: Core sharing utilities:
+  - `encodeConfig`: Compresses and encodes configuration and injections
+  - `decodeConfig`: Decompresses and validates shared configurations, returns `DecodeResult` union type
+  - `createShareableUri`: Constructs the full shareable URL
+  - `getConfigFromHash`: Extracts and decodes hash fragment from current URL
+- **`src/utils/injections.ts`**: Contains `mergeInjectionArrays` function for merging injection arrays:
+  - Matches injections by type and name (not just name)
+  - Overwrites existing injections with same type+name
+  - Adds new injections that don't exist
+  - Preserves existing injections not in the shared config
+- **`src/molecules/ShareDialog.tsx`**: Dialog component for displaying and copying share links
+- **`src/App.tsx`**: Handles initial hash fragment loading and hash change events
+- **`src/Ergogen.tsx`**: Contains share button and triggers the share dialog
+
+### Future Enhancements
+
+Several potential improvements could enhance the sharing feature:
+
+1. **URL Length Validation**: Very large configurations might create URLs that exceed browser URL length limits (typically 2048-8192 characters depending on browser). Could add validation to warn users or suggest alternative sharing methods when URLs become too long.
+
+2. **Share Link Metadata**: Currently, share links only contain the configuration and injections. Could enhance the `ShareableConfig` interface to include optional metadata like:
+   - Keyboard name/description
+   - Creation timestamp
+   - Version information
+   - Author information
+
+3. **QR Code Generation**: For easier mobile sharing, could generate QR codes that users can scan to load configurations directly on mobile devices.
+
+4. **Share Link Shortening**: Very long URLs can be unwieldy. Could integrate with URL shortening services or create a custom short link service with a backend API.
+
+5. **Mobile Native Sharing**: On mobile devices, could integrate with native sharing APIs (Web Share API) to allow sharing through the device's native share menu (SMS, email, social media, etc.).
+
+6. **Share Link History**: Track previously generated share links in localStorage, allowing users to easily access and re-share recent configurations.
+
+7. **Share Link Validation**: Add a "Test Link" feature that validates a share link works correctly before sharing it with others.
+
+8. **Better Error Recovery**: When encountering partially corrupted share links, attempt to recover and load what's possible rather than showing a complete error (e.g., load config even if injections are corrupted).
+
+9. **Share Link Expiration**: Add optional expiration dates or time-to-live (TTL) for share links, useful for temporary sharing scenarios.
+
+10. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
+
 ## Future Tasks
 
 When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:

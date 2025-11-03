@@ -71,12 +71,14 @@ declare global {
  * @property {string | undefined} configInput - The current YAML/JSON configuration string.
  * @property {Dispatch<SetStateAction<string | undefined>>} setConfigInput - Function to update the config input.
  * @property {string[][]} [initialInjectionInput] - The initial array of code injections.
+ * @property {string | null} [hashError] - Error message from hash fragment decoding, if any.
  * @property {React.ReactNode[] | React.ReactNode} children - The child components to be wrapped by the provider.
  */
 type Props = {
   configInput: string | undefined;
   setConfigInput: Dispatch<SetStateAction<string | undefined>>;
   initialInjectionInput?: string[][];
+  hashError?: string | null;
   children: React.ReactNode[] | React.ReactNode;
 };
 
@@ -203,6 +205,7 @@ const ConfigContextProvider = ({
   configInput,
   setConfigInput,
   initialInjectionInput,
+  hashError,
   children,
 }: Props) => {
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
@@ -249,6 +252,16 @@ const ConfigContextProvider = ({
       console.log('--- ConfigContextProvider unmounted ---');
     };
   }, []);
+
+  /**
+   * Effect to set error from hash fragment decoding if present.
+   * This handles errors from initial page load with invalid shared configurations.
+   */
+  useEffect(() => {
+    if (hashError) {
+      setError(hashError);
+    }
+  }, [hashError]); // setError is stable from useState, doesn't need to be in deps
 
   const clearError = useCallback(() => setError(null), []);
   const clearWarning = useCallback(() => setDeprecationWarning(null), []);
@@ -571,8 +584,17 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to process the input configuration on the initial load.
+   * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
+   * Note: Hash fragment loading (including injections) is handled in App.tsx by storing in localStorage.
+   * If there's a hashError, skip initial generation to prevent clearing the error.
    */
   useEffect(() => {
+    // If there's a hash error, don't run initial generation (error will be displayed)
+    if (hashError) {
+      return;
+    }
+
+    // Check for GitHub URL parameter
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
     if (githubUrl) {

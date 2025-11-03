@@ -1,3 +1,4 @@
+import React from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 
@@ -6,10 +7,16 @@ import { theme } from '../theme/theme';
  * @typedef {object} Props
  * @property {string} [aria-label] - An optional aria-label for the button.
  * @property {string} [data-testid] - An optional data-testid for testing purposes.
+ * @property {React.MouseEventHandler<HTMLButtonElement>} [onClick] - Click handler for the button.
+ * @property {boolean} [disabled] - Whether the button is disabled.
+ * @property {string} [className] - Optional CSS class name.
  */
 type Props = {
   'aria-label'?: string;
   'data-testid'?: string;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
+  disabled?: boolean;
+  className?: string;
 };
 
 /**

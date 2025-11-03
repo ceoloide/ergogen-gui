@@ -1,5 +1,20 @@
 # Changelog
 
+## Share A Link To Your Keyboard Configuration
+
+November 3, 2025
+
+![The share dialog showing a sharable configuration link with copy button.](./public/images/changelog/2025-11-03.png)
+
+Sharing your keyboard design with others used to be a hassle. You'd have to export your configuration file, package up all your custom footprints separately, and send multiple files or links. The recipient would then need to load everything manually, making collaboration tedious and error-prone.
+
+Now you can share your entire keyboard configuration – including all custom footprints – with a single link. Click the share button and a dialog appears with your personalized shareable URL. The link is automatically copied to your clipboard, ready to paste anywhere. Recipients can simply click the link to load your complete configuration with all custom components intact.
+
+**What changed:**
+
+- **Shareable links**: Generate a single URL that contains your keyboard configuration
+- **Complete configuration sharing**: All custom footprints and templates are included in the shared link
+
 ## Load Configurations from Local Files
 
 November 2, 2025

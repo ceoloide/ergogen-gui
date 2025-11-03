@@ -9,6 +9,7 @@ import InjectionEditor from './molecules/InjectionEditor';
 import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
+import ShareDialog from './molecules/ShareDialog';
 
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
@@ -21,6 +22,7 @@ import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { createZip } from './utils/zip';
+import { createShareableUri } from './utils/share';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -39,6 +41,7 @@ const ShortcutKey = styled.span`
   box-sizing: border-box;
   user-select: none;
 `;
+
 // Utility to get the correct shortcut for the user's OS
 function getShortcutLabel() {
   return (
@@ -266,6 +269,13 @@ const Ergogen = () => {
    */
   const configContext = useConfigContext();
 
+  /**
+   * State for showing the share notification toast.
+   * We track both visibility and whether the component should be mounted.
+   */
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+
   useHotkeys(
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
     () => {
@@ -434,8 +444,39 @@ const Ergogen = () => {
     );
   };
 
+  /**
+   * Creates a shareable URI with the current configuration and shows a dialog.
+   * Includes all current injections (footprints, templates, etc.) in the shared URI.
+   */
+  const handleShare = () => {
+    if (!configContext.configInput) {
+      return;
+    }
+
+    // Include all injections if present
+    const injectionsToShare =
+      configContext.injectionInput && configContext.injectionInput.length > 0
+        ? configContext.injectionInput
+        : undefined;
+
+    const shareableUri = createShareableUri(
+      configContext.configInput,
+      injectionsToShare
+    );
+
+    setShareLink(shareableUri);
+    setShowShareDialog(true);
+  };
+
   return (
     <ErgogenWrapper>
+      {showShareDialog && (
+        <ShareDialog
+          shareLink={shareLink}
+          onClose={() => setShowShareDialog(false)}
+          data-testid="share-dialog"
+        />
+      )}
       {!configContext.showSettings && (
         <SubHeaderContainer>
           <OutlineIconButton
@@ -476,6 +517,13 @@ const Ergogen = () => {
                 data-testid="mobile-download-button"
               >
                 <span className="material-symbols-outlined">download</span>
+              </OutlineIconButton>
+              <OutlineIconButton
+                onClick={handleShare}
+                aria-label="Share configuration"
+                data-testid="mobile-share-button"
+              >
+                <span className="material-symbols-outlined">share</span>
               </OutlineIconButton>
             </>
           )}
@@ -557,6 +605,13 @@ const Ergogen = () => {
                     data-testid="download-config-button"
                   >
                     <span className="material-symbols-outlined">download</span>
+                  </OutlineIconButton>
+                  <OutlineIconButton
+                    onClick={handleShare}
+                    aria-label="Share configuration"
+                    data-testid="share-config-button"
+                  >
+                    <span className="material-symbols-outlined">share</span>
                   </OutlineIconButton>
                 </ButtonContainer>
               </EditorContainer>
