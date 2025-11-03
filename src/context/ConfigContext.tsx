@@ -12,6 +12,7 @@ import React, {
 import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
+import { decompressFromEncodedURIComponent } from 'lz-string';
 import { useLocalStorage } from 'react-use';
 import { fetchConfigFromUrl } from '../utils/github';
 import {
@@ -573,6 +574,26 @@ const ConfigContextProvider = ({
    * Effect to process the input configuration on the initial load.
    */
   useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+      try {
+        const decompressed = decompressFromEncodedURIComponent(hash);
+        const sharedConfig = JSON.parse(decompressed);
+        if (sharedConfig.config) {
+          setConfigInput(sharedConfig.config);
+        }
+        if (sharedConfig.injections) {
+          setInjectionInput(sharedConfig.injections);
+        }
+        generateNow(sharedConfig.config, sharedConfig.injections, {
+          pointsonly: false,
+        });
+      } catch (_error) {
+        setError('Could not load shared configuration from URL.');
+      }
+      return;
+    }
+
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
     if (githubUrl) {

@@ -187,11 +187,11 @@ Users can drag and drop files anywhere on the welcome page to load them. Visual 
 - Automatic file type validation
 - Error messages for invalid file types or missing config.yaml
 
-### Conflict Resolution
+### Local File Conflict Resolution
 
 When loading footprints from local archives, the same conflict resolution system used for GitHub loading applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints.
 
-### Implementation Files
+### Local File Implementation Files
 
 - **`src/utils/localFiles.ts`**: Contains `loadLocalFile` function that handles all file types:
   - `loadTextFile`: Reads YAML/JSON files using FileReader

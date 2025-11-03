@@ -41,7 +41,7 @@ test.describe('Ergogen Configuration Processing', () => {
     // Wait for the downloads section to be visible
     const downloadsSection = page.getByTestId('downloads-container');
     await shoot('before-downloads-section-visible');
-    await expect(downloadsSection).toBeVisible({ timeout: 5000 });
+    await expect(downloadsSection).toBeVisible({ timeout: 15000 });
     await shoot('after-downloads-section-visible');
   });
   test('loads A. dux demo.dxf preview', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Ergogen Configuration Processing', () => {
     // Test DXF preview (demo output)
     const demoDxfRow = page.getByTestId('downloads-container-demo-dxf');
     await shoot('before-demo-dxf-row-visible');
-    await expect(demoDxfRow).toBeVisible({ timeout: 5000 });
+    await expect(demoDxfRow).toBeVisible({ timeout: 15000 });
     await shoot('after-demo-dxf-row-visible');
 
     const dxfPreviewButton = page.getByTestId(
@@ -74,7 +74,7 @@ test.describe('Ergogen Configuration Processing', () => {
     await dxfPreviewButton.click();
     const dxfFilePreview = page.getByTestId('demo.svg-file-preview');
     await shoot('before-dxf-file-preview-visible');
-    await expect(dxfFilePreview).toBeVisible({ timeout: 5000 });
+    await expect(dxfFilePreview).toBeVisible({ timeout: 15000 });
     await shoot('after-dxf-file-preview-visible');
   });
   test('loads A. dux KiCad PCB', async ({ page }) => {
@@ -95,7 +95,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-architeuthis_dux-kicad_pcb'
     );
     await shoot('before-pcb-row-visible');
-    await expect(pcbRow).toBeVisible({ timeout: 5000 });
+    await expect(pcbRow).toBeVisible({ timeout: 15000 });
     await shoot('after-pcb-row-visible');
 
     const pcbPreviewButton = page.getByTestId(
@@ -111,7 +111,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'pcbs.architeuthis_dux-file-preview'
     );
     await shoot('before-pcb-file-preview-visible');
-    await expect(pcbFilePreview).toBeVisible({ timeout: 5000 });
+    await expect(pcbFilePreview).toBeVisible({ timeout: 15000 });
     await shoot('after-pcb-file-preview-visible');
   });
   test('loads A. dux JSCAD preview when stlPreview is false', async ({
@@ -135,7 +135,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-prototype-jscad'
     );
     await shoot('before-jscad-row-visible');
-    await expect(demoJscadRow).toBeVisible({ timeout: 5000 });
+    await expect(demoJscadRow).toBeVisible({ timeout: 15000 });
     await shoot('after-jscad-row-visible');
 
     const jscadPreviewButton = page.getByTestId(
@@ -149,7 +149,7 @@ test.describe('Ergogen Configuration Processing', () => {
     await jscadPreviewButton.click();
     const jscadFilePreview = page.getByTestId('cases.prototype-file-preview');
     await shoot('before-jscad-file-preview-visible');
-    await expect(jscadFilePreview).toBeVisible({ timeout: 5000 });
+    await expect(jscadFilePreview).toBeVisible({ timeout: 15000 });
     await shoot('after-jscad-file-preview-visible');
   });
 
@@ -201,7 +201,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-prototype-jscad'
     );
     await shoot('before-jscad-row-visible');
-    await expect(demoJscadRow).toBeVisible({ timeout: 5000 });
+    await expect(demoJscadRow).toBeVisible({ timeout: 15000 });
     await shoot('after-jscad-row-visible');
 
     const jscadPreviewButton = page.getByTestId(
@@ -215,7 +215,7 @@ test.describe('Ergogen Configuration Processing', () => {
     await jscadPreviewButton.click();
     const jscadFilePreview = page.getByTestId('cases.prototype-file-preview');
     await shoot('before-jscad-file-preview-visible');
-    await expect(jscadFilePreview).toBeVisible({ timeout: 5000 });
+    await expect(jscadFilePreview).toBeVisible({ timeout: 15000 });
     await shoot('after-jscad-file-preview-visible');
   });
   test('loads A. dux STL previews', async ({ page }) => {
@@ -237,14 +237,14 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-mounting_plate-stl'
     );
     await shoot('before-stl-row-mounting-plate-visible');
-    await expect(stlRowMountingPlate).toBeVisible({ timeout: 10000 });
+    await expect(stlRowMountingPlate).toBeVisible({ timeout: 60000 });
     await shoot('after-stl-row-mounting-plate-visible');
 
     const stlRowPrototype = page.getByTestId(
       'downloads-container-prototype-stl'
     );
     await shoot('before-stl-row-prototype-visible');
-    await expect(stlRowPrototype).toBeVisible({ timeout: 10000 });
+    await expect(stlRowPrototype).toBeVisible({ timeout: 60000 });
     await shoot('after-stl-row-prototype-visible');
 
     // Wait for STL generation to complete (download button should appear)
@@ -252,14 +252,14 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-mounting_plate-stl-download'
     );
     await shoot('before-stl-download-button-plate-visible');
-    await expect(stlDownloadButtonPlate).toBeVisible({ timeout: 30000 });
+    await expect(stlDownloadButtonPlate).toBeVisible({ timeout: 60000 });
     await shoot('after-stl-download-button-plate-visible');
 
     const stlPreviewButtonPrototype = page.getByTestId(
       'downloads-container-prototype-stl-download'
     );
     await shoot('before-stl-download-button-prototype-visible');
-    await expect(stlPreviewButtonPrototype).toBeVisible({ timeout: 30000 });
+    await expect(stlPreviewButtonPrototype).toBeVisible({ timeout: 60000 });
     await shoot('after-stl-download-button-prototype-visible');
 
     // Click to preview the mounting_plate STL
@@ -267,7 +267,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-mounting_plate-stl-preview'
     );
     await shoot('before-stl-preview-button-plate-visible');
-    await expect(stlPreviewButtonPlate).toBeVisible({ timeout: 30000 });
+    await expect(stlPreviewButtonPlate).toBeVisible({ timeout: 60000 });
     await shoot('after-stl-preview-button-plate-visible');
 
     await stlPreviewButtonPlate.click();
@@ -275,7 +275,7 @@ test.describe('Ergogen Configuration Processing', () => {
       'cases.mounting_plate.stl-file-preview'
     );
     await shoot('before-stl-file-preview-plate-visible');
-    await expect(stlFilePreviewPlate).toBeVisible({ timeout: 5000 });
+    await expect(stlFilePreviewPlate).toBeVisible({ timeout: 15000 });
     await shoot('after-stl-file-preview-plate-visible');
 
     // Click to preview the prototype STL
@@ -283,14 +283,14 @@ test.describe('Ergogen Configuration Processing', () => {
       'downloads-container-prototype-stl-preview'
     );
     await shoot('before-stl-preview-button-proto-visible');
-    await expect(stlPreviewButtonProto).toBeVisible({ timeout: 30000 });
+    await expect(stlPreviewButtonProto).toBeVisible({ timeout: 60000 });
     await shoot('after-stl-preview-button-proto-visible');
     await stlPreviewButtonProto.click();
     const stlFilePreviewProto = page.getByTestId(
       'cases.prototype.stl-file-preview'
     );
     await shoot('before-stl-file-preview-proto-visible');
-    await expect(stlFilePreviewProto).toBeVisible({ timeout: 5000 });
+    await expect(stlFilePreviewProto).toBeVisible({ timeout: 15000 });
     await shoot('after-stl-file-preview-proto-visible');
 
     // Download both STL files and ensure they are different

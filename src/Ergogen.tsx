@@ -19,6 +19,7 @@ import GenOption from './atoms/GenOption';
 import OutlineIconButton from './atoms/OutlineIconButton';
 import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
+import ShareButton from './atoms/ShareButton';
 import { theme } from './theme/theme';
 import { createZip } from './utils/zip';
 
@@ -477,6 +478,7 @@ const Ergogen = () => {
               >
                 <span className="material-symbols-outlined">download</span>
               </OutlineIconButton>
+              <ShareButton />
             </>
           )}
           {!configContext.showConfig && (
@@ -558,6 +560,7 @@ const Ergogen = () => {
                   >
                     <span className="material-symbols-outlined">download</span>
                   </OutlineIconButton>
+                  <ShareButton />
                 </ButtonContainer>
               </EditorContainer>
             </LeftSplitPane>
