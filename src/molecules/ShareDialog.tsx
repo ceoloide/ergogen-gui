@@ -153,7 +153,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
         >
           <span className="material-symbols-outlined">close</span>
         </CloseButton>
-        <Title>Sharable Configuration Link</Title>
+        <Title>Shareable Configuration Link</Title>
         <Message>
           Share this link with others to let them view and use your keyboard
           configuration, including all of your custom footprints.
