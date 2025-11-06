@@ -1,8 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import DiscordIcon from './DiscordIcon';
-import GithubIcon from './GithubIcon';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
 
@@ -81,43 +79,10 @@ const VersionText = styled.a`
 `;
 
 /**
- * A styled anchor tag that functions as a link button.
+ * A styled button for toggling the side navigation panel.
  */
-const StyledLinkButton = styled.a`
-    background-color: transparent;
-    border: 1px solid ${theme.colors.border};
-    border-radius: 6px;
-    color: ${theme.colors.white};
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    text-decoration: none;
-    cursor: pointer;
-    font-size: ${theme.fontSizes.bodySmall};
-    line-height: 16px;
-    gap: 6px
-    height: 34px;
-
-    .material-symbols-outlined {
-        margin-right: 6px;
-        font-size: ${theme.fontSizes.iconMedium} !important;
-    }
-
-    &:hover {
-        background-color: ${theme.colors.buttonHover};
-    }
-`;
-
-const DocsButton = styled(StyledLinkButton)`
-  @media (max-width: 639px) {
-    .material-symbols-outlined {
-      margin-right: 0;
-    }
-
-    span:not(.material-symbols-outlined) {
-      display: none;
-    }
-  }
+const SideNavButton = styled(OutlineIconButton)`
+  flex-shrink: 0;
 `;
 
 /**
@@ -227,10 +192,24 @@ const Header = (): JSX.Element => {
     );
   };
 
+  const toggleSideNav = () => {
+    configContext?.setShowSideNav(!configContext?.showSideNav);
+  };
+
   return (
     <HeaderContainer>
       <LeftContainer>
-        {/* <LeftPanelButton onClick={() => window.location.reload()}><span className="material-symbols-outlined">left_panel_open</span></LeftPanelButton> */}
+        <SideNavButton
+          onClick={toggleSideNav}
+          aria-label={
+            configContext?.showSideNav
+              ? 'Hide navigation panel'
+              : 'Show navigation panel'
+          }
+          data-testid="side-nav-toggle-button"
+        >
+          <span className="material-symbols-outlined">side_navigation</span>
+        </SideNavButton>
         <ErgogenLogo>
           <LogoButton
             to="/"
@@ -276,34 +255,6 @@ const Header = (): JSX.Element => {
             <span className="material-symbols-outlined">archive</span>
           </ArchiveIconButton>
         )}
-        <DocsButton
-          href="https://docs.ergogen.xyz/"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open documentation"
-          data-testid="docs-button"
-        >
-          <span className="material-symbols-outlined">description</span>
-          <span>Docs</span>
-        </DocsButton>
-        <StyledLinkButton
-          href="https://discord.ergogen.xyz"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Join the Discord community"
-          data-testid="discord-button"
-        >
-          <DiscordIcon />
-        </StyledLinkButton>
-        <StyledLinkButton
-          href="https://github.com/ergogen"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="View the GitHub repositories"
-          data-testid="github-button"
-        >
-          <GithubIcon />
-        </StyledLinkButton>
         <OutlineIconButton
           onClick={toggleSettings}
           aria-label={
