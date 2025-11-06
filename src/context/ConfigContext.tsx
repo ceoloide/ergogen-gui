@@ -247,7 +247,6 @@ const ConfigContextProvider = ({
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
-  const hasTrackedInitialSettingsRef = useRef<boolean>(false);
 
   useEffect(() => {
     console.log('--- ConfigContextProvider mounted ---');
@@ -418,23 +417,6 @@ const ConfigContextProvider = ({
   }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
 
   /**
-   * Effect to track settings at page load (runs once when settings are first available).
-   * Uses a ref to ensure we only track once, even if settings change during initial render.
-   */
-  useEffect(() => {
-    if (!hasTrackedInitialSettingsRef.current) {
-      trackEvent('settings_loaded', {
-        debug,
-        autoGen,
-        autoGen3D,
-        kicanvasPreview,
-        stlPreview,
-      });
-      hasTrackedInitialSettingsRef.current = true;
-    }
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
-
-  /**
    * Effect to save user settings to local storage whenever they change.
    */
   useEffect(() => {
@@ -452,22 +434,32 @@ const ConfigContextProvider = ({
   }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
 
   /**
-   * Effect to track settings changes.
+   * Effect to track settings loaded and changes.
+   * Tracks settings_loaded every time settings are available (including on mount and remounts).
+   * Tracks setting_changed when settings actually change (not on initial mount).
    */
   useEffect(() => {
-    // Skip tracking on initial mount (handled by settings_loaded event)
-    if (isInitialMountRef.current) {
-      isInitialMountRef.current = false;
-      return;
-    }
-
-    trackEvent('setting_changed', {
+    // Track settings_loaded every time settings are available
+    trackEvent('settings_loaded', {
       debug,
       autoGen,
       autoGen3D,
       kicanvasPreview,
       stlPreview,
     });
+
+    // Track setting_changed only when settings actually change (not on initial mount)
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+    } else {
+      trackEvent('setting_changed', {
+        debug,
+        autoGen,
+        autoGen3D,
+        kicanvasPreview,
+        stlPreview,
+      });
+    }
   }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
 
   /**
