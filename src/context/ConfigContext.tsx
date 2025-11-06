@@ -247,7 +247,7 @@ const ConfigContextProvider = ({
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
-  const isSettingsLoadTrackedRef = useRef<boolean>(false);
+  const hasTrackedInitialSettingsRef = useRef<boolean>(false);
 
   useEffect(() => {
     console.log('--- ConfigContextProvider mounted ---');
@@ -418,10 +418,11 @@ const ConfigContextProvider = ({
   }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
 
   /**
-   * Effect to track settings at page load.
+   * Effect to track settings at page load (runs once when settings are first available).
+   * Uses a ref to ensure we only track once, even if settings change during initial render.
    */
   useEffect(() => {
-    if (!isSettingsLoadTrackedRef.current) {
+    if (!hasTrackedInitialSettingsRef.current) {
       trackEvent('settings_loaded', {
         debug,
         autoGen,
@@ -429,7 +430,7 @@ const ConfigContextProvider = ({
         kicanvasPreview,
         stlPreview,
       });
-      isSettingsLoadTrackedRef.current = true;
+      hasTrackedInitialSettingsRef.current = true;
     }
   }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
 
