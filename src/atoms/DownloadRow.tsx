@@ -1,5 +1,6 @@
 import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
+import { trackEvent } from '../utils/analytics';
 
 const spin = keyframes`
   from {

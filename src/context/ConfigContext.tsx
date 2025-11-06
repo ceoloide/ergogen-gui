@@ -247,6 +247,7 @@ const ConfigContextProvider = ({
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
+  const isSettingsLoadTrackedRef = useRef<boolean>(false);
 
   useEffect(() => {
     console.log('--- ConfigContextProvider mounted ---');
@@ -420,15 +421,17 @@ const ConfigContextProvider = ({
    * Effect to track settings at page load.
    */
   useEffect(() => {
-    trackEvent('settings_loaded', {
-      debug,
-      autoGen,
-      autoGen3D,
-      kicanvasPreview,
-      stlPreview,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+    if (!isSettingsLoadTrackedRef.current) {
+      trackEvent('settings_loaded', {
+        debug,
+        autoGen,
+        autoGen3D,
+        kicanvasPreview,
+        stlPreview,
+      });
+      isSettingsLoadTrackedRef.current = true;
+    }
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
 
   /**
    * Effect to save user settings to local storage whenever they change.
