@@ -23,6 +23,7 @@ import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { createZip } from './utils/zip';
 import { createShareableUri } from './utils/share';
+import { trackEvent } from './utils/analytics';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -336,6 +337,16 @@ const Ergogen = () => {
     configContext?.setInjectionInput(injections);
   }, [configContext, injectionToEdit]);
 
+  // Track preview changes
+  useEffect(() => {
+    if (configContext?.results && preview.key && preview.extension) {
+      trackEvent('preview_loaded', {
+        preview_type: preview.extension,
+        preview_key: preview.key,
+      });
+    }
+  }, [preview.key, preview.extension, configContext?.results]);
+
   if (!configContext) return null;
   let result = null;
   if (configContext.results) {
@@ -346,29 +357,29 @@ const Ergogen = () => {
       preview.extension = 'svg';
       result = findResult(preview.key, configContext.results);
     }
+  }
 
-    // Process the result based on the file extension to format it for the preview component.
-    switch (preview.extension) {
-      case 'svg':
-      case 'kicad_pcb':
-      case 'stl':
-        preview.content = typeof result === 'string' ? result : '';
-        break;
-      case 'jscad':
-        preview.content =
-          typeof (result as Record<string, unknown>)?.jscad === 'string'
-            ? ((result as Record<string, unknown>).jscad as string)
-            : '';
-        break;
-      case 'yaml':
-        preview.content = yaml.dump(result);
-        break;
-      case 'txt':
-        preview.content = configContext.configInput || '';
-        break;
-      default:
-        preview.content = '';
-    }
+  // Process the result based on the file extension to format it for the preview component.
+  switch (preview.extension) {
+    case 'svg':
+    case 'kicad_pcb':
+    case 'stl':
+      preview.content = typeof result === 'string' ? result : '';
+      break;
+    case 'jscad':
+      preview.content =
+        typeof (result as Record<string, unknown>)?.jscad === 'string'
+          ? ((result as Record<string, unknown>).jscad as string)
+          : '';
+      break;
+    case 'yaml':
+      preview.content = yaml.dump(result);
+      break;
+    case 'txt':
+      preview.content = configContext.configInput || '';
+      break;
+    default:
+      preview.content = '';
   }
 
   /**
@@ -413,6 +424,10 @@ const Ergogen = () => {
     if (configContext.configInput === undefined) {
       return;
     }
+    trackEvent('download_button_clicked', {
+      download_type: 'yaml',
+      file_name: 'config.yaml',
+    });
     const element = document.createElement('a');
     const file = new Blob([configContext.configInput], { type: 'text/yaml' });
     element.href = URL.createObjectURL(file);
@@ -435,6 +450,9 @@ const Ergogen = () => {
     ) {
       return;
     }
+    trackEvent('download_button_clicked', {
+      download_type: 'archive',
+    });
     createZip(
       configContext.results,
       configContext.configInput,
@@ -463,6 +481,11 @@ const Ergogen = () => {
       configContext.configInput,
       injectionsToShare
     );
+
+    trackEvent('share_button_clicked', {
+      has_injections: !!injectionsToShare,
+      injections_count: injectionsToShare?.length || 0,
+    });
 
     setShareLink(shareableUri);
     setShowShareDialog(true);

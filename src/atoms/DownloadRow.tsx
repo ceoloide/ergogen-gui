@@ -1,5 +1,6 @@
 import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
+import { trackEvent } from '../utils/analytics';
 
 const spin = keyframes`
   from {
@@ -156,6 +157,10 @@ const DownloadRow = ({
 
   const handleDownload = () => {
     if (isDisabled) return;
+    trackEvent('download_button_clicked', {
+      download_type: extension,
+      file_name: fileName,
+    });
     const element = document.createElement('a');
     const file = new Blob([content], { type: 'octet/stream' });
     element.href = URL.createObjectURL(file);
