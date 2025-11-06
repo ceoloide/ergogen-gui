@@ -426,6 +426,7 @@ const Ergogen = () => {
     }
     trackEvent('download_button_clicked', {
       download_type: 'yaml',
+      file_name: 'config.yaml',
     });
     const element = document.createElement('a');
     const file = new Blob([configContext.configInput], { type: 'text/yaml' });
