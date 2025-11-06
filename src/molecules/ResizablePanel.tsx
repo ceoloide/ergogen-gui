@@ -152,18 +152,22 @@ const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
   flex-shrink: 0;
   flex-grow: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: visible;
+  border-right: ${(props) => (props.$side === 'left' ? `1px solid ${theme.colors.border}` : 'none')};
+  border-left: ${(props) => (props.$side === 'right' ? `1px solid ${theme.colors.border}` : 'none')};
 
   @media (max-width: 639px) {
     width: 100% !important;
+    border-right: none;
+    border-left: none;
   }
 `;
 
 const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   position: absolute;
   top: 0;
-  ${(props) => (props.$side === 'left' ? 'right: -3px;' : 'left: -3px;')}
-  width: 6px;
+  ${(props) => (props.$side === 'left' ? 'right: -4px;' : 'left: -4px;')}
+  width: 8px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
@@ -171,6 +175,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   align-items: center;
   justify-content: center;
   transition: background-color 0.15s ease-in-out;
+  pointer-events: auto;
 
   &::before {
     content: '';
@@ -178,7 +183,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 4px;
+    width: 6px;
     height: 50px;
     background-color: ${theme.colors.border};
     transition: background-color 0.15s ease-in-out;
