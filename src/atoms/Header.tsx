@@ -79,13 +79,6 @@ const VersionText = styled.a`
 `;
 
 /**
- * A styled button for toggling the side navigation panel.
- */
-const SideNavButton = styled(OutlineIconButton)`
-  flex-shrink: 0;
-`;
-
-/**
  * A styled button with an outline style, typically for icons.
  */
 const OutlineIconButton = styled.button`
@@ -114,6 +107,13 @@ const OutlineIconButton = styled.button`
     &:hover {
         background-color: ${theme.colors.buttonHover};
     }
+`;
+
+/**
+ * A styled button for toggling the side navigation panel.
+ */
+const SideNavButton = styled(OutlineIconButton)`
+  flex-shrink: 0;
 `;
 
 const AccentIconButton = styled(OutlineIconButton)`
