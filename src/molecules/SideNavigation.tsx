@@ -267,7 +267,11 @@ const Content = styled.div`
 `;
 
 const Footer = styled.div`
-  padding: 1rem;
+  padding: 0 1rem;
+  height: 3em;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   flex-shrink: 0;
 `;
 
