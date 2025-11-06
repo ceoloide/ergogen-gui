@@ -1,6 +1,5 @@
 import { useEffect, useState, ChangeEvent } from 'react';
 import styled from 'styled-components';
-import Split from 'react-split';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
 
@@ -10,6 +9,7 @@ import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
 import ShareDialog from './molecules/ShareDialog';
+import ResizablePanel from './molecules/ResizablePanel';
 
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
@@ -183,47 +183,25 @@ const SettingsPaneContainer = styled.div`
 `;
 
 /**
- * A styled version of the `react-split` component, providing resizable panes.
+ * A container for the right pane that takes remaining space.
  */
-const StyledSplit = styled(Split)`
-  width: 100%;
+const RightPane = styled.div`
+  position: relative;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: row;
-
-  .gutter {
-    background-color: ${theme.colors.border};
-    border-radius: 0.15rem;
-
-    background-repeat: no-repeat;
-    background-position: 50%;
-
-    &:hover {
-      background-color: ${theme.colors.buttonSecondaryHover};
-    }
-
-    &.gutter-horizontal {
-      cursor: col-resize;
-      background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==');
-    }
-  }
 `;
 
 /**
- * A container for the left pane in a split layout.
+ * A container for nested right pane content.
  */
-const LeftSplitPane = styled.div`
+const NestedRightPane = styled.div`
   position: relative;
-  @media (min-width: 640px) {
-    min-width: 300px;
-  }
-`;
-
-/**
- * A container for the right pane in a split layout.
- */
-const RightSplitPane = styled.div`
-  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
 `;
 
 /**
@@ -243,6 +221,11 @@ const FlexContainer = styled.div`
  * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
  */
 const Ergogen = () => {
+  // Calculate initial widths based on viewport
+  const getInitialLeftWidth = () => Math.max(300, window.innerWidth * 0.3);
+  const getInitialRightWidth = () => Math.max(300, window.innerWidth * 0.3);
+  const getInitialSettingsWidth = () => Math.max(300, window.innerWidth * 0.4);
+
   /**
    * State for the currently displayed file preview.
    * @type {{key: string, extension: string, content: string}}
@@ -585,98 +568,107 @@ const Ergogen = () => {
       )}
       <FlexContainer>
         {!configContext.showSettings ? (
-          <StyledSplit
-            direction={'horizontal'}
-            sizes={[30, 70]}
-            minSize={100}
-            gutterSize={5}
-            snapOffset={0}
-            className={
-              configContext.showConfig ? 'show-config' : 'show-outputs'
-            }
-          >
-            <LeftSplitPane>
-              <EditorContainer>
-                <StyledConfigEditor data-testid="config-editor" />
-                <ButtonContainer>
-                  <GrowButton
-                    onClick={() =>
-                      configContext.generateNow(
-                        configContext.configInput,
-                        configContext.injectionInput,
-                        { pointsonly: false }
-                      )
-                    }
-                    aria-label="Generate configuration"
-                    data-testid="generate-button"
-                  >
-                    <span
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        width: '100%',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <span>Generate</span>
-                      <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
-                    </span>
-                  </GrowButton>
-                  <OutlineIconButton
-                    onClick={handleDownload}
-                    aria-label="Download configuration"
-                    data-testid="download-config-button"
-                  >
-                    <span className="material-symbols-outlined">download</span>
-                  </OutlineIconButton>
-                  <OutlineIconButton
-                    onClick={handleShare}
-                    aria-label="Share configuration"
-                    data-testid="share-config-button"
-                  >
-                    <span className="material-symbols-outlined">share</span>
-                  </OutlineIconButton>
-                </ButtonContainer>
-              </EditorContainer>
-            </LeftSplitPane>
-
-            <RightSplitPane>
-              <StyledSplit
-                direction={'horizontal'}
-                sizes={configContext.showDownloads ? [70, 30] : [100, 0]}
-                minSize={configContext.showDownloads ? 100 : 0}
-                gutterSize={configContext.showDownloads ? 5 : 0}
-                snapOffset={0}
+          <>
+            {configContext.showConfig && (
+              <ResizablePanel
+                initialWidth={getInitialLeftWidth()}
+                minWidth={300}
+                maxWidth="70%"
+                side="left"
+                data-testid="config-panel"
               >
-                <LeftSplitPane>
+                <EditorContainer>
+                  <StyledConfigEditor data-testid="config-editor" />
+                  <ButtonContainer>
+                    <GrowButton
+                      onClick={() =>
+                        configContext.generateNow(
+                          configContext.configInput,
+                          configContext.injectionInput,
+                          { pointsonly: false }
+                        )
+                      }
+                      aria-label="Generate configuration"
+                      data-testid="generate-button"
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          width: '100%',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <span>Generate</span>
+                        <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
+                      </span>
+                    </GrowButton>
+                    <OutlineIconButton
+                      onClick={handleDownload}
+                      aria-label="Download configuration"
+                      data-testid="download-config-button"
+                    >
+                      <span className="material-symbols-outlined">download</span>
+                    </OutlineIconButton>
+                    <OutlineIconButton
+                      onClick={handleShare}
+                      aria-label="Share configuration"
+                      data-testid="share-config-button"
+                    >
+                      <span className="material-symbols-outlined">share</span>
+                    </OutlineIconButton>
+                  </ButtonContainer>
+                </EditorContainer>
+              </ResizablePanel>
+            )}
+            <RightPane>
+              {configContext.showDownloads ? (
+                <>
+                  <NestedRightPane>
+                    <StyledFilePreview
+                      data-testid={`${preview.key}-file-preview`}
+                      previewExtension={preview.extension}
+                      previewKey={`${preview.key}-${configContext.resultsVersion}`}
+                      previewContent={preview.content}
+                    />
+                  </NestedRightPane>
+                  <ResizablePanel
+                    initialWidth={getInitialRightWidth()}
+                    minWidth={300}
+                    maxWidth="50%"
+                    side="right"
+                    data-testid="downloads-panel"
+                  >
+                    <ScrollablePanelContainer>
+                      <Downloads
+                        setPreview={setPreviewKey}
+                        previewKey={preview.key}
+                        data-testid="downloads-container"
+                      />
+                    </ScrollablePanelContainer>
+                  </ResizablePanel>
+                </>
+              ) : (
+                <NestedRightPane>
                   <StyledFilePreview
                     data-testid={`${preview.key}-file-preview`}
                     previewExtension={preview.extension}
                     previewKey={`${preview.key}-${configContext.resultsVersion}`}
                     previewContent={preview.content}
                   />
-                </LeftSplitPane>
-                <RightSplitPane>
-                  <ScrollablePanelContainer>
-                    <Downloads
-                      setPreview={setPreviewKey}
-                      previewKey={preview.key}
-                      data-testid="downloads-container"
-                    />
-                  </ScrollablePanelContainer>
-                </RightSplitPane>
-              </StyledSplit>
-            </RightSplitPane>
-          </StyledSplit>
+                </NestedRightPane>
+              )}
+            </RightPane>
+          </>
         ) : (
-          <StyledSplit
-            direction={'horizontal'}
-            sizes={[40, 60]}
-            minSize={100}
-            gutterSize={10}
-            snapOffset={0}
-          >
-            <LeftSplitPane>
+          <>
+            <ResizablePanel
+              initialWidth={getInitialSettingsWidth()}
+              minWidth={300}
+              maxWidth="70%"
+              side="left"
+              data-testid="settings-panel"
+            >
               <SettingsPaneContainer>
                 <OptionContainer>
                   <Title>Options</Title>
@@ -735,8 +727,8 @@ const Ergogen = () => {
                   data-testid="injections-container"
                 />
               </SettingsPaneContainer>
-            </LeftSplitPane>
-            <RightSplitPane>
+            </ResizablePanel>
+            <RightPane>
               <EditorContainer>
                 <Title as="h4">Footprint name</Title>
                 <Input
@@ -753,8 +745,8 @@ const Ergogen = () => {
                   options={{ readOnly: injectionToEdit.key === -1 }}
                 />
               </EditorContainer>
-            </RightSplitPane>
-          </StyledSplit>
+            </RightPane>
+          </>
         )}
       </FlexContainer>
     </ErgogenWrapper>
