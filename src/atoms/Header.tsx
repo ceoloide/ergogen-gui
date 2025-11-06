@@ -97,7 +97,7 @@ const OutlineIconButton = styled.button`
     cursor: pointer;
     font-size: ${theme.fontSizes.bodySmall};
     line-height: 16px;
-    gap: 6px
+    gap: 6px;
     height: 34px;
 
     .material-symbols-outlined {
