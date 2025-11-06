@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -23,15 +23,20 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   onClose,
   'data-testid': dataTestId,
 }) => {
-  const [isOpening, setIsOpening] = useState(false);
+  const prevIsOpenRef = useRef(isOpen);
+  const [isOpening, setIsOpening] = useState(isOpen);
 
   // Track whether we're opening or closing for animation speed
   useEffect(() => {
-    if (isOpen) {
+    const wasOpen = prevIsOpenRef.current;
+    if (isOpen && !wasOpen) {
+      // Opening: was closed, now open
       setIsOpening(true);
-    } else {
+    } else if (!isOpen && wasOpen) {
+      // Closing: was open, now closed
       setIsOpening(false);
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen]);
 
   // Handle Esc key press
