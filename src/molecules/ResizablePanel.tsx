@@ -162,8 +162,8 @@ const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
 const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   position: absolute;
   top: 0;
-  ${(props) => (props.$side === 'left' ? 'right: -2px;' : 'left: -2px;')}
-  width: 4px;
+  ${(props) => (props.$side === 'left' ? 'right: -3px;' : 'left: -3px;')}
+  width: 6px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
@@ -178,7 +178,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 2px;
+    width: 4px;
     height: 50px;
     background-color: ${theme.colors.border};
     transition: background-color 0.15s ease-in-out;
