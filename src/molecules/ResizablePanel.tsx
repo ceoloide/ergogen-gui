@@ -184,11 +184,12 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
     left: 50%;
     transform: translate(-50%, -50%);
     width: 3px;
-    height: 50px;
+    height: 32px;
     background-color: ${theme.colors.border};
     transition: background-color 0.15s ease-in-out;
     box-shadow: 0 -8px 0 0 ${theme.colors.backgroundLight}, 0 8px 0 0 ${theme.colors.backgroundLight};
     opacity: 1;
+    border-radius: 99px;
   }
 
   &:hover {
