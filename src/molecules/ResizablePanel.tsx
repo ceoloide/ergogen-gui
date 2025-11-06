@@ -153,25 +153,49 @@ const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
   flex-grow: 0;
   height: 100%;
   overflow: hidden;
+  border-right: ${(props) => (props.$side === 'left' ? `1px solid ${theme.colors.border}` : 'none')};
+  border-left: ${(props) => (props.$side === 'right' ? `1px solid ${theme.colors.border}` : 'none')};
 
   @media (max-width: 639px) {
     width: 100% !important;
+    border-right: none;
+    border-left: none;
   }
 `;
 
 const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   position: absolute;
   top: 0;
-  ${(props) => (props.$side === 'left' ? 'right: 0;' : 'left: 0;')}
+  ${(props) => (props.$side === 'left' ? 'right: -2px;' : 'left: -2px;')}
   width: 4px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
-  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.15s ease-in-out;
 
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 1px;
+    height: 60px;
+    background-color: ${theme.colors.border};
+    transition: background-color 0.15s ease-in-out, width 0.15s ease-in-out;
+  }
+
   &:hover {
-    background-color: ${theme.colors.accent};
+    background-color: rgba(40, 167, 69, 0.15);
+    
+    &::before {
+      background-color: ${theme.colors.accent};
+      width: 3px;
+      height: 80px;
+    }
   }
 
   @media (max-width: 639px) {
