@@ -52,8 +52,6 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   return (
     <>
       <Overlay
@@ -104,34 +102,34 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
         </Content>
         <Footer>
           <ButtonGroup>
-            <StyledLinkButton
-              href="https://docs.ergogen.xyz/"
-              target="_blank"
-              rel="noreferrer"
+            <OutlineButton
+              onClick={() => {
+                window.open('https://docs.ergogen.xyz/', '_blank', 'noopener,noreferrer');
+              }}
               aria-label="Open documentation"
               data-testid="side-nav-docs-button"
             >
               <span className="material-symbols-outlined">description</span>
               <span>Docs</span>
-            </StyledLinkButton>
-            <StyledLinkButton
-              href="https://discord.ergogen.xyz"
-              target="_blank"
-              rel="noreferrer"
+            </OutlineButton>
+            <OutlineButton
+              onClick={() => {
+                window.open('https://discord.ergogen.xyz', '_blank', 'noopener,noreferrer');
+              }}
               aria-label="Join the Discord community"
               data-testid="side-nav-discord-button"
             >
               <DiscordIcon />
-            </StyledLinkButton>
-            <StyledLinkButton
-              href="https://github.com/ergogen"
-              target="_blank"
-              rel="noreferrer"
+            </OutlineButton>
+            <OutlineButton
+              onClick={() => {
+                window.open('https://github.com/ergogen', '_blank', 'noopener,noreferrer');
+              }}
               aria-label="View the GitHub repositories"
               data-testid="side-nav-github-button"
             >
               <GithubIcon />
-            </StyledLinkButton>
+            </OutlineButton>
           </ButtonGroup>
         </Footer>
       </Panel>
@@ -178,8 +176,8 @@ const Header = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem;
-  border-bottom: 1px solid ${theme.colors.border};
+  padding: 0 1rem;
+  height: 3em;
   flex-shrink: 0;
 `;
 
@@ -252,7 +250,6 @@ const Content = styled.div`
 
 const Footer = styled.div`
   padding: 1rem;
-  border-top: 1px solid ${theme.colors.border};
   flex-shrink: 0;
 `;
 
@@ -264,8 +261,12 @@ const ButtonGroup = styled.div`
   flex-wrap: wrap;
 `;
 
-const StyledLinkButton = styled.a`
+const OutlineButton = styled.button`
   background-color: transparent;
+  transition: color 0.15s ease-in-out,
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
   color: ${theme.colors.white};
@@ -280,7 +281,6 @@ const StyledLinkButton = styled.a`
   height: 34px;
 
   .material-symbols-outlined {
-    margin-right: 6px;
     font-size: ${theme.fontSizes.iconMedium} !important;
   }
 
