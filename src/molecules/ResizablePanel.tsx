@@ -162,16 +162,15 @@ const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
 const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   position: absolute;
   top: 0;
-  ${(props) => (props.$side === 'left' ? 'right: 0;' : 'left: 0;')}
-  width: 1px;
+  ${(props) => (props.$side === 'left' ? 'right: -2px;' : 'left: -2px;')}
+  width: 4px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
-  background-color: ${theme.colors.border};
-  transition: background-color 0.15s ease-in-out;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease-in-out;
 
   &::before {
     content: '';
@@ -179,19 +178,17 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 3px;
-    height: 40px;
+    width: 2px;
+    height: 50px;
     background-color: ${theme.colors.border};
-    transition: background-color 0.15s ease-in-out, height 0.15s ease-in-out;
-    z-index: 1;
+    transition: background-color 0.15s ease-in-out;
   }
 
   &:hover {
-    background-color: ${theme.colors.accent};
+    background-color: rgba(40, 167, 69, 0.1);
     
     &::before {
       background-color: ${theme.colors.accent};
-      height: 60px;
     }
   }
 
