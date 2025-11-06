@@ -25,6 +25,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 }) => {
   const prevIsOpenRef = useRef(isOpen);
   const [isOpening, setIsOpening] = useState(isOpen);
+  const [panelWidth, setPanelWidth] = useState(320);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(320);
 
   // Track whether we're opening or closing for animation speed
   useEffect(() => {
@@ -38,6 +42,73 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen]);
+
+  // Handle resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+
+      const deltaX = e.clientX - startXRef.current;
+      const newWidth = startWidthRef.current + deltaX;
+      const maxWidth = Math.min(600, window.innerWidth * 0.9);
+      const constrainedWidth = Math.max(320, Math.min(newWidth, maxWidth));
+      setPanelWidth(constrainedWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isResizingRef.current) return;
+      e.preventDefault();
+
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - startXRef.current;
+      const newWidth = startWidthRef.current + deltaX;
+      const maxWidth = Math.min(600, window.innerWidth * 0.9);
+      const constrainedWidth = Math.max(320, Math.min(newWidth, maxWidth));
+      setPanelWidth(constrainedWidth);
+    };
+
+    const handleTouchEnd = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
+
+  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingRef.current = true;
+    startWidthRef.current = panelWidth;
+    
+    if ('touches' in e) {
+      startXRef.current = e.touches[0].clientX;
+    } else {
+      startXRef.current = e.clientX;
+    }
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   // Handle Esc key press
   useEffect(() => {
@@ -80,8 +151,14 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
         data-testid={dataTestId && `${dataTestId}-panel`}
         $isOpen={isOpen}
         $isOpening={isOpening}
+        $width={panelWidth}
         onClick={(e) => e.stopPropagation()}
       >
+        <ResizeHandle
+          onMouseDown={handleResizeStart}
+          onTouchStart={handleResizeStart}
+          data-testid={dataTestId && `${dataTestId}-resize-handle`}
+        />
         <Header>
           <LogoSection>
             <LogoButton
@@ -168,13 +245,13 @@ const Overlay = styled.div<{ $isOpen: boolean; $isOpening: boolean }>`
   pointer-events: ${(props) => (props.$isOpen ? 'auto' : 'none')};
 `;
 
-const Panel = styled.div<{ $isOpen: boolean; $isOpening: boolean }>`
+const Panel = styled.div<{ $isOpen: boolean; $isOpening: boolean; $width: number }>`
   position: fixed;
   top: 0;
   left: 0;
   height: 100%;
-  width: 320px;
-  max-width: 90vw;
+  width: ${(props) => props.$width}px;
+  max-width: min(600px, 90vw);
   background-color: ${theme.colors.backgroundLight};
   border-right: 1px solid ${theme.colors.border};
   box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
@@ -308,6 +385,26 @@ const OutlineButton = styled.button`
 
   &:hover {
     background-color: ${theme.colors.buttonHover};
+  }
+`;
+
+const ResizeHandle = styled.div`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1001;
+  background-color: transparent;
+  transition: background-color 0.15s ease-in-out;
+
+  &:hover {
+    background-color: ${theme.colors.accent};
+  }
+
+  @media (max-width: 639px) {
+    display: none;
   }
 `;
 
