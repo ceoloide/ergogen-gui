@@ -18,6 +18,7 @@ import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
+import { trackEvent } from '../utils/analytics';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
   JscadWorkerRequest,
@@ -245,6 +246,7 @@ const ConfigContextProvider = ({
   // Config version tracking
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
+  const isInitialMountRef = useRef<boolean>(true);
 
   useEffect(() => {
     console.log('--- ConfigContextProvider mounted ---');
@@ -415,6 +417,20 @@ const ConfigContextProvider = ({
   }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
 
   /**
+   * Effect to track settings at page load.
+   */
+  useEffect(() => {
+    trackEvent('settings_loaded', {
+      debug,
+      autoGen,
+      autoGen3D,
+      kicanvasPreview,
+      stlPreview,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  /**
    * Effect to save user settings to local storage whenever they change.
    */
   useEffect(() => {
@@ -429,6 +445,25 @@ const ConfigContextProvider = ({
       'ergogen:config:stlPreview',
       JSON.stringify(stlPreview)
     );
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
+
+  /**
+   * Effect to track settings changes.
+   */
+  useEffect(() => {
+    // Skip tracking on initial mount (handled by settings_loaded event)
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
+    trackEvent('setting_changed', {
+      debug,
+      autoGen,
+      autoGen3D,
+      kicanvasPreview,
+      stlPreview,
+    });
   }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
 
   /**

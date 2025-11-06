@@ -15,6 +15,7 @@ import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
+import { trackEvent } from '../utils/analytics';
 
 // Styled Components
 const WelcomePageWrapper = styled.div<{ isDragging?: boolean }>`
@@ -217,6 +218,24 @@ const Welcome = () => {
 
   const handleSelectExample = async (configValue: string) => {
     if (configContext) {
+      // Determine if this is the empty config
+      const isEmptyConfig = configValue === EmptyYAML.value;
+
+      // Find the example name by searching through all examples
+      let exampleName = 'unknown';
+      if (isEmptyConfig) {
+        exampleName = 'empty_configuration';
+      } else {
+        const foundExample = allExamples.find((ex) => ex.value === configValue);
+        if (foundExample) {
+          exampleName = foundExample.label.toLowerCase().replace(/\s+/g, '_');
+        }
+      }
+
+      trackEvent('example_loaded', {
+        example_name: exampleName,
+        is_empty: isEmptyConfig,
+      });
       configContext.setConfigInput(configValue);
       await configContext.generateNow(
         configValue,
@@ -360,6 +379,11 @@ const Welcome = () => {
     setIsGenerating(true); // Show progress bar during GitHub loading
     clearError();
 
+    // Track GitHub loading
+    trackEvent('github_loaded', {
+      github_url: githubInput,
+    });
+
     // Reset any pending conflict resolution state from previous loads
     setCurrentConflict(null);
     setPendingFootprints([]);
@@ -411,6 +435,13 @@ const Welcome = () => {
     setIsLoading(true);
     setIsGenerating(true); // Show progress bar during file loading
     clearError();
+
+    // Track local file loading
+    trackEvent('local_file_loaded', {
+      file_name: file.name,
+      file_type: file.type || 'unknown',
+      file_size: file.size,
+    });
 
     // Reset any pending conflict resolution state from previous loads
     setCurrentConflict(null);
