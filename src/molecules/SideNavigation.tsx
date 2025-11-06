@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
@@ -23,6 +23,17 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   onClose,
   'data-testid': dataTestId,
 }) => {
+  const [isOpening, setIsOpening] = useState(false);
+
+  // Track whether we're opening or closing for animation speed
+  useEffect(() => {
+    if (isOpen) {
+      setIsOpening(true);
+    } else {
+      setIsOpening(false);
+    }
+  }, [isOpen]);
+
   // Handle Esc key press
   useEffect(() => {
     if (!isOpen) return;
@@ -58,10 +69,12 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
         data-testid={dataTestId}
         onClick={onClose}
         $isOpen={isOpen}
+        $isOpening={isOpening}
       />
       <Panel
         data-testid={dataTestId && `${dataTestId}-panel`}
         $isOpen={isOpen}
+        $isOpening={isOpening}
         onClick={(e) => e.stopPropagation()}
       >
         <Header>
@@ -137,7 +150,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   );
 };
 
-const Overlay = styled.div<{ $isOpen: boolean }>`
+const Overlay = styled.div<{ $isOpen: boolean; $isOpening: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
@@ -146,11 +159,11 @@ const Overlay = styled.div<{ $isOpen: boolean }>`
   background-color: rgba(0, 0, 0, 0.7);
   z-index: 999;
   opacity: ${(props) => (props.$isOpen ? 1 : 0)};
-  transition: opacity 0.2s ease-in-out;
+  transition: opacity ${(props) => (props.$isOpening ? '0.2s' : '0.1s')} ease-in-out;
   pointer-events: ${(props) => (props.$isOpen ? 'auto' : 'none')};
 `;
 
-const Panel = styled.div<{ $isOpen: boolean }>`
+const Panel = styled.div<{ $isOpen: boolean; $isOpening: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
@@ -164,7 +177,7 @@ const Panel = styled.div<{ $isOpen: boolean }>`
   display: flex;
   flex-direction: column;
   transform: translateX(${(props) => (props.$isOpen ? '0' : '-100%')});
-  transition: transform 0.2s ease-in-out;
+  transition: transform ${(props) => (props.$isOpening ? '0.2s' : '0.1s')} ease-in-out;
 
   @media (max-width: 639px) {
     width: 100%;
