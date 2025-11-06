@@ -177,7 +177,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   transition: background-color 0.15s ease-in-out;
   pointer-events: auto;
 
-  &::before {
+  &::after {
     content: '';
     position: absolute;
     top: 50%;
@@ -195,7 +195,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   &:hover {
     background-color: rgba(40, 255, 69, 0.25);
     
-    &::before {
+    &::after {
       background-color: #32cd32;
       opacity: 1;
     }
