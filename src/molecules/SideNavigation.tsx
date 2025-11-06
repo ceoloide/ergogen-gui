@@ -146,7 +146,7 @@ const Overlay = styled.div<{ $isOpen: boolean }>`
   background-color: rgba(0, 0, 0, 0.7);
   z-index: 999;
   opacity: ${(props) => (props.$isOpen ? 1 : 0)};
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity 0.2s ease-in-out;
   pointer-events: ${(props) => (props.$isOpen ? 'auto' : 'none')};
 `;
 
@@ -164,7 +164,7 @@ const Panel = styled.div<{ $isOpen: boolean }>`
   display: flex;
   flex-direction: column;
   transform: translateX(${(props) => (props.$isOpen ? '0' : '-100%')});
-  transition: transform 0.3s ease-in-out;
+  transition: transform 0.2s ease-in-out;
 
   @media (max-width: 639px) {
     width: 100%;
