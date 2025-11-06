@@ -141,7 +141,6 @@ const ErgogenWrapper = styled.div`
   flex-direction: column;
   flex-grow: 1;
   height: 100%;
-  overflow: hidden;
   padding: 0;
 `;
 
