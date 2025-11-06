@@ -13,7 +13,6 @@ import {
 } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
-import Input from '../atoms/Input';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { trackEvent } from '../utils/analytics';
 
@@ -136,13 +135,36 @@ const GitHubInputContainer = styled.div`
   width: 100%;
   min-width: 0;
 
-  input {
-    flex: 1;
-    min-width: 0;
-  }
-
   button {
     flex-shrink: 0;
+  }
+`;
+
+const GitHubInput = styled.input`
+  flex: 1;
+  min-width: 0;
+  background-color: ${theme.colors.backgroundLighter};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: ${theme.colors.text};
+  font-family: ${theme.fonts.body};
+  font-size: ${theme.fontSizes.base};
+  outline: none;
+  transition: border-color 0.15s ease-in-out;
+
+  &:focus {
+    border-color: ${theme.colors.accent};
+  }
+
+  &::selection {
+    background-color: ${theme.colors.accent};
+    color: ${theme.colors.white};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
@@ -601,7 +623,7 @@ const Welcome = () => {
               &quot;user/repo&quot;.
             </p>
             <GitHubInputContainer>
-              <Input
+              <GitHubInput
                 placeholder="github.com/ceoloide/corney-island"
                 value={githubInput}
                 onChange={(e) => setGithubInput(e.target.value)}
