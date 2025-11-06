@@ -183,7 +183,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 6px;
+    width: 3px;
     height: 50px;
     background-color: ${theme.colors.border};
     transition: background-color 0.15s ease-in-out;
