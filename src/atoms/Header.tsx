@@ -37,6 +37,18 @@ const LeftContainer = styled.div`
   width: 100%;
 `;
 
+const SideNavButton = styled.button`
+  background: transparent;
+  border: none;
+  color: ${theme.colors.white};
+  cursor: pointer;
+  font-size: ${theme.fontSizes.iconMedium};
+  display: flex;
+  align-items: center;
+  padding: 0;
+  margin-right: 10px;
+`;
+
 /**
  * A styled container for the right section of the header.
  */
@@ -204,6 +216,10 @@ const Header = (): JSX.Element => {
     configContext?.setShowSettings(!configContext?.showSettings);
   };
 
+  const toggleSidePanel = () => {
+    configContext?.setShowSidePanel(!configContext?.showSidePanel);
+  };
+
   const handleNewClick = () => {
     configContext?.setShowSettings(false);
     navigate('/new');
@@ -230,7 +246,9 @@ const Header = (): JSX.Element => {
   return (
     <HeaderContainer>
       <LeftContainer>
-        {/* <LeftPanelButton onClick={() => window.location.reload()}><span className="material-symbols-outlined">left_panel_open</span></LeftPanelButton> */}
+        <SideNavButton onClick={toggleSidePanel}>
+          <span className="material-symbols-outlined">side_navigation</span>
+        </SideNavButton>
         <ErgogenLogo>
           <LogoButton
             to="/"
@@ -276,34 +294,6 @@ const Header = (): JSX.Element => {
             <span className="material-symbols-outlined">archive</span>
           </ArchiveIconButton>
         )}
-        <DocsButton
-          href="https://docs.ergogen.xyz/"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open documentation"
-          data-testid="docs-button"
-        >
-          <span className="material-symbols-outlined">description</span>
-          <span>Docs</span>
-        </DocsButton>
-        <StyledLinkButton
-          href="https://discord.ergogen.xyz"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Join the Discord community"
-          data-testid="discord-button"
-        >
-          <DiscordIcon />
-        </StyledLinkButton>
-        <StyledLinkButton
-          href="https://github.com/ergogen"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="View the GitHub repositories"
-          data-testid="github-button"
-        >
-          <GithubIcon />
-        </StyledLinkButton>
         <OutlineIconButton
           onClick={toggleSettings}
           aria-label={

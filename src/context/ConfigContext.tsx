@@ -145,6 +145,8 @@ type ContextProps = {
   setResultsVersion: Dispatch<SetStateAction<number>>;
   showSettings: boolean;
   setShowSettings: Dispatch<SetStateAction<boolean>>;
+  showSidePanel: boolean;
+  setShowSidePanel: Dispatch<SetStateAction<boolean>>;
   showConfig: boolean;
   setShowConfig: Dispatch<SetStateAction<boolean>>;
   showDownloads: boolean;
@@ -235,6 +237,7 @@ const ConfigContextProvider = ({
     localStorageOrDefault('ergogen:config:stlPreview', true)
   );
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSidePanel, setShowSidePanel] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -732,6 +735,8 @@ const ConfigContextProvider = ({
       setResultsVersion,
       showSettings,
       setShowSettings,
+      showSidePanel,
+      setShowSidePanel,
       showConfig,
       setShowConfig,
       showDownloads,

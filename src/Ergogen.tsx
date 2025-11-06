@@ -10,6 +10,7 @@ import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
 import ShareDialog from './molecules/ShareDialog';
+import SidePanel from './atoms/SidePanel';
 
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
@@ -493,6 +494,7 @@ const Ergogen = () => {
 
   return (
     <ErgogenWrapper>
+      {configContext.showSidePanel && <SidePanel />}
       {showShareDialog && (
         <ShareDialog
           shareLink={shareLink}
