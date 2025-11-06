@@ -190,10 +190,10 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   }
 
   &:hover {
-    background-color: rgba(40, 167, 69, 0.1);
+    background-color: rgba(40, 255, 69, 0.25);
     
     &::before {
-      background-color: ${theme.colors.accent};
+      background-color: #32cd32;
     }
   }
 
