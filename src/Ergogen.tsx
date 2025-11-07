@@ -1,4 +1,4 @@
-import { useEffect, useState, ChangeEvent } from 'react';
+import { useEffect, useState, ChangeEvent, SetStateAction, Dispatch } from 'react';
 import styled from 'styled-components';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -10,6 +10,7 @@ import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
 import ShareDialog from './molecules/ShareDialog';
 import ResizablePanel from './molecules/ResizablePanel';
+import { Preview } from './atoms/DownloadRow';
 
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
@@ -228,9 +229,9 @@ const Ergogen = () => {
 
   /**
    * State for the currently displayed file preview.
-   * @type {{key: string, extension: string, content: string}}
+   * @type {Preview}
    */
-  const [preview, setPreviewKey] = useState({
+  const [preview, setPreviewKey] = useState<Preview>({
     key: 'demo.svg',
     extension: 'svg',
     content: '',
@@ -239,7 +240,7 @@ const Ergogen = () => {
   /**
    * Wrapper function to set preview and hide downloads panel.
    */
-  const handleSetPreview = (newPreview: typeof preview) => {
+  const handleSetPreview: Dispatch<SetStateAction<Preview>> = (newPreview) => {
     setPreviewKey(newPreview);
     configContext?.setShowDownloads(false);
   };
