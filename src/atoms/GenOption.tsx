@@ -39,6 +39,16 @@ const OptionLabel = styled.label`
   font-size: ${theme.fontSizes.base};
   cursor: pointer;
   user-select: none;
+  text-align: left;
+`;
+
+/**
+ * A wrapper for the switch to ensure it's aligned to the right.
+ */
+const SwitchWrapper = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
 `;
 
 /**
@@ -109,18 +119,20 @@ const GenOption = ({
   return (
     <OptionContainer>
       <OptionLabel htmlFor={optionId}>{label}</OptionLabel>
-      <SwitchContainer $checked={checked} htmlFor={optionId}>
-        <HiddenInput
-          type="checkbox"
-          id={optionId}
-          checked={checked}
-          onChange={(e) => setSelected(e.target.checked)}
-          data-testid={`option-${optionId}`}
-          aria-label={ariaLabel}
-        />
-        <SwitchTrack $checked={checked} />
-        <SwitchThumb $checked={checked} />
-      </SwitchContainer>
+      <SwitchWrapper>
+        <SwitchContainer $checked={checked} htmlFor={optionId}>
+          <HiddenInput
+            type="checkbox"
+            id={optionId}
+            checked={checked}
+            onChange={(e) => setSelected(e.target.checked)}
+            data-testid={`option-${optionId}`}
+            aria-label={ariaLabel}
+          />
+          <SwitchTrack $checked={checked} />
+          <SwitchThumb $checked={checked} />
+        </SwitchContainer>
+      </SwitchWrapper>
     </OptionContainer>
   );
 };
