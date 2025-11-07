@@ -32,13 +32,25 @@ const styledInput = styled.input.attrs<Props>((props) => ({
   $size: props.$size || '0.5em',
 }))`
   font-size: ${theme.fontSizes.base};
-  border: 2px solid ${theme.colors.borderLight};
-  border-radius: 3px;
-  background: ${theme.colors.backgroundLight};
-  color: ${theme.colors.white};
+  background-color: ${theme.colors.backgroundLighter};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  color: ${theme.colors.text};
+  font-family: ${theme.fonts.body};
+  outline: none;
+  transition: border-color 0.15s ease-in-out;
   /* here we use the dynamically computed prop */
   margin: ${(props) => props.$size};
-  padding: ${(props) => props.$size};
+
+  &:focus {
+    border-color: ${theme.colors.accent};
+  }
+
+  &::selection {
+    background-color: ${theme.colors.accent};
+    color: ${theme.colors.white};
+  }
 `;
 
 export default styledInput;
