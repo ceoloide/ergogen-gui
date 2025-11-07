@@ -1,8 +1,12 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
+import { createShareableUri } from '../utils/share';
+import { trackEvent } from '../utils/analytics';
+import ShareDialog from '../molecules/ShareDialog';
 
 /**
  * A styled container for the entire header.
@@ -161,6 +165,8 @@ const Header = (): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareLink, setShareLink] = useState('');
 
   /**
    * Toggles the visibility of the settings panel.
@@ -192,87 +198,135 @@ const Header = (): JSX.Element => {
     );
   };
 
+  /**
+   * Creates a shareable URI with the current configuration and shows a dialog.
+   * Includes all current injections (footprints, templates, etc.) in the shared URI.
+   */
+  const handleShare = () => {
+    if (!configContext?.configInput) {
+      return;
+    }
+
+    // Include all injections if present
+    const injectionsToShare =
+      configContext.injectionInput && configContext.injectionInput.length > 0
+        ? configContext.injectionInput
+        : undefined;
+
+    const shareableUri = createShareableUri(
+      configContext.configInput,
+      injectionsToShare
+    );
+
+    trackEvent('share_button_clicked', {
+      has_injections: !!injectionsToShare,
+      injections_count: injectionsToShare?.length || 0,
+    });
+
+    setShareLink(shareableUri);
+    setShowShareDialog(true);
+  };
+
   const toggleSideNav = () => {
     configContext?.setShowSideNav(!configContext?.showSideNav);
   };
 
   return (
-    <HeaderContainer>
-      <LeftContainer>
-        <SideNavButton
-          onClick={toggleSideNav}
-          aria-label={
-            configContext?.showSideNav
-              ? 'Hide navigation panel'
-              : 'Show navigation panel'
-          }
-          data-testid="side-nav-toggle-button"
-        >
-          <span className="material-symbols-outlined">side_navigation</span>
-        </SideNavButton>
-        <ErgogenLogo>
-          <LogoButton
-            to="/"
-            aria-label="Go to home page"
-            data-testid="logo-button"
-          >
-            <LogoImage
-              src={`${process.env.PUBLIC_URL}/ergogen.png`}
-              alt="Ergogen logo"
-            />
-          </LogoButton>
-          <AppName>Ergogen</AppName>
-          <VersionText
-            href="https://github.com/ergogen/ergogen"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="View Ergogen v4.2.1 on GitHub"
-            data-testid="version-link"
-          >
-            v4.2.1
-          </VersionText>
-        </ErgogenLogo>
-      </LeftContainer>
-      <RightContainer>
-        {location.pathname === '/' && (
-          <AccentIconButton
-            onClick={handleNewClick}
-            aria-label="Start new configuration"
-            data-testid="new-config-button"
-          >
-            <span className="material-symbols-outlined">add_2</span>
-            <span>New</span>
-          </AccentIconButton>
-        )}
-        {location.pathname === '/' && (
-          <ArchiveIconButton
-            onClick={handleDownloadArchive}
-            disabled={
-              configContext?.isGenerating || configContext?.isJscadConverting
-            }
-            aria-label="Download archive of all generated files"
-            data-testid="header-download-outputs-button"
-          >
-            <span className="material-symbols-outlined">archive</span>
-          </ArchiveIconButton>
-        )}
-        {location.pathname !== '/new' && (
-          <OutlineIconButton
-            onClick={toggleSettings}
+    <>
+      {showShareDialog && (
+        <ShareDialog
+          shareLink={shareLink}
+          onClose={() => setShowShareDialog(false)}
+          data-testid="share-dialog"
+        />
+      )}
+      <HeaderContainer>
+        <LeftContainer>
+          <SideNavButton
+            onClick={toggleSideNav}
             aria-label={
-              configContext?.showSettings
-                ? 'Hide settings panel'
-                : 'Show settings panel'
+              configContext?.showSideNav
+                ? 'Hide navigation panel'
+                : 'Show navigation panel'
             }
-            data-testid="settings-button"
+            data-testid="side-nav-toggle-button"
           >
-            <span className="material-symbols-outlined">
-              {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
-            </span>
-          </OutlineIconButton>
-        )}
-      </RightContainer>
-    </HeaderContainer>
+            <span className="material-symbols-outlined">side_navigation</span>
+          </SideNavButton>
+          <ErgogenLogo>
+            <LogoButton
+              to="/"
+              aria-label="Go to home page"
+              data-testid="logo-button"
+            >
+              <LogoImage
+                src={`${process.env.PUBLIC_URL}/ergogen.png`}
+                alt="Ergogen logo"
+              />
+            </LogoButton>
+            <AppName>Ergogen</AppName>
+            <VersionText
+              href="https://github.com/ergogen/ergogen"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View Ergogen v4.2.1 on GitHub"
+              data-testid="version-link"
+            >
+              v4.2.1
+            </VersionText>
+          </ErgogenLogo>
+        </LeftContainer>
+        <RightContainer>
+          {location.pathname === '/' && (
+            <AccentIconButton
+              onClick={handleNewClick}
+              aria-label="Start new configuration"
+              data-testid="new-config-button"
+            >
+              <span className="material-symbols-outlined">add_2</span>
+              <span>New</span>
+            </AccentIconButton>
+          )}
+          {location.pathname === '/' && (
+            <>
+              <ArchiveIconButton
+                onClick={handleDownloadArchive}
+                disabled={
+                  configContext?.isGenerating || configContext?.isJscadConverting
+                }
+                aria-label="Download archive of all generated files"
+                data-testid="header-download-outputs-button"
+              >
+                <span className="material-symbols-outlined">archive</span>
+              </ArchiveIconButton>
+              <ArchiveIconButton
+                onClick={handleShare}
+                disabled={!configContext?.configInput}
+                aria-label="Share configuration"
+                data-testid="header-share-button"
+              >
+                <span className="material-symbols-outlined">share</span>
+              </ArchiveIconButton>
+            </>
+          )}
+          {location.pathname !== '/new' && (
+            <OutlineIconButton
+              onClick={toggleSettings}
+              aria-label={
+                configContext?.showSettings
+                  ? 'Hide settings panel'
+                  : 'Show settings panel'
+              }
+              data-testid="settings-button"
+            >
+              <span className="material-symbols-outlined">
+                {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
+              </span>
+            </OutlineIconButton>
+          )}
+        </RightContainer>
+      </HeaderContainer>
+    </>
   );
 };
 
