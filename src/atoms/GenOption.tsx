@@ -28,6 +28,7 @@ const OptionContainer = styled.div`
   justify-content: space-between;
   padding: 0.5rem 0;
   gap: 1rem;
+  width: 100%;
 `;
 
 /**

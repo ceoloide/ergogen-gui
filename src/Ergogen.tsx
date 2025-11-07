@@ -169,8 +169,10 @@ const StyledConfigEditor = styled(ConfigEditor)`
  * A container for settings and options.
  */
 const OptionContainer = styled.div`
-  display: inline-grid;
-  justify-content: space-between;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
 `;
 
 const SettingsPaneContainer = styled.div`
