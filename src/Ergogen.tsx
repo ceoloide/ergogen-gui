@@ -750,7 +750,7 @@ const Ergogen = () => {
               side="left"
               data-testid="settings-panel"
               style={{
-                display: !configContext.showConfig && showMobileEditor && isMobile ? 'none' : undefined,
+                display: showMobileEditor && isMobile ? 'none' : undefined,
               }}
             >
               <SettingsPaneContainer>
@@ -813,9 +813,9 @@ const Ergogen = () => {
                 />
               </SettingsPaneContainer>
             </ResizablePanel>
-            <RightPane $fullWidth={!configContext.showConfig && showMobileEditor && isMobile}>
+            <RightPane $fullWidth={showMobileEditor && isMobile}>
               <EditorContainer>
-                {!configContext.showConfig && isMobile && (
+                {isMobile && (
                   <MobileEditorHeader>
                     <Title as="h4">Footprint name</Title>
                     <MobileCloseButton
@@ -830,7 +830,7 @@ const Ergogen = () => {
                     </MobileCloseButton>
                   </MobileEditorHeader>
                 )}
-                {(!configContext.showConfig && isMobile) ? null : (
+                {(isMobile) ? null : (
                   <Title as="h4">Footprint name</Title>
                 )}
                 <Input
