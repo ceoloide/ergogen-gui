@@ -762,9 +762,7 @@ const Ergogen = () => {
                     </MobileCloseButton>
                   </MobileEditorHeader>
                 )}
-                {(isMobile) ? null : (
-                  <Title as="h4">Footprint name</Title>
-                )}
+                {!isMobile && <Title as="h4">Footprint name</Title>}
                 <Input
                   value={injectionToEdit.name}
                   onChange={handleInjectionNameChange}

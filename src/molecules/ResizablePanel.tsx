@@ -34,6 +34,23 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   const startWidthRef = useRef(initialWidth);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Calculates the maximum width in pixels from the maxWidth prop.
+   * Handles percentage strings, pixel strings, numbers, and defaults to Infinity.
+   */
+  const calculateMaxWidthPx = (maxWidthValue: number | string): number => {
+    if (typeof maxWidthValue === 'string' && maxWidthValue.includes('%')) {
+      const percentage = parseFloat(maxWidthValue) / 100;
+      return window.innerWidth * percentage;
+    } else if (typeof maxWidthValue === 'string' && maxWidthValue.includes('px')) {
+      return parseFloat(maxWidthValue);
+    } else if (typeof maxWidthValue === 'number') {
+      return maxWidthValue;
+    } else {
+      return Infinity;
+    }
+  };
+
   // Handle resize
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -44,19 +61,7 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
         : startXRef.current - e.clientX;
       const newWidth = startWidthRef.current + deltaX;
       
-      // Calculate max width
-      let maxWidthPx: number;
-      if (typeof maxWidth === 'string' && maxWidth.includes('%')) {
-        const percentage = parseFloat(maxWidth) / 100;
-        maxWidthPx = window.innerWidth * percentage;
-      } else if (typeof maxWidth === 'string' && maxWidth.includes('px')) {
-        maxWidthPx = parseFloat(maxWidth);
-      } else if (typeof maxWidth === 'number') {
-        maxWidthPx = maxWidth;
-      } else {
-        maxWidthPx = Infinity;
-      }
-
+      const maxWidthPx = calculateMaxWidthPx(maxWidth);
       const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidthPx));
       setWidth(constrainedWidth);
     };
@@ -78,18 +83,7 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
         : startXRef.current - touch.clientX;
       const newWidth = startWidthRef.current + deltaX;
       
-      let maxWidthPx: number;
-      if (typeof maxWidth === 'string' && maxWidth.includes('%')) {
-        const percentage = parseFloat(maxWidth) / 100;
-        maxWidthPx = window.innerWidth * percentage;
-      } else if (typeof maxWidth === 'string' && maxWidth.includes('px')) {
-        maxWidthPx = parseFloat(maxWidth);
-      } else if (typeof maxWidth === 'number') {
-        maxWidthPx = maxWidth;
-      } else {
-        maxWidthPx = Infinity;
-      }
-
+      const maxWidthPx = calculateMaxWidthPx(maxWidth);
       const constrainedWidth = Math.max(minWidth, Math.min(newWidth, maxWidthPx));
       setWidth(constrainedWidth);
     };
