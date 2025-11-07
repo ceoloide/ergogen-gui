@@ -22,11 +22,13 @@ import Title from '../atoms/Title';
  * @typedef {object} Props
  * @property {Dispatch<SetStateAction<Injection>>} setInjectionToEdit - Function to set the injection to be edited.
  * @property {(injection: Injection) => void} deleteInjection - Function to delete an injection.
+ * @property {() => void} [onInjectionSelect] - Optional callback when an injection is selected (for mobile).
  */
 type Props = {
   setInjectionToEdit: Dispatch<SetStateAction<Injection>>;
   deleteInjection: (injection: Injection) => void;
   injectionToEdit: Injection;
+  onInjectionSelect?: () => void;
   'data-testid'?: string;
 };
 
@@ -47,6 +49,7 @@ const Injections = ({
   setInjectionToEdit,
   deleteInjection,
   injectionToEdit,
+  onInjectionSelect,
   'data-testid': dataTestId,
 }: Props) => {
   const footprints: InjectionArr = [];
@@ -90,6 +93,10 @@ const Injections = ({
         "module.exports = {\n  params: {\n    designator: '',\n  },\n  body: p => ``\n}",
     };
     setInjectionToEdit(newInjection);
+    // Show editor on mobile when new injection is created
+    if (onInjectionSelect) {
+      onInjectionSelect();
+    }
   };
 
   return (
@@ -100,7 +107,13 @@ const Injections = ({
           <InjectionRow
             key={footprint.key}
             injection={footprint}
-            setInjectionToEdit={setInjectionToEdit}
+            setInjectionToEdit={(injection) => {
+              setInjectionToEdit(injection);
+              // Show editor on mobile when injection is selected
+              if (onInjectionSelect) {
+                onInjectionSelect();
+              }
+            }}
             deleteInjection={deleteInjection}
             previewKey={injectionToEdit.name}
             data-testid={dataTestId && `${dataTestId}-${footprint.name}`}

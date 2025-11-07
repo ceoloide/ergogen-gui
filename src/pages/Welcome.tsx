@@ -17,7 +17,7 @@ import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { trackEvent } from '../utils/analytics';
 
 // Styled Components
-const WelcomePageWrapper = styled.div<{ isDragging?: boolean }>`
+const WelcomePageWrapper = styled.div<{ $isDragging?: boolean }>`
   background-color: ${theme.colors.background};
   color: ${theme.colors.white};
   flex-grow: 1;
@@ -28,21 +28,21 @@ const WelcomePageWrapper = styled.div<{ isDragging?: boolean }>`
   transition: border-color 0.2s ease;
 
   ${(props) =>
-    props.isDragging &&
+    props.$isDragging &&
     `
     border: 3px dashed ${theme.colors.accent};
     border-radius: 8px;
   `}
 `;
 
-const DropOverlay = styled.div<{ isVisible: boolean }>`
+const DropOverlay = styled.div<{ $isVisible: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  display: ${(props) => (props.isVisible ? 'flex' : 'none')};
+  display: ${(props) => (props.$isVisible ? 'flex' : 'none')};
   align-items: center;
   justify-content: center;
   z-index: 999;
@@ -554,14 +554,14 @@ const Welcome = () => {
 
   return (
     <WelcomePageWrapper
-      isDragging={isDragging}
+      $isDragging={isDragging}
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       data-testid="welcome-page-wrapper"
     >
-      <DropOverlay isVisible={isDragging}>
+      <DropOverlay $isVisible={isDragging}>
         <DropMessage>Drop file here to load configuration</DropMessage>
       </DropOverlay>
       {currentConflict && (

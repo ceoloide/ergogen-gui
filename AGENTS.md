@@ -33,6 +33,8 @@ This project is a React-based web interface for the [Ergogen](https://github.com
 - Tests should be robust and user-centric. Prefer selecting elements by user-facing attributes (like accessible name, text, or role) over implementation details (like class names or DOM structure). Use `data-testid` for elements where no other stable, user-facing selector is available.
 - **Centralized Theming**: All colors and other theme-related properties (e.g., font sizes, spacing) should be centralized in `src/theme/theme.ts`. Components should import and use variables from this theme file instead of using hardcoded values.
 - **Styled Components for Styling**: All styling, including global styles, should be managed using `styled-components`. Global styles should be defined in a `GlobalStyle` component to ensure consistency and encapsulation within the React component architecture, avoiding the use of separate CSS files like `index.css`.
+- **Styled-components Transient Props**: When passing props to styled-components that are only used for styling and should not be passed to the DOM, prefix them with `$` (e.g., `$isVisible`, `$isDragging`). This prevents React warnings about unrecognized props on DOM elements.
+- **Styled-components Performance**: For frequently changing values (e.g., width during drag operations), use inline styles via the `style` prop instead of CSS template literals. This prevents styled-components from generating excessive classes and avoids performance warnings. Example: Instead of `width: ${props.$width}px` in the template, pass `style={{ width: `${width}px` }}` to the component.
 
 ## Development environment
 
@@ -147,6 +149,31 @@ The project follows the principles of **Atomic Design** to structure its React c
 - **`src/pages`**: The highest-level components that represent entire pages in the application. They are responsible for composing organisms and other components to build a complete user view.
 
 This structure promotes reusability and a clear separation of concerns, making it easier to develop and test components in isolation.
+
+## Resizable Panels
+
+The application uses a custom `ResizablePanel` component (`src/molecules/ResizablePanel.tsx`) for creating resizable split-panel layouts. This component replaced the `react-split` library to provide more control over styling and behavior.
+
+### Features
+
+- **Drag-to-resize**: Supports both mouse and touch interactions for resizing
+- **Flexible constraints**: Supports `minWidth`, `maxWidth` (as pixels, percentages, or numbers), and `initialWidth`
+- **Side-aware**: Can be configured as a left or right panel with appropriate handle positioning
+- **Performance optimized**: Uses inline styles for width to avoid generating excessive CSS classes during resize operations
+
+### Usage
+
+The `ResizablePanel` component is used throughout the application for:
+- **Config panel**: Left-side panel containing the configuration editor
+- **Downloads panel**: Right-side panel containing the file downloads list
+- **Settings panel**: Left-side panel containing options and injections list
+
+### Implementation Details
+
+- Width is managed via React state and updated during drag operations
+- Maximum width calculation handles percentage strings (e.g., `"70%"`), pixel strings (e.g., `"600px"`), and numeric values
+- On mobile devices (≤639px), panels automatically expand to 100% width and resize handles are hidden
+- The resize handle includes visual feedback with hover effects and a gap effect using `box-shadow`
 
 ## Web Workers
 
@@ -350,7 +377,7 @@ The share system provides comprehensive error handling:
   - Preserves existing injections not in the shared config
 - **`src/molecules/ShareDialog.tsx`**: Dialog component for displaying and copying share links
 - **`src/App.tsx`**: Handles initial hash fragment loading and hash change events
-- **`src/Ergogen.tsx`**: Contains share button and triggers the share dialog
+- **`src/atoms/Header.tsx`**: Contains the share button and share functionality. The share button is visible on the main page (`/`) but hidden on the Welcome page (`/new`). It's also visible on mobile devices.
 
 ### Future Enhancements
 
@@ -413,12 +440,14 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 
 ### [TASK-004] Replace Resizable Panel Library
 
-**Context:** The application currently uses an unspecified or custom implementation for resizable panels. The user has expressed a desire to switch to a more robust and feature-rich solution, specifically `react-resizable-panels`, to better emulate the UI behavior of modern editors like VS Code.
+**Context:** The application currently uses a custom `ResizablePanel` component (`src/molecules/ResizablePanel.tsx`) that replaced `react-split`. The user previously expressed interest in switching to `react-resizable-panels` for a more robust solution, but the custom implementation has been working well and provides good control over styling and behavior.
 
-**Task:** Replace the existing resizable panel implementation throughout the application with `react-resizable-panels`. This will involve:
+**Status:** The custom `ResizablePanel` component is currently in use and documented in AGENTS.md. This task can be considered low priority unless specific limitations are encountered.
+
+**Task (if needed):** If migration to `react-resizable-panels` is desired, this would involve:
 
 1. Adding `react-resizable-panels` as a project dependency.
-2. Identifying all components that use the current resizable panel system.
+2. Identifying all components that use the current `ResizablePanel` component.
 3. Refactoring these components to use the `PanelGroup`, `Panel`, and `PanelResizeHandle` components from the new library.
 4. Ensuring that the new implementation is styled consistently with the application's theme and provides a smooth, VS Code-like user experience.
 5. Verifying that all related functionality, including E2E tests, remains intact after the migration.

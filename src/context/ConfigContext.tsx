@@ -102,6 +102,8 @@ type Props = {
  * @property {Dispatch<SetStateAction<number>>} setResultsVersion - Function to update the results version.
  * @property {boolean} showSettings - Flag to control the visibility of the settings panel.
  * @property {Dispatch<SetStateAction<boolean>>} setShowSettings - Function to toggle the settings panel.
+ * @property {boolean} showSideNav - Flag to control the visibility of the side navigation panel.
+ * @property {Dispatch<SetStateAction<boolean>>} setShowSideNav - Function to toggle the side navigation panel.
  * @property {boolean} showConfig - Flag to control the visibility of the configuration editor.
  * @property {Dispatch<SetStateAction<boolean>>} setShowConfig - Function to toggle the config editor.
  * @property {boolean} showDownloads - Flag to control the visibility of the downloads panel.
@@ -145,6 +147,8 @@ type ContextProps = {
   setResultsVersion: Dispatch<SetStateAction<number>>;
   showSettings: boolean;
   setShowSettings: Dispatch<SetStateAction<boolean>>;
+  showSideNav: boolean;
+  setShowSideNav: Dispatch<SetStateAction<boolean>>;
   showConfig: boolean;
   setShowConfig: Dispatch<SetStateAction<boolean>>;
   showDownloads: boolean;
@@ -235,6 +239,7 @@ const ConfigContextProvider = ({
     localStorageOrDefault('ergogen:config:stlPreview', true)
   );
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [showSideNav, setShowSideNav] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -732,6 +737,8 @@ const ConfigContextProvider = ({
       setResultsVersion,
       showSettings,
       setShowSettings,
+      showSideNav,
+      setShowSideNav,
       showConfig,
       setShowConfig,
       showDownloads,
@@ -768,6 +775,8 @@ const ConfigContextProvider = ({
       setResultsVersion,
       showSettings,
       setShowSettings,
+      showSideNav,
+      setShowSideNav,
       showConfig,
       setShowConfig,
       showDownloads,

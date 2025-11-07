@@ -1,6 +1,5 @@
-import { useEffect, useState, ChangeEvent } from 'react';
+import { useEffect, useState, ChangeEvent, SetStateAction, Dispatch } from 'react';
 import styled from 'styled-components';
-import Split from 'react-split';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
 
@@ -9,7 +8,8 @@ import InjectionEditor from './molecules/InjectionEditor';
 import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
-import ShareDialog from './molecules/ShareDialog';
+import ResizablePanel from './molecules/ResizablePanel';
+import { Preview } from './atoms/DownloadRow';
 
 import { useConfigContext } from './context/ConfigContext';
 import { findResult } from './utils/object';
@@ -22,7 +22,6 @@ import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { createZip } from './utils/zip';
-import { createShareableUri } from './utils/share';
 import { trackEvent } from './utils/analytics';
 
 // Shortcut key sub-label styled component
@@ -168,8 +167,10 @@ const StyledConfigEditor = styled(ConfigEditor)`
  * A container for settings and options.
  */
 const OptionContainer = styled.div`
-  display: inline-grid;
-  justify-content: space-between;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
 `;
 
 const SettingsPaneContainer = styled.div`
@@ -182,48 +183,68 @@ const SettingsPaneContainer = styled.div`
   }
 `;
 
+const MobileEditorHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  @media (min-width: 640px) {
+    display: none;
+  }
+`;
+
+const MobileCloseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition:
+    background-color 0.15s ease-in-out,
+    color 0.15s ease-in-out;
+
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconLarge};
+  }
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+    color: ${theme.colors.text};
+  }
+
+  @media (min-width: 640px) {
+    display: none;
+  }
+`;
+
 /**
- * A styled version of the `react-split` component, providing resizable panes.
+ * A container for the right pane that takes remaining space.
  */
-const StyledSplit = styled(Split)`
-  width: 100%;
+const RightPane = styled.div<{ $fullWidth?: boolean }>`
+  position: relative;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: row;
 
-  .gutter {
-    background-color: ${theme.colors.border};
-    border-radius: 0.15rem;
-
-    background-repeat: no-repeat;
-    background-position: 50%;
-
-    &:hover {
-      background-color: ${theme.colors.buttonSecondaryHover};
-    }
-
-    &.gutter-horizontal {
-      cursor: col-resize;
-      background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==');
-    }
+  @media (max-width: 639px) {
+    width: ${(props) => (props.$fullWidth ? '100%' : 'auto')};
   }
 `;
 
 /**
- * A container for the left pane in a split layout.
+ * A container for nested right pane content.
  */
-const LeftSplitPane = styled.div`
+const NestedRightPane = styled.div`
   position: relative;
-  @media (min-width: 640px) {
-    min-width: 300px;
-  }
-`;
-
-/**
- * A container for the right pane in a split layout.
- */
-const RightSplitPane = styled.div`
-  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
 `;
 
 /**
@@ -243,15 +264,31 @@ const FlexContainer = styled.div`
  * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
  */
 const Ergogen = () => {
+  // Calculate initial widths based on viewport
+  const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
+  const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
+  const getInitialSettingsWidth = () => Math.max(350, window.innerWidth * 0.15);
+
   /**
    * State for the currently displayed file preview.
-   * @type {{key: string, extension: string, content: string}}
+   * @type {Preview}
    */
-  const [preview, setPreviewKey] = useState({
+  const [preview, setPreviewKey] = useState<Preview>({
     key: 'demo.svg',
     extension: 'svg',
     content: '',
   });
+
+  /**
+   * Wrapper function to set preview and hide downloads panel.
+   * Only hides downloads panel on mobile (when showConfig is false).
+   */
+  const handleSetPreview: Dispatch<SetStateAction<Preview>> = (newPreview) => {
+    setPreviewKey(newPreview);
+    if (!configContext?.showConfig) {
+      configContext?.setShowDownloads(false);
+    }
+  };
 
   /**
    * State for the custom injection currently being edited in the settings panel.
@@ -265,17 +302,26 @@ const Ergogen = () => {
   });
 
   /**
+   * State to track if we're showing the injection editor on mobile.
+   * Only used when showConfig is false (mobile view).
+   */
+  const [showMobileEditor, setShowMobileEditor] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 639);
+
+  /**
    * State for the selected example from the dropdown menu.
    * @type {ConfigOption | null}
    */
   const configContext = useConfigContext();
 
-  /**
-   * State for showing the share notification toast.
-   * We track both visibility and whether the component should be mounted.
-   */
-  const [showShareDialog, setShowShareDialog] = useState(false);
-  const [shareLink, setShareLink] = useState('');
+  // Track screen size changes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 639);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useHotkeys(
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
@@ -462,44 +508,9 @@ const Ergogen = () => {
     );
   };
 
-  /**
-   * Creates a shareable URI with the current configuration and shows a dialog.
-   * Includes all current injections (footprints, templates, etc.) in the shared URI.
-   */
-  const handleShare = () => {
-    if (!configContext.configInput) {
-      return;
-    }
-
-    // Include all injections if present
-    const injectionsToShare =
-      configContext.injectionInput && configContext.injectionInput.length > 0
-        ? configContext.injectionInput
-        : undefined;
-
-    const shareableUri = createShareableUri(
-      configContext.configInput,
-      injectionsToShare
-    );
-
-    trackEvent('share_button_clicked', {
-      has_injections: !!injectionsToShare,
-      injections_count: injectionsToShare?.length || 0,
-    });
-
-    setShareLink(shareableUri);
-    setShowShareDialog(true);
-  };
 
   return (
     <ErgogenWrapper>
-      {showShareDialog && (
-        <ShareDialog
-          shareLink={shareLink}
-          onClose={() => setShowShareDialog(false)}
-          data-testid="share-dialog"
-        />
-      )}
       {!configContext.showSettings && (
         <SubHeaderContainer>
           <OutlineIconButton
@@ -541,142 +552,128 @@ const Ergogen = () => {
               >
                 <span className="material-symbols-outlined">download</span>
               </OutlineIconButton>
-              <OutlineIconButton
-                onClick={handleShare}
-                aria-label="Share configuration"
-                data-testid="mobile-share-button"
-              >
-                <span className="material-symbols-outlined">share</span>
-              </OutlineIconButton>
             </>
           )}
           {!configContext.showConfig && (
-            <>
-              <OutlineIconButton
-                onClick={handleDownloadArchive}
-                disabled={
-                  configContext.isGenerating || configContext.isJscadConverting
-                }
-                aria-label="Download archive of all generated files"
-                data-testid="subheader-download-outputs-button"
-              >
-                <span className="material-symbols-outlined">archive</span>
-              </OutlineIconButton>
-              <OutlineIconButton
-                onClick={() =>
-                  configContext.setShowDownloads(!configContext.showDownloads)
-                }
-                aria-label={
-                  configContext.showDownloads
-                    ? 'Hide downloads panel'
-                    : 'Show downloads panel'
-                }
-                data-testid="mobile-downloads-toggle-button"
-              >
-                <span className="material-symbols-outlined">
-                  {configContext.showDownloads
-                    ? 'expand_content'
-                    : 'collapse_content'}
-                </span>
-              </OutlineIconButton>
-            </>
+            <OutlineIconButton
+              onClick={() =>
+                configContext.setShowDownloads(!configContext.showDownloads)
+              }
+              aria-label={
+                configContext.showDownloads
+                  ? 'Hide downloads panel'
+                  : 'Show downloads panel'
+              }
+              data-testid="mobile-downloads-toggle-button"
+            >
+              <span className="material-symbols-outlined">
+                {configContext.showDownloads
+                  ? 'expand_content'
+                  : 'collapse_content'}
+              </span>
+            </OutlineIconButton>
           )}
         </SubHeaderContainer>
       )}
       <FlexContainer>
         {!configContext.showSettings ? (
-          <StyledSplit
-            direction={'horizontal'}
-            sizes={[30, 70]}
-            minSize={100}
-            gutterSize={5}
-            snapOffset={0}
-            className={
-              configContext.showConfig ? 'show-config' : 'show-outputs'
-            }
-          >
-            <LeftSplitPane>
-              <EditorContainer>
-                <StyledConfigEditor data-testid="config-editor" />
-                <ButtonContainer>
-                  <GrowButton
-                    onClick={() =>
-                      configContext.generateNow(
-                        configContext.configInput,
-                        configContext.injectionInput,
-                        { pointsonly: false }
-                      )
-                    }
-                    aria-label="Generate configuration"
-                    data-testid="generate-button"
-                  >
-                    <span
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        width: '100%',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <span>Generate</span>
-                      <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
-                    </span>
-                  </GrowButton>
-                  <OutlineIconButton
-                    onClick={handleDownload}
-                    aria-label="Download configuration"
-                    data-testid="download-config-button"
-                  >
-                    <span className="material-symbols-outlined">download</span>
-                  </OutlineIconButton>
-                  <OutlineIconButton
-                    onClick={handleShare}
-                    aria-label="Share configuration"
-                    data-testid="share-config-button"
-                  >
-                    <span className="material-symbols-outlined">share</span>
-                  </OutlineIconButton>
-                </ButtonContainer>
-              </EditorContainer>
-            </LeftSplitPane>
-
-            <RightSplitPane>
-              <StyledSplit
-                direction={'horizontal'}
-                sizes={configContext.showDownloads ? [70, 30] : [100, 0]}
-                minSize={configContext.showDownloads ? 100 : 0}
-                gutterSize={configContext.showDownloads ? 5 : 0}
-                snapOffset={0}
+          <>
+            {configContext.showConfig && (
+              <ResizablePanel
+                initialWidth={getInitialLeftWidth()}
+                minWidth={250}
+                maxWidth="60%"
+                side="left"
+                data-testid="config-panel"
               >
-                <LeftSplitPane>
+                <EditorContainer>
+                  <StyledConfigEditor data-testid="config-editor" />
+                  <ButtonContainer>
+                    <GrowButton
+                      onClick={() =>
+                        configContext.generateNow(
+                          configContext.configInput,
+                          configContext.injectionInput,
+                          { pointsonly: false }
+                        )
+                      }
+                      aria-label="Generate configuration"
+                      data-testid="generate-button"
+                    >
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          width: '100%',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <span>Generate</span>
+                        <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
+                      </span>
+                    </GrowButton>
+                    <OutlineIconButton
+                      onClick={handleDownload}
+                      aria-label="Download configuration"
+                      data-testid="download-config-button"
+                    >
+                      <span className="material-symbols-outlined">download</span>
+                    </OutlineIconButton>
+                  </ButtonContainer>
+                </EditorContainer>
+              </ResizablePanel>
+            )}
+            <RightPane>
+              {configContext.showDownloads ? (
+                <>
+                  <NestedRightPane>
+                    <StyledFilePreview
+                      data-testid={`${preview.key}-file-preview`}
+                      previewExtension={preview.extension}
+                      previewKey={`${preview.key}-${configContext.resultsVersion}`}
+                      previewContent={preview.content}
+                    />
+                  </NestedRightPane>
+                  <ResizablePanel
+                    initialWidth={getInitialRightWidth()}
+                    minWidth={105}
+                    maxWidth="30%"
+                    side="right"
+                    data-testid="downloads-panel"
+                  >
+                    <ScrollablePanelContainer>
+                      <Downloads
+                        setPreview={handleSetPreview}
+                        previewKey={preview.key}
+                        data-testid="downloads-container"
+                      />
+                    </ScrollablePanelContainer>
+                  </ResizablePanel>
+                </>
+              ) : (
+                <NestedRightPane>
                   <StyledFilePreview
                     data-testid={`${preview.key}-file-preview`}
                     previewExtension={preview.extension}
                     previewKey={`${preview.key}-${configContext.resultsVersion}`}
                     previewContent={preview.content}
                   />
-                </LeftSplitPane>
-                <RightSplitPane>
-                  <ScrollablePanelContainer>
-                    <Downloads
-                      setPreview={setPreviewKey}
-                      previewKey={preview.key}
-                      data-testid="downloads-container"
-                    />
-                  </ScrollablePanelContainer>
-                </RightSplitPane>
-              </StyledSplit>
-            </RightSplitPane>
-          </StyledSplit>
+                </NestedRightPane>
+              )}
+            </RightPane>
+          </>
         ) : (
-          <StyledSplit
-            direction={'horizontal'}
-            sizes={[40, 60]}
-            minSize={100}
-            gutterSize={10}
-            snapOffset={0}
-          >
-            <LeftSplitPane>
+          <>
+            <ResizablePanel
+              initialWidth={getInitialSettingsWidth()}
+              minWidth={150}
+              maxWidth="70%"
+              side="left"
+              data-testid="settings-panel"
+              style={{
+                display: showMobileEditor && isMobile ? 'none' : undefined,
+              }}
+            >
               <SettingsPaneContainer>
                 <OptionContainer>
                   <Title>Options</Title>
@@ -732,13 +729,29 @@ const Ergogen = () => {
                   setInjectionToEdit={setInjectionToEdit}
                   deleteInjection={handleDeleteInjection}
                   injectionToEdit={injectionToEdit}
+                  onInjectionSelect={() => setShowMobileEditor(true)}
                   data-testid="injections-container"
                 />
               </SettingsPaneContainer>
-            </LeftSplitPane>
-            <RightSplitPane>
+            </ResizablePanel>
+            <RightPane $fullWidth={showMobileEditor && isMobile}>
               <EditorContainer>
-                <Title as="h4">Footprint name</Title>
+                {isMobile && (
+                  <MobileEditorHeader>
+                    <Title as="h4">Footprint name</Title>
+                    <MobileCloseButton
+                      onClick={() => {
+                        setShowMobileEditor(false);
+                        setInjectionToEdit({ key: -1, type: '', name: '', content: '' });
+                      }}
+                      aria-label="Close editor"
+                      data-testid="mobile-editor-close"
+                    >
+                      <span className="material-symbols-outlined">close</span>
+                    </MobileCloseButton>
+                  </MobileEditorHeader>
+                )}
+                {!isMobile && <Title as="h4">Footprint name</Title>}
                 <Input
                   value={injectionToEdit.name}
                   onChange={handleInjectionNameChange}
@@ -753,8 +766,8 @@ const Ergogen = () => {
                   options={{ readOnly: injectionToEdit.key === -1 }}
                 />
               </EditorContainer>
-            </RightSplitPane>
-          </StyledSplit>
+            </RightPane>
+          </>
         )}
       </FlexContainer>
     </ErgogenWrapper>

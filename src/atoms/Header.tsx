@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import DiscordIcon from './DiscordIcon';
-import GithubIcon from './GithubIcon';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
+import { createShareableUri } from '../utils/share';
+import { trackEvent } from '../utils/analytics';
+import ShareDialog from '../molecules/ShareDialog';
 
 /**
  * A styled container for the entire header.
@@ -81,46 +83,6 @@ const VersionText = styled.a`
 `;
 
 /**
- * A styled anchor tag that functions as a link button.
- */
-const StyledLinkButton = styled.a`
-    background-color: transparent;
-    border: 1px solid ${theme.colors.border};
-    border-radius: 6px;
-    color: ${theme.colors.white};
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    text-decoration: none;
-    cursor: pointer;
-    font-size: ${theme.fontSizes.bodySmall};
-    line-height: 16px;
-    gap: 6px
-    height: 34px;
-
-    .material-symbols-outlined {
-        margin-right: 6px;
-        font-size: ${theme.fontSizes.iconMedium} !important;
-    }
-
-    &:hover {
-        background-color: ${theme.colors.buttonHover};
-    }
-`;
-
-const DocsButton = styled(StyledLinkButton)`
-  @media (max-width: 639px) {
-    .material-symbols-outlined {
-      margin-right: 0;
-    }
-
-    span:not(.material-symbols-outlined) {
-      display: none;
-    }
-  }
-`;
-
-/**
  * A styled button with an outline style, typically for icons.
  */
 const OutlineIconButton = styled.button`
@@ -139,7 +101,7 @@ const OutlineIconButton = styled.button`
     cursor: pointer;
     font-size: ${theme.fontSizes.bodySmall};
     line-height: 16px;
-    gap: 6px
+    gap: 6px;
     height: 34px;
 
     .material-symbols-outlined {
@@ -149,6 +111,13 @@ const OutlineIconButton = styled.button`
     &:hover {
         background-color: ${theme.colors.buttonHover};
     }
+`;
+
+/**
+ * A styled button for toggling the side navigation panel.
+ */
+const SideNavButton = styled(OutlineIconButton)`
+  flex-shrink: 0;
 `;
 
 const AccentIconButton = styled(OutlineIconButton)`
@@ -161,11 +130,13 @@ const AccentIconButton = styled(OutlineIconButton)`
   }
 `;
 
-const ArchiveIconButton = styled(OutlineIconButton)`
-  @media (max-width: 639px) {
+const NewButtonText = styled.span`
+  @media (max-width: 375px) {
     display: none;
   }
 `;
+
+const ArchiveIconButton = styled(OutlineIconButton)``;
 
 /**
  * A responsive button that is only visible on smaller screens.
@@ -196,6 +167,8 @@ const Header = (): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareLink, setShareLink] = useState('');
 
   /**
    * Toggles the visibility of the settings panel.
@@ -227,98 +200,133 @@ const Header = (): JSX.Element => {
     );
   };
 
+  /**
+   * Creates a shareable URI with the current configuration and shows a dialog.
+   * Includes all current injections (footprints, templates, etc.) in the shared URI.
+   */
+  const handleShare = () => {
+    if (!configContext?.configInput) {
+      return;
+    }
+
+    // Include all injections if present
+    const injectionsToShare =
+      configContext.injectionInput && configContext.injectionInput.length > 0
+        ? configContext.injectionInput
+        : undefined;
+
+    const shareableUri = createShareableUri(
+      configContext.configInput,
+      injectionsToShare
+    );
+
+    trackEvent('share_button_clicked', {
+      has_injections: !!injectionsToShare,
+      injections_count: injectionsToShare?.length || 0,
+    });
+
+    setShareLink(shareableUri);
+    setShowShareDialog(true);
+  };
+
+  const toggleSideNav = () => {
+    configContext?.setShowSideNav(!configContext?.showSideNav);
+  };
+
   return (
-    <HeaderContainer>
-      <LeftContainer>
-        {/* <LeftPanelButton onClick={() => window.location.reload()}><span className="material-symbols-outlined">left_panel_open</span></LeftPanelButton> */}
-        <ErgogenLogo>
-          <LogoButton
-            to="/"
-            aria-label="Go to home page"
-            data-testid="logo-button"
-          >
-            <LogoImage
-              src={`${process.env.PUBLIC_URL}/ergogen.png`}
-              alt="Ergogen logo"
-            />
-          </LogoButton>
-          <AppName>Ergogen</AppName>
-          <VersionText
-            href="https://github.com/ergogen/ergogen"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="View Ergogen v4.2.1 on GitHub"
-            data-testid="version-link"
-          >
-            v4.2.1
-          </VersionText>
-        </ErgogenLogo>
-      </LeftContainer>
-      <RightContainer>
-        {location.pathname === '/' && (
-          <AccentIconButton
-            onClick={handleNewClick}
-            aria-label="Start new configuration"
-            data-testid="new-config-button"
-          >
-            <span className="material-symbols-outlined">add_2</span>
-          </AccentIconButton>
-        )}
-        {location.pathname === '/' && (
-          <ArchiveIconButton
-            onClick={handleDownloadArchive}
-            disabled={
-              configContext?.isGenerating || configContext?.isJscadConverting
+    <>
+      {showShareDialog && (
+        <ShareDialog
+          shareLink={shareLink}
+          onClose={() => setShowShareDialog(false)}
+          data-testid="share-dialog"
+        />
+      )}
+      <HeaderContainer>
+        <LeftContainer>
+          <SideNavButton
+            onClick={toggleSideNav}
+            aria-label={
+              configContext?.showSideNav
+                ? 'Hide navigation panel'
+                : 'Show navigation panel'
             }
-            aria-label="Download archive of all generated files"
-            data-testid="header-download-outputs-button"
+            data-testid="side-nav-toggle-button"
           >
-            <span className="material-symbols-outlined">archive</span>
-          </ArchiveIconButton>
-        )}
-        <DocsButton
-          href="https://docs.ergogen.xyz/"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open documentation"
-          data-testid="docs-button"
-        >
-          <span className="material-symbols-outlined">description</span>
-          <span>Docs</span>
-        </DocsButton>
-        <StyledLinkButton
-          href="https://discord.ergogen.xyz"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Join the Discord community"
-          data-testid="discord-button"
-        >
-          <DiscordIcon />
-        </StyledLinkButton>
-        <StyledLinkButton
-          href="https://github.com/ergogen"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="View the GitHub repositories"
-          data-testid="github-button"
-        >
-          <GithubIcon />
-        </StyledLinkButton>
-        <OutlineIconButton
-          onClick={toggleSettings}
-          aria-label={
-            configContext?.showSettings
-              ? 'Hide settings panel'
-              : 'Show settings panel'
-          }
-          data-testid="settings-button"
-        >
-          <span className="material-symbols-outlined">
-            {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
-          </span>
-        </OutlineIconButton>
-      </RightContainer>
-    </HeaderContainer>
+            <span className="material-symbols-outlined">side_navigation</span>
+          </SideNavButton>
+          <ErgogenLogo>
+            <LogoButton
+              to="/"
+              aria-label="Go to home page"
+              data-testid="logo-button"
+            >
+              <LogoImage
+                src={`${process.env.PUBLIC_URL}/ergogen.png`}
+                alt="Ergogen logo"
+              />
+            </LogoButton>
+            <AppName>Ergogen</AppName>
+            <VersionText
+              href="https://github.com/ergogen/ergogen"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View Ergogen v4.2.1 on GitHub"
+              data-testid="version-link"
+            >
+              v4.2.1
+            </VersionText>
+          </ErgogenLogo>
+        </LeftContainer>
+        <RightContainer>
+          {location.pathname === '/' && (
+            <>
+              <AccentIconButton
+                onClick={handleNewClick}
+                aria-label="Start new configuration"
+                data-testid="new-config-button"
+              >
+                <span className="material-symbols-outlined">add_2</span>
+                <NewButtonText>New</NewButtonText>
+              </AccentIconButton>
+              <ArchiveIconButton
+                onClick={handleDownloadArchive}
+                disabled={
+                  configContext?.isGenerating || configContext?.isJscadConverting
+                }
+                aria-label="Download archive of all generated files"
+                data-testid="header-download-outputs-button"
+              >
+                <span className="material-symbols-outlined">archive</span>
+              </ArchiveIconButton>
+              <ArchiveIconButton
+                onClick={handleShare}
+                disabled={!configContext?.configInput}
+                aria-label="Share configuration"
+                data-testid="header-share-button"
+              >
+                <span className="material-symbols-outlined">share</span>
+              </ArchiveIconButton>
+            </>
+          )}
+          {location.pathname !== '/new' && (
+            <OutlineIconButton
+              onClick={toggleSettings}
+              aria-label={
+                configContext?.showSettings
+                  ? 'Hide settings panel'
+                  : 'Show settings panel'
+              }
+              data-testid="settings-button"
+            >
+              <span className="material-symbols-outlined">
+                {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
+              </span>
+            </OutlineIconButton>
+          )}
+        </RightContainer>
+      </HeaderContainer>
+    </>
   );
 };
 

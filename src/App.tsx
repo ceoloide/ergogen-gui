@@ -8,6 +8,7 @@ import Welcome from './pages/Welcome';
 import Header from './atoms/Header';
 import LoadingBar from './atoms/LoadingBar';
 import Banners from './organisms/Banners';
+import SideNavigation from './molecules/SideNavigation';
 import ConfigContextProvider, {
   useConfigContext,
 } from './context/ConfigContext';
@@ -221,6 +222,11 @@ const AppContent = () => {
         data-testid="loading-bar"
       />
       <Banners />
+      <SideNavigation
+        isOpen={configContext?.showSideNav ?? false}
+        onClose={() => configContext?.setShowSideNav(false)}
+        data-testid="side-navigation"
+      />
       <PageWrapper>
         <Routes>
           <Route

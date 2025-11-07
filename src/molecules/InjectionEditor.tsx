@@ -1,5 +1,6 @@
 import { Editor } from '@monaco-editor/react';
 import { Dispatch, SetStateAction } from 'react';
+import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { Injection } from '../atoms/InjectionRow';
 
@@ -60,9 +61,9 @@ const InjectionEditor = ({
   if (!configContext) return null;
 
   return (
-    <div className={className} data-testid={dataTestId} aria-label={ariaLabel}>
+    <EditorWrapper className={className} data-testid={dataTestId} aria-label={ariaLabel}>
       <Editor
-        height="60vh"
+        height="100%"
         defaultLanguage="javascript"
         language="javascript"
         onChange={handleChange}
@@ -70,8 +71,16 @@ const InjectionEditor = ({
         theme={'ergogen-theme'}
         options={options || undefined}
       />
-    </div>
+    </EditorWrapper>
   );
 };
+
+const EditorWrapper = styled.div`
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+`;
 
 export default InjectionEditor;
