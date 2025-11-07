@@ -269,7 +269,7 @@ const Ergogen = () => {
   // Calculate initial widths based on viewport
   const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
   const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
-  const getInitialSettingsWidth = () => Math.max(300, window.innerWidth * 0.15);
+  const getInitialSettingsWidth = () => Math.max(350, window.innerWidth * 0.15);
 
   /**
    * State for the currently displayed file preview.

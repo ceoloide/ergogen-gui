@@ -152,11 +152,15 @@ const DownloadRow = ({
   previewKey,
   'data-testid': dataTestId,
 }: Props) => {
-  // Determine if this row is disabled (pending STL generation)
-  const isDisabled = extension === 'stl' && !content;
+  // Determine if this row is disabled (pending STL generation or KiCad Preview disabled)
+  const isDisabled =
+    (extension === 'stl' && !content) ||
+    (extension === 'kicad_pcb' && !preview);
+  // STL files without content show loading button, kicad_pcb files without preview still show download button
+  const showLoadingButton = extension === 'stl' && !content;
 
   const handleDownload = () => {
-    if (isDisabled) return;
+    if (showLoadingButton) return;
     trackEvent('download_button_clicked', {
       download_type: extension,
       file_name: fileName,
@@ -189,7 +193,7 @@ const DownloadRow = ({
         {fileName}.{extension}
       </FileName>
       <Buttons>
-        {isDisabled ? (
+        {showLoadingButton ? (
           <LoadingButton
             aria-label={`Generating ${fileName}.${extension}`}
             data-testid={testId && `${testId}-loading`}
