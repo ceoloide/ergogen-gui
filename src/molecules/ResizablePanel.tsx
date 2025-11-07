@@ -11,6 +11,7 @@ type ResizablePanelProps = {
   minWidth?: number;
   maxWidth?: number | string;
   side?: 'left' | 'right';
+  fullWidthOnMobile?: boolean;
   'data-testid'?: string;
 };
 
@@ -24,6 +25,7 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   minWidth = 10,
   maxWidth = '100%',
   side = 'left',
+  fullWidthOnMobile = false,
   'data-testid': dataTestId,
 }) => {
   const [width, setWidth] = useState(initialWidth);
@@ -31,6 +33,13 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   const startXRef = useRef(0);
   const startWidthRef = useRef(initialWidth);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Update width to full viewport width on mobile when fullWidthOnMobile is true
+  useEffect(() => {
+    if (fullWidthOnMobile && window.innerWidth <= 639) {
+      setWidth(window.innerWidth);
+    }
+  }, [fullWidthOnMobile]);
 
   // Handle resize
   useEffect(() => {
@@ -133,6 +142,7 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
       ref={containerRef}
       $width={width}
       $side={side}
+      $fullWidthOnMobile={fullWidthOnMobile}
       data-testid={dataTestId}
     >
       {children}
@@ -146,11 +156,11 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   );
 };
 
-const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
+const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right'; $fullWidthOnMobile: boolean }>`
   position: relative;
   width: ${(props) => props.$width}px;
   flex-shrink: 0;
-  flex-grow: 0;
+  flex-grow: ${(props) => (props.$fullWidthOnMobile ? 1 : 0)};
   height: 100%;
   overflow: visible;
   border-right: ${(props) => (props.$side === 'left' ? `1px solid ${theme.colors.border}` : 'none')};
@@ -158,6 +168,7 @@ const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
 
   @media (max-width: 639px) {
     width: 100% !important;
+    flex-grow: ${(props) => (props.$fullWidthOnMobile ? 1 : 0)};
     border-right: none;
     border-left: none;
   }

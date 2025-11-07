@@ -251,6 +251,10 @@ const FlexContainer = styled.div`
   display: flex;
   height: 100%;
   width: 100%;
+
+  @media (max-width: 639px) {
+    flex-direction: column;
+  }
 `;
 
 /**
@@ -744,59 +748,62 @@ const Ergogen = () => {
               minWidth={150}
               maxWidth="70%"
               side="left"
+              fullWidthOnMobile={!configContext.showConfig && showMobileEditor && isMobile}
               data-testid="settings-panel"
             >
               <SettingsPaneContainer>
-                <OptionContainer>
-                  <Title>Options</Title>
-                  <GenOption
-                    optionId={'autogen'}
-                    label={'Auto-generate'}
-                    setSelected={configContext.setAutoGen}
-                    checked={configContext.autoGen}
-                    aria-label="Enable auto-generate"
-                  />
-                  <GenOption
-                    optionId={'debug'}
-                    label={'Debug'}
-                    setSelected={configContext.setDebug}
-                    checked={configContext.debug}
-                    aria-label="Enable debug mode"
-                  />
-                  <GenOption
-                    optionId={'autogen3d'}
-                    label={
-                      <>
-                        Auto-gen PCB, 3D <small>(slow)</small>
-                      </>
-                    }
-                    setSelected={configContext.setAutoGen3D}
-                    checked={configContext.autoGen3D}
-                    aria-label="Enable auto-generate PCB and 3D (slow)"
-                  />
-                  <GenOption
-                    optionId={'kicanvasPreview'}
-                    label={
-                      <>
-                        KiCad Preview <small>(experimental)</small>
-                      </>
-                    }
-                    setSelected={configContext.setKicanvasPreview}
-                    checked={configContext.kicanvasPreview}
-                    aria-label="Enable KiCad preview (experimental)"
-                  />
-                  <GenOption
-                    optionId={'stlPreview'}
-                    label={
-                      <>
-                        STL Preview <small>(experimental)</small>
-                      </>
-                    }
-                    setSelected={configContext.setStlPreview}
-                    checked={configContext.stlPreview}
-                    aria-label="Enable STL preview (experimental)"
-                  />
-                </OptionContainer>
+                {(!configContext.showConfig && showMobileEditor && isMobile) ? null : (
+                  <OptionContainer>
+                    <Title>Options</Title>
+                    <GenOption
+                      optionId={'autogen'}
+                      label={'Auto-generate'}
+                      setSelected={configContext.setAutoGen}
+                      checked={configContext.autoGen}
+                      aria-label="Enable auto-generate"
+                    />
+                    <GenOption
+                      optionId={'debug'}
+                      label={'Debug'}
+                      setSelected={configContext.setDebug}
+                      checked={configContext.debug}
+                      aria-label="Enable debug mode"
+                    />
+                    <GenOption
+                      optionId={'autogen3d'}
+                      label={
+                        <>
+                          Auto-gen PCB, 3D <small>(slow)</small>
+                        </>
+                      }
+                      setSelected={configContext.setAutoGen3D}
+                      checked={configContext.autoGen3D}
+                      aria-label="Enable auto-generate PCB and 3D (slow)"
+                    />
+                    <GenOption
+                      optionId={'kicanvasPreview'}
+                      label={
+                        <>
+                          KiCad Preview <small>(experimental)</small>
+                        </>
+                      }
+                      setSelected={configContext.setKicanvasPreview}
+                      checked={configContext.kicanvasPreview}
+                      aria-label="Enable KiCad preview (experimental)"
+                    />
+                    <GenOption
+                      optionId={'stlPreview'}
+                      label={
+                        <>
+                          STL Preview <small>(experimental)</small>
+                        </>
+                      }
+                      setSelected={configContext.setStlPreview}
+                      checked={configContext.stlPreview}
+                      aria-label="Enable STL preview (experimental)"
+                    />
+                  </OptionContainer>
+                )}
                 {!configContext.showConfig && showMobileEditor && isMobile ? (
                   <EditorContainer>
                     <MobileEditorHeader>
