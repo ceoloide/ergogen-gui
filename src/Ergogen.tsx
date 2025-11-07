@@ -225,13 +225,17 @@ const MobileCloseButton = styled.button`
 /**
  * A container for the right pane that takes remaining space.
  */
-const RightPane = styled.div`
+const RightPane = styled.div<{ $fullWidth?: boolean }>`
   position: relative;
   flex: 1;
   min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: row;
+
+  @media (max-width: 639px) {
+    width: ${(props) => (props.$fullWidth ? '100%' : 'auto')};
+  }
 `;
 
 /**
@@ -251,10 +255,6 @@ const FlexContainer = styled.div`
   display: flex;
   height: 100%;
   width: 100%;
-
-  @media (max-width: 639px) {
-    flex-direction: column;
-  }
 `;
 
 /**
@@ -748,122 +748,106 @@ const Ergogen = () => {
               minWidth={150}
               maxWidth="70%"
               side="left"
-              fullWidthOnMobile={!configContext.showConfig && showMobileEditor && isMobile}
               data-testid="settings-panel"
+              style={{
+                display: !configContext.showConfig && showMobileEditor && isMobile ? 'none' : undefined,
+              }}
             >
               <SettingsPaneContainer>
-                {(!configContext.showConfig && showMobileEditor && isMobile) ? null : (
-                  <OptionContainer>
-                    <Title>Options</Title>
-                    <GenOption
-                      optionId={'autogen'}
-                      label={'Auto-generate'}
-                      setSelected={configContext.setAutoGen}
-                      checked={configContext.autoGen}
-                      aria-label="Enable auto-generate"
-                    />
-                    <GenOption
-                      optionId={'debug'}
-                      label={'Debug'}
-                      setSelected={configContext.setDebug}
-                      checked={configContext.debug}
-                      aria-label="Enable debug mode"
-                    />
-                    <GenOption
-                      optionId={'autogen3d'}
-                      label={
-                        <>
-                          Auto-gen PCB, 3D <small>(slow)</small>
-                        </>
-                      }
-                      setSelected={configContext.setAutoGen3D}
-                      checked={configContext.autoGen3D}
-                      aria-label="Enable auto-generate PCB and 3D (slow)"
-                    />
-                    <GenOption
-                      optionId={'kicanvasPreview'}
-                      label={
-                        <>
-                          KiCad Preview <small>(experimental)</small>
-                        </>
-                      }
-                      setSelected={configContext.setKicanvasPreview}
-                      checked={configContext.kicanvasPreview}
-                      aria-label="Enable KiCad preview (experimental)"
-                    />
-                    <GenOption
-                      optionId={'stlPreview'}
-                      label={
-                        <>
-                          STL Preview <small>(experimental)</small>
-                        </>
-                      }
-                      setSelected={configContext.setStlPreview}
-                      checked={configContext.stlPreview}
-                      aria-label="Enable STL preview (experimental)"
-                    />
-                  </OptionContainer>
-                )}
-                {!configContext.showConfig && showMobileEditor && isMobile ? (
-                  <EditorContainer>
-                    <MobileEditorHeader>
-                      <Title as="h4">Footprint name</Title>
-                      <MobileCloseButton
-                        onClick={() => {
-                          setShowMobileEditor(false);
-                          setInjectionToEdit({ key: -1, type: '', name: '', content: '' });
-                        }}
-                        aria-label="Close editor"
-                        data-testid="mobile-editor-close"
-                      >
-                        <span className="material-symbols-outlined">close</span>
-                      </MobileCloseButton>
-                    </MobileEditorHeader>
-                    <Input
-                      value={injectionToEdit.name}
-                      onChange={handleInjectionNameChange}
-                      disabled={injectionToEdit.key === -1}
-                      aria-label="Footprint name"
-                      data-testid="footprint-name-input"
-                    />
-                    <Title as="h4">Footprint code</Title>
-                    <InjectionEditor
-                      injection={injectionToEdit}
-                      setInjection={setInjectionToEdit}
-                      options={{ readOnly: injectionToEdit.key === -1 }}
-                    />
-                  </EditorContainer>
-                ) : (
-                  <Injections
-                    setInjectionToEdit={setInjectionToEdit}
-                    deleteInjection={handleDeleteInjection}
-                    injectionToEdit={injectionToEdit}
-                    onInjectionSelect={() => setShowMobileEditor(true)}
-                    data-testid="injections-container"
+                <OptionContainer>
+                  <Title>Options</Title>
+                  <GenOption
+                    optionId={'autogen'}
+                    label={'Auto-generate'}
+                    setSelected={configContext.setAutoGen}
+                    checked={configContext.autoGen}
+                    aria-label="Enable auto-generate"
                   />
-                )}
+                  <GenOption
+                    optionId={'debug'}
+                    label={'Debug'}
+                    setSelected={configContext.setDebug}
+                    checked={configContext.debug}
+                    aria-label="Enable debug mode"
+                  />
+                  <GenOption
+                    optionId={'autogen3d'}
+                    label={
+                      <>
+                        Auto-gen PCB, 3D <small>(slow)</small>
+                      </>
+                    }
+                    setSelected={configContext.setAutoGen3D}
+                    checked={configContext.autoGen3D}
+                    aria-label="Enable auto-generate PCB and 3D (slow)"
+                  />
+                  <GenOption
+                    optionId={'kicanvasPreview'}
+                    label={
+                      <>
+                        KiCad Preview <small>(experimental)</small>
+                      </>
+                    }
+                    setSelected={configContext.setKicanvasPreview}
+                    checked={configContext.kicanvasPreview}
+                    aria-label="Enable KiCad preview (experimental)"
+                  />
+                  <GenOption
+                    optionId={'stlPreview'}
+                    label={
+                      <>
+                        STL Preview <small>(experimental)</small>
+                      </>
+                    }
+                    setSelected={configContext.setStlPreview}
+                    checked={configContext.stlPreview}
+                    aria-label="Enable STL preview (experimental)"
+                  />
+                </OptionContainer>
+                <Injections
+                  setInjectionToEdit={setInjectionToEdit}
+                  deleteInjection={handleDeleteInjection}
+                  injectionToEdit={injectionToEdit}
+                  onInjectionSelect={() => setShowMobileEditor(true)}
+                  data-testid="injections-container"
+                />
               </SettingsPaneContainer>
             </ResizablePanel>
-            {configContext.showConfig && (
-              <RightPane>
-                <EditorContainer>
+            <RightPane $fullWidth={!configContext.showConfig && showMobileEditor && isMobile}>
+              <EditorContainer>
+                {!configContext.showConfig && isMobile && (
+                  <MobileEditorHeader>
+                    <Title as="h4">Footprint name</Title>
+                    <MobileCloseButton
+                      onClick={() => {
+                        setShowMobileEditor(false);
+                        setInjectionToEdit({ key: -1, type: '', name: '', content: '' });
+                      }}
+                      aria-label="Close editor"
+                      data-testid="mobile-editor-close"
+                    >
+                      <span className="material-symbols-outlined">close</span>
+                    </MobileCloseButton>
+                  </MobileEditorHeader>
+                )}
+                {(!configContext.showConfig && isMobile) ? null : (
                   <Title as="h4">Footprint name</Title>
-                  <Input
-                    value={injectionToEdit.name}
-                    onChange={handleInjectionNameChange}
-                    disabled={injectionToEdit.key === -1}
-                    aria-label="Footprint name"
-                    data-testid="footprint-name-input"
-                  />
-                  <Title as="h4">Footprint code</Title>
-                  <InjectionEditor
-                    injection={injectionToEdit}
-                    setInjection={setInjectionToEdit}
-                    options={{ readOnly: injectionToEdit.key === -1 }}
-                  />
-                </EditorContainer>
-              </RightPane>
-            )}
+                )}
+                <Input
+                  value={injectionToEdit.name}
+                  onChange={handleInjectionNameChange}
+                  disabled={injectionToEdit.key === -1}
+                  aria-label="Footprint name"
+                  data-testid="footprint-name-input"
+                />
+                <Title as="h4">Footprint code</Title>
+                <InjectionEditor
+                  injection={injectionToEdit}
+                  setInjection={setInjectionToEdit}
+                  options={{ readOnly: injectionToEdit.key === -1 }}
+                />
+              </EditorContainer>
+            </RightPane>
           </>
         )}
       </FlexContainer>
