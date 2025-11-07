@@ -287,28 +287,24 @@ const Header = (): JSX.Element => {
               <span>New</span>
             </AccentIconButton>
           )}
-          {location.pathname === '/' && (
-            <>
-              <ArchiveIconButton
-                onClick={handleDownloadArchive}
-                disabled={
-                  configContext?.isGenerating || configContext?.isJscadConverting
-                }
-                aria-label="Download archive of all generated files"
-                data-testid="header-download-outputs-button"
-              >
-                <span className="material-symbols-outlined">archive</span>
-              </ArchiveIconButton>
-              <ArchiveIconButton
-                onClick={handleShare}
-                disabled={!configContext?.configInput}
-                aria-label="Share configuration"
-                data-testid="header-share-button"
-              >
-                <span className="material-symbols-outlined">share</span>
-              </ArchiveIconButton>
-            </>
-          )}
+          <ArchiveIconButton
+            onClick={handleDownloadArchive}
+            disabled={
+              configContext?.isGenerating || configContext?.isJscadConverting
+            }
+            aria-label="Download archive of all generated files"
+            data-testid="header-download-outputs-button"
+          >
+            <span className="material-symbols-outlined">archive</span>
+          </ArchiveIconButton>
+          <ArchiveIconButton
+            onClick={handleShare}
+            disabled={!configContext?.configInput}
+            aria-label="Share configuration"
+            data-testid="header-share-button"
+          >
+            <span className="material-symbols-outlined">share</span>
+          </ArchiveIconButton>
           {location.pathname !== '/new' && (
             <OutlineIconButton
               onClick={toggleSettings}

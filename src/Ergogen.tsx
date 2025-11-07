@@ -566,35 +566,23 @@ const Ergogen = () => {
             </>
           )}
           {!configContext.showConfig && (
-            <>
-              <OutlineIconButton
-                onClick={handleDownloadArchive}
-                disabled={
-                  configContext.isGenerating || configContext.isJscadConverting
-                }
-                aria-label="Download archive of all generated files"
-                data-testid="subheader-download-outputs-button"
-              >
-                <span className="material-symbols-outlined">archive</span>
-              </OutlineIconButton>
-              <OutlineIconButton
-                onClick={() =>
-                  configContext.setShowDownloads(!configContext.showDownloads)
-                }
-                aria-label={
-                  configContext.showDownloads
-                    ? 'Hide downloads panel'
-                    : 'Show downloads panel'
-                }
-                data-testid="mobile-downloads-toggle-button"
-              >
-                <span className="material-symbols-outlined">
-                  {configContext.showDownloads
-                    ? 'expand_content'
-                    : 'collapse_content'}
-                </span>
-              </OutlineIconButton>
-            </>
+            <OutlineIconButton
+              onClick={() =>
+                configContext.setShowDownloads(!configContext.showDownloads)
+              }
+              aria-label={
+                configContext.showDownloads
+                  ? 'Hide downloads panel'
+                  : 'Show downloads panel'
+              }
+              data-testid="mobile-downloads-toggle-button"
+            >
+              <span className="material-symbols-outlined">
+                {configContext.showDownloads
+                  ? 'expand_content'
+                  : 'collapse_content'}
+              </span>
+            </OutlineIconButton>
           )}
         </SubHeaderContainer>
       )}
