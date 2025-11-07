@@ -130,6 +130,12 @@ const AccentIconButton = styled(OutlineIconButton)`
   }
 `;
 
+const NewButtonText = styled.span`
+  @media (max-width: 375px) {
+    display: none;
+  }
+`;
+
 const ArchiveIconButton = styled(OutlineIconButton)``;
 
 /**
@@ -281,7 +287,7 @@ const Header = (): JSX.Element => {
                 data-testid="new-config-button"
               >
                 <span className="material-symbols-outlined">add_2</span>
-                <span>New</span>
+                <NewButtonText>New</NewButtonText>
               </AccentIconButton>
               <ArchiveIconButton
                 onClick={handleDownloadArchive}
