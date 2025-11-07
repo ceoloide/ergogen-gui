@@ -130,11 +130,7 @@ const AccentIconButton = styled(OutlineIconButton)`
   }
 `;
 
-const ArchiveIconButton = styled(OutlineIconButton)`
-  @media (max-width: 639px) {
-    display: none;
-  }
-`;
+const ArchiveIconButton = styled(OutlineIconButton)``;
 
 /**
  * A responsive button that is only visible on smaller screens.
@@ -278,33 +274,35 @@ const Header = (): JSX.Element => {
         </LeftContainer>
         <RightContainer>
           {location.pathname === '/' && (
-            <AccentIconButton
-              onClick={handleNewClick}
-              aria-label="Start new configuration"
-              data-testid="new-config-button"
-            >
-              <span className="material-symbols-outlined">add_2</span>
-              <span>New</span>
-            </AccentIconButton>
+            <>
+              <AccentIconButton
+                onClick={handleNewClick}
+                aria-label="Start new configuration"
+                data-testid="new-config-button"
+              >
+                <span className="material-symbols-outlined">add_2</span>
+                <span>New</span>
+              </AccentIconButton>
+              <ArchiveIconButton
+                onClick={handleDownloadArchive}
+                disabled={
+                  configContext?.isGenerating || configContext?.isJscadConverting
+                }
+                aria-label="Download archive of all generated files"
+                data-testid="header-download-outputs-button"
+              >
+                <span className="material-symbols-outlined">archive</span>
+              </ArchiveIconButton>
+              <ArchiveIconButton
+                onClick={handleShare}
+                disabled={!configContext?.configInput}
+                aria-label="Share configuration"
+                data-testid="header-share-button"
+              >
+                <span className="material-symbols-outlined">share</span>
+              </ArchiveIconButton>
+            </>
           )}
-          <ArchiveIconButton
-            onClick={handleDownloadArchive}
-            disabled={
-              configContext?.isGenerating || configContext?.isJscadConverting
-            }
-            aria-label="Download archive of all generated files"
-            data-testid="header-download-outputs-button"
-          >
-            <span className="material-symbols-outlined">archive</span>
-          </ArchiveIconButton>
-          <ArchiveIconButton
-            onClick={handleShare}
-            disabled={!configContext?.configInput}
-            aria-label="Share configuration"
-            data-testid="header-share-button"
-          >
-            <span className="material-symbols-outlined">share</span>
-          </ArchiveIconButton>
           {location.pathname !== '/new' && (
             <OutlineIconButton
               onClick={toggleSettings}
