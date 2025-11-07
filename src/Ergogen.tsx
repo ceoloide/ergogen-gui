@@ -305,6 +305,12 @@ const Ergogen = () => {
   const [showMobileEditor, setShowMobileEditor] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 639);
 
+  /**
+   * State for the selected example from the dropdown menu.
+   * @type {ConfigOption | null}
+   */
+  const configContext = useConfigContext();
+
   // Track screen size changes
   useEffect(() => {
     const handleResize = () => {
@@ -323,12 +329,6 @@ const Ergogen = () => {
       setShowMobileEditor(false);
     }
   }, [injectionToEdit.key, configContext?.showConfig, isMobile]);
-
-  /**
-   * State for the selected example from the dropdown menu.
-   * @type {ConfigOption | null}
-   */
-  const configContext = useConfigContext();
 
   /**
    * State for showing the share notification toast.
