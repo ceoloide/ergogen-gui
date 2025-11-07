@@ -182,7 +182,7 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   --active-color: ${theme.colors.accent};
   --transition-delay: 0s;
 
-  &::hover {
+  &:hover {
     --transition-delay: 0.05s;
   }
   
