@@ -256,19 +256,21 @@ const Header = (): JSX.Element => {
             <span className="material-symbols-outlined">archive</span>
           </ArchiveIconButton>
         )}
-        <OutlineIconButton
-          onClick={toggleSettings}
-          aria-label={
-            configContext?.showSettings
-              ? 'Hide settings panel'
-              : 'Show settings panel'
-          }
-          data-testid="settings-button"
-        >
-          <span className="material-symbols-outlined">
-            {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
-          </span>
-        </OutlineIconButton>
+        {location.pathname !== '/new' && (
+          <OutlineIconButton
+            onClick={toggleSettings}
+            aria-label={
+              configContext?.showSettings
+                ? 'Hide settings panel'
+                : 'Show settings panel'
+            }
+            data-testid="settings-button"
+          >
+            <span className="material-symbols-outlined">
+              {configContext?.showSettings ? 'keyboard_alt' : 'settings'}
+            </span>
+          </OutlineIconButton>
+        )}
       </RightContainer>
     </HeaderContainer>
   );
