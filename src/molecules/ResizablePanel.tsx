@@ -127,9 +127,11 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   return (
     <PanelContainer
       ref={containerRef}
-      $width={width}
       $side={side}
-      style={style}
+      style={{
+        width: `${width}px`,
+        ...style,
+      }}
       data-testid={dataTestId}
     >
       {children}
@@ -143,9 +145,8 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   );
 };
 
-const PanelContainer = styled.div<{ $width: number; $side: 'left' | 'right' }>`
+const PanelContainer = styled.div<{ $side: 'left' | 'right' }>`
   position: relative;
-  width: ${(props) => props.$width}px;
   flex-shrink: 0;
   flex-grow: 0;
   height: 100%;
