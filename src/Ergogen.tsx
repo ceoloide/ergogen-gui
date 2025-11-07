@@ -239,10 +239,13 @@ const Ergogen = () => {
 
   /**
    * Wrapper function to set preview and hide downloads panel.
+   * Only hides downloads panel on mobile (when showConfig is false).
    */
   const handleSetPreview: Dispatch<SetStateAction<Preview>> = (newPreview) => {
     setPreviewKey(newPreview);
-    configContext?.setShowDownloads(false);
+    if (!configContext?.showConfig) {
+      configContext?.setShowDownloads(false);
+    }
   };
 
   /**
