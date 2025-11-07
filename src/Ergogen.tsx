@@ -237,6 +237,14 @@ const Ergogen = () => {
   });
 
   /**
+   * Wrapper function to set preview and hide downloads panel.
+   */
+  const handleSetPreview = (newPreview: typeof preview) => {
+    setPreviewKey(newPreview);
+    configContext?.setShowDownloads(false);
+  };
+
+  /**
    * State for the custom injection currently being edited in the settings panel.
    * @type {Injection}
    */
@@ -641,7 +649,7 @@ const Ergogen = () => {
                   >
                     <ScrollablePanelContainer>
                       <Downloads
-                        setPreview={setPreviewKey}
+                        setPreview={handleSetPreview}
                         previewKey={preview.key}
                         data-testid="downloads-container"
                       />
