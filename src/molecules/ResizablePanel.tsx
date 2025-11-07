@@ -174,8 +174,22 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease-in-out;
   pointer-events: auto;
+  transition: height .2s cubic-bezier(.2, 1.7, .3, 1) var(--transition-delay), background-color .2s ease var(--transition-delay);
+  --active-color: ${theme.colors.accent};
+  --transition-delay: 0s;
+
+  &::hover {
+    --transition-delay: 0.05s;
+  }
+  
+  &:hover::before, &:hover::after {
+    background-color: var(--active-color);
+  }
+    
+  &:hover::after {
+    height: 64px;
+  }
 
   &::after {
     content: '';
@@ -184,21 +198,26 @@ const ResizeHandle = styled.div<{ $side: 'left' | 'right' }>`
     left: 50%;
     transform: translate(-50%, -50%);
     width: 3px;
-    height: 32px;
-    background-color: ${theme.colors.border};
-    transition: background-color 0.15s ease-in-out;
+    height: 48px;
+    background-color: color-mix(in srgb, #e6e1ff 10%, transparent);
+    transition: height .2s cubic-bezier(.2, 1.7, .3, 1) var(--transition-delay), background-color .2s ease var(--transition-delay);
+    pointer-events: none;
     box-shadow: 0 -8px 0 0 ${theme.colors.backgroundLight}, 0 8px 0 0 ${theme.colors.backgroundLight};
     opacity: 1;
     border-radius: 99px;
   }
 
-  &:hover {
-    background-color: rgba(40, 255, 69, 0.25);
-    
-    &::after {
-      background-color: #32cd32;
-      opacity: 1;
-    }
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1px;
+    height: 100%;
+    background-color: transparent;
+    transform: translateX(-50%);
+    transition: background-color .2s ease var(--transition-delay);
+    pointer-events: none;
   }
 
   @media (max-width: 639px) {
