@@ -21,7 +21,7 @@ type ResizablePanelProps = {
 const ResizablePanel: React.FC<ResizablePanelProps> = ({
   children,
   initialWidth = 300,
-  minWidth = 100,
+  minWidth = 10,
   maxWidth = '100%',
   side = 'left',
   'data-testid': dataTestId,

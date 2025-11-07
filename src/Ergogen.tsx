@@ -222,9 +222,9 @@ const FlexContainer = styled.div`
  */
 const Ergogen = () => {
   // Calculate initial widths based on viewport
-  const getInitialLeftWidth = () => Math.max(300, window.innerWidth * 0.3);
-  const getInitialRightWidth = () => Math.max(300, window.innerWidth * 0.3);
-  const getInitialSettingsWidth = () => Math.max(300, window.innerWidth * 0.4);
+  const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
+  const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
+  const getInitialSettingsWidth = () => Math.max(300, window.innerWidth * 0.15);
 
   /**
    * State for the currently displayed file preview.
@@ -572,8 +572,8 @@ const Ergogen = () => {
             {configContext.showConfig && (
               <ResizablePanel
                 initialWidth={getInitialLeftWidth()}
-                minWidth={300}
-                maxWidth="70%"
+                minWidth={250}
+                maxWidth="60%"
                 side="left"
                 data-testid="config-panel"
               >
@@ -634,8 +634,8 @@ const Ergogen = () => {
                   </NestedRightPane>
                   <ResizablePanel
                     initialWidth={getInitialRightWidth()}
-                    minWidth={300}
-                    maxWidth="50%"
+                    minWidth={105}
+                    maxWidth="30%"
                     side="right"
                     data-testid="downloads-panel"
                   >
@@ -664,7 +664,7 @@ const Ergogen = () => {
           <>
             <ResizablePanel
               initialWidth={getInitialSettingsWidth()}
-              minWidth={300}
+              minWidth={150}
               maxWidth="70%"
               side="left"
               data-testid="settings-panel"
