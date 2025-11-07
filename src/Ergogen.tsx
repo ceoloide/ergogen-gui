@@ -183,6 +183,45 @@ const SettingsPaneContainer = styled.div`
   }
 `;
 
+const MobileEditorHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+
+  @media (min-width: 640px) {
+    display: none;
+  }
+`;
+
+const MobileCloseButton = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition:
+    background-color 0.15s ease-in-out,
+    color 0.15s ease-in-out;
+
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconLarge};
+  }
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+    color: ${theme.colors.text};
+  }
+
+  @media (min-width: 640px) {
+    display: none;
+  }
+`;
+
 /**
  * A container for the right pane that takes remaining space.
  */
@@ -258,6 +297,32 @@ const Ergogen = () => {
     name: '',
     content: '',
   });
+
+  /**
+   * State to track if we're showing the injection editor on mobile.
+   * Only used when showConfig is false (mobile view).
+   */
+  const [showMobileEditor, setShowMobileEditor] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 639);
+
+  // Track screen size changes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 639);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Show mobile editor when injectionToEdit changes and we're on mobile
+  useEffect(() => {
+    if (isMobile && !configContext?.showConfig && injectionToEdit.key !== -1) {
+      setShowMobileEditor(true);
+    } else if (!isMobile) {
+      // Reset mobile editor state when not on mobile
+      setShowMobileEditor(false);
+    }
+  }, [injectionToEdit.key, configContext?.showConfig, isMobile]);
 
   /**
    * State for the selected example from the dropdown menu.
@@ -732,32 +797,66 @@ const Ergogen = () => {
                     aria-label="Enable STL preview (experimental)"
                   />
                 </OptionContainer>
-                <Injections
-                  setInjectionToEdit={setInjectionToEdit}
-                  deleteInjection={handleDeleteInjection}
-                  injectionToEdit={injectionToEdit}
-                  data-testid="injections-container"
-                />
+                {!configContext.showConfig && showMobileEditor && isMobile ? (
+                  <EditorContainer>
+                    <MobileEditorHeader>
+                      <Title as="h4">Footprint name</Title>
+                      <MobileCloseButton
+                        onClick={() => {
+                          setShowMobileEditor(false);
+                          setInjectionToEdit({ key: -1, type: '', name: '', content: '' });
+                        }}
+                        aria-label="Close editor"
+                        data-testid="mobile-editor-close"
+                      >
+                        <span className="material-symbols-outlined">close</span>
+                      </MobileCloseButton>
+                    </MobileEditorHeader>
+                    <Input
+                      value={injectionToEdit.name}
+                      onChange={handleInjectionNameChange}
+                      disabled={injectionToEdit.key === -1}
+                      aria-label="Footprint name"
+                      data-testid="footprint-name-input"
+                    />
+                    <Title as="h4">Footprint code</Title>
+                    <InjectionEditor
+                      injection={injectionToEdit}
+                      setInjection={setInjectionToEdit}
+                      options={{ readOnly: injectionToEdit.key === -1 }}
+                    />
+                  </EditorContainer>
+                ) : (
+                  <Injections
+                    setInjectionToEdit={setInjectionToEdit}
+                    deleteInjection={handleDeleteInjection}
+                    injectionToEdit={injectionToEdit}
+                    onInjectionSelect={() => setShowMobileEditor(true)}
+                    data-testid="injections-container"
+                  />
+                )}
               </SettingsPaneContainer>
             </ResizablePanel>
-            <RightPane>
-              <EditorContainer>
-                <Title as="h4">Footprint name</Title>
-                <Input
-                  value={injectionToEdit.name}
-                  onChange={handleInjectionNameChange}
-                  disabled={injectionToEdit.key === -1}
-                  aria-label="Footprint name"
-                  data-testid="footprint-name-input"
-                />
-                <Title as="h4">Footprint code</Title>
-                <InjectionEditor
-                  injection={injectionToEdit}
-                  setInjection={setInjectionToEdit}
-                  options={{ readOnly: injectionToEdit.key === -1 }}
-                />
-              </EditorContainer>
-            </RightPane>
+            {configContext.showConfig && (
+              <RightPane>
+                <EditorContainer>
+                  <Title as="h4">Footprint name</Title>
+                  <Input
+                    value={injectionToEdit.name}
+                    onChange={handleInjectionNameChange}
+                    disabled={injectionToEdit.key === -1}
+                    aria-label="Footprint name"
+                    data-testid="footprint-name-input"
+                  />
+                  <Title as="h4">Footprint code</Title>
+                  <InjectionEditor
+                    injection={injectionToEdit}
+                    setInjection={setInjectionToEdit}
+                    options={{ readOnly: injectionToEdit.key === -1 }}
+                  />
+                </EditorContainer>
+              </RightPane>
+            )}
           </>
         )}
       </FlexContainer>

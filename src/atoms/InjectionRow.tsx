@@ -98,6 +98,17 @@ const StyledLinkButton = styled.a`
 `;
 
 /**
+ * A styled button for editing on mobile, only visible on screens <=639px.
+ */
+const MobileEditButton = styled.a`
+  ${buttonStyles}
+  
+  @media (min-width: 640px) {
+    display: none;
+  }
+`;
+
+/**
  * A component that displays a single injection with buttons to edit, delete, and download.
  *
  * @param {Props} props - The props for the component.
@@ -120,6 +131,17 @@ const InjectionRow = ({
         {injection.name}
       </InjectionName>
       <Buttons>
+        <MobileEditButton
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            setInjectionToEdit(injection);
+          }}
+          aria-label={`edit injection ${injection.name}`}
+          data-testid={dataTestId && `${dataTestId}-edit`}
+        >
+          <span className="material-symbols-outlined">edit</span>
+        </MobileEditButton>
         <StyledLinkButton
           href="#"
           onClick={(e) => {
