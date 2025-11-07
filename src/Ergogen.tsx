@@ -323,17 +323,6 @@ const Ergogen = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Show mobile editor when injectionToEdit changes and we're on mobile
-  useEffect(() => {
-    if (isMobile && !configContext?.showConfig && injectionToEdit.key !== -1) {
-      setShowMobileEditor(true);
-    } else if (!isMobile) {
-      // Reset mobile editor state when not on mobile
-      setShowMobileEditor(false);
-    }
-  }, [injectionToEdit.key, configContext?.showConfig, isMobile]);
-
-
   useHotkeys(
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
     () => {
