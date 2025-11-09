@@ -50,12 +50,11 @@ const LogoImage = styled.img`
 /**
  * A styled div for the application name.
  */
-const AppName = styled.div`
+const AppName = styled.div<{ $clickable?: boolean }>`
   font-size: ${theme.fontSizes.base};
   font-weight: ${theme.fontWeights.semiBold};
   color: ${theme.colors.white};
-  ${(props: { $clickable?: boolean }) =>
-    props.$clickable ? 'cursor: pointer;' : ''}
+  ${(props) => (props.$clickable ? 'cursor: pointer;' : '')}
   @media (max-width: 420px) {
     display: none;
   }
