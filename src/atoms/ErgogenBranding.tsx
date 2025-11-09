@@ -74,6 +74,26 @@ const VersionText = styled.a`
 `;
 
 /**
+ * Gets the GitHub URL from environment variable or defaults to the Ergogen repository.
+ * Can be overridden with REACT_APP_ERGOGEN_GITHUB_URL environment variable.
+ */
+const getGitHubUrl = (): string => {
+  return (
+    process.env.REACT_APP_ERGOGEN_GITHUB_URL ||
+    'https://github.com/ergogen/ergogen'
+  );
+};
+
+/**
+ * Gets the version string from environment variable or defaults to the ergogen dependency version.
+ * Can be overridden with REACT_APP_ERGOGEN_VERSION environment variable.
+ * Defaults to "4.2.1" which matches the ergogen dependency version in package.json.
+ */
+const getVersion = (): string => {
+  return process.env.REACT_APP_ERGOGEN_VERSION || '4.2.1';
+};
+
+/**
  * A component that displays the Ergogen logo, app name, and version number.
  * This is used in both the main header and the side navigation panel.
  *
@@ -84,6 +104,10 @@ const ErgogenBranding: React.FC<ErgogenBrandingProps> = ({
   onClick,
   'data-testid': dataTestId,
 }) => {
+  const githubUrl = getGitHubUrl();
+  const version = getVersion();
+  const versionText = `v${version}`;
+
   return (
     <ErgogenLogo>
       <LogoButton
@@ -101,14 +125,14 @@ const ErgogenBranding: React.FC<ErgogenBrandingProps> = ({
         Ergogen
       </AppName>
       <VersionText
-        href="https://github.com/ergogen/ergogen"
+        href={githubUrl}
         target="_blank"
         rel="noreferrer"
         onClick={onClick}
-        aria-label="View Ergogen v4.2.1 on GitHub"
+        aria-label={`View Ergogen ${versionText} on GitHub`}
         data-testid={dataTestId ? `${dataTestId}-version-link` : 'version-link'}
       >
-        v4.2.1
+        {versionText}
       </VersionText>
     </ErgogenLogo>
   );
