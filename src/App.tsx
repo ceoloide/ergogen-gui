@@ -44,11 +44,18 @@ const App = () => {
     console.log('[App] Hash result:', {
       hasResult: !!cachedHashResult,
       success: cachedHashResult?.success,
-      hasConfig: !!cachedHashResult?.config,
-      hasInjections: cachedHashResult?.config?.injections !== undefined,
-      injectionCount: cachedHashResult?.config?.injections?.length || 0,
-      error: cachedHashResult?.error,
-      message: cachedHashResult?.message,
+      hasConfig: cachedHashResult?.success ? !!cachedHashResult.config : false,
+      hasInjections:
+        cachedHashResult?.success &&
+        cachedHashResult.config.injections !== undefined,
+      injectionCount:
+        cachedHashResult?.success && cachedHashResult.config.injections
+          ? cachedHashResult.config.injections.length
+          : 0,
+      error: cachedHashResult?.success ? undefined : cachedHashResult?.error,
+      message: cachedHashResult?.success
+        ? undefined
+        : cachedHashResult?.message,
     });
   } else {
     console.log('[App] Using cached hash result from module variable (subsequent render/remount)');
