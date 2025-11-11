@@ -365,8 +365,11 @@ const AppContent = ({
         pointsonly: false,
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingSharedConfig, configContext]); // Process when pendingSharedConfig is provided and context is available
+  }, [
+    pendingSharedConfig,
+    configContext,
+    processInjectionsWithConflictResolution,
+  ]); // Process when pendingSharedConfig is provided and context is available
 
   /**
    * Effect to handle hash fragment changes when navigating to shared configurations.
