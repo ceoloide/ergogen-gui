@@ -135,6 +135,14 @@ const AppContent = ({
 
   // Track if we've already processed the initial pending shared config
   const hasProcessedInitialSharedConfig = useRef(false);
+  // Store pending shared config in a ref so it persists across renders
+  // Initialize with the prop value - this captures it on first render
+  const pendingSharedConfigRef = useRef(pendingSharedConfig);
+  
+  // Update ref if prop changes (though it should only be set on initial mount)
+  if (pendingSharedConfig !== pendingSharedConfigRef.current) {
+    pendingSharedConfigRef.current = pendingSharedConfig;
+  }
 
   // Conflict resolution state for shared config hash fragment loading
   const [pendingInjections, setPendingInjections] = useState<
@@ -330,26 +338,42 @@ const AppContent = ({
   /**
    * Effect to process pending shared config from initial hash fragment load.
    * This processes the config with conflict resolution after React has rendered.
+   * The effect runs when both configContext and pendingSharedConfig are available.
    */
   useEffect(() => {
-    if (
-      !configContext ||
-      !pendingSharedConfig ||
-      hasProcessedInitialSharedConfig.current
-    ) {
+    // Wait for configContext to be available
+    if (!configContext) {
+      return;
+    }
+
+    // Use the prop directly instead of ref to ensure we get the latest value
+    // The ref is mainly for persistence, but we check the prop to trigger re-runs
+    const sharedConfig = pendingSharedConfig || pendingSharedConfigRef.current;
+    
+    if (!sharedConfig) {
+      // No pending shared config to process
+      return;
+    }
+    
+    if (hasProcessedInitialSharedConfig.current) {
+      // Already processed, don't process again
       return;
     }
 
     // Mark as processed to prevent re-processing on re-renders
     hasProcessedInitialSharedConfig.current = true;
 
+    console.log('[App] Processing pending shared config with conflict resolution', {
+      hasInjections: sharedConfig.injections !== undefined,
+      injectionCount: sharedConfig.injections?.length || 0,
+    });
+
     // Process the pending shared config with conflict resolution
-    const sharedConfig = pendingSharedConfig;
     // Update config (already set in localStorage, but ensure context is updated)
     configContext.setConfigInput(sharedConfig.config);
 
     // Process injections with conflict resolution
-    if (sharedConfig.injections !== undefined) {
+    if (sharedConfig.injections !== undefined && sharedConfig.injections.length > 0) {
       processInjectionsWithConflictResolution(
         sharedConfig.injections,
         sharedConfig.config
@@ -366,10 +390,10 @@ const AppContent = ({
       });
     }
   }, [
-    pendingSharedConfig,
     configContext,
+    pendingSharedConfig,
     processInjectionsWithConflictResolution,
-  ]); // Process when pendingSharedConfig is provided and context is available
+  ]); // Re-run when configContext or pendingSharedConfig becomes available
 
   /**
    * Effect to handle hash fragment changes when navigating to shared configurations.
