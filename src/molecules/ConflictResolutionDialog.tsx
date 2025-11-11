@@ -7,7 +7,7 @@ import Button from '../atoms/Button';
  * Props for the ConflictResolutionDialog component.
  */
 type ConflictResolutionDialogProps = {
-  footprintName: string;
+  injectionName: string;
   onResolve: (
     action: 'skip' | 'overwrite' | 'keep-both',
     applyToAll: boolean
@@ -21,7 +21,7 @@ type ConflictResolutionDialogProps = {
  * Provides options to skip, overwrite, or keep both injections.
  */
 const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
-  footprintName,
+  injectionName,
   onResolve,
   onCancel,
   'data-testid': dataTestId,
@@ -33,7 +33,7 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
       <DialogBox data-testid={dataTestId && `${dataTestId}-box`}>
         <Title>Injection Conflict</Title>
         <Message>
-          An injection with the name <strong>{footprintName}</strong> already
+          An injection with the name <strong>{injectionName}</strong> already
           exists. How would you like to resolve this conflict?
         </Message>
         <CheckboxContainer>

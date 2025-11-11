@@ -5,18 +5,18 @@ import ConflictResolutionDialog from './ConflictResolutionDialog';
 describe('ConflictResolutionDialog', () => {
   const mockOnResolve = jest.fn();
   const mockOnCancel = jest.fn();
-  const footprintName = 'test/footprint';
+  const injectionName = 'test/footprint';
 
   beforeEach(() => {
     mockOnResolve.mockClear();
     mockOnCancel.mockClear();
   });
 
-  it('renders with the correct footprint name', () => {
+  it('renders with the correct injection name', () => {
     // Arrange & Act
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -25,14 +25,14 @@ describe('ConflictResolutionDialog', () => {
 
     // Assert
     expect(screen.getByText('Injection Conflict')).toBeInTheDocument();
-    expect(screen.getByText(footprintName)).toBeInTheDocument();
+    expect(screen.getByText(injectionName)).toBeInTheDocument();
   });
 
   it('calls onResolve with "skip" when Skip button is clicked', () => {
     // Arrange
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -50,7 +50,7 @@ describe('ConflictResolutionDialog', () => {
     // Arrange
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -68,7 +68,7 @@ describe('ConflictResolutionDialog', () => {
     // Arrange
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -86,7 +86,7 @@ describe('ConflictResolutionDialog', () => {
     // Arrange
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -106,7 +106,7 @@ describe('ConflictResolutionDialog', () => {
     // Arrange
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -124,7 +124,7 @@ describe('ConflictResolutionDialog', () => {
     // Arrange
     render(
       <ConflictResolutionDialog
-        footprintName={footprintName}
+        injectionName={injectionName}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"

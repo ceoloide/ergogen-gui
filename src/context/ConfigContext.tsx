@@ -13,12 +13,18 @@ import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
-import { fetchConfigFromUrl } from '../utils/github';
+import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
 import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
 import { trackEvent } from '../utils/analytics';
+import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
+import {
+  checkForInjectionConflict,
+  mergeInjectionArraysWithResolution,
+  ConflictResolution,
+} from '../utils/injections';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
   JscadWorkerRequest,
@@ -243,6 +249,18 @@ const ConfigContextProvider = ({
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  // Conflict resolution state for GitHub URI parameter loading
+  const [pendingInjections, setPendingInjections] = useState<
+    string[][] | null
+  >(null);
+  const [pendingConfig, setPendingConfig] = useState<string | null>(null);
+  const [currentConflict, setCurrentConflict] = useState<{
+    type: string;
+    name: string;
+  } | null>(null);
+  const [pendingInjectionsAtConflict, setPendingInjectionsAtConflict] =
+    useState<string[][] | null>(null);
 
   // Worker refs
   const ergogenWorkerRef = useRef<Worker | null>(null);
@@ -619,6 +637,172 @@ const ConfigContextProvider = ({
   );
 
   /**
+   * Processes injections with conflict resolution, showing dialog when conflicts are found.
+   * Similar to the logic in Welcome.tsx but adapted for ConfigContext.
+   */
+  const processInjectionsWithConflictResolution = useCallback(
+    async (
+      newInjections: string[][],
+      config: string,
+      resolution: ConflictResolution | null = null,
+      currentInjections?: string[][]
+    ): Promise<void> => {
+      const injectionsToUse = currentInjections || injectionInput || [];
+
+      if (newInjections.length === 0) {
+        // No injections to process, just load the config
+        setInjectionInput(injectionsToUse);
+        setConfigInput(config);
+        await generateNow(config, injectionsToUse, { pointsonly: false });
+        return;
+      }
+
+      const currentInjection = newInjections[0];
+      const remainingInjections = newInjections.slice(1);
+
+      // Validate injection format
+      if (
+        !Array.isArray(currentInjection) ||
+        currentInjection.length !== 3 ||
+        typeof currentInjection[0] !== 'string' ||
+        typeof currentInjection[1] !== 'string' ||
+        typeof currentInjection[2] !== 'string'
+      ) {
+        console.warn(
+          '[ConfigContext] Skipping invalid injection format:',
+          currentInjection
+        );
+        // Continue with remaining injections
+        if (remainingInjections.length > 0) {
+          await processInjectionsWithConflictResolution(
+            remainingInjections,
+            config,
+            resolution,
+            injectionsToUse
+          );
+        } else {
+          setInjectionInput(injectionsToUse);
+          setConfigInput(config);
+          await generateNow(config, injectionsToUse, { pointsonly: false });
+        }
+        return;
+      }
+
+      const [type, name] = currentInjection;
+
+      // Check for conflict using the current injections state
+      const conflictCheck = checkForInjectionConflict(
+        type,
+        name,
+        injectionsToUse
+      );
+
+      if (conflictCheck.hasConflict && !resolution) {
+        // Show dialog and pause processing
+        setCurrentConflict({ type, name });
+        setPendingInjections(newInjections);
+        setPendingConfig(config);
+        setPendingInjectionsAtConflict(injectionsToUse);
+        return;
+      }
+
+      // Determine resolution to use
+      const resolutionToUse = resolution || 'skip';
+
+      // Merge this injection with the current injections state
+      const mergedInjections = mergeInjectionArraysWithResolution(
+        [currentInjection],
+        injectionsToUse,
+        resolutionToUse
+      );
+
+      // Process remaining injections with the updated injections
+      if (remainingInjections.length > 0) {
+        await processInjectionsWithConflictResolution(
+          remainingInjections,
+          config,
+          resolution,
+          mergedInjections
+        );
+      } else {
+        // All injections processed, update context and load the config
+        setInjectionInput(mergedInjections);
+        setConfigInput(config);
+        await generateNow(config, mergedInjections, { pointsonly: false });
+      }
+    },
+    [injectionInput, setInjectionInput, setConfigInput, generateNow]
+  );
+
+  /**
+   * Handles conflict resolution from the dialog.
+   */
+  const handleConflictResolution = useCallback(
+    async (
+      action: ConflictResolution,
+      applyToAllConflicts: boolean
+    ): Promise<void> => {
+      if (!pendingInjections || !pendingConfig) return;
+
+      setCurrentConflict(null);
+
+      // Process the current injection with the chosen action
+      const currentInjection = pendingInjections[0];
+      const remainingInjections = pendingInjections.slice(1);
+
+      // Merge with current injections state
+      const mergedInjections = mergeInjectionArraysWithResolution(
+        [currentInjection],
+        pendingInjectionsAtConflict || injectionInput || [],
+        action
+      );
+
+      // Resume processing remaining injections with the updated injections
+      if (remainingInjections.length > 0) {
+        await processInjectionsWithConflictResolution(
+          remainingInjections,
+          pendingConfig,
+          applyToAllConflicts ? action : null,
+          mergedInjections
+        );
+      } else {
+        // All injections processed, update context and load the config
+        setInjectionInput(mergedInjections);
+        setConfigInput(pendingConfig);
+        await generateNow(pendingConfig, mergedInjections, {
+          pointsonly: false,
+        });
+
+        // Clean up state only after all injections are processed
+        setPendingInjections(null);
+        setPendingConfig(null);
+        setPendingInjectionsAtConflict(null);
+      }
+    },
+    [
+      pendingInjections,
+      pendingConfig,
+      pendingInjectionsAtConflict,
+      injectionInput,
+      processInjectionsWithConflictResolution,
+      setInjectionInput,
+      setConfigInput,
+      generateNow,
+    ]
+  );
+
+  /**
+   * Handles cancellation of conflict resolution.
+   */
+  const handleConflictCancel = useCallback(() => {
+    setCurrentConflict(null);
+    setPendingInjections(null);
+    setPendingConfig(null);
+    setPendingInjectionsAtConflict(null);
+    setError('Loading cancelled by user');
+  }, [setError]);
+
+  /**
    * Effect to process the input configuration on the initial load.
    * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
    * Note: Hash fragment loading (including injections) is handled in App.tsx by storing in localStorage.
@@ -654,42 +838,26 @@ const ConfigContextProvider = ({
           }
 
           try {
-            // Import mergeInjections to handle footprints
-            const { mergeInjections } = await import('../utils/injections');
+            // Convert footprints to injection array format
+            const newInjections: string[][] = result.footprints.map((fp) => [
+              'footprint',
+              fp.name,
+              fp.content,
+            ]);
 
-            console.log(
-              '[ConfigContext] Current injectionInput before merge:',
-              injectionInput
+            // Process injections with conflict resolution
+            await processInjectionsWithConflictResolution(
+              newInjections,
+              result.config
             );
-
-            // Merge footprints with existing injections using 'overwrite' strategy
-            // This ensures GitHub footprints take precedence when loading from URL
-            const mergedInjections = mergeInjections(
-              result.footprints,
-              injectionInput,
-              'overwrite'
-            );
-
-            console.log(
-              '[ConfigContext] Merged injections count:',
-              mergedInjections.length
-            );
-            console.log(
-              '[ConfigContext] Merged injections:',
-              mergedInjections.map((inj) => inj[1])
-            );
-
-            setInjectionInput(mergedInjections);
-            setConfigInput(result.config);
-            generateNow(result.config, mergedInjections, { pointsonly: false });
           } catch (error) {
-            // If footprint processing fails, don't load the config
+            // If injection processing fails, don't load the config
             console.error(
-              '[ConfigContext] Error processing footprints:',
+              '[ConfigContext] Error processing injections:',
               error
             );
             throw new Error(
-              `Failed to process footprints: ${error instanceof Error ? error.message : 'Unknown error'}`
+              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
           }
         })
@@ -800,6 +968,14 @@ const ConfigContextProvider = ({
 
   return (
     <ConfigContext.Provider value={contextValue}>
+      {currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={currentConflict.name}
+          onResolve={handleConflictResolution}
+          onCancel={handleConflictCancel}
+          data-testid="conflict-dialog"
+        />
+      )}
       {children}
     </ConfigContext.Provider>
   );

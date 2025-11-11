@@ -11,12 +11,14 @@ type ConflictCheckResult =
   | { hasConflict: true; conflictingName: string };
 
 /**
- * Checks if a footprint name conflicts with existing injections.
- * @param name - The name of the footprint to check.
+ * Checks if an injection name conflicts with existing injections of the same type.
+ * @param type - The type of injection to check (e.g., 'footprint', 'template').
+ * @param name - The name of the injection to check.
  * @param existingInjections - The array of existing injections.
  * @returns A conflict check result indicating if there's a conflict and the name.
  */
-export const checkForConflict = (
+export const checkForInjectionConflict = (
+  type: string,
   name: string,
   existingInjections: string[][] | undefined
 ): ConflictCheckResult => {
@@ -24,11 +26,15 @@ export const checkForConflict = (
     return { hasConflict: false };
   }
 
-  const existingNames = existingInjections
-    .filter((inj) => inj.length === 3 && inj[0] === 'footprint')
-    .map((inj) => inj[1]);
+  const hasConflict = existingInjections.some(
+    (inj) =>
+      Array.isArray(inj) &&
+      inj.length === 3 &&
+      inj[0] === type &&
+      inj[1] === name
+  );
 
-  if (existingNames.includes(name)) {
+  if (hasConflict) {
     return { hasConflict: true, conflictingName: name };
   }
 
@@ -36,12 +42,28 @@ export const checkForConflict = (
 };
 
 /**
+ * Checks if a footprint name conflicts with existing injections.
+ * @param name - The name of the footprint to check.
+ * @param existingInjections - The array of existing injections.
+ * @returns A conflict check result indicating if there's a conflict and the name.
+ * @deprecated Use checkForInjectionConflict instead for better type safety.
+ */
+export const checkForConflict = (
+  name: string,
+  existingInjections: string[][] | undefined
+): ConflictCheckResult => {
+  return checkForInjectionConflict('footprint', name, existingInjections);
+};
+
+/**
  * Generates a unique name by appending an incremental number.
+ * @param type - The type of injection (e.g., 'footprint', 'template').
  * @param baseName - The base name to make unique.
  * @param existingInjections - The array of existing injections.
  * @returns A unique name.
  */
-export const generateUniqueName = (
+export const generateUniqueInjectionName = (
+  type: string,
   baseName: string,
   existingInjections: string[][] | undefined
 ): string => {
@@ -50,7 +72,7 @@ export const generateUniqueName = (
   }
 
   const existingNames = existingInjections
-    .filter((inj) => inj.length === 3 && inj[0] === 'footprint')
+    .filter((inj) => inj.length === 3 && inj[0] === type)
     .map((inj) => inj[1]);
 
   let counter = 1;
@@ -62,6 +84,20 @@ export const generateUniqueName = (
   }
 
   return newName;
+};
+
+/**
+ * Generates a unique name by appending an incremental number.
+ * @param baseName - The base name to make unique.
+ * @param existingInjections - The array of existing injections.
+ * @returns A unique name.
+ * @deprecated Use generateUniqueInjectionName instead for better type safety.
+ */
+export const generateUniqueName = (
+  baseName: string,
+  existingInjections: string[][] | undefined
+): string => {
+  return generateUniqueInjectionName('footprint', baseName, existingInjections);
 };
 
 /**
@@ -102,8 +138,88 @@ export const mergeInjections = (
         }
       } else if (resolution === 'keep-both') {
         // Generate a unique name and add
-        const uniqueName = generateUniqueName(footprint.name, result);
+        const uniqueName = generateUniqueInjectionName(
+          'footprint',
+          footprint.name,
+          result
+        );
         result.push(['footprint', uniqueName, footprint.content]);
+      }
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Merges new injection arrays into existing injections with conflict resolution.
+ * For each injection in the new array:
+ * - If an injection with the same type and name exists, applies the resolution strategy
+ * - If no injection with the same type and name exists, it adds it
+ * - Existing injections not present in the new array are kept intact
+ * @param newInjections - Array of new injections to merge (format: [type, name, content][])
+ * @param existingInjections - The current array of injections
+ * @param resolution - The conflict resolution strategy
+ * @returns The merged array of injections
+ */
+export const mergeInjectionArraysWithResolution = (
+  newInjections: string[][],
+  existingInjections: string[][] | undefined,
+  resolution: ConflictResolution
+): string[][] => {
+  const result = existingInjections ? [...existingInjections] : [];
+
+  // Process each new injection
+  for (const newInj of newInjections) {
+    // Validate injection format
+    if (!Array.isArray(newInj) || newInj.length !== 3) {
+      console.warn(
+        '[mergeInjectionArraysWithResolution] Skipping invalid injection format:',
+        newInj
+      );
+      continue;
+    }
+
+    const [type, name, content] = newInj;
+    if (
+      typeof type !== 'string' ||
+      typeof name !== 'string' ||
+      typeof content !== 'string'
+    ) {
+      console.warn(
+        '[mergeInjectionArraysWithResolution] Skipping injection with invalid types:',
+        newInj
+      );
+      continue;
+    }
+
+    // Check for conflict
+    const conflictCheck = checkForInjectionConflict(type, name, result);
+
+    if (!conflictCheck.hasConflict) {
+      // No conflict, add directly
+      result.push([type, name, content]);
+    } else {
+      // Handle conflict based on resolution strategy
+      if (resolution === 'skip') {
+        // Do nothing, skip this injection
+        continue;
+      } else if (resolution === 'overwrite') {
+        // Find and replace the existing injection
+        const existingIndex = result.findIndex(
+          (inj) =>
+            Array.isArray(inj) &&
+            inj.length === 3 &&
+            inj[0] === type &&
+            inj[1] === name
+        );
+        if (existingIndex !== -1) {
+          result[existingIndex] = [type, name, content];
+        }
+      } else if (resolution === 'keep-both') {
+        // Generate a unique name and add
+        const uniqueName = generateUniqueInjectionName(type, name, result);
+        result.push([type, uniqueName, content]);
       }
     }
   }
@@ -125,49 +241,10 @@ export const mergeInjectionArrays = (
   newInjections: string[][],
   existingInjections: string[][] | undefined
 ): string[][] => {
-  const result = existingInjections ? [...existingInjections] : [];
-
-  // Process each new injection
-  for (const newInj of newInjections) {
-    // Validate injection format
-    if (!Array.isArray(newInj) || newInj.length !== 3) {
-      console.warn(
-        '[mergeInjectionArrays] Skipping invalid injection format:',
-        newInj
-      );
-      continue;
-    }
-
-    const [type, name, content] = newInj;
-    if (
-      typeof type !== 'string' ||
-      typeof name !== 'string' ||
-      typeof content !== 'string'
-    ) {
-      console.warn(
-        '[mergeInjectionArrays] Skipping injection with invalid types:',
-        newInj
-      );
-      continue;
-    }
-
-    // Find existing injection with same type and name
-    const existingIndex = result.findIndex(
-      (inj) =>
-        Array.isArray(inj) &&
-        inj.length === 3 &&
-        inj[0] === type &&
-        inj[1] === name
-    );
-
-    if (existingIndex !== -1) {
-      // Overwrite existing injection
-      result[existingIndex] = [type, name, content];
-    } else {
-      // Add new injection
-      result.push([type, name, content]);
-    }
-  }
-
-  return result;
+  // Use 'overwrite' as the default strategy for backward compatibility
+  return mergeInjectionArraysWithResolution(
+    newInjections,
+    existingInjections,
+    'overwrite'
+  );
 };

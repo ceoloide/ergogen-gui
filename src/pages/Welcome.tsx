@@ -566,7 +566,7 @@ const Welcome = () => {
       </DropOverlay>
       {currentConflict && (
         <ConflictResolutionDialog
-          footprintName={currentConflict}
+          injectionName={currentConflict}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
           data-testid="conflict-dialog"

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useLocalStorage } from 'react-use';
 import styled from 'styled-components';
@@ -14,7 +14,13 @@ import ConfigContextProvider, {
 } from './context/ConfigContext';
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
 import { getConfigFromHash } from './utils/share';
-import { mergeInjectionArrays } from './utils/injections';
+import {
+  mergeInjectionArrays,
+  checkForInjectionConflict,
+  mergeInjectionArraysWithResolution,
+  ConflictResolution,
+} from './utils/injections';
+import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 
 const App = () => {
   // Synchronously get the initial value to avoid race conditions on first render.
@@ -135,6 +141,197 @@ const AppContent = () => {
   // Get configInput from context to ensure we have the latest value
   const configInput = configContext?.configInput;
 
+  // Conflict resolution state for shared config hash fragment loading
+  const [pendingInjections, setPendingInjections] = useState<
+    string[][] | null
+  >(null);
+  const [pendingConfig, setPendingConfig] = useState<string | null>(null);
+  const [currentConflict, setCurrentConflict] = useState<{
+    type: string;
+    name: string;
+  } | null>(null);
+  const [pendingInjectionsAtConflict, setPendingInjectionsAtConflict] =
+    useState<string[][] | null>(null);
+
+  /**
+   * Processes injections with conflict resolution, showing dialog when conflicts are found.
+   */
+  const processInjectionsWithConflictResolution = useCallback(
+    async (
+      newInjections: string[][],
+      config: string,
+      resolution: ConflictResolution | null = null,
+      currentInjections?: string[][]
+    ): Promise<void> => {
+      if (!configContext) return;
+
+      const injectionsToUse = currentInjections || configContext.injectionInput || [];
+
+      if (newInjections.length === 0) {
+        // No injections to process, just load the config
+        configContext.setInjectionInput(injectionsToUse);
+        configContext.setConfigInput(config);
+        await configContext.generateNow(config, injectionsToUse, {
+          pointsonly: false,
+        });
+        return;
+      }
+
+      const currentInjection = newInjections[0];
+      const remainingInjections = newInjections.slice(1);
+
+      // Validate injection format
+      if (
+        !Array.isArray(currentInjection) ||
+        currentInjection.length !== 3 ||
+        typeof currentInjection[0] !== 'string' ||
+        typeof currentInjection[1] !== 'string' ||
+        typeof currentInjection[2] !== 'string'
+      ) {
+        console.warn('[App] Skipping invalid injection format:', currentInjection);
+        // Continue with remaining injections
+        if (remainingInjections.length > 0) {
+          await processInjectionsWithConflictResolution(
+            remainingInjections,
+            config,
+            resolution,
+            injectionsToUse
+          );
+        } else {
+          configContext.setInjectionInput(injectionsToUse);
+          configContext.setConfigInput(config);
+          await configContext.generateNow(config, injectionsToUse, {
+            pointsonly: false,
+          });
+        }
+        return;
+      }
+
+      const [type, name] = currentInjection;
+
+      // Check for conflict using the current injections state
+      const conflictCheck = checkForInjectionConflict(
+        type,
+        name,
+        injectionsToUse
+      );
+
+      if (conflictCheck.hasConflict && !resolution) {
+        // Show dialog and pause processing
+        setCurrentConflict({ type, name });
+        setPendingInjections(newInjections);
+        setPendingConfig(config);
+        setPendingInjectionsAtConflict(injectionsToUse);
+        return;
+      }
+
+      // Determine resolution to use
+      const resolutionToUse = resolution || 'skip';
+
+      // Merge this injection with the current injections state
+      const mergedInjections = mergeInjectionArraysWithResolution(
+        [currentInjection],
+        injectionsToUse,
+        resolutionToUse
+      );
+
+      // Process remaining injections with the updated injections
+      if (remainingInjections.length > 0) {
+        await processInjectionsWithConflictResolution(
+          remainingInjections,
+          config,
+          resolution,
+          mergedInjections
+        );
+      } else {
+        // All injections processed, update context and load the config
+        configContext.setInjectionInput(mergedInjections);
+        configContext.setConfigInput(config);
+        await configContext.generateNow(config, mergedInjections, {
+          pointsonly: false,
+        });
+      }
+    },
+    [configContext]
+  );
+
+  /**
+   * Handles conflict resolution from the dialog.
+   */
+  const handleConflictResolution = useCallback(
+    async (
+      action: ConflictResolution,
+      applyToAllConflicts: boolean
+    ): Promise<void> => {
+      if (!configContext || !pendingInjections || !pendingConfig) return;
+
+      setCurrentConflict(null);
+
+      // Process the current injection with the chosen action
+      const currentInjection = pendingInjections[0];
+      const remainingInjections = pendingInjections.slice(1);
+
+      // Merge with current injections state
+      const mergedInjections = mergeInjectionArraysWithResolution(
+        [currentInjection],
+        pendingInjectionsAtConflict || configContext.injectionInput || [],
+        action
+      );
+
+      // Resume processing remaining injections with the updated injections
+      if (remainingInjections.length > 0) {
+        await processInjectionsWithConflictResolution(
+          remainingInjections,
+          pendingConfig,
+          applyToAllConflicts ? action : null,
+          mergedInjections
+        );
+      } else {
+        // All injections processed, update context and load the config
+        configContext.setInjectionInput(mergedInjections);
+        configContext.setConfigInput(pendingConfig);
+        await configContext.generateNow(pendingConfig, mergedInjections, {
+          pointsonly: false,
+        });
+
+        // Store merged result in localStorage to persist
+        localStorage.setItem(
+          'ergogen:injection',
+          JSON.stringify(mergedInjections)
+        );
+        // Store config in localStorage
+        localStorage.setItem(
+          CONFIG_LOCAL_STORAGE_KEY,
+          JSON.stringify(pendingConfig)
+        );
+
+        // Clean up state only after all injections are processed
+        setPendingInjections(null);
+        setPendingConfig(null);
+        setPendingInjectionsAtConflict(null);
+      }
+    },
+    [
+      configContext,
+      pendingInjections,
+      pendingConfig,
+      pendingInjectionsAtConflict,
+      processInjectionsWithConflictResolution,
+    ]
+  );
+
+  /**
+   * Handles cancellation of conflict resolution.
+   */
+  const handleConflictCancel = useCallback(() => {
+    if (!configContext) return;
+    setCurrentConflict(null);
+    setPendingInjections(null);
+    setPendingConfig(null);
+    setPendingInjectionsAtConflict(null);
+    configContext.setError('Loading cancelled by user');
+  }, [configContext]);
+
   /**
    * Effect to handle hash fragment changes when navigating to shared configurations.
    * This allows loading shared configs even when already on the Ergogen page.
@@ -156,30 +353,30 @@ const AppContent = () => {
         const sharedConfig = hashResult.config;
         // Update config
         configContext.setConfigInput(sharedConfig.config);
-        // Merge injections: shared injections overwrite existing ones with same type+name, but keep others
-        const mergedInjections = sharedConfig.injections
-          ? mergeInjectionArrays(
-              sharedConfig.injections,
-              configContext.injectionInput
-            )
-          : configContext.injectionInput;
-        if (sharedConfig.injections !== undefined) {
-          configContext.setInjectionInput(mergedInjections);
-          // Store merged result in localStorage to persist
-          localStorage.setItem(
-            'ergogen:injection',
-            JSON.stringify(mergedInjections)
-          );
-        }
         // Store config in localStorage
         localStorage.setItem(
           CONFIG_LOCAL_STORAGE_KEY,
           JSON.stringify(sharedConfig.config)
         );
-        // Generate with the new config and merged injections
-        configContext.generateNow(sharedConfig.config, mergedInjections, {
-          pointsonly: false,
-        });
+
+        // Process injections with conflict resolution
+        if (sharedConfig.injections !== undefined) {
+          processInjectionsWithConflictResolution(
+            sharedConfig.injections,
+            sharedConfig.config
+          ).catch((error) => {
+            console.error('[App] Error processing injections:', error);
+            configContext.setError(
+              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          });
+        } else {
+          // No injections to process, just generate
+          configContext.generateNow(sharedConfig.config, configContext.injectionInput, {
+            pointsonly: false,
+          });
+        }
+
         // Clear the hash fragment after loading
         window.history.replaceState(
           null,
@@ -212,10 +409,18 @@ const AppContent = () => {
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [configContext]);
+  }, [configContext, processInjectionsWithConflictResolution]);
 
   return (
     <>
+      {currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={currentConflict.name}
+          onResolve={handleConflictResolution}
+          onCancel={handleConflictCancel}
+          data-testid="conflict-dialog"
+        />
+      )}
       <Header />
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
