@@ -7,8 +7,8 @@ import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
 import {
-  checkForConflict,
-  mergeInjections,
+  checkForInjectionConflict,
+  mergeInjectionArraysWithResolution,
   ConflictResolution,
 } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -268,6 +268,12 @@ const Welcome = () => {
     }
   };
 
+  /**
+   * Processes footprints (or any injections) with conflict resolution.
+   * This function is generic and works with any injection type, though currently
+   * it's primarily used for footprints from GitHub/local files.
+   * In the future, this can be extended to handle templates and other injection types.
+   */
   const processFootprints = async (
     footprints: GitHubFootprint[],
     config: string,
@@ -295,8 +301,16 @@ const Welcome = () => {
     const currentFootprint = footprints[0];
     const remainingFootprints = footprints.slice(1);
 
-    // Check for conflict using the current injections state
-    const conflictCheck = checkForConflict(
+    // Convert footprint to injection array format
+    const currentInjection: string[] = [
+      'footprint',
+      currentFootprint.name,
+      currentFootprint.content,
+    ];
+
+    // Check for conflict using the generic conflict checking function
+    const conflictCheck = checkForInjectionConflict(
+      'footprint',
       currentFootprint.name,
       injectionsToUse
     );
@@ -313,9 +327,9 @@ const Welcome = () => {
     // Determine resolution to use
     const resolutionToUse = resolution || 'skip';
 
-    // Merge this footprint with the current injections state
-    const mergedInjections = mergeInjections(
-      [currentFootprint],
+    // Merge this injection with the current injections state using generic merge function
+    const mergedInjections = mergeInjectionArraysWithResolution(
+      [currentInjection],
       injectionsToUse,
       resolutionToUse
     );
@@ -351,9 +365,16 @@ const Welcome = () => {
     const currentFootprint = pendingFootprints[0];
     const remainingFootprints = pendingFootprints.slice(1);
 
-    // Merge with current injections state
-    const mergedInjections = mergeInjections(
-      [currentFootprint],
+    // Convert footprint to injection array format
+    const currentInjection: string[] = [
+      'footprint',
+      currentFootprint.name,
+      currentFootprint.content,
+    ];
+
+    // Merge with current injections state using generic merge function
+    const mergedInjections = mergeInjectionArraysWithResolution(
+      [currentInjection],
       injectionsAtConflict || configContext.injectionInput,
       action
     );

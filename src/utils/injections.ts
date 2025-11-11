@@ -1,5 +1,6 @@
 /**
  * Represents a conflict resolution strategy.
+ * Used when merging injections of any type (footprints, templates, etc.).
  */
 export type ConflictResolution = 'skip' | 'overwrite' | 'keep-both';
 
@@ -153,11 +154,13 @@ export const mergeInjections = (
 
 /**
  * Merges new injection arrays into existing injections with conflict resolution.
+ * This function is generic and works with any injection type (footprints, templates, etc.).
  * For each injection in the new array:
  * - If an injection with the same type and name exists, applies the resolution strategy
  * - If no injection with the same type and name exists, it adds it
  * - Existing injections not present in the new array are kept intact
  * @param newInjections - Array of new injections to merge (format: [type, name, content][])
+ *   where type can be 'footprint', 'template', or any future injection type
  * @param existingInjections - The current array of injections
  * @param resolution - The conflict resolution strategy
  * @returns The merged array of injections
