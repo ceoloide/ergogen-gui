@@ -6,17 +6,19 @@ describe('ConflictResolutionDialog', () => {
   const mockOnResolve = jest.fn();
   const mockOnCancel = jest.fn();
   const injectionName = 'test/footprint';
+  const injectionType = 'footprint';
 
   beforeEach(() => {
     mockOnResolve.mockClear();
     mockOnCancel.mockClear();
   });
 
-  it('renders with the correct injection name', () => {
+  it('renders with the correct injection name and type', () => {
     // Arrange & Act
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -24,8 +26,30 @@ describe('ConflictResolutionDialog', () => {
     );
 
     // Assert
-    expect(screen.getByText('Injection Conflict')).toBeInTheDocument();
+    expect(screen.getByText('Footprint Conflict')).toBeInTheDocument();
     expect(screen.getByText(injectionName)).toBeInTheDocument();
+    expect(
+      screen.getByText(/A footprint with the name/, { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('renders with template type correctly', () => {
+    // Arrange & Act
+    render(
+      <ConflictResolutionDialog
+        injectionName="my-template"
+        injectionType="template"
+        onResolve={mockOnResolve}
+        onCancel={mockOnCancel}
+        data-testid="conflict-dialog"
+      />
+    );
+
+    // Assert
+    expect(screen.getByText('Template Conflict')).toBeInTheDocument();
+    expect(
+      screen.getByText(/A template with the name/, { exact: false })
+    ).toBeInTheDocument();
   });
 
   it('calls onResolve with "skip" when Skip button is clicked', () => {
@@ -33,6 +57,7 @@ describe('ConflictResolutionDialog', () => {
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -51,6 +76,7 @@ describe('ConflictResolutionDialog', () => {
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -69,6 +95,7 @@ describe('ConflictResolutionDialog', () => {
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -87,6 +114,7 @@ describe('ConflictResolutionDialog', () => {
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -107,6 +135,7 @@ describe('ConflictResolutionDialog', () => {
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -125,6 +154,7 @@ describe('ConflictResolutionDialog', () => {
     render(
       <ConflictResolutionDialog
         injectionName={injectionName}
+        injectionType={injectionType}
         onResolve={mockOnResolve}
         onCancel={mockOnCancel}
         data-testid="conflict-dialog"
@@ -135,11 +165,11 @@ describe('ConflictResolutionDialog', () => {
     expect(
       screen.getByLabelText('Apply this choice to all conflicts')
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Skip this injection')).toBeInTheDocument();
+    expect(screen.getByLabelText('Skip this footprint')).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Overwrite existing injection')
+      screen.getByLabelText('Overwrite existing footprint')
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Keep both injections')).toBeInTheDocument();
+    expect(screen.getByLabelText('Keep both footprints')).toBeInTheDocument();
     expect(screen.getByLabelText('Cancel loading')).toBeInTheDocument();
   });
 });

@@ -223,7 +223,10 @@ const Welcome = () => {
   const [pendingFootprints, setPendingFootprints] = useState<GitHubFootprint[]>(
     []
   );
-  const [currentConflict, setCurrentConflict] = useState<string | null>(null);
+  const [currentConflict, setCurrentConflict] = useState<{
+    type: string;
+    name: string;
+  } | null>(null);
   const [pendingConfig, setPendingConfig] = useState<string | null>(null);
   const [injectionsAtConflict, setInjectionsAtConflict] = useState<
     string[][] | null
@@ -317,7 +320,7 @@ const Welcome = () => {
 
     if (conflictCheck.hasConflict && !resolution) {
       // Show dialog and pause processing
-      setCurrentConflict(currentFootprint.name);
+      setCurrentConflict({ type: 'footprint', name: currentFootprint.name });
       setPendingFootprints(footprints);
       setPendingConfig(config);
       setInjectionsAtConflict(injectionsToUse ?? null);
@@ -587,7 +590,8 @@ const Welcome = () => {
       </DropOverlay>
       {currentConflict && (
         <ConflictResolutionDialog
-          injectionName={currentConflict}
+          injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
           data-testid="conflict-dialog"

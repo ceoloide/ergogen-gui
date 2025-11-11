@@ -971,6 +971,7 @@ const ConfigContextProvider = ({
       {currentConflict && (
         <ConflictResolutionDialog
           injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
           data-testid="conflict-dialog"
