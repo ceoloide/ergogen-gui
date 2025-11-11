@@ -216,7 +216,7 @@ Users can drag and drop files anywhere on the welcome page to load them. Visual 
 
 ### Conflict Resolution
 
-When loading footprints from local archives, the same conflict resolution system used for GitHub loading applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints.
+When loading footprints from local archives, the same unified conflict resolution system applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints. The system works for all injection types (footprints, templates, etc.) and shows type-specific dialogs (e.g., "Footprint Conflict").
 
 ### Implementation Files
 
@@ -231,6 +231,11 @@ When loading footprints from local archives, the same conflict resolution system
 The application supports loading Ergogen configurations directly from GitHub repositories. This feature has been extended to include automatic footprint loading.
 
 ### Loading from GitHub
+
+GitHub configurations can be loaded in two ways:
+
+1. **Via Welcome Page Input**: User enters a GitHub URL in the input field on the Welcome page
+2. **Via URL Parameter**: User navigates to a URL with `?github=user/repo` parameter (e.g., `https://ergogen.io/?github=ceoloide/corney-island`)
 
 When a user provides a GitHub repository URL (e.g., `user/repo` or `https://github.com/user/repo`), the application:
 
@@ -252,14 +257,35 @@ When a user provides a GitHub repository URL (e.g., `user/repo` or `https://gith
 
 ### Conflict Resolution
 
-When loading footprints from GitHub, the application checks for naming conflicts with existing custom footprints. If a conflict is detected:
+The application provides a unified conflict resolution system for all injection types (footprints, templates, and future types) across multiple loading scenarios:
 
-1. A `ConflictResolutionDialog` is displayed to the user with three options:
-   - **Skip**: The new footprint is not loaded
-   - **Overwrite**: The new footprint replaces the existing one
-   - **Keep Both**: Both footprints are retained; the new one gets a unique name with an incremental suffix (e.g., `footprint_1`)
+#### When Conflicts Occur
 
-2. An "Apply to all conflicts" checkbox allows the user to use the same resolution strategy for all subsequent conflicts in the current load operation.
+Conflict resolution is triggered when loading injections from:
+1. **GitHub repository URLs** (via the Welcome page input or `?github=` URL parameter)
+2. **Local files** (ZIP/EKB archives with footprints)
+3. **Shared configuration links** (hash fragments with injections)
+
+#### Conflict Resolution Dialog
+
+When a conflict is detected, a `ConflictResolutionDialog` is displayed to the user with:
+
+1. **Type-specific messaging**: The dialog shows the specific injection type (e.g., "Footprint Conflict", "Template Conflict") rather than generic "injection" terminology, making it clearer for users.
+
+2. **Three resolution options**:
+   - **Skip**: The new injection is not loaded
+   - **Overwrite**: The new injection replaces the existing one
+   - **Keep Both**: Both injections are retained; the new one gets a unique name with an incremental suffix (e.g., `footprint_1`)
+
+3. **"Apply to all conflicts" checkbox**: Allows the user to use the same resolution strategy for all subsequent conflicts in the current load operation.
+
+#### Generic Implementation
+
+The conflict resolution infrastructure is generic and works with any injection type:
+- Uses `checkForInjectionConflict(type, name, existingInjections)` for type-aware conflict detection
+- Uses `mergeInjectionArraysWithResolution(newInjections, existingInjections, resolution)` for merging with conflict resolution
+- The dialog accepts an `injectionType` prop to display type-specific messages
+- Currently used for footprints, but ready for templates and future injection types
 
 ### Implementation Files
 
@@ -268,9 +294,16 @@ When loading footprints from GitHub, the application checks for naming conflicts
   - `fetchFootprintsFromRepo`: Recursive traversal of an entire repository (for submodules)
   - `parseGitmodules`: Parses `.gitmodules` file to extract submodule paths and URLs
   - `bfsForYamlFiles`: Performs breadth-first search to find YAML files in repository
-- **`src/utils/injections.ts`**: Utility functions for conflict detection (`checkForConflict`), unique name generation (`generateUniqueName`), and merging injections (`mergeInjections`)
-- **`src/molecules/ConflictResolutionDialog.tsx`**: React component for the conflict resolution UI
+- **`src/utils/injections.ts`**: Generic utility functions for conflict resolution:
+  - `checkForInjectionConflict(type, name, existingInjections)`: Type-aware conflict detection
+  - `generateUniqueInjectionName(type, baseName, existingInjections)`: Generates unique names for any injection type
+  - `mergeInjectionArraysWithResolution(newInjections, existingInjections, resolution)`: Merges injections with conflict resolution
+  - `mergeInjections(newFootprints, existingInjections, resolution)`: Footprint-specific wrapper (deprecated, use `mergeInjectionArraysWithResolution` instead)
+  - `mergeInjectionArrays(newInjections, existingInjections)`: Default merge with overwrite strategy
+- **`src/molecules/ConflictResolutionDialog.tsx`**: React component for the conflict resolution UI that displays type-specific messages
 - **`src/pages/Welcome.tsx`**: Orchestrates the loading process (both GitHub and local files), handles conflicts sequentially, and manages dialog state. Also includes drag-and-drop handlers for local file loading
+- **`src/context/ConfigContext.tsx`**: Handles conflict resolution for GitHub URI parameter loading (`?github=...`)
+- **`src/App.tsx`**: Handles conflict resolution for shared config hash fragment loading
 
 ### GitHub API Rate Limiting
 
@@ -338,21 +371,23 @@ When a user navigates to a URL with a hash fragment:
 1. **Initial Load**: On page load, `App.tsx` synchronously checks for a hash fragment before initializing localStorage:
    - Extracts and decodes the hash fragment
    - Validates the structure (must have `config` as string, optional `injections` as `string[][]`)
-   - If valid, sets initial config and merges injections, storing both in localStorage
+   - If valid, sets initial config and merges injections with conflict resolution, storing both in localStorage
    - If invalid, stores error message for display via the error banner
    - Clears the hash fragment after processing
+   - **Note**: Initial load uses overwrite strategy (no dialog) since it happens synchronously before React renders
 
 2. **Hash Change Events**: When navigating to a shared URL while already on the page:
    - `AppContent` component listens for `hashchange` events
    - Repeats the same extraction, validation, and loading process
-   - Updates the configuration state and triggers regeneration
+   - **Shows conflict resolution dialog** for any injection conflicts (footprints, templates, etc.)
+   - Updates the configuration state and triggers regeneration after conflicts are resolved
 
-3. **Injection Merging**: When loading shared configurations, injections are merged intelligently:
-   - Uses `mergeInjectionArrays` utility function
-   - Shared injections overwrite existing ones with the same type and name
+3. **Injection Merging**: When loading shared configurations:
+   - Uses `mergeInjectionArraysWithResolution` utility function with conflict resolution
+   - Shows `ConflictResolutionDialog` for each conflict, allowing user to choose skip, overwrite, or keep both
+   - Works for all injection types (footprints, templates, etc.)
    - New injections are added if they don't exist
    - Existing injections not present in the shared config are preserved
-   - This differs from GitHub loading, which uses the `overwrite` strategy
 
 ### Error Handling
 
@@ -370,9 +405,10 @@ The share system provides comprehensive error handling:
   - `decodeConfig`: Decompresses and validates shared configurations, returns `DecodeResult` union type
   - `createShareableUri`: Constructs the full shareable URL
   - `getConfigFromHash`: Extracts and decodes hash fragment from current URL
-- **`src/utils/injections.ts`**: Contains `mergeInjectionArrays` function for merging injection arrays:
+- **`src/utils/injections.ts`**: Contains functions for merging injection arrays:
+  - `mergeInjectionArraysWithResolution`: Merges with conflict resolution (skip, overwrite, keep-both)
+  - `mergeInjectionArrays`: Default merge with overwrite strategy (uses `mergeInjectionArraysWithResolution` internally)
   - Matches injections by type and name (not just name)
-  - Overwrites existing injections with same type+name
   - Adds new injections that don't exist
   - Preserves existing injections not in the shared config
 - **`src/molecules/ShareDialog.tsx`**: Dialog component for displaying and copying share links
