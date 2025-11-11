@@ -22,33 +22,38 @@ import {
 } from './utils/injections';
 import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 
+// Module-level variable to persist hash result across React StrictMode remounts
+// React StrictMode in dev mode intentionally remounts components, which resets refs
+let cachedHashResult: ReturnType<typeof getConfigFromHash> | null = null;
+let hashHasBeenRead = false;
+
 const App = () => {
   // Synchronously get the initial value to avoid race conditions on first render.
 
-  // Store hash result in a ref so it persists across re-renders
-  // (React StrictMode causes double renders, and hash gets cleared after first render)
-  const hashResultRef = React.useRef<ReturnType<typeof getConfigFromHash> | null>(null);
-  if (hashResultRef.current === null) {
-    // Only read hash on first render
-    console.log('[App] Reading hash fragment (first render)', {
+  // Store hash result in a module-level variable so it persists across StrictMode remounts
+  // React StrictMode causes components to unmount/remount, which resets refs
+  if (!hashHasBeenRead) {
+    // Only read hash once, ever (persists across StrictMode remounts)
+    console.log('[App] Reading hash fragment (first time)', {
       hash: window.location.hash,
       hashLength: window.location.hash.length,
       fullUrl: window.location.href,
     });
-    hashResultRef.current = getConfigFromHash();
+    cachedHashResult = getConfigFromHash();
+    hashHasBeenRead = true;
     console.log('[App] Hash result:', {
-      hasResult: !!hashResultRef.current,
-      success: hashResultRef.current?.success,
-      hasConfig: !!hashResultRef.current?.config,
-      hasInjections: hashResultRef.current?.config?.injections !== undefined,
-      injectionCount: hashResultRef.current?.config?.injections?.length || 0,
-      error: hashResultRef.current?.error,
-      message: hashResultRef.current?.message,
+      hasResult: !!cachedHashResult,
+      success: cachedHashResult?.success,
+      hasConfig: !!cachedHashResult?.config,
+      hasInjections: cachedHashResult?.config?.injections !== undefined,
+      injectionCount: cachedHashResult?.config?.injections?.length || 0,
+      error: cachedHashResult?.error,
+      message: cachedHashResult?.message,
     });
   } else {
-    console.log('[App] Using cached hash result from ref (subsequent render)');
+    console.log('[App] Using cached hash result from module variable (subsequent render/remount)');
   }
-  const hashResult = hashResultRef.current;
+  const hashResult = cachedHashResult;
 
   let initialConfig = '';
   let initialInjectionInput: string[][] = [];
