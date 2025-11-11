@@ -25,9 +25,31 @@ import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 const App = () => {
   // Synchronously get the initial value to avoid race conditions on first render.
 
-  // Check for shared config in hash fragment first (highest priority)
-  // This must happen before localStorage initialization
-  const hashResult = getConfigFromHash();
+  // Store hash result in a ref so it persists across re-renders
+  // (React StrictMode causes double renders, and hash gets cleared after first render)
+  const hashResultRef = React.useRef<ReturnType<typeof getConfigFromHash> | null>(null);
+  if (hashResultRef.current === null) {
+    // Only read hash on first render
+    console.log('[App] Reading hash fragment (first render)', {
+      hash: window.location.hash,
+      hashLength: window.location.hash.length,
+      fullUrl: window.location.href,
+    });
+    hashResultRef.current = getConfigFromHash();
+    console.log('[App] Hash result:', {
+      hasResult: !!hashResultRef.current,
+      success: hashResultRef.current?.success,
+      hasConfig: !!hashResultRef.current?.config,
+      hasInjections: hashResultRef.current?.config?.injections !== undefined,
+      injectionCount: hashResultRef.current?.config?.injections?.length || 0,
+      error: hashResultRef.current?.error,
+      message: hashResultRef.current?.message,
+    });
+  } else {
+    console.log('[App] Using cached hash result from ref (subsequent render)');
+  }
+  const hashResult = hashResultRef.current;
+
   let initialConfig = '';
   let initialInjectionInput: string[][] = [];
   let hashError: string | null = null;
@@ -45,11 +67,20 @@ const App = () => {
       const sharedConfig = hashResult.config;
       initialConfig = sharedConfig.config;
       // Store the shared config data to process with conflict resolution after React renders
-      // Store in ref synchronously
-      pendingSharedConfigRef.current = {
-        config: sharedConfig.config,
-        injections: sharedConfig.injections,
-      };
+      // Store in ref synchronously, but only set once (persist across re-renders)
+      if (pendingSharedConfigRef.current === null) {
+        pendingSharedConfigRef.current = {
+          config: sharedConfig.config,
+          injections: sharedConfig.injections,
+        };
+        console.log('[App] Set pendingSharedConfigRef.current synchronously', {
+          hasInjections: pendingSharedConfigRef.current.injections !== undefined,
+          injectionCount: pendingSharedConfigRef.current.injections?.length || 0,
+          refValue: pendingSharedConfigRef.current,
+        });
+      } else {
+        console.log('[App] pendingSharedConfigRef already set, skipping');
+      }
       // Temporarily store config in localStorage so useLocalStorage picks it up
       // Injections will be processed with conflict resolution after React renders
       localStorage.setItem(
@@ -119,13 +150,20 @@ const App = () => {
   } | null>(null);
 
   // Set state from ref on mount to ensure it's available for AppContent
+  // This must run synchronously or the ref value will be lost
   React.useEffect(() => {
+    console.log('[App] useEffect to set pendingSharedConfig state', {
+      refValue: pendingSharedConfigRef.current,
+      hasRef: !!pendingSharedConfigRef.current,
+    });
     if (pendingSharedConfigRef.current) {
-      setPendingSharedConfig(pendingSharedConfigRef.current);
-      console.log('[App] Set pendingSharedConfig state from ref', {
+      console.log('[App] Setting pendingSharedConfig state from ref', {
         hasInjections: pendingSharedConfigRef.current.injections !== undefined,
         injectionCount: pendingSharedConfigRef.current.injections?.length || 0,
       });
+      setPendingSharedConfig(pendingSharedConfigRef.current);
+    } else {
+      console.log('[App] Ref is null, nothing to set');
     }
   }, []); // Only run once on mount
 
