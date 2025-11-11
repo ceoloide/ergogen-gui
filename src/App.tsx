@@ -33,8 +33,11 @@ const App = () => {
   let hashError: string | null = null;
 
   // Store shared config data for deferred processing with conflict resolution
-  let pendingSharedConfig: { config: string; injections?: string[][] } | null =
-    null;
+  // Use a ref to capture synchronously, then state to trigger re-renders
+  const pendingSharedConfigRef = React.useRef<{
+    config: string;
+    injections?: string[][];
+  } | null>(null);
 
   if (hashResult) {
     if (hashResult.success) {
@@ -42,7 +45,8 @@ const App = () => {
       const sharedConfig = hashResult.config;
       initialConfig = sharedConfig.config;
       // Store the shared config data to process with conflict resolution after React renders
-      pendingSharedConfig = {
+      // Store in ref synchronously
+      pendingSharedConfigRef.current = {
         config: sharedConfig.config,
         injections: sharedConfig.injections,
       };
@@ -108,6 +112,23 @@ const App = () => {
     initialConfig
   );
 
+  // Convert ref to state so it can be passed as a prop and trigger re-renders
+  const [pendingSharedConfig, setPendingSharedConfig] = React.useState<{
+    config: string;
+    injections?: string[][];
+  } | null>(null);
+
+  // Set state from ref on mount to ensure it's available for AppContent
+  React.useEffect(() => {
+    if (pendingSharedConfigRef.current) {
+      setPendingSharedConfig(pendingSharedConfigRef.current);
+      console.log('[App] Set pendingSharedConfig state from ref', {
+        hasInjections: pendingSharedConfigRef.current.injections !== undefined,
+        injectionCount: pendingSharedConfigRef.current.injections?.length || 0,
+      });
+    }
+  }, []); // Only run once on mount
+
   return (
     // Pass the state and the setter function down to the context provider.
     <ConfigContextProvider
@@ -142,7 +163,23 @@ const AppContent = ({
   // Update ref if prop changes (though it should only be set on initial mount)
   if (pendingSharedConfig !== pendingSharedConfigRef.current) {
     pendingSharedConfigRef.current = pendingSharedConfig;
+    console.log('[App] Updated pendingSharedConfigRef', {
+      hasConfig: !!pendingSharedConfig,
+      hasInjections: pendingSharedConfig?.injections !== undefined,
+      injectionCount: pendingSharedConfig?.injections?.length || 0,
+    });
   }
+
+  // Debug: Log on every render to see what's happening
+  useEffect(() => {
+    console.log('[App] AppContent render', {
+      hasConfigContext: !!configContext,
+      hasPendingSharedConfig: !!pendingSharedConfig,
+      hasPendingSharedConfigRef: !!pendingSharedConfigRef.current,
+      hasProcessed: hasProcessedInitialSharedConfig.current,
+      pendingSharedConfigValue: pendingSharedConfig ? JSON.stringify(pendingSharedConfig).substring(0, 100) : 'null',
+    });
+  });
 
   // Conflict resolution state for shared config hash fragment loading
   const [pendingInjections, setPendingInjections] = useState<
@@ -338,25 +375,30 @@ const AppContent = ({
   /**
    * Effect to process pending shared config from initial hash fragment load.
    * This processes the config with conflict resolution after React has rendered.
-   * The effect runs when both configContext and pendingSharedConfig are available.
+   * Uses the prop directly so it re-runs when pendingSharedConfig is set.
    */
   useEffect(() => {
+    console.log('[App] Effect to process pending shared config', {
+      hasConfigContext: !!configContext,
+      hasPendingSharedConfig: !!pendingSharedConfig,
+      hasPendingSharedConfigRef: !!pendingSharedConfigRef.current,
+      hasProcessed: hasProcessedInitialSharedConfig.current,
+    });
+
     // Wait for configContext to be available
     if (!configContext) {
+      console.log('[App] Effect: configContext not available yet');
       return;
     }
 
-    // Use the prop directly instead of ref to ensure we get the latest value
-    // The ref is mainly for persistence, but we check the prop to trigger re-runs
-    const sharedConfig = pendingSharedConfig || pendingSharedConfigRef.current;
-    
-    if (!sharedConfig) {
-      // No pending shared config to process
+    // Use the prop directly - it will be set by the parent App component's useEffect
+    if (!pendingSharedConfig) {
+      console.log('[App] Effect: No pending shared config to process');
       return;
     }
     
     if (hasProcessedInitialSharedConfig.current) {
-      // Already processed, don't process again
+      console.log('[App] Effect: Already processed, skipping');
       return;
     }
 
@@ -364,19 +406,20 @@ const AppContent = ({
     hasProcessedInitialSharedConfig.current = true;
 
     console.log('[App] Processing pending shared config with conflict resolution', {
-      hasInjections: sharedConfig.injections !== undefined,
-      injectionCount: sharedConfig.injections?.length || 0,
+      hasInjections: pendingSharedConfig.injections !== undefined,
+      injectionCount: pendingSharedConfig.injections?.length || 0,
     });
 
     // Process the pending shared config with conflict resolution
     // Update config (already set in localStorage, but ensure context is updated)
-    configContext.setConfigInput(sharedConfig.config);
+    configContext.setConfigInput(pendingSharedConfig.config);
 
     // Process injections with conflict resolution
-    if (sharedConfig.injections !== undefined && sharedConfig.injections.length > 0) {
+    if (pendingSharedConfig.injections !== undefined && pendingSharedConfig.injections.length > 0) {
+      console.log('[App] Starting conflict resolution for', pendingSharedConfig.injections.length, 'injections');
       processInjectionsWithConflictResolution(
-        sharedConfig.injections,
-        sharedConfig.config
+        pendingSharedConfig.injections,
+        pendingSharedConfig.config
       ).catch((error) => {
         console.error('[App] Error processing injections from initial hash:', error);
         configContext.setError(
@@ -384,8 +427,9 @@ const AppContent = ({
         );
       });
     } else {
+      console.log('[App] No injections to process, generating config');
       // No injections to process, just generate
-      configContext.generateNow(sharedConfig.config, configContext.injectionInput, {
+      configContext.generateNow(pendingSharedConfig.config, configContext.injectionInput, {
         pointsonly: false,
       });
     }
