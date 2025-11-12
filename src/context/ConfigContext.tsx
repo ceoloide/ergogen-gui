@@ -13,7 +13,7 @@ import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
-import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
+import { fetchConfigFromUrl } from '../utils/github';
 import {
   createErgogenWorker,
   createJscadWorker,

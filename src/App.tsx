@@ -15,7 +15,6 @@ import ConfigContextProvider, {
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
 import { getConfigFromHash } from './utils/share';
 import {
-  mergeInjectionArrays,
   checkForInjectionConflict,
   mergeInjectionArraysWithResolution,
   ConflictResolution,
