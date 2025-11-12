@@ -353,10 +353,9 @@ const Welcome = () => {
     });
 
     // Reset any pending conflict resolution state from previous loads
-    setCurrentConflict(null);
+    // Note: currentConflict is managed by the hook, so we only reset local state
     setPendingFootprints([]);
     setPendingConfig(null);
-    setInjectionsAtConflict(null);
 
     fetchConfigFromUrl(githubInput)
       .then(async (result) => {
@@ -412,10 +411,9 @@ const Welcome = () => {
     });
 
     // Reset any pending conflict resolution state from previous loads
-    setCurrentConflict(null);
+    // Note: currentConflict is managed by the hook, so we only reset local state
     setPendingFootprints([]);
     setPendingConfig(null);
-    setInjectionsAtConflict(null);
 
     try {
       const result = await loadLocalFile(file);
