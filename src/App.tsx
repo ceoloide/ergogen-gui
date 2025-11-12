@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useLocalStorage } from 'react-use';
 import styled from 'styled-components';
@@ -40,7 +40,7 @@ const App = () => {
 
   // Store shared config data for deferred processing with conflict resolution
   // Use a ref to capture synchronously, then state to trigger re-renders
-  const pendingSharedConfigRef = React.useRef<{
+  const pendingSharedConfigRef = useRef<{
     config: string;
     injections?: string[][];
   } | null>(null);
@@ -121,14 +121,14 @@ const App = () => {
   );
 
   // Convert ref to state so it can be passed as a prop and trigger re-renders
-  const [pendingSharedConfig, setPendingSharedConfig] = React.useState<{
+  const [pendingSharedConfig, setPendingSharedConfig] = useState<{
     config: string;
     injections?: string[][];
   } | null>(null);
 
   // Set state from ref on mount to ensure it's available for AppContent
   // This must run synchronously or the ref value will be lost
-  React.useEffect(() => {
+  useEffect(() => {
     if (pendingSharedConfigRef.current) {
       setPendingSharedConfig(pendingSharedConfigRef.current);
     }
