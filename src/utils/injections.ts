@@ -1,6 +1,23 @@
 /**
- * Represents a conflict resolution strategy.
+ * Utility functions for managing injections (footprints, templates, etc.).
+ * 
+ * This module provides generic functions that work with any injection type.
+ * Injections are represented as arrays of three strings: [type, name, content]
+ * where:
+ * - type: The injection type (e.g., 'footprint', 'template')
+ * - name: The unique name of the injection
+ * - content: The code/content of the injection
+ * 
+ * The module includes both generic functions (recommended) and deprecated
+ * footprint-specific wrappers for backward compatibility.
+ */
+
+/**
+ * Represents a conflict resolution strategy for handling injection conflicts.
  * Used when merging injections of any type (footprints, templates, etc.).
+ * - 'skip': Skip the conflicting injection, keep the existing one
+ * - 'overwrite': Replace the existing injection with the new one
+ * - 'keep-both': Keep both injections by renaming the new one with a unique suffix
  */
 export type ConflictResolution = 'skip' | 'overwrite' | 'keep-both';
 
@@ -65,10 +82,11 @@ export const checkForInjectionConflict = (
 
 /**
  * Checks if a footprint name conflicts with existing injections.
+ * This is a footprint-specific wrapper around checkForInjectionConflict.
  * @param name - The name of the footprint to check.
  * @param existingInjections - The array of existing injections.
  * @returns A conflict check result indicating if there's a conflict and the name.
- * @deprecated Use checkForInjectionConflict instead for better type safety.
+ * @deprecated Use checkForInjectionConflict instead for generic injection type support.
  */
 export const checkForConflict = (
   name: string,
@@ -109,11 +127,12 @@ export const generateUniqueInjectionName = (
 };
 
 /**
- * Generates a unique name by appending an incremental number.
+ * Generates a unique footprint name by appending an incremental number.
+ * This is a footprint-specific wrapper around generateUniqueInjectionName.
  * @param baseName - The base name to make unique.
  * @param existingInjections - The array of existing injections.
  * @returns A unique name.
- * @deprecated Use generateUniqueInjectionName instead for better type safety.
+ * @deprecated Use generateUniqueInjectionName instead for generic injection type support.
  */
 export const generateUniqueName = (
   baseName: string,
@@ -124,10 +143,14 @@ export const generateUniqueName = (
 
 /**
  * Merges new footprints into existing injections based on the resolution strategy.
+ * This is a footprint-specific wrapper that converts footprint objects to the generic
+ * injection format and uses mergeInjectionArraysWithResolution internally.
  * @param newFootprints - Array of new footprints to merge.
  * @param existingInjections - The current array of injections.
  * @param resolution - The conflict resolution strategy.
  * @returns The merged array of injections.
+ * @deprecated For new code, use mergeInjectionArraysWithResolution directly with
+ *   injections in the format [type, name, content] for generic injection type support.
  */
 export const mergeInjections = (
   newFootprints: Array<{ name: string; content: string }>,
