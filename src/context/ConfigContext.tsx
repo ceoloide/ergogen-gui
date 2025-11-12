@@ -20,7 +20,7 @@ import {
 } from '../workers/workerFactory';
 import { trackEvent } from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
-import { ConflictResolution } from '../utils/injections';
+import { ConflictResolutionStrategy } from '../utils/injections';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {

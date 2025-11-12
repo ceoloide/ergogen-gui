@@ -6,7 +6,7 @@ import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
-import { ConflictResolution } from '../utils/injections';
+import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
@@ -289,7 +289,7 @@ const Welcome = () => {
   const processFootprints = async (
     footprints: GitHubFootprint[],
     config: string,
-    resolution: ConflictResolution | null = null,
+    resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]
   ): Promise<void> => {
     if (!configContext) {
@@ -321,7 +321,7 @@ const Welcome = () => {
    * The base handler already processes remaining injections internally.
    */
   const handleConflictResolution = async (
-    action: ConflictResolution,
+    action: ConflictResolutionStrategy,
     applyToAllConflicts: boolean
   ) => {
     // Call the base handler - it handles all remaining injections internally

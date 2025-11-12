@@ -19,7 +19,7 @@
  * - 'overwrite': Replace the existing injection with the new one
  * - 'keep-both': Keep both injections by renaming the new one with a unique suffix
  */
-export type ConflictResolution = 'skip' | 'overwrite' | 'keep-both';
+export type ConflictResolutionStrategy = 'skip' | 'overwrite' | 'keep-both';
 
 /**
  * Result of checking for a conflict.
@@ -155,7 +155,7 @@ export const generateUniqueName = (
 export const mergeInjections = (
   newFootprints: Array<{ name: string; content: string }>,
   existingInjections: string[][] | undefined,
-  resolution: ConflictResolution
+  resolution: ConflictResolutionStrategy
 ): string[][] => {
   const result = existingInjections ? [...existingInjections] : [];
 
@@ -212,7 +212,7 @@ export const mergeInjections = (
 export const mergeInjectionArraysWithResolution = (
   newInjections: string[][],
   existingInjections: string[][] | undefined,
-  resolution: ConflictResolution
+  resolution: ConflictResolutionStrategy
 ): string[][] => {
   const result = existingInjections ? [...existingInjections] : [];
 

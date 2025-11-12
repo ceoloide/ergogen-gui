@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   checkForInjectionConflict,
   mergeInjectionArraysWithResolution,
-  ConflictResolution,
+  ConflictResolutionStrategy,
   isValidInjection,
 } from '../utils/injections';
 
@@ -38,12 +38,12 @@ export interface UseInjectionConflictResolutionReturn {
   processInjectionsWithConflictResolution: (
     newInjections: string[][],
     config: string,
-    resolution?: ConflictResolution | null,
+    resolution?: ConflictResolutionStrategy | null,
     currentInjections?: string[][]
   ) => Promise<void>;
   /** Handle conflict resolution from dialog */
   handleConflictResolution: (
-    action: ConflictResolution,
+    action: ConflictResolutionStrategy,
     applyToAllConflicts: boolean
   ) => Promise<void>;
   /** Handle cancellation of conflict resolution */
@@ -80,7 +80,7 @@ export const useInjectionConflictResolution = (
     async (
       newInjections: string[][],
       config: string,
-      resolution: ConflictResolution | null = null,
+      resolution: ConflictResolutionStrategy | null = null,
       currentInjections?: string[][]
     ): Promise<void> => {
       const injectionsToUse =
@@ -179,7 +179,7 @@ export const useInjectionConflictResolution = (
    */
   const handleConflictResolution = useCallback(
     async (
-      action: ConflictResolution,
+      action: ConflictResolutionStrategy,
       applyToAllConflicts: boolean
     ): Promise<void> => {
       if (!pendingInjections || !pendingConfig) return;
