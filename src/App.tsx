@@ -14,12 +14,8 @@ import ConfigContextProvider, {
 } from './context/ConfigContext';
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
 import { getConfigFromHash } from './utils/share';
-import {
-  checkForInjectionConflict,
-  mergeInjectionArraysWithResolution,
-  ConflictResolution,
-} from './utils/injections';
 import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
+import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
 
 // Module-level variable to persist hash result across React StrictMode remounts
 // React StrictMode in dev mode intentionally remounts components, which resets refs
@@ -174,196 +170,29 @@ const AppContent = ({
     pendingSharedConfigRef.current = pendingSharedConfig;
   }
 
-  // Conflict resolution state for shared config hash fragment loading
-  const [pendingInjections, setPendingInjections] = useState<
-    string[][] | null
-  >(null);
-  const [pendingConfig, setPendingConfig] = useState<string | null>(null);
-  const [currentConflict, setCurrentConflict] = useState<{
-    type: string;
-    name: string;
-  } | null>(null);
-  const [pendingInjectionsAtConflict, setPendingInjectionsAtConflict] =
-    useState<string[][] | null>(null);
-
-  /**
-   * Processes injections with conflict resolution, showing dialog when conflicts are found.
-   */
-  const processInjectionsWithConflictResolution = useCallback(
-    async (
-      newInjections: string[][],
-      config: string,
-      resolution: ConflictResolution | null = null,
-      currentInjections?: string[][]
-    ): Promise<void> => {
-      if (!configContext) return;
-
-      const injectionsToUse = currentInjections || configContext.injectionInput || [];
-
-      if (newInjections.length === 0) {
-        // No injections to process, just load the config
-        configContext.setInjectionInput(injectionsToUse);
-        configContext.setConfigInput(config);
-        await configContext.generateNow(config, injectionsToUse, {
-          pointsonly: false,
-        });
-        return;
-      }
-
-      const currentInjection = newInjections[0];
-      const remainingInjections = newInjections.slice(1);
-
-      // Validate injection format
-      if (
-        !Array.isArray(currentInjection) ||
-        currentInjection.length !== 3 ||
-        typeof currentInjection[0] !== 'string' ||
-        typeof currentInjection[1] !== 'string' ||
-        typeof currentInjection[2] !== 'string'
-      ) {
-        console.warn('[App] Skipping invalid injection format:', currentInjection);
-        // Continue with remaining injections
-        if (remainingInjections.length > 0) {
-          await processInjectionsWithConflictResolution(
-            remainingInjections,
-            config,
-            resolution,
-            injectionsToUse
-          );
-        } else {
-          configContext.setInjectionInput(injectionsToUse);
-          configContext.setConfigInput(config);
-          await configContext.generateNow(config, injectionsToUse, {
-            pointsonly: false,
-          });
-        }
-        return;
-      }
-
-      const [type, name] = currentInjection;
-
-      // Check for conflict using the current injections state
-      const conflictCheck = checkForInjectionConflict(
-        type,
-        name,
-        injectionsToUse
-      );
-
-      if (conflictCheck.hasConflict && !resolution) {
-        // Show dialog and pause processing
-        setCurrentConflict({ type, name });
-        setPendingInjections(newInjections);
-        setPendingConfig(config);
-        setPendingInjectionsAtConflict(injectionsToUse);
-        return;
-      }
-
-      // Determine resolution to use
-      const resolutionToUse = resolution || 'skip';
-
-      // Merge this injection with the current injections state
-      const mergedInjections = mergeInjectionArraysWithResolution(
-        [currentInjection],
-        injectionsToUse,
-        resolutionToUse
-      );
-
-      // Process remaining injections with the updated injections
-      if (remainingInjections.length > 0) {
-        await processInjectionsWithConflictResolution(
-          remainingInjections,
-          config,
-          resolution,
-          mergedInjections
-        );
-      } else {
-        // All injections processed, update context and load the config
-        configContext.setInjectionInput(mergedInjections);
-        configContext.setConfigInput(config);
-        await configContext.generateNow(config, mergedInjections, {
-          pointsonly: false,
-        });
+  // Use the injection conflict resolution hook
+  const {
+    currentConflict,
+    processInjectionsWithConflictResolution,
+    handleConflictResolution,
+    handleConflictCancel,
+  } = useInjectionConflictResolution({
+    setInjectionInput: (injections) => configContext?.setInjectionInput(injections),
+    setConfigInput: (config) => configContext?.setConfigInput(config),
+    generateNow: async (config, injections, options) => {
+      if (configContext) {
+        await configContext.generateNow(config, injections, options);
       }
     },
-    [configContext]
-  );
-
-  /**
-   * Handles conflict resolution from the dialog.
-   */
-  const handleConflictResolution = useCallback(
-    async (
-      action: ConflictResolution,
-      applyToAllConflicts: boolean
-    ): Promise<void> => {
-      if (!configContext || !pendingInjections || !pendingConfig) return;
-
-      setCurrentConflict(null);
-
-      // Process the current injection with the chosen action
-      const currentInjection = pendingInjections[0];
-      const remainingInjections = pendingInjections.slice(1);
-
-      // Merge with current injections state
-      const mergedInjections = mergeInjectionArraysWithResolution(
-        [currentInjection],
-        pendingInjectionsAtConflict || configContext.injectionInput || [],
-        action
-      );
-
-      // Resume processing remaining injections with the updated injections
-      if (remainingInjections.length > 0) {
-        await processInjectionsWithConflictResolution(
-          remainingInjections,
-          pendingConfig,
-          applyToAllConflicts ? action : null,
-          mergedInjections
-        );
-      } else {
-        // All injections processed, update context and load the config
-        configContext.setInjectionInput(mergedInjections);
-        configContext.setConfigInput(pendingConfig);
-        await configContext.generateNow(pendingConfig, mergedInjections, {
-          pointsonly: false,
-        });
-
-        // Store merged result in localStorage to persist
-        localStorage.setItem(
-          'ergogen:injection',
-          JSON.stringify(mergedInjections)
-        );
-        // Store config in localStorage
-        localStorage.setItem(
-          CONFIG_LOCAL_STORAGE_KEY,
-          JSON.stringify(pendingConfig)
-        );
-
-        // Clean up state only after all injections are processed
-        setPendingInjections(null);
-        setPendingConfig(null);
-        setPendingInjectionsAtConflict(null);
-      }
+    getCurrentInjections: () => configContext?.injectionInput || [],
+    onComplete: async (config, injections) => {
+      // Store merged result in localStorage to persist
+      localStorage.setItem('ergogen:injection', JSON.stringify(injections));
+      // Store config in localStorage
+      localStorage.setItem(CONFIG_LOCAL_STORAGE_KEY, JSON.stringify(config));
     },
-    [
-      configContext,
-      pendingInjections,
-      pendingConfig,
-      pendingInjectionsAtConflict,
-      processInjectionsWithConflictResolution,
-    ]
-  );
-
-  /**
-   * Handles cancellation of conflict resolution.
-   */
-  const handleConflictCancel = useCallback(() => {
-    if (!configContext) return;
-    setCurrentConflict(null);
-    setPendingInjections(null);
-    setPendingConfig(null);
-    setPendingInjectionsAtConflict(null);
-    configContext.setError('Loading cancelled by user');
-  }, [configContext]);
+    setError: (error) => configContext?.setError(error),
+  });
 
   /**
    * Effect to process pending shared config from initial hash fragment load.
