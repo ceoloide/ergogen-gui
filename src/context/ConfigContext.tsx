@@ -19,6 +19,9 @@ import {
   createJscadWorker,
 } from '../workers/workerFactory';
 import { trackEvent } from '../utils/analytics';
+import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
+import { ConflictResolutionStrategy } from '../utils/injections';
+import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
   JscadWorkerRequest,
@@ -243,6 +246,16 @@ const ConfigContextProvider = ({
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  // Refs to store callbacks for the conflict resolution hook
+  // These are needed because generateNow is defined later in the component
+  const generateNowRef = useRef<
+    ((
+      textInput: string | undefined,
+      injectionInput: string[][] | undefined,
+      options?: { pointsonly: boolean }
+    ) => Promise<void>) | null
+  >(null);
 
   // Worker refs
   const ergogenWorkerRef = useRef<Worker | null>(null);
@@ -618,6 +631,29 @@ const ConfigContextProvider = ({
     [processInput, runGeneration]
   );
 
+  // Update ref when generateNow changes
+  generateNowRef.current = generateNow;
+
+  // Use the injection conflict resolution hook
+  // Note: generateNow is accessed via ref because it's defined later
+  const {
+    currentConflict,
+    processInjectionsWithConflictResolution,
+    handleConflictResolution,
+    handleConflictCancel,
+  } = useInjectionConflictResolution({
+    setInjectionInput,
+    setConfigInput,
+    generateNow: async (config, injections, options) => {
+      if (generateNowRef.current) {
+        await generateNowRef.current(config, injections, options);
+      }
+    },
+    getCurrentInjections: () => injectionInput || [],
+    setError,
+  });
+
+
   /**
    * Effect to process the input configuration on the initial load.
    * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
@@ -654,42 +690,26 @@ const ConfigContextProvider = ({
           }
 
           try {
-            // Import mergeInjections to handle footprints
-            const { mergeInjections } = await import('../utils/injections');
+            // Convert footprints to injection array format
+            const newInjections: string[][] = result.footprints.map((fp) => [
+              'footprint',
+              fp.name,
+              fp.content,
+            ]);
 
-            console.log(
-              '[ConfigContext] Current injectionInput before merge:',
-              injectionInput
+            // Process injections with conflict resolution
+            await processInjectionsWithConflictResolution(
+              newInjections,
+              result.config
             );
-
-            // Merge footprints with existing injections using 'overwrite' strategy
-            // This ensures GitHub footprints take precedence when loading from URL
-            const mergedInjections = mergeInjections(
-              result.footprints,
-              injectionInput,
-              'overwrite'
-            );
-
-            console.log(
-              '[ConfigContext] Merged injections count:',
-              mergedInjections.length
-            );
-            console.log(
-              '[ConfigContext] Merged injections:',
-              mergedInjections.map((inj) => inj[1])
-            );
-
-            setInjectionInput(mergedInjections);
-            setConfigInput(result.config);
-            generateNow(result.config, mergedInjections, { pointsonly: false });
           } catch (error) {
-            // If footprint processing fails, don't load the config
+            // If injection processing fails, don't load the config
             console.error(
-              '[ConfigContext] Error processing footprints:',
+              '[ConfigContext] Error processing injections:',
               error
             );
             throw new Error(
-              `Failed to process footprints: ${error instanceof Error ? error.message : 'Unknown error'}`
+              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
           }
         })
@@ -800,6 +820,15 @@ const ConfigContextProvider = ({
 
   return (
     <ConfigContext.Provider value={contextValue}>
+      {currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
+          onResolve={handleConflictResolution}
+          onCancel={handleConflictCancel}
+          data-testid="conflict-dialog"
+        />
+      )}
       {children}
     </ConfigContext.Provider>
   );

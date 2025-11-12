@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useLocalStorage } from 'react-use';
 import styled from 'styled-components';
@@ -14,46 +14,52 @@ import ConfigContextProvider, {
 } from './context/ConfigContext';
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
 import { getConfigFromHash } from './utils/share';
-import { mergeInjectionArrays } from './utils/injections';
+import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
+import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
+
+// Module-level variable to persist hash result across React StrictMode remounts
+// React StrictMode in dev mode intentionally remounts components, which resets refs
+let cachedHashResult: ReturnType<typeof getConfigFromHash> | null = null;
+let hashHasBeenRead = false;
 
 const App = () => {
   // Synchronously get the initial value to avoid race conditions on first render.
 
-  // Check for shared config in hash fragment first (highest priority)
-  // This must happen before localStorage initialization
-  const hashResult = getConfigFromHash();
+  // Store hash result in a module-level variable so it persists across StrictMode remounts
+  // React StrictMode causes components to unmount/remount, which resets refs
+  if (!hashHasBeenRead) {
+    // Only read hash once, ever (persists across StrictMode remounts)
+    cachedHashResult = getConfigFromHash();
+    hashHasBeenRead = true;
+  }
+  const hashResult = cachedHashResult;
+
   let initialConfig = '';
   let initialInjectionInput: string[][] = [];
   let hashError: string | null = null;
+
+  // Store shared config data for deferred processing with conflict resolution
+  // Use a ref to capture synchronously, then state to trigger re-renders
+  const pendingSharedConfigRef = useRef<{
+    config: string;
+    injections?: string[][];
+  } | null>(null);
 
   if (hashResult) {
     if (hashResult.success) {
       // Use shared config from hash fragment - this takes priority over localStorage
       const sharedConfig = hashResult.config;
       initialConfig = sharedConfig.config;
-      // Handle injections: merge shared injections with existing ones
-      // If undefined, keep existing injections (not present in shared config)
-      if (sharedConfig.injections !== undefined) {
-        // Get existing injections from localStorage
-        const existingInjectionsJson =
-          localStorage.getItem('ergogen:injection');
-        const existingInjections: string[][] | undefined =
-          existingInjectionsJson
-            ? JSON.parse(existingInjectionsJson)
-            : undefined;
-        // Merge: shared injections overwrite existing ones with same type+name, but keep others
-        initialInjectionInput = mergeInjectionArrays(
-          sharedConfig.injections,
-          existingInjections
-        );
-        // Store merged result in localStorage so useLocalStorage picks it up
-        localStorage.setItem(
-          'ergogen:injection',
-          JSON.stringify(initialInjectionInput)
-        );
+      // Store the shared config data to process with conflict resolution after React renders
+      // Store in ref synchronously, but only set once (persist across re-renders)
+      if (pendingSharedConfigRef.current === null) {
+        pendingSharedConfigRef.current = {
+          config: sharedConfig.config,
+          injections: sharedConfig.injections,
+        };
       }
-      // Temporarily store in localStorage so useLocalStorage picks it up
-      // This ensures the config persists if user navigates away and comes back
+      // Temporarily store config in localStorage so useLocalStorage picks it up
+      // Injections will be processed with conflict resolution after React renders
       localStorage.setItem(
         CONFIG_LOCAL_STORAGE_KEY,
         JSON.stringify(initialConfig)
@@ -114,6 +120,20 @@ const App = () => {
     initialConfig
   );
 
+  // Convert ref to state so it can be passed as a prop and trigger re-renders
+  const [pendingSharedConfig, setPendingSharedConfig] = useState<{
+    config: string;
+    injections?: string[][];
+  } | null>(null);
+
+  // Set state from ref on mount to ensure it's available for AppContent
+  // This must run synchronously or the ref value will be lost
+  useEffect(() => {
+    if (pendingSharedConfigRef.current) {
+      setPendingSharedConfig(pendingSharedConfigRef.current);
+    }
+  }, []); // Only run once on mount
+
   return (
     // Pass the state and the setter function down to the context provider.
     <ConfigContextProvider
@@ -122,7 +142,7 @@ const App = () => {
       initialInjectionInput={initialInjectionInput}
       hashError={hashError}
     >
-      <AppContent />
+      <AppContent pendingSharedConfig={pendingSharedConfig} />
     </ConfigContextProvider>
   );
 };
@@ -130,16 +150,104 @@ const App = () => {
 /**
  * Inner component that has access to the config context.
  */
-const AppContent = () => {
+const AppContent = ({
+  pendingSharedConfig,
+}: {
+  pendingSharedConfig?: { config: string; injections?: string[][] } | null;
+}) => {
   const configContext = useConfigContext();
   // Get configInput from context to ensure we have the latest value
   const configInput = configContext?.configInput;
 
+  // Track if we've already processed the initial pending shared config
+  const hasProcessedInitialSharedConfig = useRef(false);
+  // Store pending shared config in a ref so it persists across renders
+  // Initialize with the prop value - this captures it on first render
+  const pendingSharedConfigRef = useRef(pendingSharedConfig);
+  
+  // Update ref if prop changes (though it should only be set on initial mount)
+  if (pendingSharedConfig !== pendingSharedConfigRef.current) {
+    pendingSharedConfigRef.current = pendingSharedConfig;
+  }
+
+  // Use the injection conflict resolution hook
+  const {
+    currentConflict,
+    processInjectionsWithConflictResolution,
+    handleConflictResolution,
+    handleConflictCancel,
+  } = useInjectionConflictResolution({
+    setInjectionInput: (injections) => configContext?.setInjectionInput(injections),
+    setConfigInput: (config) => configContext?.setConfigInput(config),
+    generateNow: async (config, injections, options) => {
+      if (configContext) {
+        await configContext.generateNow(config, injections, options);
+      }
+    },
+    getCurrentInjections: () => configContext?.injectionInput || [],
+    onComplete: async (config, injections) => {
+      // Store merged result in localStorage to persist
+      localStorage.setItem('ergogen:injection', JSON.stringify(injections));
+      // Store config in localStorage
+      localStorage.setItem(CONFIG_LOCAL_STORAGE_KEY, JSON.stringify(config));
+    },
+    setError: (error) => configContext?.setError(error),
+  });
+
+  /**
+   * Effect to process pending shared config from initial hash fragment load.
+   * This processes the config with conflict resolution after React has rendered.
+   * Uses the prop directly so it re-runs when pendingSharedConfig is set.
+   */
+  useEffect(() => {
+    // Wait for configContext to be available
+    if (!configContext) {
+      return;
+    }
+
+    // Use the prop directly - it will be set by the parent App component's useEffect
+    if (!pendingSharedConfig) {
+      return;
+    }
+    
+    if (hasProcessedInitialSharedConfig.current) {
+      return;
+    }
+
+    // Mark as processed to prevent re-processing on re-renders
+    hasProcessedInitialSharedConfig.current = true;
+
+    // Process the pending shared config with conflict resolution
+    // Update config (already set in localStorage, but ensure context is updated)
+    configContext.setConfigInput(pendingSharedConfig.config);
+
+    // Process injections with conflict resolution
+    if (pendingSharedConfig.injections !== undefined && pendingSharedConfig.injections.length > 0) {
+      processInjectionsWithConflictResolution(
+        pendingSharedConfig.injections,
+        pendingSharedConfig.config
+      ).catch((error) => {
+        console.error('[App] Error processing injections from initial hash:', error);
+        configContext.setError(
+          `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      });
+    } else {
+      // No injections to process, just generate
+      configContext.generateNow(pendingSharedConfig.config, configContext.injectionInput, {
+        pointsonly: false,
+      });
+    }
+  }, [
+    configContext,
+    pendingSharedConfig,
+    processInjectionsWithConflictResolution,
+  ]); // Re-run when configContext or pendingSharedConfig becomes available
+
   /**
    * Effect to handle hash fragment changes when navigating to shared configurations.
    * This allows loading shared configs even when already on the Ergogen page.
-   * Note: Initial hash loading is handled synchronously in App.tsx before render,
-   * so this only handles subsequent hash changes (e.g., navigating to a shared URL).
+   * Note: Initial hash loading is now deferred to the effect above for conflict resolution.
    */
   useEffect(() => {
     if (!configContext) {
@@ -156,30 +264,30 @@ const AppContent = () => {
         const sharedConfig = hashResult.config;
         // Update config
         configContext.setConfigInput(sharedConfig.config);
-        // Merge injections: shared injections overwrite existing ones with same type+name, but keep others
-        const mergedInjections = sharedConfig.injections
-          ? mergeInjectionArrays(
-              sharedConfig.injections,
-              configContext.injectionInput
-            )
-          : configContext.injectionInput;
-        if (sharedConfig.injections !== undefined) {
-          configContext.setInjectionInput(mergedInjections);
-          // Store merged result in localStorage to persist
-          localStorage.setItem(
-            'ergogen:injection',
-            JSON.stringify(mergedInjections)
-          );
-        }
         // Store config in localStorage
         localStorage.setItem(
           CONFIG_LOCAL_STORAGE_KEY,
           JSON.stringify(sharedConfig.config)
         );
-        // Generate with the new config and merged injections
-        configContext.generateNow(sharedConfig.config, mergedInjections, {
-          pointsonly: false,
-        });
+
+        // Process injections with conflict resolution
+        if (sharedConfig.injections !== undefined) {
+          processInjectionsWithConflictResolution(
+            sharedConfig.injections,
+            sharedConfig.config
+          ).catch((error) => {
+            console.error('[App] Error processing injections:', error);
+            configContext.setError(
+              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          });
+        } else {
+          // No injections to process, just generate
+          configContext.generateNow(sharedConfig.config, configContext.injectionInput, {
+            pointsonly: false,
+          });
+        }
+
         // Clear the hash fragment after loading
         window.history.replaceState(
           null,
@@ -212,10 +320,19 @@ const AppContent = () => {
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [configContext]);
+  }, [configContext, processInjectionsWithConflictResolution]);
 
   return (
     <>
+      {currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
+          onResolve={handleConflictResolution}
+          onCancel={handleConflictCancel}
+          data-testid="conflict-dialog"
+        />
+      )}
       <Header />
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
