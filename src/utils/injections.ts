@@ -30,27 +30,18 @@ type ConflictCheckResult =
 
 /**
  * Validates that an injection has the correct format: [type, name, content]
+ * All elements must be strings.
  * @param inj - The injection to validate
- * @param strict - If true, also validates that all elements are strings (default: false)
- * @returns True if the injection is valid, false otherwise
+ * @returns True if the injection is valid (array of 3 strings), false otherwise
  */
-export const isValidInjection = (
-  inj: unknown,
-  strict: boolean = false
-): inj is string[] => {
-  if (!Array.isArray(inj) || inj.length !== 3) {
-    return false;
-  }
-
-  if (strict) {
-    return (
-      typeof inj[0] === 'string' &&
-      typeof inj[1] === 'string' &&
-      typeof inj[2] === 'string'
-    );
-  }
-
-  return true;
+export const isValidInjection = (inj: unknown): inj is string[] => {
+  return (
+    Array.isArray(inj) &&
+    inj.length === 3 &&
+    typeof inj[0] === 'string' &&
+    typeof inj[1] === 'string' &&
+    typeof inj[2] === 'string'
+  );
 };
 
 /**
@@ -218,8 +209,8 @@ export const mergeInjectionArraysWithResolution = (
 
   // Process each new injection
   for (const newInj of newInjections) {
-    // Validate injection format (strict validation to ensure all elements are strings)
-    if (!isValidInjection(newInj, true)) {
+    // Validate injection format
+    if (!isValidInjection(newInj)) {
       console.warn(
         '[mergeInjectionArraysWithResolution] Skipping invalid injection format:',
         newInj

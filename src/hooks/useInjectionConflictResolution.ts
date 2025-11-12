@@ -100,8 +100,8 @@ export const useInjectionConflictResolution = (
       const currentInjection = newInjections[0];
       const remainingInjections = newInjections.slice(1);
 
-      // Validate injection format (strict validation to ensure all elements are strings)
-      if (!isValidInjection(currentInjection, true)) {
+      // Validate injection format
+      if (!isValidInjection(currentInjection)) {
         console.warn(
           '[useInjectionConflictResolution] Skipping invalid injection format:',
           currentInjection
