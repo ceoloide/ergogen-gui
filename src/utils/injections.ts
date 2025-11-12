@@ -73,7 +73,7 @@ export const generateUniqueInjectionName = (
   }
 
   const existingNames = existingInjections
-    .filter((inj) => inj.length === 3 && inj[0] === type)
+    .filter((inj) => Array.isArray(inj) && inj.length === 3 && inj[0] === type)
     .map((inj) => inj[1]);
 
   let counter = 1;
