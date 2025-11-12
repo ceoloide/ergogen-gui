@@ -3,6 +3,7 @@ import {
   checkForInjectionConflict,
   mergeInjectionArraysWithResolution,
   ConflictResolution,
+  isValidInjection,
 } from '../utils/injections';
 
 /**
@@ -99,14 +100,8 @@ export const useInjectionConflictResolution = (
       const currentInjection = newInjections[0];
       const remainingInjections = newInjections.slice(1);
 
-      // Validate injection format
-      if (
-        !Array.isArray(currentInjection) ||
-        currentInjection.length !== 3 ||
-        typeof currentInjection[0] !== 'string' ||
-        typeof currentInjection[1] !== 'string' ||
-        typeof currentInjection[2] !== 'string'
-      ) {
+      // Validate injection format (strict validation to ensure all elements are strings)
+      if (!isValidInjection(currentInjection, true)) {
         console.warn(
           '[useInjectionConflictResolution] Skipping invalid injection format:',
           currentInjection

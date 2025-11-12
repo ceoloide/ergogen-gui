@@ -12,6 +12,31 @@ type ConflictCheckResult =
   | { hasConflict: true; conflictingName: string };
 
 /**
+ * Validates that an injection has the correct format: [type, name, content]
+ * @param inj - The injection to validate
+ * @param strict - If true, also validates that all elements are strings (default: false)
+ * @returns True if the injection is valid, false otherwise
+ */
+export const isValidInjection = (
+  inj: unknown,
+  strict: boolean = false
+): inj is string[] => {
+  if (!Array.isArray(inj) || inj.length !== 3) {
+    return false;
+  }
+
+  if (strict) {
+    return (
+      typeof inj[0] === 'string' &&
+      typeof inj[1] === 'string' &&
+      typeof inj[2] === 'string'
+    );
+  }
+
+  return true;
+};
+
+/**
  * Checks if an injection name conflicts with existing injections of the same type.
  * @param type - The type of injection to check (e.g., 'footprint', 'template').
  * @param name - The name of the injection to check.
@@ -28,11 +53,7 @@ export const checkForInjectionConflict = (
   }
 
   const hasConflict = existingInjections.some(
-    (inj) =>
-      Array.isArray(inj) &&
-      inj.length === 3 &&
-      inj[0] === type &&
-      inj[1] === name
+    (inj) => isValidInjection(inj) && inj[0] === type && inj[1] === name
   );
 
   if (hasConflict) {
@@ -73,7 +94,7 @@ export const generateUniqueInjectionName = (
   }
 
   const existingNames = existingInjections
-    .filter((inj) => Array.isArray(inj) && inj.length === 3 && inj[0] === type)
+    .filter((inj) => isValidInjection(inj) && inj[0] === type)
     .map((inj) => inj[1]);
 
   let counter = 1;
@@ -130,7 +151,7 @@ export const mergeInjections = (
         // Find and replace the existing injection
         const index = result.findIndex(
           (inj) =>
-            inj.length === 3 &&
+            isValidInjection(inj) &&
             inj[0] === 'footprint' &&
             inj[1] === footprint.name
         );
@@ -174,8 +195,8 @@ export const mergeInjectionArraysWithResolution = (
 
   // Process each new injection
   for (const newInj of newInjections) {
-    // Validate injection format
-    if (!Array.isArray(newInj) || newInj.length !== 3) {
+    // Validate injection format (strict validation to ensure all elements are strings)
+    if (!isValidInjection(newInj, true)) {
       console.warn(
         '[mergeInjectionArraysWithResolution] Skipping invalid injection format:',
         newInj
@@ -184,17 +205,6 @@ export const mergeInjectionArraysWithResolution = (
     }
 
     const [type, name, content] = newInj;
-    if (
-      typeof type !== 'string' ||
-      typeof name !== 'string' ||
-      typeof content !== 'string'
-    ) {
-      console.warn(
-        '[mergeInjectionArraysWithResolution] Skipping injection with invalid types:',
-        newInj
-      );
-      continue;
-    }
 
     // Check for conflict
     const conflictCheck = checkForInjectionConflict(type, name, result);
@@ -210,11 +220,7 @@ export const mergeInjectionArraysWithResolution = (
       } else if (resolution === 'overwrite') {
         // Find and replace the existing injection
         const existingIndex = result.findIndex(
-          (inj) =>
-            Array.isArray(inj) &&
-            inj.length === 3 &&
-            inj[0] === type &&
-            inj[1] === name
+          (inj) => isValidInjection(inj) && inj[0] === type && inj[1] === name
         );
         if (existingIndex !== -1) {
           result[existingIndex] = [type, name, content];
