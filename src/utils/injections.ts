@@ -1,13 +1,13 @@
 /**
  * Utility functions for managing injections (footprints, templates, etc.).
- * 
+ *
  * This module provides generic functions that work with any injection type.
  * Injections are represented as arrays of three strings: [type, name, content]
  * where:
  * - type: The injection type (e.g., 'footprint', 'template')
  * - name: The unique name of the injection
  * - content: The code/content of the injection
- * 
+ *
  * The module includes both generic functions (recommended) and deprecated
  * footprint-specific wrappers for backward compatibility.
  */
@@ -51,7 +51,7 @@ export const isValidInjection = (inj: unknown): inj is string[] => {
  * @param existingInjections - The array of existing injections.
  * @returns A conflict check result indicating if there's a conflict and the name.
  */
-export const checkForInjectionConflict = (
+const checkForInjectionConflict = (
   type: string,
   name: string,
   existingInjections: string[][] | undefined
@@ -69,6 +69,37 @@ export const checkForInjectionConflict = (
   }
 
   return { hasConflict: false };
+};
+
+/**
+ * Checks for conflicts for multiple injections at once.
+ * @param newInjections - Array of new injections to check.
+ * @param existingInjections - The array of existing injections.
+ * @returns An array of conflict results for injections that have conflicts.
+ */
+export const getInjectionConflicts = (
+  newInjections: string[][],
+  existingInjections: string[][] | undefined
+): { injection: string[]; conflict: ConflictCheckResult }[] => {
+  if (!existingInjections || existingInjections.length === 0) {
+    return [];
+  }
+
+  const conflicts: { injection: string[]; conflict: ConflictCheckResult }[] =
+    [];
+
+  for (const inj of newInjections) {
+    if (!isValidInjection(inj)) continue;
+
+    const [type, name] = inj;
+    const conflict = checkForInjectionConflict(type, name, existingInjections);
+
+    if (conflict.hasConflict) {
+      conflicts.push({ injection: inj, conflict });
+    }
+  }
+
+  return conflicts;
 };
 
 /**

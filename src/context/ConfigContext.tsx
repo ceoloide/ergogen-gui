@@ -13,15 +13,14 @@ import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
-import { fetchConfigFromUrl } from '../utils/github';
 import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
 import { trackEvent } from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
-import { ConflictResolutionStrategy } from '../utils/injections';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
+import { useConfigLoader } from '../hooks/useConfigLoader';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
   JscadWorkerRequest,
@@ -250,11 +249,12 @@ const ConfigContextProvider = ({
   // Refs to store callbacks for the conflict resolution hook
   // These are needed because generateNow is defined later in the component
   const generateNowRef = useRef<
-    ((
-      textInput: string | undefined,
-      injectionInput: string[][] | undefined,
-      options?: { pointsonly: boolean }
-    ) => Promise<void>) | null
+    | ((
+        textInput: string | undefined,
+        injectionInput: string[][] | undefined,
+        options?: { pointsonly: boolean }
+      ) => Promise<void>)
+    | null
   >(null);
 
   // Worker refs
@@ -653,6 +653,11 @@ const ConfigContextProvider = ({
     setError,
   });
 
+  // Use the config loader hook
+  const { isLoading: isConfigLoading } = useConfigLoader({
+    processInjectionsWithConflictResolution,
+    setError,
+  });
 
   /**
    * Effect to process the input configuration on the initial load.
@@ -666,62 +671,22 @@ const ConfigContextProvider = ({
       return;
     }
 
-    // Check for GitHub URL parameter
+    // If we are loading from GitHub, wait for that to finish
+    if (isConfigLoading) {
+      return;
+    }
+
+    // If not loading from GitHub, and we have configInput, generate it
+    // This handles the case where we have config from localStorage or hash fragment
+    // but NOT from a GitHub URL (which is handled by useConfigLoader)
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
-    if (githubUrl) {
-      console.log('[ConfigContext] Loading from URL parameter:', githubUrl);
-      fetchConfigFromUrl(githubUrl)
-        .then(async (result) => {
-          console.log('[ConfigContext] Fetch result:', {
-            configLength: result.config.length,
-            footprintsCount: result.footprints.length,
-            configPath: result.configPath,
-            rateLimitWarning: result.rateLimitWarning,
-          });
-          console.log(
-            '[ConfigContext] Footprints:',
-            result.footprints.map((f) => f.name)
-          );
 
-          // Show rate limit warning if present
-          if (result.rateLimitWarning) {
-            setError(result.rateLimitWarning);
-          }
-
-          try {
-            // Convert footprints to injection array format
-            const newInjections: string[][] = result.footprints.map((fp) => [
-              'footprint',
-              fp.name,
-              fp.content,
-            ]);
-
-            // Process injections with conflict resolution
-            await processInjectionsWithConflictResolution(
-              newInjections,
-              result.config
-            );
-          } catch (error) {
-            // If injection processing fails, don't load the config
-            console.error(
-              '[ConfigContext] Error processing injections:',
-              error
-            );
-            throw new Error(
-              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-          }
-        })
-        .catch((e) => {
-          console.error('[ConfigContext] Failed to load from GitHub:', e);
-          setError(`Failed to load from GitHub: ${e.message}`);
-        });
-    } else if (configInput) {
+    if (!githubUrl && configInput) {
       generateNow(configInput, injectionInput, { pointsonly: false });
     }
     // eslint-disable-next-line
-  }, []);
+  }, [isConfigLoading]);
 
   /**
    * Effect to process the input configuration whenever it or the auto-generation settings change.
@@ -820,21 +785,21 @@ const ConfigContextProvider = ({
 
   return (
     <ConfigContext.Provider value={contextValue}>
+      {children}
       {currentConflict && (
         <ConflictResolutionDialog
           injectionName={currentConflict.name}
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-dialog"
+          data-testid="conflict-resolution-dialog"
         />
       )}
-      {children}
     </ConfigContext.Provider>
   );
 };
 
-export default ConfigContextProvider;
+export { ConfigContextProvider };
 
 /**
  * A custom hook to easily consume the ConfigContext.

@@ -217,10 +217,7 @@ const Welcome = () => {
   const [githubInput, setGithubInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
-  const [pendingFootprints, setPendingFootprints] = useState<GitHubFootprint[]>(
-    []
-  );
-  const [pendingConfig, setPendingConfig] = useState<string | null>(null);
+
   const [isDragging, setIsDragging] = useState(false);
 
   // Use the injection conflict resolution hook
@@ -230,7 +227,8 @@ const Welcome = () => {
     handleConflictResolution: handleConflictResolutionBase,
     handleConflictCancel: handleConflictCancelBase,
   } = useInjectionConflictResolution({
-    setInjectionInput: (injections) => configContext?.setInjectionInput(injections),
+    setInjectionInput: (injections) =>
+      configContext?.setInjectionInput(injections),
     setConfigInput: (config) => configContext?.setConfigInput(config),
     generateNow: async (config, injections, options) => {
       if (configContext) {
@@ -304,8 +302,6 @@ const Welcome = () => {
     ]);
 
     // Store footprints and config for conflict resolution handler
-    setPendingFootprints(footprints);
-    setPendingConfig(config);
 
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
@@ -329,15 +325,12 @@ const Welcome = () => {
 
     // Clean up footprint-specific state after processing completes
     // (The hook manages its own internal state)
-    setPendingFootprints([]);
-    setPendingConfig(null);
   };
 
   const handleConflictCancel = () => {
     handleConflictCancelBase();
-    setPendingFootprints([]);
-    setPendingConfig(null);
     setIsLoading(false);
+    configContext?.setIsGenerating(false);
   };
 
   const handleGitHub = () => {
@@ -354,8 +347,6 @@ const Welcome = () => {
 
     // Reset any pending conflict resolution state from previous loads
     // Note: currentConflict is managed by the hook, so we only reset local state
-    setPendingFootprints([]);
-    setPendingConfig(null);
 
     fetchConfigFromUrl(githubInput)
       .then(async (result) => {
@@ -412,8 +403,6 @@ const Welcome = () => {
 
     // Reset any pending conflict resolution state from previous loads
     // Note: currentConflict is managed by the hook, so we only reset local state
-    setPendingFootprints([]);
-    setPendingConfig(null);
 
     try {
       const result = await loadLocalFile(file);
@@ -514,7 +503,7 @@ const Welcome = () => {
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-dialog"
+          data-testid="conflict-resolution-dialog"
         />
       )}
       <WelcomeContainer>

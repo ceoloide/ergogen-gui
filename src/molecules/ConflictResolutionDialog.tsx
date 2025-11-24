@@ -43,9 +43,12 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
       <DialogBox data-testid={dataTestId && `${dataTestId}-box`}>
         <Title>{typeLabel} Conflict</Title>
         <Message>
-          A {injectionType} with the name <strong>{injectionName}</strong> already
-          exists. How would you like to resolve this conflict?
+          A {injectionType} with the name <strong>{injectionName}</strong>{' '}
+          already exists.
+          <br />
+          How would you like to resolve this conflict?
         </Message>
+
         <CheckboxContainer>
           <input
             type="checkbox"
@@ -57,6 +60,7 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
           />
           <label htmlFor="apply-to-all">Apply to all conflicts</label>
         </CheckboxContainer>
+
         <ButtonGroup>
           <Button
             onClick={() => onResolve('skip', applyToAll)}

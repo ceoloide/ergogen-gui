@@ -9,7 +9,8 @@ import Header from './atoms/Header';
 import LoadingBar from './atoms/LoadingBar';
 import Banners from './organisms/Banners';
 import SideNavigation from './molecules/SideNavigation';
-import ConfigContextProvider, {
+import {
+  ConfigContextProvider,
   useConfigContext,
 } from './context/ConfigContext';
 import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
@@ -35,7 +36,7 @@ const App = () => {
   const hashResult = cachedHashResult;
 
   let initialConfig = '';
-  let initialInjectionInput: string[][] = [];
+  const initialInjectionInput: string[][] = [];
   let hashError: string | null = null;
 
   // Store shared config data for deferred processing with conflict resolution
@@ -47,23 +48,33 @@ const App = () => {
 
   if (hashResult) {
     if (hashResult.success) {
-      // Use shared config from hash fragment - this takes priority over localStorage
+      // Use shared config from hash fragment
       const sharedConfig = hashResult.config;
-      initialConfig = sharedConfig.config;
+
       // Store the shared config data to process with conflict resolution after React renders
-      // Store in ref synchronously, but only set once (persist across re-renders)
       if (pendingSharedConfigRef.current === null) {
         pendingSharedConfigRef.current = {
           config: sharedConfig.config,
           injections: sharedConfig.injections,
         };
       }
-      // Temporarily store config in localStorage so useLocalStorage picks it up
-      // Injections will be processed with conflict resolution after React renders
-      localStorage.setItem(
-        CONFIG_LOCAL_STORAGE_KEY,
-        JSON.stringify(initialConfig)
-      );
+
+      // Check if we have injections that might conflict
+      const hasInjections =
+        sharedConfig.injections && sharedConfig.injections.length > 0;
+
+      if (!hasInjections) {
+        // No injections, safe to load config immediately
+        initialConfig = sharedConfig.config;
+        localStorage.setItem(
+          CONFIG_LOCAL_STORAGE_KEY,
+          JSON.stringify(initialConfig)
+        );
+      } else {
+        // We have injections. Defer loading the new config until conflicts are resolved.
+        // We will fall through to load the *existing* config from local storage for now.
+      }
+
       // Clear the hash fragment after reading it
       window.history.replaceState(
         null,
@@ -85,7 +96,21 @@ const App = () => {
         window.location.pathname + window.location.search
       );
     }
-  } else {
+  }
+
+  // Load from local storage if:
+  // 1. No hash result provided
+  // 2. Hash result was successful but had injections (deferred loading)
+  // 3. Hash result failed (we might want to show empty, but let's stick to original behavior of NOT loading local if hash failed?
+  //    Actually, original behavior was: if (hashResult) { ... } else { load local }.
+  //    So if hash failed, it did NOT load local. initialConfig remained ''.
+  const shouldLoadFromLocalStorage =
+    !hashResult ||
+    (hashResult.success &&
+      hashResult.config.injections &&
+      hashResult.config.injections.length > 0);
+
+  if (shouldLoadFromLocalStorage) {
     // Since we changed the local storage key for the Ergogen config, we need to always check for the legacy key first and migrate it if it exists.
     // This migration code can be removed in a future release once we are confident most users have migrated.
     const legacyStoredConfigValue = localStorage.getItem(
@@ -109,7 +134,11 @@ const App = () => {
     }
 
     const storedConfigValue = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
-    initialConfig = storedConfigValue ? JSON.parse(storedConfigValue) : '';
+    // Only overwrite initialConfig if we found something (it might be '' if hash failed)
+    // Actually, if shouldLoadFromLocalStorage is true, initialConfig is currently '' (default).
+    if (storedConfigValue) {
+      initialConfig = JSON.parse(storedConfigValue);
+    }
   }
 
   // The useLocalStorage hook now manages the config state in the App component.
@@ -164,7 +193,7 @@ const AppContent = ({
   // Store pending shared config in a ref so it persists across renders
   // Initialize with the prop value - this captures it on first render
   const pendingSharedConfigRef = useRef(pendingSharedConfig);
-  
+
   // Update ref if prop changes (though it should only be set on initial mount)
   if (pendingSharedConfig !== pendingSharedConfigRef.current) {
     pendingSharedConfigRef.current = pendingSharedConfig;
@@ -177,7 +206,8 @@ const AppContent = ({
     handleConflictResolution,
     handleConflictCancel,
   } = useInjectionConflictResolution({
-    setInjectionInput: (injections) => configContext?.setInjectionInput(injections),
+    setInjectionInput: (injections) =>
+      configContext?.setInjectionInput(injections),
     setConfigInput: (config) => configContext?.setConfigInput(config),
     generateNow: async (config, injections, options) => {
       if (configContext) {
@@ -209,7 +239,7 @@ const AppContent = ({
     if (!pendingSharedConfig) {
       return;
     }
-    
+
     if (hasProcessedInitialSharedConfig.current) {
       return;
     }
@@ -218,25 +248,39 @@ const AppContent = ({
     hasProcessedInitialSharedConfig.current = true;
 
     // Process the pending shared config with conflict resolution
-    // Update config (already set in localStorage, but ensure context is updated)
-    configContext.setConfigInput(pendingSharedConfig.config);
 
     // Process injections with conflict resolution
-    if (pendingSharedConfig.injections !== undefined && pendingSharedConfig.injections.length > 0) {
+    if (
+      pendingSharedConfig.injections !== undefined &&
+      pendingSharedConfig.injections.length > 0
+    ) {
+      // If we have injections, we defer setting the config until conflicts are resolved.
+      // The processInjectionsWithConflictResolution function will handle setting the config
+      // once resolution is complete (or if there are no conflicts).
       processInjectionsWithConflictResolution(
         pendingSharedConfig.injections,
         pendingSharedConfig.config
       ).catch((error) => {
-        console.error('[App] Error processing injections from initial hash:', error);
+        console.error(
+          '[App] Error processing injections from initial hash:',
+          error
+        );
         configContext.setError(
           `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
       });
     } else {
-      // No injections to process, just generate
-      configContext.generateNow(pendingSharedConfig.config, configContext.injectionInput, {
-        pointsonly: false,
-      });
+      // No injections to process, just set config and generate
+      // This handles the case where we loaded the config immediately in the parent component
+      // but we still need to ensure the context is updated and generation runs.
+      configContext.setConfigInput(pendingSharedConfig.config);
+      configContext.generateNow(
+        pendingSharedConfig.config,
+        configContext.injectionInput,
+        {
+          pointsonly: false,
+        }
+      );
     }
   }, [
     configContext,
@@ -262,16 +306,12 @@ const AppContent = ({
 
       if (hashResult.success) {
         const sharedConfig = hashResult.config;
-        // Update config
-        configContext.setConfigInput(sharedConfig.config);
-        // Store config in localStorage
-        localStorage.setItem(
-          CONFIG_LOCAL_STORAGE_KEY,
-          JSON.stringify(sharedConfig.config)
-        );
-
         // Process injections with conflict resolution
-        if (sharedConfig.injections !== undefined) {
+        if (
+          sharedConfig.injections !== undefined &&
+          sharedConfig.injections.length > 0
+        ) {
+          // Defer setting config until resolution is complete
           processInjectionsWithConflictResolution(
             sharedConfig.injections,
             sharedConfig.config
@@ -282,10 +322,22 @@ const AppContent = ({
             );
           });
         } else {
+          // No injections, safe to update config immediately
+          configContext.setConfigInput(sharedConfig.config);
+          // Store config in localStorage
+          localStorage.setItem(
+            CONFIG_LOCAL_STORAGE_KEY,
+            JSON.stringify(sharedConfig.config)
+          );
+
           // No injections to process, just generate
-          configContext.generateNow(sharedConfig.config, configContext.injectionInput, {
-            pointsonly: false,
-          });
+          configContext.generateNow(
+            sharedConfig.config,
+            configContext.injectionInput,
+            {
+              pointsonly: false,
+            }
+          );
         }
 
         // Clear the hash fragment after loading
@@ -330,7 +382,7 @@ const AppContent = ({
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-dialog"
+          data-testid="conflict-resolution-dialog"
         />
       )}
       <Header />
