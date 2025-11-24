@@ -301,7 +301,6 @@ const Welcome = () => {
       fp.content,
     ]);
 
-    // Store footprints and config for conflict resolution handler
 
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
