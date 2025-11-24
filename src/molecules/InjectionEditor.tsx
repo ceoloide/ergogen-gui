@@ -61,7 +61,11 @@ const InjectionEditor = ({
   if (!configContext) return null;
 
   return (
-    <EditorWrapper className={className} data-testid={dataTestId} aria-label={ariaLabel}>
+    <EditorWrapper
+      className={className}
+      data-testid={dataTestId}
+      aria-label={ariaLabel}
+    >
       <Editor
         height="100%"
         defaultLanguage="javascript"

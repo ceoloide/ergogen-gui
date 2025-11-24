@@ -1,4 +1,10 @@
-import { useEffect, useState, ChangeEvent, SetStateAction, Dispatch } from 'react';
+import {
+  useEffect,
+  useState,
+  ChangeEvent,
+  SetStateAction,
+  Dispatch,
+} from 'react';
 import styled from 'styled-components';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -21,7 +27,7 @@ import OutlineIconButton from './atoms/OutlineIconButton';
 import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
-import { createZip } from './utils/zip';
+
 import { trackEvent } from './utils/analytics';
 
 // Shortcut key sub-label styled component
@@ -484,31 +490,6 @@ const Ergogen = () => {
     document.body.removeChild(element);
   };
 
-  /**
-   * Triggers a download of all generated files as a zip archive.
-   */
-  const handleDownloadArchive = () => {
-    if (
-      !configContext.results ||
-      !configContext.configInput ||
-      configContext.isGenerating ||
-      configContext.isJscadConverting
-    ) {
-      return;
-    }
-    trackEvent('download_button_clicked', {
-      download_type: 'archive',
-    });
-    createZip(
-      configContext.results,
-      configContext.configInput,
-      configContext.injectionInput,
-      configContext.debug,
-      configContext.stlPreview
-    );
-  };
-
-
   return (
     <ErgogenWrapper>
       {!configContext.showSettings && (
@@ -617,7 +598,9 @@ const Ergogen = () => {
                       aria-label="Download configuration"
                       data-testid="download-config-button"
                     >
-                      <span className="material-symbols-outlined">download</span>
+                      <span className="material-symbols-outlined">
+                        download
+                      </span>
                     </OutlineIconButton>
                   </ButtonContainer>
                 </EditorContainer>
@@ -742,7 +725,12 @@ const Ergogen = () => {
                     <MobileCloseButton
                       onClick={() => {
                         setShowMobileEditor(false);
-                        setInjectionToEdit({ key: -1, type: '', name: '', content: '' });
+                        setInjectionToEdit({
+                          key: -1,
+                          type: '',
+                          name: '',
+                          content: '',
+                        });
                       }}
                       aria-label="Close editor"
                       data-testid="mobile-editor-close"

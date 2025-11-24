@@ -86,31 +86,32 @@ const VersionText = styled.a`
  * A styled button with an outline style, typically for icons.
  */
 const OutlineIconButton = styled.button`
-    background-color: transparent;
-    transition: color .15s ease-in-out,
-    background-color .15s ease-in-out,
-    border-color .15s ease-in-out,
-    box-shadow .15s ease-in-out;
-    border: 1px solid ${theme.colors.border};
-    border-radius: 6px;
-    color: ${theme.colors.white};
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    text-decoration: none;
-    cursor: pointer;
-    font-size: ${theme.fontSizes.bodySmall};
-    line-height: 16px;
-    gap: 6px;
-    height: 34px;
+  background-color: transparent;
+  transition:
+    color 0.15s ease-in-out,
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  color: ${theme.colors.white};
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  text-decoration: none;
+  cursor: pointer;
+  font-size: ${theme.fontSizes.bodySmall};
+  line-height: 16px;
+  gap: 6px;
+  height: 34px;
 
-    .material-symbols-outlined {
-        font-size: ${theme.fontSizes.iconMedium} !important;
-    }
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconMedium} !important;
+  }
 
-    &:hover {
-        background-color: ${theme.colors.buttonHover};
-    }
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+  }
 `;
 
 /**
@@ -292,7 +293,8 @@ const Header = (): JSX.Element => {
               <ArchiveIconButton
                 onClick={handleDownloadArchive}
                 disabled={
-                  configContext?.isGenerating || configContext?.isJscadConverting
+                  configContext?.isGenerating ||
+                  configContext?.isJscadConverting
                 }
                 aria-label="Download archive of all generated files"
                 data-testid="header-download-outputs-button"

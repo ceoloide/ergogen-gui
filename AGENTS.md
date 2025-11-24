@@ -34,7 +34,7 @@ This project is a React-based web interface for the [Ergogen](https://github.com
 - **Centralized Theming**: All colors and other theme-related properties (e.g., font sizes, spacing) should be centralized in `src/theme/theme.ts`. Components should import and use variables from this theme file instead of using hardcoded values.
 - **Styled Components for Styling**: All styling, including global styles, should be managed using `styled-components`. Global styles should be defined in a `GlobalStyle` component to ensure consistency and encapsulation within the React component architecture, avoiding the use of separate CSS files like `index.css`.
 - **Styled-components Transient Props**: When passing props to styled-components that are only used for styling and should not be passed to the DOM, prefix them with `$` (e.g., `$isVisible`, `$isDragging`). This prevents React warnings about unrecognized props on DOM elements.
-- **Styled-components Performance**: For frequently changing values (e.g., width during drag operations), use inline styles via the `style` prop instead of CSS template literals. This prevents styled-components from generating excessive classes and avoids performance warnings. Example: Instead of `width: ${props.$width}px` in the template, pass `style={{ width: `${width}px` }}` to the component.
+- **Styled-components Performance**: For frequently changing values (e.g., width during drag operations), use inline styles via the `style` prop instead of CSS template literals. This prevents styled-components from generating excessive classes and avoids performance warnings. Example: Instead of `width: ${props.$width}px` in the template, pass `style={{ width:`${width}px`}}` to the component.
 
 ## Development environment
 
@@ -164,6 +164,7 @@ The application uses a custom `ResizablePanel` component (`src/molecules/Resizab
 ### Usage
 
 The `ResizablePanel` component is used throughout the application for:
+
 - **Config panel**: Left-side panel containing the configuration editor
 - **Downloads panel**: Right-side panel containing the file downloads list
 - **Settings panel**: Left-side panel containing options and injections list
@@ -214,11 +215,11 @@ Users can drag and drop files anywhere on the welcome page to load them. Visual 
 - Automatic file type validation
 - Error messages for invalid file types or missing config.yaml
 
-### Conflict Resolution
+### Local File Conflict Resolution
 
 When loading footprints from local archives, the same unified conflict resolution system applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints. The system works for all injection types (footprints, templates, etc.) and shows type-specific dialogs (e.g., "Footprint Conflict").
 
-### Implementation Files
+### Local File Implementation
 
 - **`src/utils/localFiles.ts`**: Contains `loadLocalFile` function that handles all file types:
   - `loadTextFile`: Reads YAML/JSON files using FileReader
@@ -255,13 +256,14 @@ When a user provides a GitHub repository URL (e.g., `user/repo` or `https://gith
    - Loads all `.js` files from the submodule and prefixes names with the relative path
    - Example: A submodule at `footprints/external` with `switch.js` becomes `external/switch`
 
-### Conflict Resolution
+### GitHub Conflict Resolution
 
 The application provides a unified conflict resolution system for all injection types (footprints, templates, and future types) across multiple loading scenarios:
 
 #### When Conflicts Occur
 
 Conflict resolution is triggered when loading injections from:
+
 1. **GitHub repository URLs** (via the Welcome page input or `?github=` URL parameter)
 2. **Local files** (ZIP/EKB archives with footprints)
 3. **Shared configuration links** (hash fragments with injections)
@@ -282,12 +284,13 @@ When a conflict is detected, a `ConflictResolutionDialog` is displayed to the us
 #### Generic Implementation
 
 The conflict resolution infrastructure is generic and works with any injection type:
+
 - Uses `checkForInjectionConflict(type, name, existingInjections)` for type-aware conflict detection
 - Uses `mergeInjectionArraysWithResolution(newInjections, existingInjections, resolution)` for merging with conflict resolution
 - The dialog accepts an `injectionType` prop to display type-specific messages
 - Currently used for footprints, but ready for templates and future injection types
 
-### Implementation Files
+### GitHub Implementation
 
 - **`src/utils/github.ts`**: Contains `fetchConfigFromUrl` function that returns both config and footprints, plus helper functions:
   - `fetchFootprintsFromDirectory`: Recursive directory traversal for a single directory
@@ -398,7 +401,7 @@ The share system provides comprehensive error handling:
 - **Console Logging**: All errors are logged to the console with `[Share]` prefix for debugging
 - **Debug Mode**: Adding `?debug` to the URL enables debug logging that shows the decoded configuration object in the console
 
-### Implementation Files
+### Sharing Implementation
 
 - **`src/utils/share.ts`**: Core sharing utilities:
   - `encodeConfig`: Compresses and encodes configuration and injections

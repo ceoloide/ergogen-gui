@@ -28,7 +28,7 @@ global.window.ergogen = {
   inject: jest.fn(),
 };
 
-import ConfigContextProvider from './ConfigContext';
+import { ConfigContextProvider } from './ConfigContext';
 
 const mockConfig = 'points: {}';
 
