@@ -7,7 +7,7 @@ test.describe('Responsive Layout', () => {
     // Set viewport to a mobile size
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Empty Configuration' }).click();
+    await page.getByTestId('empty-config-button').click();
 
     const configEditor = page.getByTestId('config-editor');
     const outputPanel = page.getByTestId('demo.svg-file-preview');
@@ -19,7 +19,7 @@ test.describe('Responsive Layout', () => {
     await shoot('after-mobile-config-visible-output-hidden');
 
     // 2. Click "Outputs" button
-    await page.getByRole('button', { name: 'Outputs' }).click();
+    await page.getByTestId('mobile-outputs-button').click();
 
     // 3. "Outputs" is active, editor is hidden, output is visible
     await shoot('before-mobile-output-visible-config-hidden');
