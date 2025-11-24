@@ -249,7 +249,6 @@ const AppContent = ({
 
     // Process the pending shared config with conflict resolution
 
-    // Process injections with conflict resolution
     if (
       pendingSharedConfig.injections !== undefined &&
       pendingSharedConfig.injections.length > 0
