@@ -99,7 +99,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     e.stopPropagation();
     isResizingRef.current = true;
     startWidthRef.current = panelWidth;
-    
+
     if ('touches' in e) {
       startXRef.current = e.touches[0].clientX;
     } else {
@@ -192,14 +192,16 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             <span className="material-symbols-outlined">close</span>
           </CloseButton>
         </Header>
-        <Content>
-          {/* Content area - can be expanded in the future */}
-        </Content>
+        <Content>{/* Content area - can be expanded in the future */}</Content>
         <Footer>
           <ButtonGroup>
             <OutlineButton
               onClick={() => {
-                window.open('https://docs.ergogen.xyz/', '_blank', 'noopener,noreferrer');
+                window.open(
+                  'https://docs.ergogen.xyz/',
+                  '_blank',
+                  'noopener,noreferrer'
+                );
               }}
               aria-label="Open documentation"
               data-testid="side-nav-docs-button"
@@ -209,7 +211,11 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             </OutlineButton>
             <OutlineButton
               onClick={() => {
-                window.open('https://discord.ergogen.xyz', '_blank', 'noopener,noreferrer');
+                window.open(
+                  'https://discord.ergogen.xyz',
+                  '_blank',
+                  'noopener,noreferrer'
+                );
               }}
               aria-label="Join the Discord community"
               data-testid="side-nav-discord-button"
@@ -218,7 +224,11 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             </OutlineButton>
             <OutlineButton
               onClick={() => {
-                window.open('https://github.com/ergogen', '_blank', 'noopener,noreferrer');
+                window.open(
+                  'https://github.com/ergogen',
+                  '_blank',
+                  'noopener,noreferrer'
+                );
               }}
               aria-label="View the GitHub repositories"
               data-testid="side-nav-github-button"
@@ -241,11 +251,16 @@ const Overlay = styled.div<{ $isOpen: boolean; $isOpening: boolean }>`
   background-color: rgba(0, 0, 0, 0.7);
   z-index: 999;
   opacity: ${(props) => (props.$isOpen ? 1 : 0)};
-  transition: opacity ${(props) => (props.$isOpening ? '0.2s' : '0.1s')} ease-in-out;
+  transition: opacity ${(props) => (props.$isOpening ? '0.2s' : '0.1s')}
+    ease-in-out;
   pointer-events: ${(props) => (props.$isOpen ? 'auto' : 'none')};
 `;
 
-const Panel = styled.div<{ $isOpen: boolean; $isOpening: boolean; $width: number }>`
+const Panel = styled.div<{
+  $isOpen: boolean;
+  $isOpening: boolean;
+  $width: number;
+}>`
   position: fixed;
   top: 0;
   left: 0;
@@ -259,7 +274,8 @@ const Panel = styled.div<{ $isOpen: boolean; $isOpening: boolean; $width: number
   display: flex;
   flex-direction: column;
   transform: translateX(${(props) => (props.$isOpen ? '0' : '-100%')});
-  transition: transform ${(props) => (props.$isOpening ? '0.2s' : '0.1s')} ease-in-out;
+  transition: transform ${(props) => (props.$isOpening ? '0.2s' : '0.1s')}
+    ease-in-out;
 
   @media (max-width: 639px) {
     width: 100%;
@@ -362,7 +378,8 @@ const ButtonGroup = styled.div`
 
 const OutlineButton = styled.button`
   background-color: transparent;
-  transition: color 0.15s ease-in-out,
+  transition:
+    color 0.15s ease-in-out,
     background-color 0.15s ease-in-out,
     border-color 0.15s ease-in-out,
     box-shadow 0.15s ease-in-out;

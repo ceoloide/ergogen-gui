@@ -7,7 +7,8 @@ import Button from '../atoms/Button';
  * Props for the ConflictResolutionDialog component.
  */
 type ConflictResolutionDialogProps = {
-  footprintName: string;
+  injectionName: string;
+  injectionType: string;
   onResolve: (
     action: 'skip' | 'overwrite' | 'keep-both',
     applyToAll: boolean
@@ -17,25 +18,37 @@ type ConflictResolutionDialogProps = {
 };
 
 /**
+ * Capitalizes the first letter of a string.
+ */
+const capitalize = (str: string): string => {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+/**
  * A dialog component that prompts the user to resolve injection name conflicts.
  * Provides options to skip, overwrite, or keep both injections.
  */
 const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
-  footprintName,
+  injectionName,
+  injectionType,
   onResolve,
   onCancel,
   'data-testid': dataTestId,
 }) => {
   const [applyToAll, setApplyToAll] = useState(false);
+  const typeLabel = capitalize(injectionType);
 
   return (
     <Overlay data-testid={dataTestId}>
       <DialogBox data-testid={dataTestId && `${dataTestId}-box`}>
-        <Title>Injection Conflict</Title>
+        <Title>{typeLabel} Conflict</Title>
         <Message>
-          An injection with the name <strong>{footprintName}</strong> already
-          exists. How would you like to resolve this conflict?
+          A {injectionType} with the name <strong>{injectionName}</strong>{' '}
+          already exists.
+          <br />
+          How would you like to resolve this conflict?
         </Message>
+
         <CheckboxContainer>
           <input
             type="checkbox"
@@ -47,12 +60,13 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
           />
           <label htmlFor="apply-to-all">Apply to all conflicts</label>
         </CheckboxContainer>
+
         <ButtonGroup>
           <Button
             onClick={() => onResolve('skip', applyToAll)}
             size="medium"
             data-testid={dataTestId && `${dataTestId}-skip`}
-            aria-label="Skip this injection"
+            aria-label={`Skip this ${injectionType}`}
           >
             Skip
           </Button>
@@ -60,7 +74,7 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
             onClick={() => onResolve('overwrite', applyToAll)}
             size="medium"
             data-testid={dataTestId && `${dataTestId}-overwrite`}
-            aria-label="Overwrite existing injection"
+            aria-label={`Overwrite existing ${injectionType}`}
           >
             Overwrite
           </Button>
@@ -68,7 +82,7 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
             onClick={() => onResolve('keep-both', applyToAll)}
             size="medium"
             data-testid={dataTestId && `${dataTestId}-keep-both`}
-            aria-label="Keep both injections"
+            aria-label={`Keep both ${injectionType}s`}
           >
             Keep Both
           </Button>

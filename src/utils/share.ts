@@ -37,7 +37,7 @@ export const encodeConfig = (
 /**
  * Result of decoding a shared configuration.
  */
-export type DecodeResult =
+type DecodeResult =
   | { success: true; config: ShareableConfig }
   | {
       success: false;

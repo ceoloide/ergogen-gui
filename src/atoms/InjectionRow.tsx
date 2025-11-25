@@ -102,7 +102,7 @@ const StyledLinkButton = styled.a`
  */
 const MobileEditButton = styled.a`
   ${buttonStyles}
-  
+
   @media (min-width: 640px) {
     display: none;
   }

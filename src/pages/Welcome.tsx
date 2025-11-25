@@ -6,15 +6,12 @@ import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
-import {
-  checkForConflict,
-  mergeInjections,
-  ConflictResolution,
-} from '../utils/injections';
+import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { trackEvent } from '../utils/analytics';
+import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 
 // Styled Components
 const WelcomePageWrapper = styled.div<{ $isDragging?: boolean }>`
@@ -220,15 +217,30 @@ const Welcome = () => {
   const [githubInput, setGithubInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
-  const [pendingFootprints, setPendingFootprints] = useState<GitHubFootprint[]>(
-    []
-  );
-  const [currentConflict, setCurrentConflict] = useState<string | null>(null);
-  const [pendingConfig, setPendingConfig] = useState<string | null>(null);
-  const [injectionsAtConflict, setInjectionsAtConflict] = useState<
-    string[][] | null
-  >(null);
+
   const [isDragging, setIsDragging] = useState(false);
+
+  // Use the injection conflict resolution hook
+  const {
+    currentConflict,
+    processInjectionsWithConflictResolution,
+    handleConflictResolution: handleConflictResolutionBase,
+    handleConflictCancel: handleConflictCancelBase,
+  } = useInjectionConflictResolution({
+    setInjectionInput: (injections) =>
+      configContext?.setInjectionInput(injections),
+    setConfigInput: (config) => configContext?.setConfigInput(config),
+    generateNow: async (config, injections, options) => {
+      if (configContext) {
+        await configContext.generateNow(config, injections, options);
+      }
+    },
+    getCurrentInjections: () => configContext?.injectionInput || [],
+    onComplete: async () => {
+      setShouldNavigate(true);
+    },
+    setError: (error) => configContext?.setError(error),
+  });
 
   // Navigate to home when config has been set
   useEffect(() => {
@@ -268,130 +280,56 @@ const Welcome = () => {
     }
   };
 
+  /**
+   * Processes footprints (or any injections) with conflict resolution.
+   * Converts GitHubFootprint[] to string[][] and uses the conflict resolution hook.
+   */
   const processFootprints = async (
     footprints: GitHubFootprint[],
     config: string,
-    resolution: ConflictResolution | null = null,
+    resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]
   ): Promise<void> => {
     if (!configContext) {
       throw new Error('Configuration context not available');
     }
 
-    // Use provided injections or fall back to context
-    const injectionsToUse = currentInjections || configContext.injectionInput;
+    // Convert footprints to injection array format
+    const injections: string[][] = footprints.map((fp) => [
+      'footprint',
+      fp.name,
+      fp.content,
+    ]);
 
-    if (footprints.length === 0) {
-      // No footprints to process, just load the config
-      configContext.setInjectionInput(injectionsToUse);
-      configContext.setConfigInput(config);
-      await configContext.generateNow(config, injectionsToUse, {
-        pointsonly: false,
-      });
-      setShouldNavigate(true);
-      return;
-    }
 
-    const currentFootprint = footprints[0];
-    const remainingFootprints = footprints.slice(1);
-
-    // Check for conflict using the current injections state
-    const conflictCheck = checkForConflict(
-      currentFootprint.name,
-      injectionsToUse
+    // Use the hook's process function
+    await processInjectionsWithConflictResolution(
+      injections,
+      config,
+      resolution,
+      currentInjections
     );
-
-    if (conflictCheck.hasConflict && !resolution) {
-      // Show dialog and pause processing
-      setCurrentConflict(currentFootprint.name);
-      setPendingFootprints(footprints);
-      setPendingConfig(config);
-      setInjectionsAtConflict(injectionsToUse ?? null);
-      return;
-    }
-
-    // Determine resolution to use
-    const resolutionToUse = resolution || 'skip';
-
-    // Merge this footprint with the current injections state
-    const mergedInjections = mergeInjections(
-      [currentFootprint],
-      injectionsToUse,
-      resolutionToUse
-    );
-
-    // Process remaining footprints with the updated injections
-    if (remainingFootprints.length > 0) {
-      await processFootprints(
-        remainingFootprints,
-        config,
-        resolution,
-        mergedInjections
-      );
-    } else {
-      // All footprints processed, update context and load the config
-      configContext.setInjectionInput(mergedInjections);
-      configContext.setConfigInput(config);
-      await configContext.generateNow(config, mergedInjections, {
-        pointsonly: false,
-      });
-      setShouldNavigate(true);
-    }
   };
 
+  /**
+   * Wrapper for handleConflictResolution that cleans up footprint-specific state.
+   * The base handler already processes remaining injections internally.
+   */
   const handleConflictResolution = async (
-    action: ConflictResolution,
+    action: ConflictResolutionStrategy,
     applyToAllConflicts: boolean
   ) => {
-    if (!configContext || !pendingFootprints || !pendingConfig) return;
+    // Call the base handler - it handles all remaining injections internally
+    await handleConflictResolutionBase(action, applyToAllConflicts);
 
-    setCurrentConflict(null);
-
-    // Process the current footprint with the chosen action
-    const currentFootprint = pendingFootprints[0];
-    const remainingFootprints = pendingFootprints.slice(1);
-
-    // Merge with current injections state
-    const mergedInjections = mergeInjections(
-      [currentFootprint],
-      injectionsAtConflict || configContext.injectionInput,
-      action
-    );
-
-    // Resume processing remaining footprints with the updated injections
-    if (remainingFootprints.length > 0) {
-      await processFootprints(
-        remainingFootprints,
-        pendingConfig,
-        applyToAllConflicts ? action : null,
-        mergedInjections
-      );
-    } else {
-      // All footprints processed, update context and load the config
-      configContext.setInjectionInput(mergedInjections);
-      configContext.setConfigInput(pendingConfig);
-      await configContext.generateNow(pendingConfig, mergedInjections, {
-        pointsonly: false,
-      });
-      setShouldNavigate(true);
-
-      // Clean up state only after all footprints are processed
-      setPendingFootprints([]);
-      setPendingConfig(null);
-      setInjectionsAtConflict(null);
-    }
+    // Clean up footprint-specific state after processing completes
+    // (The hook manages its own internal state)
   };
 
   const handleConflictCancel = () => {
-    setCurrentConflict(null);
-    setPendingFootprints([]);
-    setPendingConfig(null);
-    setInjectionsAtConflict(null);
+    handleConflictCancelBase();
     setIsLoading(false);
-    // Show error message that loading was cancelled
-    if (configContext) {
-      configContext.setError('Loading cancelled by user');
-    }
+    configContext?.setIsGenerating(false);
   };
 
   const handleGitHub = () => {
@@ -407,10 +345,7 @@ const Welcome = () => {
     });
 
     // Reset any pending conflict resolution state from previous loads
-    setCurrentConflict(null);
-    setPendingFootprints([]);
-    setPendingConfig(null);
-    setInjectionsAtConflict(null);
+    // Note: currentConflict is managed by the hook, so we only reset local state
 
     fetchConfigFromUrl(githubInput)
       .then(async (result) => {
@@ -466,10 +401,7 @@ const Welcome = () => {
     });
 
     // Reset any pending conflict resolution state from previous loads
-    setCurrentConflict(null);
-    setPendingFootprints([]);
-    setPendingConfig(null);
-    setInjectionsAtConflict(null);
+    // Note: currentConflict is managed by the hook, so we only reset local state
 
     try {
       const result = await loadLocalFile(file);
@@ -566,10 +498,11 @@ const Welcome = () => {
       </DropOverlay>
       {currentConflict && (
         <ConflictResolutionDialog
-          footprintName={currentConflict}
+          injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-dialog"
+          data-testid="conflict-resolution-dialog"
         />
       )}
       <WelcomeContainer>

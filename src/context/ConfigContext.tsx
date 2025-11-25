@@ -13,12 +13,14 @@ import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
-import { fetchConfigFromUrl } from '../utils/github';
 import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
 import { trackEvent } from '../utils/analytics';
+import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
+import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
+import { useConfigLoader } from '../hooks/useConfigLoader';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
   JscadWorkerRequest,
@@ -243,6 +245,8 @@ const ConfigContextProvider = ({
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+
 
   // Worker refs
   const ergogenWorkerRef = useRef<Worker | null>(null);
@@ -618,6 +622,32 @@ const ConfigContextProvider = ({
     [processInput, runGeneration]
   );
 
+  // Memoize callbacks for the conflict resolution hook to prevent unnecessary re-renders
+  const conflictResolutionCallbacks = useMemo(
+    () => ({
+      setInjectionInput,
+      setConfigInput,
+      generateNow,
+      getCurrentInjections: () => injectionInput || [],
+      setError,
+    }),
+    [injectionInput, generateNow, setInjectionInput, setConfigInput, setError]
+  );
+
+  // Use the injection conflict resolution hook
+  const {
+    currentConflict,
+    processInjectionsWithConflictResolution,
+    handleConflictResolution,
+    handleConflictCancel,
+  } = useInjectionConflictResolution(conflictResolutionCallbacks);
+
+  // Use the config loader hook
+  const { isLoading: isConfigLoading } = useConfigLoader({
+    processInjectionsWithConflictResolution,
+    setError,
+  });
+
   /**
    * Effect to process the input configuration on the initial load.
    * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
@@ -630,78 +660,22 @@ const ConfigContextProvider = ({
       return;
     }
 
-    // Check for GitHub URL parameter
+    // If we are loading from GitHub, wait for that to finish
+    if (isConfigLoading) {
+      return;
+    }
+
+    // If not loading from GitHub, and we have configInput, generate it
+    // This handles the case where we have config from localStorage or hash fragment
+    // but NOT from a GitHub URL (which is handled by useConfigLoader)
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
-    if (githubUrl) {
-      console.log('[ConfigContext] Loading from URL parameter:', githubUrl);
-      fetchConfigFromUrl(githubUrl)
-        .then(async (result) => {
-          console.log('[ConfigContext] Fetch result:', {
-            configLength: result.config.length,
-            footprintsCount: result.footprints.length,
-            configPath: result.configPath,
-            rateLimitWarning: result.rateLimitWarning,
-          });
-          console.log(
-            '[ConfigContext] Footprints:',
-            result.footprints.map((f) => f.name)
-          );
 
-          // Show rate limit warning if present
-          if (result.rateLimitWarning) {
-            setError(result.rateLimitWarning);
-          }
-
-          try {
-            // Import mergeInjections to handle footprints
-            const { mergeInjections } = await import('../utils/injections');
-
-            console.log(
-              '[ConfigContext] Current injectionInput before merge:',
-              injectionInput
-            );
-
-            // Merge footprints with existing injections using 'overwrite' strategy
-            // This ensures GitHub footprints take precedence when loading from URL
-            const mergedInjections = mergeInjections(
-              result.footprints,
-              injectionInput,
-              'overwrite'
-            );
-
-            console.log(
-              '[ConfigContext] Merged injections count:',
-              mergedInjections.length
-            );
-            console.log(
-              '[ConfigContext] Merged injections:',
-              mergedInjections.map((inj) => inj[1])
-            );
-
-            setInjectionInput(mergedInjections);
-            setConfigInput(result.config);
-            generateNow(result.config, mergedInjections, { pointsonly: false });
-          } catch (error) {
-            // If footprint processing fails, don't load the config
-            console.error(
-              '[ConfigContext] Error processing footprints:',
-              error
-            );
-            throw new Error(
-              `Failed to process footprints: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-          }
-        })
-        .catch((e) => {
-          console.error('[ConfigContext] Failed to load from GitHub:', e);
-          setError(`Failed to load from GitHub: ${e.message}`);
-        });
-    } else if (configInput) {
+    if (!githubUrl && configInput) {
       generateNow(configInput, injectionInput, { pointsonly: false });
     }
     // eslint-disable-next-line
-  }, []);
+  }, [isConfigLoading]);
 
   /**
    * Effect to process the input configuration whenever it or the auto-generation settings change.
@@ -801,11 +775,20 @@ const ConfigContextProvider = ({
   return (
     <ConfigContext.Provider value={contextValue}>
       {children}
+      {currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
+          onResolve={handleConflictResolution}
+          onCancel={handleConflictCancel}
+          data-testid="conflict-resolution-dialog"
+        />
+      )}
     </ConfigContext.Provider>
   );
 };
 
-export default ConfigContextProvider;
+export { ConfigContextProvider };
 
 /**
  * A custom hook to easily consume the ConfigContext.

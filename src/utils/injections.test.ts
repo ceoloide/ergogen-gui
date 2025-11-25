@@ -3,6 +3,7 @@ import {
   generateUniqueName,
   mergeInjections,
   mergeInjectionArrays,
+  getInjectionConflicts,
 } from './injections';
 
 describe('injections utilities', () => {
@@ -365,6 +366,56 @@ describe('injections utilities', () => {
       // Check added one
       const newOne = result.find((inj) => inj[1] === 'new_one');
       expect(newOne).toEqual(['footprint', 'new_one', 'new_content']);
+    });
+  });
+
+  describe('getInjectionConflicts', () => {
+    it('returns empty array when no conflicts exist', () => {
+      // Arrange
+      const newInjections = [
+        ['footprint', 'new_footprint', 'content'],
+        ['template', 'new_template', 'content'],
+      ];
+      const existingInjections = [
+        ['footprint', 'existing_footprint', 'content'],
+      ];
+
+      // Act
+      const result = getInjectionConflicts(newInjections, existingInjections);
+
+      // Assert
+      expect(result).toHaveLength(0);
+    });
+
+    it('returns conflicts when they exist', () => {
+      // Arrange
+      const newInjections = [
+        ['footprint', 'existing_footprint', 'new_content'],
+        ['template', 'existing_template', 'new_content'],
+        ['footprint', 'new_footprint', 'content'],
+      ];
+      const existingInjections = [
+        ['footprint', 'existing_footprint', 'old_content'],
+        ['template', 'existing_template', 'old_content'],
+      ];
+
+      // Act
+      const result = getInjectionConflicts(newInjections, existingInjections);
+
+      // Assert
+      expect(result).toHaveLength(2);
+      expect(result[0].injection).toEqual([
+        'footprint',
+        'existing_footprint',
+        'new_content',
+      ]);
+      expect(result[0].conflict.hasConflict).toBe(true);
+      expect(result[1].injection).toEqual([
+        'template',
+        'existing_template',
+        'new_content',
+      ]);
+      expect(result[1].conflict.hasConflict).toBe(true);
     });
   });
 });
