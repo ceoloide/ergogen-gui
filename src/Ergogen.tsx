@@ -167,6 +167,7 @@ const ScrollablePanelContainer = styled.div`
 const StyledConfigEditor = styled(ConfigEditor)`
   position: relative;
   flex-grow: 1;
+  min-height: 0;
 `;
 
 /**
