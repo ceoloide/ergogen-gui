@@ -1,5 +1,5 @@
 import { Editor, OnMount } from '@monaco-editor/react';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useConfigContext } from '../context/ConfigContext';
 
 /**
@@ -40,6 +40,9 @@ const ConfigEditor = ({
   'aria-label': ariaLabel,
 }: Props) => {
   const configContext = useConfigContext();
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   // Provide safe defaults when context is null to avoid conditional hooks
   const defaults = {
@@ -79,6 +82,7 @@ const ConfigEditor = ({
   }, [configInput, handleChange]);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
     editor.addAction({
       id: 'generate-config',
       label: 'Generate',
@@ -90,12 +94,57 @@ const ConfigEditor = ({
         generateNow(currentConfig, injectionInput, { pointsonly: false });
       },
     });
+
+    // Handle window and container resize to update Monaco Editor layout
+    const updateLayout = () => {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        editor.layout();
+      });
+    };
+
+    // Listen to window resize events
+    window.addEventListener('resize', updateLayout);
+
+    // Use ResizeObserver to detect container size changes
+    const container = containerRef.current;
+    let resizeObserver: ResizeObserver | null = null;
+
+    if (container && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        updateLayout();
+      });
+      resizeObserver.observe(container);
+    }
+
+    // Store cleanup function in ref for cleanup on unmount
+    cleanupRef.current = () => {
+      window.removeEventListener('resize', updateLayout);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
   };
+
+  // Cleanup resize listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+    };
+  }, []);
 
   if (!configContext) return null;
 
   return (
-    <div className={className} data-testid={dataTestId} aria-label={ariaLabel}>
+    <div
+      ref={containerRef}
+      className={className}
+      data-testid={dataTestId}
+      aria-label={ariaLabel}
+    >
       <Editor
         height="100%"
         defaultLanguage="yaml"
