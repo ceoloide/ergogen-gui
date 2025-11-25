@@ -56,6 +56,11 @@ export const useConfigLoader = ({
             newInjections,
             result.config
           );
+
+          // Clear the GitHub URL parameter after successful loading
+          const url = new URL(window.location.href);
+          url.searchParams.delete('github');
+          window.history.replaceState(null, '', url);
         } catch (e) {
           console.error('[useConfigLoader] Failed to load from GitHub:', e);
           setError(

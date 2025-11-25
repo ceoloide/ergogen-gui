@@ -301,7 +301,6 @@ const Welcome = () => {
       fp.content,
     ]);
 
-
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
       injections,

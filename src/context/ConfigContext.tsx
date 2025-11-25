@@ -246,8 +246,6 @@ const ConfigContextProvider = ({
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-
-
   // Worker refs
   const ergogenWorkerRef = useRef<Worker | null>(null);
   const jscadWorkerRef = useRef<Worker | null>(null);

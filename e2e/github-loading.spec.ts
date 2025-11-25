@@ -94,7 +94,7 @@ test.describe('GitHub Loading', () => {
     await shoot('footprints-loaded');
   });
 
-  test.skip('should load config with URL parameter and footprints', async ({
+  test('should load config with URL parameter and footprints', async ({
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
@@ -120,9 +120,13 @@ test.describe('GitHub Loading', () => {
 
     // Wait for config to be loaded and editor to be visible
     await expect(page.getByTestId('config-editor')).toBeVisible({
-      timeout: 5000,
+      timeout: 30000,
     });
     await shoot('config-editor-visible-url-param');
+
+    // Verify that the GitHub URL parameter has been cleared after loading
+    const url = new URL(page.url());
+    expect(url.searchParams.has('github')).toBe(false);
 
     // Wait for logs
     await page.waitForTimeout(2000);
