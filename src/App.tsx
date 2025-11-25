@@ -106,6 +106,7 @@ const App = () => {
   //    So if hash failed, it did NOT load local. initialConfig remained ''.
   const shouldLoadFromLocalStorage =
     !hashResult ||
+    !hashResult.success ||
     (hashResult.success &&
       hashResult.config.injections &&
       hashResult.config.injections.length > 0);
