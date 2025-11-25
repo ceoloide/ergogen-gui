@@ -246,16 +246,7 @@ const ConfigContextProvider = ({
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Refs to store callbacks for the conflict resolution hook
-  // These are needed because generateNow is defined later in the component
-  const generateNowRef = useRef<
-    | ((
-        textInput: string | undefined,
-        injectionInput: string[][] | undefined,
-        options?: { pointsonly: boolean }
-      ) => Promise<void>)
-    | null
-  >(null);
+
 
   // Worker refs
   const ergogenWorkerRef = useRef<Worker | null>(null);
@@ -631,27 +622,25 @@ const ConfigContextProvider = ({
     [processInput, runGeneration]
   );
 
-  // Update ref when generateNow changes
-  generateNowRef.current = generateNow;
+  // Memoize callbacks for the conflict resolution hook to prevent unnecessary re-renders
+  const conflictResolutionCallbacks = useMemo(
+    () => ({
+      setInjectionInput,
+      setConfigInput,
+      generateNow,
+      getCurrentInjections: () => injectionInput || [],
+      setError,
+    }),
+    [injectionInput, generateNow, setInjectionInput, setConfigInput, setError]
+  );
 
   // Use the injection conflict resolution hook
-  // Note: generateNow is accessed via ref because it's defined later
   const {
     currentConflict,
     processInjectionsWithConflictResolution,
     handleConflictResolution,
     handleConflictCancel,
-  } = useInjectionConflictResolution({
-    setInjectionInput,
-    setConfigInput,
-    generateNow: async (config, injections, options) => {
-      if (generateNowRef.current) {
-        await generateNowRef.current(config, injections, options);
-      }
-    },
-    getCurrentInjections: () => injectionInput || [],
-    setError,
-  });
+  } = useInjectionConflictResolution(conflictResolutionCallbacks);
 
   // Use the config loader hook
   const { isLoading: isConfigLoading } = useConfigLoader({
