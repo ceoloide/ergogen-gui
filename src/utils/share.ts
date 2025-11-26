@@ -177,17 +177,49 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
 };
 
 /**
+ * Options for creating a shareable URI.
+ */
+type CreateShareableUriOptions = {
+  /** The YAML/JSON configuration string */
+  config: string;
+  /** Optional array of injections (footprints, templates, etc.) */
+  injections?: string[][];
+  /**
+   * Optional canonical output from Ergogen (results.canonical).
+   * When provided, footprint injections are filtered to only include
+   * those actually used in the configuration's PCBs section.
+   * Non-footprint injections (templates, etc.) are always included.
+   */
+  canonical?: unknown;
+};
+
+/**
  * Creates a shareable URI with the encoded configuration as a hash fragment.
+ * When canonical output is provided, only footprints used in the configuration
+ * are included in the share link.
  *
- * @param config - The YAML/JSON configuration string
- * @param injections - Optional array of injections
+ * @param options - Configuration options for creating the shareable URI
  * @returns Full URL with encoded config in hash fragment
  */
 export const createShareableUri = (
-  config: string,
-  injections?: string[][]
+  options: CreateShareableUriOptions
 ): string => {
-  const encoded = encodeConfig(config, injections);
+  const { config, injections, canonical } = options;
+
+  // Filter injections if canonical output is provided
+  let injectionsToShare = injections;
+  if (canonical && injections && injections.length > 0) {
+    const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
+    injectionsToShare = filterInjectionsForSharing(injections, usedFootprints);
+  }
+
+  // Only include injections if there are any after filtering
+  const finalInjections =
+    injectionsToShare && injectionsToShare.length > 0
+      ? injectionsToShare
+      : undefined;
+
+  const encoded = encodeConfig(config, finalInjections);
   const baseUrl = window.location.origin + window.location.pathname;
   return `${baseUrl}#${encoded}`;
 };

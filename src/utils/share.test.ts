@@ -111,17 +111,144 @@ describe('share utilities', () => {
     });
 
     it('creates URI with config only', () => {
-      const uri = createShareableUri(testConfig);
+      // Act
+      const uri = createShareableUri({ config: testConfig });
+
+      // Assert
       expect(uri).toMatch(/^https:\/\/example.com\/#/);
       const fragment = uri.split('#')[1];
       expect(fragment).toBeTruthy();
     });
 
     it('creates URI with config and injections', () => {
-      const uri = createShareableUri(testConfig, testInjections);
+      // Act
+      const uri = createShareableUri({
+        config: testConfig,
+        injections: testInjections,
+      });
+
+      // Assert
       expect(uri).toMatch(/^https:\/\/example.com\/#/);
       const fragment = uri.split('#')[1];
       expect(fragment).toBeTruthy();
+    });
+
+    it('filters footprint injections when canonical is provided', () => {
+      // Arrange
+      const injections: string[][] = [
+        ['footprint', 'used/switch', 'function switch() {}'],
+        ['footprint', 'unused/diode', 'function diode() {}'],
+        ['template', 'my_template', 'template content'],
+      ];
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              switch1: { what: 'used/switch' },
+            },
+          },
+        },
+      };
+
+      // Act
+      const uri = createShareableUri({
+        config: testConfig,
+        injections,
+        canonical,
+      });
+
+      // Assert - decode and verify only used footprint and template are included
+      const fragment = uri.split('#')[1];
+      const decoded = decodeConfig(fragment);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual([
+          ['footprint', 'used/switch', 'function switch() {}'],
+          ['template', 'my_template', 'template content'],
+        ]);
+      }
+    });
+
+    it('includes all injections when canonical is not provided', () => {
+      // Arrange
+      const injections: string[][] = [
+        ['footprint', 'footprint1', 'function fp1() {}'],
+        ['footprint', 'footprint2', 'function fp2() {}'],
+      ];
+
+      // Act
+      const uri = createShareableUri({
+        config: testConfig,
+        injections,
+      });
+
+      // Assert - all injections should be included
+      const fragment = uri.split('#')[1];
+      const decoded = decodeConfig(fragment);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual(injections);
+      }
+    });
+
+    it('excludes injections when all footprints are filtered out', () => {
+      // Arrange
+      const injections: string[][] = [
+        ['footprint', 'unused/footprint', 'function fp() {}'],
+      ];
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              switch1: { what: 'different/footprint' },
+            },
+          },
+        },
+      };
+
+      // Act
+      const uri = createShareableUri({
+        config: testConfig,
+        injections,
+        canonical,
+      });
+
+      // Assert - no injections should be in the result
+      const fragment = uri.split('#')[1];
+      const decoded = decodeConfig(fragment);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toBeUndefined();
+      }
+    });
+
+    it('handles canonical with no pcbs section', () => {
+      // Arrange
+      const injections: string[][] = [
+        ['footprint', 'some/footprint', 'function fp() {}'],
+        ['template', 'my_template', 'template content'],
+      ];
+      const canonical = {
+        points: {},
+        outlines: {},
+      };
+
+      // Act
+      const uri = createShareableUri({
+        config: testConfig,
+        injections,
+        canonical,
+      });
+
+      // Assert - only non-footprint injections should be included
+      const fragment = uri.split('#')[1];
+      const decoded = decodeConfig(fragment);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual([
+          ['template', 'my_template', 'template content'],
+        ]);
+      }
     });
   });
 

@@ -4,11 +4,7 @@ import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
-import {
-  createShareableUri,
-  extractUsedFootprintsFromCanonical,
-  filterInjectionsForSharing,
-} from '../utils/share';
+import { createShareableUri } from '../utils/share';
 import { trackEvent } from '../utils/analytics';
 import ShareDialog from '../molecules/ShareDialog';
 
@@ -215,33 +211,15 @@ const Header = (): JSX.Element => {
       return;
     }
 
-    // Extract used footprints from the canonical output
-    const usedFootprints = extractUsedFootprintsFromCanonical(
-      configContext.results?.canonical
-    );
-
-    // Filter injections to only include used footprints and all non-footprint injections
-    const injectionsToShare = filterInjectionsForSharing(
-      configContext.injectionInput,
-      usedFootprints
-    );
-
-    // Only pass injections if there are any to share
-    const finalInjections =
-      injectionsToShare.length > 0 ? injectionsToShare : undefined;
-
-    const shareableUri = createShareableUri(
-      configContext.configInput,
-      finalInjections
-    );
+    const shareableUri = createShareableUri({
+      config: configContext.configInput,
+      injections: configContext.injectionInput,
+      canonical: configContext.results?.canonical,
+    });
 
     trackEvent('share_button_clicked', {
-      has_injections: !!finalInjections,
-      injections_count: finalInjections?.length || 0,
-      total_injections: configContext.injectionInput?.length || 0,
-      footprints_filtered:
-        (configContext.injectionInput?.length || 0) -
-        (finalInjections?.length || 0),
+      has_injections: !!configContext.injectionInput?.length,
+      injections_count: configContext.injectionInput?.length || 0,
     });
 
     setShareLink(shareableUri);
