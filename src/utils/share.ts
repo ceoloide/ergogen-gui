@@ -177,17 +177,138 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
 };
 
 /**
+ * Extracts footprint names used in the PCBs section of the canonical YAML.
+ * Traverses all PCBs and collects all `what` values from footprint definitions.
+ *
+ * @param canonical - The canonical YAML object (already parsed)
+ * @returns Set of footprint names (e.g., 'ceoloide/switch_mx')
+ */
+export const extractUsedFootprints = (
+  canonical: unknown
+): Set<string> => {
+  const usedFootprints = new Set<string>();
+
+  if (!canonical || typeof canonical !== 'object') {
+    return usedFootprints;
+  }
+
+  const canonicalObj = canonical as Record<string, unknown>;
+
+  // Check if pcbs section exists
+  if (!canonicalObj.pcbs || typeof canonicalObj.pcbs !== 'object') {
+    return usedFootprints;
+  }
+
+  const pcbs = canonicalObj.pcbs as Record<string, unknown>;
+
+  // Iterate through each PCB
+  for (const pcbName of Object.keys(pcbs)) {
+    const pcb = pcbs[pcbName];
+    if (!pcb || typeof pcb !== 'object') {
+      continue;
+    }
+
+    const pcbObj = pcb as Record<string, unknown>;
+
+    // Check if footprints section exists
+    if (!pcbObj.footprints || typeof pcbObj.footprints !== 'object') {
+      continue;
+    }
+
+    const footprints = pcbObj.footprints as Record<string, unknown>;
+
+    // Iterate through each footprint definition
+    for (const footprintName of Object.keys(footprints)) {
+      const footprint = footprints[footprintName];
+      if (!footprint || typeof footprint !== 'object') {
+        continue;
+      }
+
+      const footprintObj = footprint as Record<string, unknown>;
+
+      // Extract the 'what' field which contains the footprint name
+      if (
+        footprintObj.what &&
+        typeof footprintObj.what === 'string' &&
+        footprintObj.what.trim().length > 0
+      ) {
+        usedFootprints.add(footprintObj.what);
+      }
+    }
+  }
+
+  return usedFootprints;
+};
+
+/**
+ * Filters injections to only include footprints that are used in the configuration.
+ * Uses the canonical YAML to determine which footprints are actually used.
+ *
+ * @param injections - Array of injections to filter (format: [type, name, content][])
+ * @param canonical - The canonical YAML object (already parsed)
+ * @returns Filtered array containing only used footprints and all non-footprint injections
+ */
+export const filterUsedFootprints = (
+  injections: string[][] | undefined,
+  canonical: unknown
+): string[][] | undefined => {
+  if (!injections || injections.length === 0) {
+    return undefined;
+  }
+
+  const usedFootprints = extractUsedFootprints(canonical);
+
+  // If no footprints are used, filter out all footprint injections
+  if (usedFootprints.size === 0) {
+    return injections.filter((inj) => {
+      if (!Array.isArray(inj) || inj.length !== 3) {
+        return true; // Keep invalid injections (shouldn't happen, but be safe)
+      }
+      const [type] = inj;
+      return type !== 'footprint'; // Keep non-footprint injections
+    });
+  }
+
+  // Filter injections: keep footprints that are used, and all non-footprint injections
+  const filtered = injections.filter((inj) => {
+    if (!Array.isArray(inj) || inj.length !== 3) {
+      return true; // Keep invalid injections (shouldn't happen, but be safe)
+    }
+
+    const [type, name] = inj;
+
+    // Keep all non-footprint injections (templates, etc.)
+    if (type !== 'footprint') {
+      return true;
+    }
+
+    // For footprints, only keep if they're used
+    return usedFootprints.has(name);
+  });
+
+  return filtered.length > 0 ? filtered : undefined;
+};
+
+/**
  * Creates a shareable URI with the encoded configuration as a hash fragment.
  *
  * @param config - The YAML/JSON configuration string
  * @param injections - Optional array of injections
+ * @param canonical - Optional canonical YAML object to filter footprints
  * @returns Full URL with encoded config in hash fragment
  */
 export const createShareableUri = (
   config: string,
-  injections?: string[][]
+  injections?: string[][],
+  canonical?: unknown
 ): string => {
-  const encoded = encodeConfig(config, injections);
+  // Filter footprints if canonical YAML is provided
+  const filteredInjections =
+    canonical && injections
+      ? filterUsedFootprints(injections, canonical)
+      : injections;
+
+  const encoded = encodeConfig(config, filteredInjections);
   const baseUrl = window.location.origin + window.location.pathname;
   return `${baseUrl}#${encoded}`;
 };

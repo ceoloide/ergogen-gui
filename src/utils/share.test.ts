@@ -4,6 +4,8 @@ import {
   createShareableUri,
   getConfigFromHash,
   ShareableConfig,
+  extractUsedFootprints,
+  filterUsedFootprints,
 } from './share';
 import { compressToEncodedURIComponent } from 'lz-string';
 
@@ -205,6 +207,288 @@ describe('share utilities', () => {
       expect(decoded.success).toBe(true);
       if (decoded.success) {
         expect(decoded.config.config).toBe(largeConfig);
+      }
+    });
+  });
+
+  describe('extractUsedFootprints', () => {
+    it('returns empty set for null or undefined canonical', () => {
+      expect(extractUsedFootprints(null).size).toBe(0);
+      expect(extractUsedFootprints(undefined).size).toBe(0);
+    });
+
+    it('returns empty set for canonical without pcbs section', () => {
+      const canonical = { points: {} };
+      expect(extractUsedFootprints(canonical).size).toBe(0);
+    });
+
+    it('returns empty set for canonical with empty pcbs section', () => {
+      const canonical = { pcbs: {} };
+      expect(extractUsedFootprints(canonical).size).toBe(0);
+    });
+
+    it('extracts footprint names from single PCB', () => {
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+              diodes: {
+                what: 'ceoloide/diode_tht_sod123',
+              },
+            },
+          },
+        },
+      };
+      const used = extractUsedFootprints(canonical);
+      expect(used.size).toBe(2);
+      expect(used.has('ceoloide/switch_mx')).toBe(true);
+      expect(used.has('ceoloide/diode_tht_sod123')).toBe(true);
+    });
+
+    it('extracts footprint names from multiple PCBs', () => {
+      const canonical = {
+        pcbs: {
+          left_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+            },
+          },
+          right_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+              mcu: {
+                what: 'ceoloide/mcu_nice_nano',
+              },
+            },
+          },
+        },
+      };
+      const used = extractUsedFootprints(canonical);
+      expect(used.size).toBe(2); // Duplicates are deduplicated by Set
+      expect(used.has('ceoloide/switch_mx')).toBe(true);
+      expect(used.has('ceoloide/mcu_nice_nano')).toBe(true);
+    });
+
+    it('ignores footprints without what field', () => {
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+              invalid: {
+                where: true,
+              },
+            },
+          },
+        },
+      };
+      const used = extractUsedFootprints(canonical);
+      expect(used.size).toBe(1);
+      expect(used.has('ceoloide/switch_mx')).toBe(true);
+    });
+
+    it('ignores footprints with empty what field', () => {
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+              invalid: {
+                what: '',
+              },
+              invalid2: {
+                what: '   ',
+              },
+            },
+          },
+        },
+      };
+      const used = extractUsedFootprints(canonical);
+      expect(used.size).toBe(1);
+      expect(used.has('ceoloide/switch_mx')).toBe(true);
+    });
+
+    it('handles PCBs without footprints section', () => {
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            template: 'kicad8',
+          },
+        },
+      };
+      const used = extractUsedFootprints(canonical);
+      expect(used.size).toBe(0);
+    });
+  });
+
+  describe('filterUsedFootprints', () => {
+    const testInjections: string[][] = [
+      ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+      ['footprint', 'ceoloide/diode_tht_sod123', 'function diode() {}'],
+      ['footprint', 'ceoloide/unused_footprint', 'function unused() {}'],
+      ['template', 'my_template', 'function template() {}'],
+    ];
+
+    it('returns undefined for undefined injections', () => {
+      const canonical = { pcbs: {} };
+      expect(filterUsedFootprints(undefined, canonical)).toBeUndefined();
+    });
+
+    it('returns undefined for empty injections', () => {
+      const canonical = { pcbs: {} };
+      expect(filterUsedFootprints([], canonical)).toBeUndefined();
+    });
+
+    it('filters out all footprints when canonical has no pcbs', () => {
+      const canonical = {};
+      const filtered = filterUsedFootprints(testInjections, canonical);
+      expect(filtered).toEqual([
+        ['template', 'my_template', 'function template() {}'],
+      ]);
+    });
+
+    it('filters out all footprints when pcbs section is empty', () => {
+      const canonical = { pcbs: {} };
+      const filtered = filterUsedFootprints(testInjections, canonical);
+      expect(filtered).toEqual([
+        ['template', 'my_template', 'function template() {}'],
+      ]);
+    });
+
+    it('keeps only used footprints', () => {
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+              diodes: {
+                what: 'ceoloide/diode_tht_sod123',
+              },
+            },
+          },
+        },
+      };
+      const filtered = filterUsedFootprints(testInjections, canonical);
+      expect(filtered).toEqual([
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['footprint', 'ceoloide/diode_tht_sod123', 'function diode() {}'],
+        ['template', 'my_template', 'function template() {}'],
+      ]);
+    });
+
+    it('keeps all non-footprint injections', () => {
+      const injections: string[][] = [
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['template', 'my_template', 'function template() {}'],
+        ['other', 'other_injection', 'function other() {}'],
+      ];
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+            },
+          },
+        },
+      };
+      const filtered = filterUsedFootprints(injections, canonical);
+      expect(filtered).toEqual([
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['template', 'my_template', 'function template() {}'],
+        ['other', 'other_injection', 'function other() {}'],
+      ]);
+    });
+
+    it('returns undefined when all injections are filtered out', () => {
+      const injections: string[][] = [
+        ['footprint', 'ceoloide/unused_footprint', 'function unused() {}'],
+      ];
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+            },
+          },
+        },
+      };
+      const filtered = filterUsedFootprints(injections, canonical);
+      expect(filtered).toBeUndefined();
+    });
+  });
+
+  describe('createShareableUri with canonical filtering', () => {
+    beforeEach(() => {
+      Object.defineProperty(window, 'location', {
+        value: {
+          origin: 'https://example.com',
+          pathname: '/',
+        },
+        writable: true,
+      });
+    });
+
+    it('filters footprints when canonical is provided', () => {
+      const injections: string[][] = [
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['footprint', 'ceoloide/unused_footprint', 'function unused() {}'],
+        ['template', 'my_template', 'function template() {}'],
+      ];
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+            },
+          },
+        },
+      };
+
+      const uri = createShareableUri(testConfig, injections, canonical);
+      const fragment = uri.split('#')[1];
+      const decoded = decodeConfig(fragment);
+
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual([
+          ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+          ['template', 'my_template', 'function template() {}'],
+        ]);
+      }
+    });
+
+    it('includes all injections when canonical is not provided', () => {
+      const injections: string[][] = [
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['footprint', 'ceoloide/unused_footprint', 'function unused() {}'],
+      ];
+
+      const uri = createShareableUri(testConfig, injections);
+      const fragment = uri.split('#')[1];
+      const decoded = decodeConfig(fragment);
+
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual(injections);
       }
     });
   });
