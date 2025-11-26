@@ -43,6 +43,8 @@ jobs:
         env:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+      - name: Create 404.html for SPA routing
+        run: cp ./build/index.html ./build/404.html
       - name: Conditionally create CNAME
         if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
         run: echo "${{ vars.CNAME_DOMAIN }}" > ./build/CNAME
