@@ -4,7 +4,11 @@ import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
-import { createShareableUri } from '../utils/share';
+import {
+  createShareableUri,
+  extractUsedFootprintsFromCanonical,
+  filterInjectionsForSharing,
+} from '../utils/share';
 import { trackEvent } from '../utils/analytics';
 import ShareDialog from '../molecules/ShareDialog';
 
@@ -203,27 +207,41 @@ const Header = (): JSX.Element => {
 
   /**
    * Creates a shareable URI with the current configuration and shows a dialog.
-   * Includes all current injections (footprints, templates, etc.) in the shared URI.
+   * Only includes footprints that are actually used in the configuration (based on canonical.yaml).
+   * Non-footprint injections (templates, etc.) are always included.
    */
   const handleShare = () => {
     if (!configContext?.configInput) {
       return;
     }
 
-    // Include all injections if present
-    const injectionsToShare =
-      configContext.injectionInput && configContext.injectionInput.length > 0
-        ? configContext.injectionInput
-        : undefined;
+    // Extract used footprints from the canonical output
+    const usedFootprints = extractUsedFootprintsFromCanonical(
+      configContext.results?.canonical
+    );
+
+    // Filter injections to only include used footprints and all non-footprint injections
+    const injectionsToShare = filterInjectionsForSharing(
+      configContext.injectionInput,
+      usedFootprints
+    );
+
+    // Only pass injections if there are any to share
+    const finalInjections =
+      injectionsToShare.length > 0 ? injectionsToShare : undefined;
 
     const shareableUri = createShareableUri(
       configContext.configInput,
-      injectionsToShare
+      finalInjections
     );
 
     trackEvent('share_button_clicked', {
-      has_injections: !!injectionsToShare,
-      injections_count: injectionsToShare?.length || 0,
+      has_injections: !!finalInjections,
+      injections_count: finalInjections?.length || 0,
+      total_injections: configContext.injectionInput?.length || 0,
+      footprints_filtered:
+        (configContext.injectionInput?.length || 0) -
+        (finalInjections?.length || 0),
     });
 
     setShareLink(shareableUri);
