@@ -4,7 +4,7 @@ Welcome to the Ergogen GUI, a powerful web-based interface for the [Ergogen](htt
 
 With this GUI, you can write Ergogen configurations in YAML, see live 2D (SVG) previews of your design, and export the necessary files for manufacturing your own keyboard.
 
-See the live demo at [ergogen.ceoloide.com](https://ergogen.ceoloide.com).
+See the live demo at [ergogen.xyz](https://ergogen.xyz).
 
 > [!WARNING]
 > This repository currently relies on Node.js v20. It will not build with newer versions like Node v22 due to outdated dependencies. Please ensure you are using a compatible Node version for development.
@@ -72,7 +72,7 @@ If you're building a tool that generates Ergogen configurations, you can create 
 
 ### Share Link Format
 
-Share links use URL hash fragments: `https://ergogen.ceoloide.com/#<encoded-data>`
+Share links use URL hash fragments: `https://ergogen.xyz/#<encoded-data>`
 
 The encoded data is a JSON object compressed using [lz-string](https://github.com/pieroxy/lz-string):
 
@@ -96,7 +96,7 @@ function createErgogenShareLink(yamlConfig) {
   const encoded = compressToEncodedURIComponent(
     JSON.stringify(shareableConfig)
   );
-  return `https://ergogen.ceoloide.com/#${encoded}`;
+  return `https://ergogen.xyz/#${encoded}`;
 }
 
 // Usage
@@ -143,7 +143,7 @@ function createErgogenShareLink(yamlConfig, footprints = []) {
   const encoded = compressToEncodedURIComponent(
     JSON.stringify(shareableConfig)
   );
-  return `https://ergogen.ceoloide.com/#${encoded}`;
+  return `https://ergogen.xyz/#${encoded}`;
 }
 
 // Usage with custom footprint
@@ -194,7 +194,7 @@ yarn add lz-string
 ### Notes
 
 - The configuration can be either YAML or JSON format
-- Share links work with any Ergogen GUI deployment (not just `ergogen.ceoloide.com`)
+- Share links work with any Ergogen GUI deployment (not just `ergogen.xyz`)
 - Very large configurations may create long URLs; consider URL length limits (~2000-8000 chars depending on browser)
 - When users open a share link, the configuration is loaded and Ergogen immediately processes it
 
