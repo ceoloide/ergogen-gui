@@ -182,7 +182,7 @@ const shareLink = createErgogenShareLink(config, footprints);
 
 ### Notes
 
-- The configuration can be either YAML or JSON format
+- The configuration can be either YAML or [KLE (Keyboard Layout Editor)](http://www.keyboard-layout-editor.com/) JSON format
 - Share links work with any Ergogen GUI deployment (not just `ergogen.xyz`)
 - Very large configurations may create long URLs; consider URL length limits (~2000-8000 chars depending on browser)
 - When users open a share link, the configuration is loaded and Ergogen immediately processes it
