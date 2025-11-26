@@ -301,7 +301,6 @@ const Welcome = () => {
       fp.content,
     ]);
 
-
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
       injections,
@@ -515,8 +514,22 @@ const Welcome = () => {
 
         <OptionsContainer>
           <OptionBox>
+            <h2>Visual Editor</h2>
+            <p>
+              Design your keyboard layout visually with drag-and-drop. Great for
+              beginners.
+            </p>
+            <Button
+              onClick={() => navigate('/layout-editor')}
+              aria-label="Open visual layout editor"
+              data-testid="layout-editor-button"
+            >
+              Open Layout Editor
+            </Button>
+          </OptionBox>
+          <OptionBox>
             <h2>Start Fresh</h2>
-            <p>Begin with a completely blank slate.</p>
+            <p>Begin with a completely blank slate and write YAML directly.</p>
             <Button
               onClick={() => handleSelectExample(EmptyYAML.value)}
               aria-label="Start with empty configuration"

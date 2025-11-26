@@ -446,6 +446,63 @@ Several potential improvements could enhance the sharing feature:
 
 10. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
 
+## Visual Layout Editor
+
+The application includes a visual layout editor that allows users to create and edit ergogen keyboard configurations using a graphical interface, inspired by tools like [kle-ng](https://github.com/adamws/kle-ng).
+
+### Layout Editor Architecture
+
+The layout editor is located in `src/layout-editor/` and consists of:
+
+- **`types.ts`**: Core TypeScript interfaces for the editor including:
+  - `EditorKey`: Represents a single key with position, size, rotation, and metadata
+  - `EditorColumn`: Column configuration with stagger, splay, and spread settings
+  - `EditorRow`: Row configuration
+  - `EditorZone`: Zone containing columns, rows, and keys
+  - `EditorLayout`: Complete layout state with keys, zones, mirror settings, etc.
+  - `EditorMode`: Interaction modes (select, pan, add-key, rotate, move)
+
+- **`LayoutEditorContext.tsx`**: React context for managing editor state with:
+  - State management for layout, viewport, selection, and history
+  - Undo/redo functionality with 50-entry history
+  - Actions for adding, updating, deleting, and moving keys
+  - Zone and column management
+
+- **Components** (`src/layout-editor/components/`):
+  - `LayoutCanvas`: Main canvas for rendering keys using HTML5 Canvas API
+  - `EditorToolbar`: Vertical toolbar with editing tools (select, add, delete, pan, rotate)
+  - `KeyPropertiesPanel`: Panel for editing selected key properties (position, size, rotation, color)
+  - `ZonePropertiesPanel`: Panel for managing zones, columns, and rows
+
+- **Utilities** (`src/layout-editor/utils/`):
+  - `yamlConverter.ts`: Functions to convert between visual layout and ergogen YAML format
+    - `layoutToYaml`: Converts EditorLayout to ergogen YAML configuration
+    - `yamlToLayout`: Parses ergogen YAML into EditorLayout
+
+### Layout Editor Features
+
+- **Visual Key Editing**: Click to select keys, drag to move, edit properties in the side panel
+- **Multi-Selection**: Shift+click to extend selection, drag to create selection rectangle
+- **Grid System**: Configurable grid with snap-to-grid functionality
+- **Zoom and Pan**: Scroll wheel to zoom, middle-click or pan tool to pan
+- **Zone Management**: Create and edit zones with columns and rows
+- **Column Properties**: Set stagger, splay, and spread for each column
+- **YAML Export**: Export the visual layout as ergogen YAML configuration
+- **Undo/Redo**: Full history support with keyboard shortcuts (Ctrl+Z, Ctrl+Shift+Z)
+
+### Access
+
+The layout editor is accessible at `/layout-editor` and linked from the Welcome page as a "Visual Editor" option.
+
+### Planned Improvements
+
+- Import existing YAML configurations for visual editing
+- Mirror preview showing mirrored keys in real-time
+- Keyboard shortcuts for common operations
+- Copy/paste/duplicate key functionality
+- Align and distribute selected keys
+- Template presets for common keyboard layouts
+
 ## Future Tasks
 
 When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:
