@@ -66,6 +66,138 @@ The Ergogen GUI is divided into three main sections: the configuration editor on
 - **Outputs**: This section lists all the files generated from your configuration. You can download any file by clicking the download icon next to it.
 - **Settings**: Click the gear icon in the header to open the settings panel. Here, you can manage custom footprints and adjust generation options.
 
+## Creating Share Links (For External Developers)
+
+If you're building a tool that generates Ergogen configurations, you can create share links that open the Ergogen GUI with your configuration preloaded. This allows your users to instantly preview and edit the generated config.
+
+### Share Link Format
+
+Share links use URL hash fragments: `https://ergogen.ceoloide.com/#<encoded-data>`
+
+The encoded data is a JSON object compressed using [lz-string](https://github.com/pieroxy/lz-string):
+
+```typescript
+interface ShareableConfig {
+  config: string; // The YAML or JSON configuration (required)
+  injections?: string[][]; // Optional custom footprints: [type, name, code][]
+}
+```
+
+### Basic Example (JavaScript)
+
+```javascript
+import { compressToEncodedURIComponent } from 'lz-string';
+
+function createErgogenShareLink(yamlConfig) {
+  const shareableConfig = {
+    config: yamlConfig,
+  };
+
+  const encoded = compressToEncodedURIComponent(
+    JSON.stringify(shareableConfig)
+  );
+  return `https://ergogen.ceoloide.com/#${encoded}`;
+}
+
+// Usage
+const config = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+        ring:
+        middle:
+        index:
+      rows:
+        bottom:
+        home:
+        top:
+`;
+
+const shareLink = createErgogenShareLink(config);
+console.log(shareLink);
+```
+
+### Including Custom Footprints
+
+If your configuration uses custom footprints, include them in the `injections` array. Each injection is a tuple of `[type, name, code]`:
+
+```javascript
+import { compressToEncodedURIComponent } from 'lz-string';
+
+function createErgogenShareLink(yamlConfig, footprints = []) {
+  const shareableConfig = {
+    config: yamlConfig,
+  };
+
+  // Add footprints if provided
+  if (footprints.length > 0) {
+    shareableConfig.injections = footprints.map((fp) => [
+      'footprint', // type
+      fp.name, // e.g., 'my_custom_switch'
+      fp.code, // JavaScript footprint code
+    ]);
+  }
+
+  const encoded = compressToEncodedURIComponent(
+    JSON.stringify(shareableConfig)
+  );
+  return `https://ergogen.ceoloide.com/#${encoded}`;
+}
+
+// Usage with custom footprint
+const config = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      rows:
+        home:
+pcbs:
+  main:
+    outlines:
+      board:
+        outline: board
+    footprints:
+      switch:
+        what: my_custom_switch
+        where: true
+`;
+
+const footprints = [
+  {
+    name: 'my_custom_switch',
+    code: `
+    module.exports = {
+      params: { from: undefined, to: undefined },
+      body: p => \`(footprint "my_switch" ...)\`
+    };
+  `,
+  },
+];
+
+const shareLink = createErgogenShareLink(config, footprints);
+```
+
+### Installation
+
+To use `lz-string` in your project:
+
+```bash
+npm install lz-string
+# or
+yarn add lz-string
+```
+
+### Notes
+
+- The configuration can be either YAML or JSON format
+- Share links work with any Ergogen GUI deployment (not just `ergogen.ceoloide.com`)
+- Very large configurations may create long URLs; consider URL length limits (~2000-8000 chars depending on browser)
+- When users open a share link, the configuration is loaded and Ergogen immediately processes it
+
 ## Deployment to GitHub Pages
 
 This repository includes a GitHub Actions workflow to automatically build and deploy the application to GitHub Pages whenever changes are pushed to the `main` branch.
