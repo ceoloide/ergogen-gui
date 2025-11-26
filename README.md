@@ -4,7 +4,7 @@ Welcome to the Ergogen GUI, a powerful web-based interface for the [Ergogen](htt
 
 With this GUI, you can write Ergogen configurations in YAML, see live 2D (SVG) previews of your design, and export the necessary files for manufacturing your own keyboard.
 
-See the live demo at [ergogen.ceoloide.com](https://ergogen.ceoloide.com).
+See the live demo at [ergogen.xyz](https://ergogen.xyz).
 
 > [!WARNING]
 > This repository currently relies on Node.js v20. It will not build with newer versions like Node v22 due to outdated dependencies. Please ensure you are using a compatible Node version for development.
@@ -65,6 +65,127 @@ The Ergogen GUI is divided into three main sections: the configuration editor on
 - **File Preview**: This panel shows a preview of the selected output file. You can switch between different outputs, like outlines (SVG) or PCBs (via KiCanvas), by clicking the "Preview" button next to the file name in the "Outputs" list.
 - **Outputs**: This section lists all the files generated from your configuration. You can download any file by clicking the download icon next to it.
 - **Settings**: Click the gear icon in the header to open the settings panel. Here, you can manage custom footprints and adjust generation options.
+
+## Creating Share Links (For External Developers)
+
+If you're building a tool that generates Ergogen configurations, you can create share links that open the Ergogen GUI with your configuration preloaded. This allows your users to instantly preview and edit the generated config.
+
+### Share Link Format
+
+Share links use URL hash fragments: `https://ergogen.xyz/#<encoded-data>`
+
+The encoded data is a JSON object compressed using [lz-string](https://github.com/pieroxy/lz-string):
+
+```typescript
+interface ShareableConfig {
+  config: string; // The YAML or JSON configuration (required)
+  injections?: string[][]; // Optional custom footprints: [type, name, code][]
+}
+```
+
+### Basic Example (JavaScript)
+
+```javascript
+import { compressToEncodedURIComponent } from 'lz-string';
+
+function createErgogenShareLink(yamlConfig) {
+  const shareableConfig = {
+    config: yamlConfig,
+  };
+
+  const encoded = compressToEncodedURIComponent(
+    JSON.stringify(shareableConfig)
+  );
+  return `https://ergogen.xyz/#${encoded}`;
+}
+
+// Usage
+const config = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+        ring:
+        middle:
+        index:
+      rows:
+        bottom:
+        home:
+        top:
+`;
+
+const shareLink = createErgogenShareLink(config);
+console.log(shareLink);
+```
+
+### Including Custom Footprints
+
+If your configuration uses custom footprints, include them in the `injections` array. Each injection is a tuple of `[type, name, code]`:
+
+```javascript
+import { compressToEncodedURIComponent } from 'lz-string';
+
+function createErgogenShareLink(yamlConfig, footprints = []) {
+  const shareableConfig = {
+    config: yamlConfig,
+  };
+
+  // Add footprints if provided
+  if (footprints.length > 0) {
+    shareableConfig.injections = footprints.map((fp) => [
+      'footprint', // type
+      fp.name, // e.g., 'my_custom_switch'
+      fp.code, // JavaScript footprint code
+    ]);
+  }
+
+  const encoded = compressToEncodedURIComponent(
+    JSON.stringify(shareableConfig)
+  );
+  return `https://ergogen.xyz/#${encoded}`;
+}
+
+// Usage with custom footprint
+const config = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      rows:
+        home:
+pcbs:
+  main:
+    footprints:
+      switch:
+        what: my_custom_footprint
+        where: true
+`;
+
+const footprints = [
+  {
+    name: 'my_custom_footprint',
+    code: `
+module.exports = {
+  params: {
+    designator: '',
+  },
+  body: p => \`\`
+}
+  `,
+  },
+];
+
+const shareLink = createErgogenShareLink(config, footprints);
+```
+
+### Notes
+
+- The configuration can be either YAML or [KLE (Keyboard Layout Editor)](http://www.keyboard-layout-editor.com/) JSON format
+- Share links work with any Ergogen GUI deployment (not just `ergogen.xyz`)
+- Very large configurations may create long URLs; consider URL length limits (~2000-8000 chars depending on browser)
+- When users open a share link, the configuration is loaded and Ergogen immediately processes it
 
 ## Deployment to GitHub Pages
 

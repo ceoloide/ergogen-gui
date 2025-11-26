@@ -203,27 +203,23 @@ const Header = (): JSX.Element => {
 
   /**
    * Creates a shareable URI with the current configuration and shows a dialog.
-   * Includes all current injections (footprints, templates, etc.) in the shared URI.
+   * Only includes footprints that are actually used in the configuration (based on canonical.yaml).
+   * Non-footprint injections (templates, etc.) are always included.
    */
   const handleShare = () => {
     if (!configContext?.configInput) {
       return;
     }
 
-    // Include all injections if present
-    const injectionsToShare =
-      configContext.injectionInput && configContext.injectionInput.length > 0
-        ? configContext.injectionInput
-        : undefined;
-
-    const shareableUri = createShareableUri(
-      configContext.configInput,
-      injectionsToShare
-    );
+    const shareableUri = createShareableUri({
+      config: configContext.configInput,
+      injections: configContext.injectionInput,
+      canonical: configContext.results?.canonical,
+    });
 
     trackEvent('share_button_clicked', {
-      has_injections: !!injectionsToShare,
-      injections_count: injectionsToShare?.length || 0,
+      has_injections: !!configContext.injectionInput?.length,
+      injections_count: configContext.injectionInput?.length || 0,
     });
 
     setShareLink(shareableUri);

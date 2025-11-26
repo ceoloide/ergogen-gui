@@ -338,21 +338,24 @@ The GitHub loading functionality uses unauthenticated requests, which are subjec
 
 ## Configuration Sharing
 
-The application supports sharing keyboard configurations via URL hash fragments. Users can generate a shareable link that contains both the configuration and all custom injections (footprints, templates, etc.), allowing recipients to load the complete setup with a single click.
+The application supports sharing keyboard configurations via URL hash fragments. Users can generate a shareable link that contains the configuration and only the custom footprints that are actually used, allowing recipients to load the complete setup with a single click.
 
 ### Share Link Format
 
 Shareable links use the format: `https://ergogen.io/#<encoded-config>` where the hash fragment contains:
 
 - The keyboard configuration (YAML/JSON string)
-- All custom injections (footprints, templates, etc.) as an optional array
+- Only the footprint injections that are actually used in the configuration's PCBs section
+- All non-footprint injections (templates, etc.) are always included
 
 The configuration and injections are compressed and URL-encoded using `lz-string`'s `compressToEncodedURIComponent` function for efficient transmission.
 
 ### Sharing Process
 
 1. **Generation**: When the user clicks the share button, the app:
-   - Collects the current configuration and all injections
+   - Collects the current configuration and canonical output
+   - Extracts used footprint names from the canonical output's PCBs section (`pcbs[*].footprints[*].what`)
+   - Filters injections to only include footprints that are used (non-footprint injections like templates are always included)
    - Encodes them into a `ShareableConfig` object (with optional `injections` field)
    - Compresses and URL-encodes the JSON representation
    - Constructs a full URL with the encoded data in the hash fragment
@@ -406,8 +409,13 @@ The share system provides comprehensive error handling:
 - **`src/utils/share.ts`**: Core sharing utilities:
   - `encodeConfig`: Compresses and encodes configuration and injections
   - `decodeConfig`: Decompresses and validates shared configurations, returns `DecodeResult` union type
-  - `createShareableUri`: Constructs the full shareable URL
+  - `createShareableUri`: Constructs the full shareable URL. Accepts an options object with:
+    - `config`: The YAML/JSON configuration string (required)
+    - `injections`: Optional array of injections
+    - `canonical`: Optional canonical output from Ergogen. When provided, footprint injections are automatically filtered to only include those used in the PCBs section
   - `getConfigFromHash`: Extracts and decodes hash fragment from current URL
+  - `extractUsedFootprintsFromCanonical`: Extracts footprint names from canonical output's PCBs section
+  - `filterInjectionsForSharing`: Filters injections to only include used footprints (keeps all non-footprint injections)
 - **`src/utils/injections.ts`**: Contains functions for merging injection arrays:
   - `mergeInjectionArraysWithResolution`: Merges with conflict resolution (skip, overwrite, keep-both)
   - `mergeInjectionArrays`: Default merge with overwrite strategy (uses `mergeInjectionArraysWithResolution` internally)
