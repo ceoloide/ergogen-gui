@@ -157,23 +157,22 @@ points:
         home:
 pcbs:
   main:
-    outlines:
-      board:
-        outline: board
     footprints:
       switch:
-        what: my_custom_switch
+        what: my_custom_footprint
         where: true
 `;
 
 const footprints = [
   {
-    name: 'my_custom_switch',
+    name: 'my_custom_footprint',
     code: `
-    module.exports = {
-      params: { from: undefined, to: undefined },
-      body: p => \`(footprint "my_switch" ...)\`
-    };
+module.exports = {
+  params: {
+    designator: '',
+  },
+  body: p => \`\`
+}
   `,
   },
 ];
