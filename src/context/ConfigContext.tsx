@@ -57,7 +57,7 @@ type Results = {
 
 declare global {
   interface Window {
-    ergogen: {
+    ergogen?: {
       process: (
         config: unknown,
         debug: boolean,

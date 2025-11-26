@@ -17,6 +17,7 @@ declare global {
         debug: boolean,
         logger: (m: string) => void
       ) => unknown;
+      inject: (type: string, name: string, value: unknown) => void;
     };
   }
 }
