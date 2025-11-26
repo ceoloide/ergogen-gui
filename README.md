@@ -180,16 +180,6 @@ module.exports = {
 const shareLink = createErgogenShareLink(config, footprints);
 ```
 
-### Installation
-
-To use `lz-string` in your project:
-
-```bash
-npm install lz-string
-# or
-yarn add lz-string
-```
-
 ### Notes
 
 - The configuration can be either YAML or JSON format
