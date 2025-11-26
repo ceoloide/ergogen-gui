@@ -3,24 +3,7 @@
  * and converting it to Ergogen configuration.
  */
 
-declare global {
-  interface Window {
-    kle?: {
-      Serial?: {
-        deserialize: (config: string) => unknown;
-        serialize: (keyboard: unknown) => string;
-      };
-    };
-    ergogen?: {
-      process: (
-        config: unknown,
-        debug: boolean,
-        logger: (m: string) => void
-      ) => unknown;
-      inject: (type: string, name: string, value: unknown) => void;
-    };
-  }
-}
+// Window type definitions are in src/types/window.d.ts
 
 /**
  * Converts KLE JSON string to Ergogen configuration.
