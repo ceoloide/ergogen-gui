@@ -15,19 +15,31 @@ export interface ShareableConfig {
 /**
  * Encodes and compresses a keyboard configuration for sharing via URI.
  * Includes both config and injections (footprints, templates, etc.) when present.
+ * If canonical YAML is provided, only footprints actually used in the configuration
+ * are included in the share link.
  *
  * @param config - The YAML/JSON configuration string
  * @param injections - Optional array of injections (footprints, templates, etc.)
+ * @param canonical - Optional canonical YAML object to filter footprints
  * @returns Encoded and compressed string suitable for URI fragment
  */
 export const encodeConfig = (
   config: string,
-  injections?: string[][]
+  injections?: string[][],
+  canonical?: unknown
 ): string => {
+  // Filter footprints if canonical YAML is provided
+  const filteredInjections =
+    canonical && injections
+      ? filterUsedFootprints(injections, canonical)
+      : injections;
+
   const shareableConfig: ShareableConfig = {
     config,
-    // Include all injections if present
-    ...(injections && injections.length > 0 ? { injections } : {}),
+    // Include filtered injections if present
+    ...(filteredInjections && filteredInjections.length > 0
+      ? { injections: filteredInjections }
+      : {}),
   };
 
   const jsonString = JSON.stringify(shareableConfig);
@@ -291,6 +303,8 @@ export const filterUsedFootprints = (
 
 /**
  * Creates a shareable URI with the encoded configuration as a hash fragment.
+ * If canonical YAML is provided, only footprints actually used in the configuration
+ * are included in the share link.
  *
  * @param config - The YAML/JSON configuration string
  * @param injections - Optional array of injections
@@ -302,13 +316,7 @@ export const createShareableUri = (
   injections?: string[][],
   canonical?: unknown
 ): string => {
-  // Filter footprints if canonical YAML is provided
-  const filteredInjections =
-    canonical && injections
-      ? filterUsedFootprints(injections, canonical)
-      : injections;
-
-  const encoded = encodeConfig(config, filteredInjections);
+  const encoded = encodeConfig(config, injections, canonical);
   const baseUrl = window.location.origin + window.location.pathname;
   return `${baseUrl}#${encoded}`;
 };

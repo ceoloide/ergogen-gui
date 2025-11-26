@@ -29,6 +29,51 @@ describe('share utilities', () => {
       expect(typeof encoded).toBe('string');
       expect(encoded.length).toBeGreaterThan(0);
     });
+
+    it('filters footprints when canonical is provided', () => {
+      const injections: string[][] = [
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['footprint', 'ceoloide/unused_footprint', 'function unused() {}'],
+        ['template', 'my_template', 'function template() {}'],
+      ];
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              keys: {
+                what: 'ceoloide/switch_mx',
+              },
+            },
+          },
+        },
+      };
+
+      const encoded = encodeConfig(testConfig, injections, canonical);
+      const decoded = decodeConfig(encoded);
+
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual([
+          ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+          ['template', 'my_template', 'function template() {}'],
+        ]);
+      }
+    });
+
+    it('includes all injections when canonical is not provided', () => {
+      const injections: string[][] = [
+        ['footprint', 'ceoloide/switch_mx', 'function switch() {}'],
+        ['footprint', 'ceoloide/unused_footprint', 'function unused() {}'],
+      ];
+
+      const encoded = encodeConfig(testConfig, injections);
+      const decoded = decodeConfig(encoded);
+
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.injections).toEqual(injections);
+      }
+    });
   });
 
   describe('decodeConfig', () => {
