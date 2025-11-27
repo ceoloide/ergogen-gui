@@ -116,10 +116,10 @@ function renderKey(
   // Outer and inner rectangle parameters
   const outerRadius = Math.min(6 * zoom, width / 4, height / 4);
   // Inner rectangle is 15% smaller (7.5% inset on each side)
-  const innerInsetX = width * 0.075;
-  const innerInsetY = height * 0.075;
+  const innerInsetX = width * 0.1;
+  const innerInsetY = height * 0.1;
   const innerRadius = Math.min(4 * zoom, (width - innerInsetX * 2) / 4, (height - innerInsetY * 2) / 4);
-  const topOffset = Math.max(1.5 * zoom, 2); // Inner rect is slightly offset upward
+  const topOffset = Math.max(4 * zoom, 2); // Inner rect is slightly offset upward
 
   ctx.save();
 
@@ -136,7 +136,7 @@ function renderKey(
   }
 
   // Colors for the keycap
-  const outerColor = key.mirrored ? '#a0a0a0' : '#d4d4d4'; // Off-white/light grey
+  const outerColor = key.mirrored ? '#a0a0a0' : '#d7d7d7'; // Off-white/light grey
   const innerColor = key.mirrored ? '#c0c0c0' : '#f5f5f5'; // White/very light
   const borderColor = key.mirrored ? '#888888' : '#b0b0b0'; // Border
 
