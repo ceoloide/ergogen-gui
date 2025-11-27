@@ -33,12 +33,12 @@ const Toolbar = styled.div`
   flex-wrap: wrap;
 `;
 
-const CanvasContainer = styled.div`
+const CanvasContainer = styled.div<{ $cursor?: string }>`
   flex: 1;
   position: relative;
   overflow: hidden;
   background-color: ${theme.colors.backgroundLighter};
-  cursor: ${(props: { $cursor?: string }) => props.$cursor || 'default'};
+  cursor: ${(props) => props.$cursor || 'default'};
 `;
 
 const Canvas = styled.svg`
@@ -246,6 +246,29 @@ const CanvasEditor: React.FC = () => {
       }
     },
     { preventDefault: true }
+  );
+
+  const handleAddKey = useCallback(
+    (x: number, y: number) => {
+      // Snap to grid
+      const snappedX = snapToGrid(x, gridSizeMm);
+      const snappedY = snapToGrid(y, gridSizeMm);
+
+      const newKey: CanvasKey = {
+        id: `key-${Date.now()}-${Math.random()}`,
+        x: snappedX,
+        y: snappedY,
+        width: 1,
+        height: 1,
+        rotation: 0,
+        rotationOriginX: snappedX,
+        rotationOriginY: snappedY,
+      };
+
+      setKeys((prev) => [...prev, newKey]);
+      setSelectedKeys(new Set([newKey.id]));
+    },
+    [gridSizeMm]
   );
 
   const moveSelectedKeys = useCallback(
@@ -517,29 +540,6 @@ const CanvasEditor: React.FC = () => {
       setViewZoom(newZoom);
     },
     [viewZoom]
-  );
-
-  const handleAddKey = useCallback(
-    (x: number, y: number) => {
-      // Snap to grid
-      const snappedX = snapToGrid(x, gridSizeMm);
-      const snappedY = snapToGrid(y, gridSizeMm);
-
-      const newKey: CanvasKey = {
-        id: `key-${Date.now()}-${Math.random()}`,
-        x: snappedX,
-        y: snappedY,
-        width: 1,
-        height: 1,
-        rotation: 0,
-        rotationOriginX: snappedX,
-        rotationOriginY: snappedY,
-      };
-
-      setKeys((prev) => [...prev, newKey]);
-      setSelectedKeys(new Set([newKey.id]));
-    },
-    [gridSizeMm]
   );
 
   const handleCanvasClick = useCallback(
