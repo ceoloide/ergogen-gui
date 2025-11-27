@@ -269,13 +269,15 @@ const Panel = styled.div<{
   max-width: min(600px, 90vw);
   background-color: ${theme.colors.backgroundLight};
   border-right: 1px solid ${theme.colors.border};
-  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  box-shadow: ${(props) =>
+    props.$isOpen ? '4px 0 20px rgba(0, 0, 0, 0.5)' : 'none'};
   z-index: 1000;
   display: flex;
   flex-direction: column;
   transform: translateX(${(props) => (props.$isOpen ? '0' : '-100%')});
-  transition: transform ${(props) => (props.$isOpening ? '0.2s' : '0.1s')}
-    ease-in-out;
+  transition:
+    transform ${(props) => (props.$isOpening ? '0.2s' : '0.1s')} ease-in-out,
+    box-shadow ${(props) => (props.$isOpening ? '0.2s' : '0.1s')} ease-in-out;
 
   @media (max-width: 639px) {
     width: 100%;
