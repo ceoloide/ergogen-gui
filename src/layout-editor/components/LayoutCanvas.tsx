@@ -87,8 +87,9 @@ interface LayoutCanvasProps {
 }
 
 /**
- * Renders a single key on the canvas (kle-ng style).
+ * Renders a single key on the canvas (keycap style).
  * Key coordinates (x, y) represent the CENTER of the key.
+ * Draws two concentric rounded rectangles to simulate a keycap appearance.
  */
 function renderKey(
   ctx: CanvasRenderingContext2D,
@@ -112,7 +113,11 @@ function renderKey(
   const x = centerX - width / 2;
   const y = centerY - height / 2;
 
-  const cornerRadius = Math.min(4 * zoom, width / 4, height / 4);
+  // Outer and inner rectangle parameters
+  const outerRadius = Math.min(6 * zoom, width / 4, height / 4);
+  const innerInset = Math.max(3 * zoom, 4); // Inset from outer edge
+  const innerRadius = Math.min(4 * zoom, (width - innerInset * 2) / 4, (height - innerInset * 2) / 4);
+  const topOffset = Math.max(1.5 * zoom, 2); // Inner rect is slightly offset upward
 
   ctx.save();
 
@@ -128,20 +133,40 @@ function renderKey(
     ctx.translate(-centerX, -centerY);
   }
 
-  // Draw key fill (flat style)
-  const keyColor = key.mirrored ? '#b0b0b0' : key.color;
-  ctx.fillStyle = keyColor;
+  // Colors for the keycap
+  const outerColor = key.mirrored ? '#a0a0a0' : '#d4d4d4'; // Off-white/light grey
+  const innerColor = key.mirrored ? '#c0c0c0' : '#f5f5f5'; // White/very light
+  const borderColor = key.mirrored ? '#888888' : '#b0b0b0'; // Border
+
+  // Draw outer rectangle (base of keycap)
+  ctx.fillStyle = outerColor;
   ctx.beginPath();
-  ctx.roundRect(x, y, width, height, cornerRadius);
+  ctx.roundRect(x, y, width, height, outerRadius);
   ctx.fill();
 
-  // Draw key border
-  ctx.strokeStyle = isSelected
-    ? theme.colors.accent
-    : adjustColor(keyColor, -40);
+  // Draw outer border
+  ctx.strokeStyle = isSelected ? theme.colors.accent : borderColor;
   ctx.lineWidth = isSelected ? 2 : 1;
   ctx.beginPath();
-  ctx.roundRect(x, y, width, height, cornerRadius);
+  ctx.roundRect(x, y, width, height, outerRadius);
+  ctx.stroke();
+
+  // Draw inner rectangle (top surface of keycap) - slightly offset upward
+  const innerX = x + innerInset;
+  const innerY = y + innerInset - topOffset; // Offset upward
+  const innerWidth = width - innerInset * 2;
+  const innerHeight = height - innerInset * 2;
+
+  ctx.fillStyle = innerColor;
+  ctx.beginPath();
+  ctx.roundRect(innerX, innerY, innerWidth, innerHeight, innerRadius);
+  ctx.fill();
+
+  // Draw inner border (subtle)
+  ctx.strokeStyle = isSelected ? theme.colors.accent : '#c8c8c8';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.roundRect(innerX, innerY, innerWidth, innerHeight, innerRadius);
   ctx.stroke();
 
   // Draw selection highlight and center crosshair
@@ -151,7 +176,7 @@ function renderKey(
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.roundRect(x - 2, y - 2, width + 4, height + 4, cornerRadius + 2);
+    ctx.roundRect(x - 2, y - 2, width + 4, height + 4, outerRadius + 2);
     ctx.stroke();
 
     // Draw center crosshair
@@ -187,8 +212,9 @@ function renderKey(
 
 /**
  * Adjusts a hex color's brightness.
+ * Currently unused but kept for potential future use.
  */
-function adjustColor(color: string, amount: number): string {
+function _adjustColor(color: string, amount: number): string {
   const hex = color.replace('#', '');
   const r = Math.min(255, Math.max(0, parseInt(hex.slice(0, 2), 16) + amount));
   const g = Math.min(255, Math.max(0, parseInt(hex.slice(2, 4), 16) + amount));
