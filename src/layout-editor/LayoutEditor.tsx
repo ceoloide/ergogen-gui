@@ -49,9 +49,17 @@ const HeaderTitle = styled.h1`
   margin: 0;
 `;
 
-const UnsavedIndicator = styled.span`
+const SavedIndicator = styled.span`
   font-size: ${theme.fontSizes.bodySmall};
-  color: ${theme.colors.warning};
+  color: ${theme.colors.textDark};
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .material-symbols-outlined {
+    font-size: 14px;
+    color: ${theme.colors.accent};
+  }
 `;
 
 const HeaderActions = styled.div`
@@ -186,7 +194,7 @@ const LayoutEditorContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<PropertiesTab>('key');
   const [showHelp, setShowHelp] = useState(false);
 
-  const { isDirty, layout } = state;
+  const { layout, isDirty } = state;
 
   // Handle export to YAML
   const handleExport = useCallback(() => {
@@ -246,10 +254,10 @@ const LayoutEditorContent: React.FC = () => {
         return;
       }
 
-      // Ctrl/Cmd + S: Export
+      // Ctrl/Cmd + S: Prevent default (auto-save handles saving)
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        handleExport();
+        // Auto-save is handled by the effect below, no action needed
       }
 
       // Ctrl/Cmd + Z: Undo
@@ -270,19 +278,21 @@ const LayoutEditorContent: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleExport, dispatch]);
+  }, [dispatch]);
 
-  // Auto-save to localStorage
+  // Auto-save to localStorage after every layout change
   useEffect(() => {
     if (isDirty) {
       try {
         const yaml = layoutToYaml(layout);
         localStorage.setItem('layout-editor:autosave', yaml);
+        // Mark as clean since we've auto-saved
+        dispatch({ type: 'MARK_CLEAN' });
       } catch (error) {
         console.error('Failed to autosave:', error);
       }
     }
-  }, [isDirty, layout]);
+  }, [isDirty, layout, dispatch]);
 
   // Load autosave on mount
   useEffect(() => {
@@ -303,7 +313,10 @@ const LayoutEditorContent: React.FC = () => {
       <EditorHeader>
         <HeaderLeft>
           <HeaderTitle>Layout Editor</HeaderTitle>
-          {isDirty && <UnsavedIndicator>• Unsaved changes</UnsavedIndicator>}
+          <SavedIndicator>
+            <span className="material-symbols-outlined">check_circle</span>
+            Auto-saved
+          </SavedIndicator>
         </HeaderLeft>
         <HeaderActions>
           <HelpButton
