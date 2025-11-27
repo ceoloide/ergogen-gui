@@ -525,6 +525,20 @@ const Welcome = () => {
             </Button>
           </OptionBox>
           <OptionBox>
+            <h2>Visual Editor</h2>
+            <p>
+              Design your keyboard layout visually with an interactive canvas
+              editor. No YAML knowledge required.
+            </p>
+            <Button
+              onClick={() => navigate('/canvas')}
+              aria-label="Open visual canvas editor"
+              data-testid="canvas-editor-button"
+            >
+              Canvas Editor
+            </Button>
+          </OptionBox>
+          <OptionBox>
             <h2>From Local File</h2>
             <p>
               Load a configuration from your computer. Supports *.yaml, *.json,
