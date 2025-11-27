@@ -6,4 +6,7 @@
  */
 
 // Main component
-export { LayoutEditor } from './LayoutEditor';
+import { LayoutEditor } from './LayoutEditor';
+
+export { LayoutEditor };
+
