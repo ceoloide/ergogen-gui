@@ -520,7 +520,14 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
 
           if (moveX !== 0 || moveY !== 0) {
             moveSelectedKeys(moveX, moveY);
-            setDragStart({ x, y });
+            // Only update dragStart by the amount we actually moved (in screen coords)
+            // This preserves any remainder for the next frame
+            const actualDx = moveX * scale;
+            const actualDy = -moveY * scale; // Flip back for screen coordinates
+            setDragStart({
+              x: dragStart.x + actualDx,
+              y: dragStart.y + actualDy,
+            });
           }
         }
       }
