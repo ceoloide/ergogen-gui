@@ -514,6 +514,20 @@ const Welcome = () => {
 
         <OptionsContainer>
           <OptionBox>
+            <h2>Canvas Editor</h2>
+            <p>
+              Create your keyboard layout visually using an interactive canvas
+              editor with drag-and-drop tools.
+            </p>
+            <Button
+              onClick={() => navigate('/canvas')}
+              aria-label="Open canvas editor"
+              data-testid="canvas-editor-button"
+            >
+              Open Canvas Editor
+            </Button>
+          </OptionBox>
+          <OptionBox>
             <h2>Start Fresh</h2>
             <p>Begin with a completely blank slate.</p>
             <Button
