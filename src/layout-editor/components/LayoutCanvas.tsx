@@ -497,10 +497,10 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       }
 
       if (mode === 'add-key') {
-        // Add key at click position
+        // Add key at click position, snap to minor grid (0.125 U)
         const gridPos = screenToGrid(x, y);
-        const snappedX = grid.snap ? Math.round(gridPos.x) : gridPos.x;
-        const snappedY = grid.snap ? Math.round(gridPos.y) : gridPos.y;
+        const snappedX = grid.snap ? Math.round(gridPos.x * 8) / 8 : gridPos.x;
+        const snappedY = grid.snap ? Math.round(gridPos.y * 8) / 8 : gridPos.y;
         addKey({ x: snappedX, y: snappedY });
         return;
       }
@@ -571,8 +571,9 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           let moveY = -dy / scale;
 
           if (grid.snap) {
-            moveX = Math.round(moveX * 4) / 4; // Snap to 0.25 increments
-            moveY = Math.round(moveY * 4) / 4;
+            // Snap to minor grid (0.125 U / 1/8 U)
+            moveX = Math.round(moveX * 8) / 8;
+            moveY = Math.round(moveY * 8) / 8;
           }
 
           if (moveX !== 0 || moveY !== 0) {
