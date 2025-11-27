@@ -510,7 +510,8 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           // Moving selected keys
           const scale = PIXELS_PER_UNIT * zoom;
           let moveX = dx / scale;
-          let moveY = dy / scale;
+          // Flip Y axis: screen down = negative grid Y
+          let moveY = -dy / scale;
 
           if (grid.snap) {
             moveX = Math.round(moveX * 4) / 4; // Snap to 0.25 increments
@@ -559,7 +560,8 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
         layout.keys.forEach((key, id) => {
           const scale = PIXELS_PER_UNIT * zoom;
           const keyX = key.x * scale + adjustedPanX;
-          const keyY = key.y * scale + adjustedPanY;
+          // Flip Y axis: positive Y goes up
+          const keyY = -key.y * scale + adjustedPanY - key.height * scale;
           const keyWidth = key.width * scale;
           const keyHeight = key.height * scale;
 
