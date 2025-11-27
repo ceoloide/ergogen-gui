@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import { useLayoutEditor } from '../LayoutEditorContext';
 import { EditorKey, PIXELS_PER_UNIT } from '../types';
 import { theme } from '../../theme/theme';
+import { AddKeyOverlay, CardinalDirection } from './AddKeyOverlay';
 
 // Canvas container with dark background
 const CanvasContainer = styled.div`
@@ -292,6 +293,10 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     pan,
     zoom: zoomFn,
     addKey,
+    addKeyInDirection,
+    selectedKeys,
+    showAddKeyOverlay,
+    setShowAddKeyOverlay,
   } = useLayoutEditor();
 
   const { layout, viewport, selection, grid, mode } = state;
@@ -319,6 +324,14 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       observer.disconnect();
     };
   }, []);
+
+  // Close add key overlay when selection changes
+  useEffect(() => {
+    // Close overlay if selection becomes empty or multi-select
+    if (showAddKeyOverlay && selection.keys.size !== 1) {
+      setShowAddKeyOverlay(false);
+    }
+  }, [selection.keys.size, showAddKeyOverlay, setShowAddKeyOverlay]);
 
   // Render the canvas
   useEffect(() => {
@@ -597,6 +610,17 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     [zoomFn]
   );
 
+  // Handle add key in direction
+  const handleAddKeyDirection = useCallback(
+    (direction: CardinalDirection) => {
+      if (selectedKeys.length === 1 && selectedKeys[0]) {
+        addKeyInDirection(selectedKeys[0].id, direction);
+        setShowAddKeyOverlay(false);
+      }
+    },
+    [selectedKeys, addKeyInDirection, setShowAddKeyOverlay]
+  );
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -614,7 +638,11 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           // Delete selected keys is handled by context
           break;
         case 'Escape':
-          clearSelection();
+          if (showAddKeyOverlay) {
+            setShowAddKeyOverlay(false);
+          } else {
+            clearSelection();
+          }
           break;
         case 'a':
           if (e.ctrlKey || e.metaKey) {
@@ -627,7 +655,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection]);
+  }, [clearSelection, showAddKeyOverlay, setShowAddKeyOverlay]);
 
   // Calculate grid position for display
   const gridPos = screenToGrid(mousePos.x, mousePos.y);
@@ -659,6 +687,20 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           $top={Math.min(selectionRect.startY, selectionRect.endY)}
           $width={Math.abs(selectionRect.endX - selectionRect.startX)}
           $height={Math.abs(selectionRect.endY - selectionRect.startY)}
+        />
+      )}
+      {showAddKeyOverlay && selectedKeys.length === 1 && selectedKeys[0] && (
+        <AddKeyOverlay
+          selectedKey={selectedKeys[0]}
+          zone={layout.zones.get(selectedKeys[0].zone) || null}
+          allKeys={layout.keys}
+          zoom={zoom}
+          panX={panX}
+          panY={panY}
+          canvasWidth={canvasSize.width}
+          canvasHeight={canvasSize.height}
+          onDirectionClick={handleAddKeyDirection}
+          onClose={() => setShowAddKeyOverlay(false)}
         />
       )}
       <StatusBar>

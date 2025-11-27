@@ -90,8 +90,16 @@ const ToolbarItem: React.FC<ToolbarItemProps> = ({
 );
 
 export const EditorToolbar: React.FC = () => {
-  const { state, setMode, deleteSelectedKeys, undo, redo, canUndo, canRedo } =
-    useLayoutEditor();
+  const {
+    state,
+    setMode,
+    deleteSelectedKeys,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    handleAddKeyButtonClick,
+  } = useLayoutEditor();
 
   const { mode, selection } = state;
   const hasSelection = selection.keys.size > 0;
@@ -108,7 +116,7 @@ export const EditorToolbar: React.FC = () => {
           icon="add_circle"
           title="Add Key (A)"
           active={mode === 'add-key'}
-          onClick={() => handleModeChange('add-key')}
+          onClick={handleAddKeyButtonClick}
         />
         <ToolbarItem
           icon="remove_circle"

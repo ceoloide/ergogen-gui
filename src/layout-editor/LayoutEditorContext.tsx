@@ -7,6 +7,7 @@ import React, {
   useContext,
   useReducer,
   useCallback,
+  useState,
   ReactNode,
 } from 'react';
 import {
@@ -86,6 +87,13 @@ type EditorAction =
   | { type: 'CLEAR_SELECTION' }
   | { type: 'SELECT_ALL' }
   | { type: 'ADD_KEY'; payload: Partial<EditorKey> }
+  | {
+      type: 'ADD_KEY_IN_DIRECTION';
+      payload: {
+        referenceKeyId: string;
+        direction: 'up' | 'down' | 'left' | 'right';
+      };
+    }
   | { type: 'UPDATE_KEY'; payload: { id: string; changes: Partial<EditorKey> } }
   | { type: 'DELETE_KEYS'; payload: string[] }
   | { type: 'MOVE_KEYS'; payload: { ids: string[]; dx: number; dy: number } }
@@ -203,6 +211,104 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       };
       const newKeys = new Map(state.layout.keys);
       newKeys.set(id, newKey);
+      return {
+        ...state,
+        layout: { ...state.layout, keys: newKeys },
+        selection: { keys: new Set([id]), zone: null },
+        isDirty: true,
+      };
+    }
+
+    case 'ADD_KEY_IN_DIRECTION': {
+      const { referenceKeyId, direction } = action.payload;
+      const refKey = state.layout.keys.get(referenceKeyId);
+      if (!refKey) return state;
+
+      const zone = state.layout.zones.get(refKey.zone);
+      const id = generateId('key');
+
+      // Calculate new position and column/row
+      let newX = refKey.x;
+      let newY = refKey.y;
+      let newColumn = refKey.column;
+      let newRow = refKey.row;
+
+      if (zone) {
+        const colIndex = zone.columns.findIndex(
+          (c) => c.name === refKey.column
+        );
+        const rowIndex = zone.rows.findIndex((r) => r.name === refKey.row);
+
+        switch (direction) {
+          case 'up':
+            newY = refKey.y - 1;
+            if (rowIndex > 0) {
+              newRow = zone.rows[rowIndex - 1]?.name || `row${rowIndex}`;
+            } else {
+              // Need to create a new row - for now use a generated name
+              newRow = `row_above_${refKey.row}`;
+            }
+            break;
+          case 'down':
+            newY = refKey.y + 1;
+            if (rowIndex < zone.rows.length - 1) {
+              newRow = zone.rows[rowIndex + 1]?.name || `row${rowIndex + 2}`;
+            } else {
+              newRow = `row_below_${refKey.row}`;
+            }
+            break;
+          case 'left':
+            newX = refKey.x - 1;
+            if (colIndex > 0) {
+              newColumn = zone.columns[colIndex - 1]?.name || `col${colIndex}`;
+            } else {
+              newColumn = `col_left_${refKey.column}`;
+            }
+            break;
+          case 'right':
+            newX = refKey.x + 1;
+            if (colIndex < zone.columns.length - 1) {
+              newColumn =
+                zone.columns[colIndex + 1]?.name || `col${colIndex + 2}`;
+            } else {
+              newColumn = `col_right_${refKey.column}`;
+            }
+            break;
+        }
+      } else {
+        // No zone - just adjust position
+        switch (direction) {
+          case 'up':
+            newY = refKey.y - 1;
+            break;
+          case 'down':
+            newY = refKey.y + 1;
+            break;
+          case 'left':
+            newX = refKey.x - 1;
+            break;
+          case 'right':
+            newX = refKey.x + 1;
+            break;
+        }
+      }
+
+      const newKey: EditorKey = {
+        ...DEFAULT_KEY,
+        id,
+        x: newX,
+        y: newY,
+        zone: refKey.zone,
+        column: newColumn,
+        row: newRow,
+        name: `${refKey.zone}_${newColumn}_${newRow}`,
+        rotation: refKey.rotation,
+        color: refKey.color,
+      };
+
+      const newKeys = new Map(state.layout.keys);
+      newKeys.set(id, newKey);
+
       return {
         ...state,
         layout: { ...state.layout, keys: newKeys },
@@ -412,6 +518,9 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
   }
 }
 
+// Direction type
+type Direction = 'up' | 'down' | 'left' | 'right';
+
 // Context type
 interface LayoutEditorContextType {
   state: EditorState;
@@ -426,6 +535,8 @@ interface LayoutEditorContextType {
   clearSelection: () => void;
   selectAll: () => void;
   addKey: (key?: Partial<EditorKey>) => void;
+  addFirstKey: () => void;
+  addKeyInDirection: (referenceKeyId: string, direction: Direction) => void;
   updateKey: (id: string, changes: Partial<EditorKey>) => void;
   deleteSelectedKeys: () => void;
   moveSelectedKeys: (dx: number, dy: number) => void;
@@ -439,6 +550,10 @@ interface LayoutEditorContextType {
   canUndo: boolean;
   canRedo: boolean;
   selectedKeys: EditorKey[];
+  // Add key overlay state
+  showAddKeyOverlay: boolean;
+  setShowAddKeyOverlay: (show: boolean) => void;
+  handleAddKeyButtonClick: () => void;
 }
 
 const LayoutEditorContext = createContext<LayoutEditorContextType | null>(null);
@@ -448,6 +563,7 @@ const LayoutEditorContext = createContext<LayoutEditorContextType | null>(null);
  */
 export function LayoutEditorProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(editorReducer, createInitialState());
+  const [showAddKeyOverlay, setShowAddKeyOverlay] = useState(false);
 
   const setMode = useCallback(
     (mode: EditorMode) => dispatch({ type: 'SET_MODE', payload: mode }),
@@ -517,6 +633,54 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SAVE_HISTORY', payload: 'Add key' });
   }, []);
 
+  const addFirstKey = useCallback(() => {
+    // Add the first key at [0,0] with default zone, column, and row
+    // Also create the default zone if it doesn't exist
+    if (!state.layout.zones.has('matrix')) {
+      dispatch({
+        type: 'ADD_ZONE',
+        payload: {
+          name: 'matrix',
+          columns: [
+            {
+              name: 'col1',
+              spread: 19.05,
+              stagger: 0,
+              splay: 0,
+              splayOrigin: [0, 0],
+              ergogenProps: {},
+            },
+          ],
+          rows: [{ name: 'row1', ergogenProps: {} }],
+        },
+      });
+    }
+
+    dispatch({
+      type: 'ADD_KEY',
+      payload: {
+        x: 0,
+        y: 0,
+        zone: 'matrix',
+        column: 'col1',
+        row: 'row1',
+        name: 'matrix_col1_row1',
+      },
+    });
+    dispatch({ type: 'SAVE_HISTORY', payload: 'Add first key' });
+  }, [state.layout.zones]);
+
+  const addKeyInDirection = useCallback(
+    (referenceKeyId: string, direction: Direction) => {
+      dispatch({
+        type: 'ADD_KEY_IN_DIRECTION',
+        payload: { referenceKeyId, direction },
+      });
+      dispatch({ type: 'SAVE_HISTORY', payload: `Add key ${direction}` });
+    },
+    []
+  );
+
   const updateKey = useCallback((id: string, changes: Partial<EditorKey>) => {
     dispatch({ type: 'UPDATE_KEY', payload: { id, changes } });
   }, []);
@@ -582,6 +746,55 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     .map((id) => state.layout.keys.get(id))
     .filter((k): k is EditorKey => k !== undefined);
 
+  const handleAddKeyButtonClick = useCallback(() => {
+    // If no keys exist, add the first key at [0,0]
+    if (state.layout.keys.size === 0) {
+      // Add the default zone if it doesn't exist
+      if (!state.layout.zones.has('matrix')) {
+        dispatch({
+          type: 'ADD_ZONE',
+          payload: {
+            name: 'matrix',
+            columns: [
+              {
+                name: 'col1',
+                spread: 19.05,
+                stagger: 0,
+                splay: 0,
+                splayOrigin: [0, 0],
+                ergogenProps: {},
+              },
+            ],
+            rows: [{ name: 'row1', ergogenProps: {} }],
+          },
+        });
+      }
+
+      dispatch({
+        type: 'ADD_KEY',
+        payload: {
+          x: 0,
+          y: 0,
+          zone: 'matrix',
+          column: 'col1',
+          row: 'row1',
+          name: 'matrix_col1_row1',
+        },
+      });
+      dispatch({ type: 'SAVE_HISTORY', payload: 'Add first key' });
+      return;
+    }
+
+    // If exactly one key is selected, show the overlay
+    if (state.selection.keys.size === 1) {
+      setShowAddKeyOverlay(true);
+      return;
+    }
+
+    // Otherwise, switch to add-key mode for click-to-add behavior
+    dispatch({ type: 'SET_MODE', payload: 'add-key' });
+  }, [state.layout.keys.size, state.layout.zones, state.selection.keys.size]);
+
   const value: LayoutEditorContextType = {
     state,
     dispatch,
@@ -594,6 +807,8 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     clearSelection,
     selectAll,
     addKey,
+    addFirstKey,
+    addKeyInDirection,
     updateKey,
     deleteSelectedKeys,
     moveSelectedKeys,
@@ -607,6 +822,9 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     canUndo,
     canRedo,
     selectedKeys,
+    showAddKeyOverlay,
+    setShowAddKeyOverlay,
+    handleAddKeyButtonClick,
   };
 
   return (
