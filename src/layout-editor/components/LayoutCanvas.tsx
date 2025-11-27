@@ -99,7 +99,8 @@ function renderKey(
   isPendingSelection: boolean,
   zoom: number,
   panX: number,
-  panY: number
+  panY: number,
+  globalRotation: number
 ) {
   const scale = PIXELS_PER_UNIT * zoom;
   const width = key.width * scale;
@@ -134,9 +135,10 @@ function renderKey(
   }
 
   // Apply rotation around key center
-  if (key.rotation !== 0) {
+  const totalRotation = key.rotation + globalRotation;
+  if (totalRotation !== 0) {
     ctx.translate(centerX, centerY);
-    ctx.rotate((key.rotation * Math.PI) / 180);
+    ctx.rotate((totalRotation * Math.PI) / 180);
     ctx.translate(-centerX, -centerY);
   }
 
@@ -338,7 +340,8 @@ function isPointInKey(
   key: EditorKey,
   zoom: number,
   panX: number,
-  panY: number
+  panY: number,
+  globalRotation: number
 ): boolean {
   const scale = PIXELS_PER_UNIT * zoom;
   const width = key.width * scale;
@@ -353,9 +356,10 @@ function isPointInKey(
   const x = centerX - width / 2;
   const y = centerY - height / 2;
 
-  if (key.rotation !== 0) {
+  const totalRotation = key.rotation + globalRotation;
+  if (totalRotation !== 0) {
     // For rotated keys, transform the point to key's local space
-    const angle = (-key.rotation * Math.PI) / 180;
+    const angle = (-totalRotation * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     const dx = px - centerX;
@@ -511,7 +515,8 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           isPendingSelection,
           zoom,
           adjustedPanX,
-          adjustedPanY
+          adjustedPanY,
+          layout.globalRotation
         );
       });
 
@@ -528,7 +533,8 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           false, // Already selected, so not pending
           zoom,
           adjustedPanX,
-          adjustedPanY
+          adjustedPanY,
+          layout.globalRotation
         );
       });
   }, [
@@ -552,7 +558,17 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       // Check keys in reverse order (topmost first)
       const keysArray = Array.from(layout.keys.values()).reverse();
       for (const key of keysArray) {
-        if (isPointInKey(x, y, key, zoom, adjustedPanX, adjustedPanY)) {
+        if (
+          isPointInKey(
+            x,
+            y,
+            key,
+            zoom,
+            adjustedPanX,
+            adjustedPanY,
+            layout.globalRotation
+          )
+        ) {
           return key;
         }
       }
