@@ -192,7 +192,7 @@ export interface EditorState {
   grid: {
     /** Whether grid is visible */
     visible: boolean;
-    /** Grid cell size in units */
+    /** Grid cell size in mm */
     size: number;
     /** Whether to snap to grid */
     snap: boolean;

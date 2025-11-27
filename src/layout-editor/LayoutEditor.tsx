@@ -498,11 +498,10 @@ const SettingsPanel: React.FC = () => {
             onChange={(val) =>
               dispatch({
                 type: 'SET_GRID_SIZE',
-                payload: Math.max(0.25, val),
+                payload: Math.max(0.1, val),
               })
             }
-            step={0.25}
-            min={0.25}
+            min={0.1}
           />
         </SettingsRow>
       </SettingsSection>

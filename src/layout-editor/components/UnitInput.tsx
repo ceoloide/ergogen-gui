@@ -10,11 +10,11 @@ interface UnitDefinition {
   factor: number; // Multiplier to convert FROM base unit TO this unit
 }
 
-// Base unit is U (19.05mm)
+// Base unit is mm
 const LENGTH_UNITS: UnitDefinition[] = [
-  { value: 'U', label: 'U', factor: 1 },
-  { value: 'u', label: 'u', factor: 19.05 / 19 },
-  { value: 'mm', label: 'mm', factor: 19.05 },
+  { value: 'U', label: 'U', factor: 1 / 19.05 },
+  { value: 'u', label: 'u', factor: 1 / 19 },
+  { value: 'mm', label: 'mm', factor: 1 },
 ];
 
 const DEGREE_UNIT: UnitDefinition[] = [

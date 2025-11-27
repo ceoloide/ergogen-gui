@@ -73,7 +73,7 @@ function createInitialState(): EditorState {
     isDirty: false,
     grid: {
       visible: true,
-      size: 1,
+      size: 19.05,
       snap: true,
     },
   };

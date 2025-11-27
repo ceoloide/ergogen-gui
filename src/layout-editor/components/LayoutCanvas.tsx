@@ -5,7 +5,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import styled from 'styled-components';
 import { useLayoutEditor } from '../LayoutEditorContext';
-import { EditorKey, PIXELS_PER_UNIT } from '../types';
+import { EditorKey, PIXELS_PER_UNIT, KEY_UNIT_MM } from '../types';
 import { theme } from '../../theme/theme';
 import { AddKeyOverlay, CardinalDirection } from './AddKeyOverlay';
 
@@ -236,8 +236,8 @@ function _adjustColor(color: string, amount: number): string {
 
 /**
  * Renders the grid on the canvas with major and minor grid lines.
- * Major grid: 1 U intervals, offset by 0.5 U so origin is centered between lines
- * Minor grid: 0.125 U (1/8 U) intervals
+ * Major grid: gridSize intervals (in mm)
+ * Minor grid: 1/8 of major grid
  */
 function renderGrid(
   ctx: CanvasRenderingContext2D,
@@ -246,18 +246,18 @@ function renderGrid(
   zoom: number,
   panX: number,
   panY: number,
-  _gridSize: number // Currently unused, kept for API compatibility
+  gridSize: number
 ) {
-  const pixelsPerUnit = PIXELS_PER_UNIT * zoom;
+  const pixelsPerMm = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
 
-  // Minor grid: 0.125 U (1/8 U)
-  const minorGridSize = 0.125;
-  const minorScale = pixelsPerUnit * minorGridSize;
+  // Major grid: gridSize (in mm)
+  const majorScale = gridSize * pixelsPerMm;
 
-  // Major grid: 1 U, offset by 0.5 U so origin is between major lines
-  const majorGridSize = 1;
-  const majorScale = pixelsPerUnit * majorGridSize;
-  const majorOffset = 0.5 * pixelsPerUnit; // Offset so [0,0] is centered between major lines
+  // Minor grid: 1/8 of major grid
+  const minorScale = majorScale / 8;
+
+  // Offset so origin is centered between major lines
+  const majorOffset = majorScale / 2;
 
   // Draw minor grid lines (lighter)
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
@@ -287,7 +287,7 @@ function renderGrid(
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
   ctx.lineWidth = 1;
 
-  // Calculate major grid offset (including the 0.5 U shift)
+  // Calculate major grid offset (including the shift)
   const majorOffsetX =
     (((panX + majorOffset) % majorScale) + majorScale) % majorScale;
   const majorOffsetY =
@@ -593,10 +593,16 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       }
 
       if (mode === 'add-key') {
-        // Add key at click position, snap to minor grid (0.125 U)
+        // Add key at click position, snap to minor grid (gridSize / 8)
         const gridPos = screenToGrid(x, y);
-        const snappedX = grid.snap ? Math.round(gridPos.x * 8) / 8 : gridPos.x;
-        const snappedY = grid.snap ? Math.round(gridPos.y * 8) / 8 : gridPos.y;
+        const gridSizeU = grid.size / KEY_UNIT_MM;
+        const snapStep = gridSizeU / 8;
+        const snappedX = grid.snap
+          ? Math.round(gridPos.x / snapStep) * snapStep
+          : gridPos.x;
+        const snappedY = grid.snap
+          ? Math.round(gridPos.y / snapStep) * snapStep
+          : gridPos.y;
         addKey({ x: snappedX, y: snappedY });
         return;
       }
@@ -672,9 +678,11 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           let moveY = -dy / scale;
 
           if (grid.snap) {
-            // Snap to minor grid (0.125 U / 1/8 U)
-            moveX = Math.round(moveX * 8) / 8;
-            moveY = Math.round(moveY * 8) / 8;
+            // Snap to minor grid (gridSize / 8)
+            const gridSizeU = grid.size / KEY_UNIT_MM;
+            const snapStep = gridSizeU / 8;
+            moveX = Math.round(moveX / snapStep) * snapStep;
+            moveY = Math.round(moveY / snapStep) * snapStep;
           }
 
           if (moveX !== 0 || moveY !== 0) {
