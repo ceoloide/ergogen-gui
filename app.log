@@ -1,0 +1,3 @@
+yarn run v1.22.22
+$ yarn run generate-previews
+$ ts-node --project scripts/tsconfig.json scripts/generate-previews.js
