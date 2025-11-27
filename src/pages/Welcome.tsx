@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
@@ -213,12 +213,18 @@ const allExamples: ConfigOption[] = exampleOptions
 
 const Welcome = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const configContext = useConfigContext();
   const [githubInput, setGithubInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
+
+  // Check if layout editor experiment is enabled via URL parameter
+  const isLayoutEditorEnabled = useMemo(() => {
+    return searchParams.get('exp') === 'layout-editor';
+  }, [searchParams]);
 
   // Use the injection conflict resolution hook
   const {
@@ -513,20 +519,22 @@ const Welcome = () => {
         </SubHeader>
 
         <OptionsContainer>
-          <OptionBox>
-            <h2>Visual Editor</h2>
-            <p>
-              Design your keyboard layout visually with drag-and-drop. Great for
-              beginners.
-            </p>
-            <Button
-              onClick={() => navigate('/layout-editor')}
-              aria-label="Open visual layout editor"
-              data-testid="layout-editor-button"
-            >
-              Open Layout Editor
-            </Button>
-          </OptionBox>
+          {isLayoutEditorEnabled && (
+            <OptionBox>
+              <h2>Visual Editor</h2>
+              <p>
+                Design your keyboard layout visually with drag-and-drop. Great
+                for beginners.
+              </p>
+              <Button
+                onClick={() => navigate('/layout-editor')}
+                aria-label="Open visual layout editor"
+                data-testid="layout-editor-button"
+              >
+                Open Layout Editor
+              </Button>
+            </OptionBox>
+          )}
           <OptionBox>
             <h2>Start Fresh</h2>
             <p>Begin with a completely blank slate and write YAML directly.</p>
