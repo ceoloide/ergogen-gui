@@ -99,7 +99,8 @@ function renderKey(
 ) {
   const scale = PIXELS_PER_UNIT * zoom;
   const x = key.x * scale + panX;
-  const y = key.y * scale + panY;
+  // Flip Y axis: positive Y goes up, negative Y goes down
+  const y = -key.y * scale + panY - key.height * scale;
   const width = key.width * scale;
   const height = key.height * scale;
 
@@ -244,7 +245,8 @@ function isPointInKey(
 ): boolean {
   const scale = PIXELS_PER_UNIT * zoom;
   const x = key.x * scale + panX;
-  const y = key.y * scale + panY;
+  // Flip Y axis: positive Y goes up, negative Y goes down
+  const y = -key.y * scale + panY - key.height * scale;
   const width = key.width * scale;
   const height = key.height * scale;
 
@@ -414,7 +416,8 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       const scale = PIXELS_PER_UNIT * zoom;
       return {
         x: (screenX - adjustedPanX) / scale,
-        y: (screenY - adjustedPanY) / scale,
+        // Flip Y axis: screen Y down = negative grid Y
+        y: -(screenY - adjustedPanY) / scale,
       };
     },
     [panX, panY, canvasSize, zoom]

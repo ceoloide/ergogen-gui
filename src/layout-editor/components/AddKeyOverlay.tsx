@@ -235,8 +235,9 @@ export const AddKeyOverlay: React.FC<AddKeyOverlayProps> = ({
   const adjustedPanY = panY + canvasHeight / 2;
   const screenX =
     selectedKey.x * scale + adjustedPanX + (selectedKey.width * scale) / 2;
+  // Flip Y axis: positive Y goes up on screen
   const screenY =
-    selectedKey.y * scale + adjustedPanY + (selectedKey.height * scale) / 2;
+    -selectedKey.y * scale + adjustedPanY - (selectedKey.height * scale) / 2;
 
   const directions: CardinalDirection[] = ['up', 'down', 'left', 'right'];
 
