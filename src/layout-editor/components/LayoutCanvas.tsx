@@ -87,7 +87,7 @@ interface LayoutCanvasProps {
 }
 
 /**
- * Renders a single key on the canvas.
+ * Renders a single key on the canvas (kle-ng style).
  */
 function renderKey(
   ctx: CanvasRenderingContext2D,
@@ -103,69 +103,71 @@ function renderKey(
   const y = -key.y * scale + panY - key.height * scale;
   const width = key.width * scale;
   const height = key.height * scale;
+  const centerX = x + width / 2;
+  const centerY = y + height / 2;
+  const cornerRadius = Math.min(4 * zoom, width / 4, height / 4);
 
   ctx.save();
 
   // Apply rotation around key center
   if (key.rotation !== 0) {
-    const centerX = x + width / 2;
-    const centerY = y + height / 2;
     ctx.translate(centerX, centerY);
     ctx.rotate((key.rotation * Math.PI) / 180);
     ctx.translate(-centerX, -centerY);
   }
 
-  // Draw key shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  // Draw key fill (flat style)
+  const keyColor = key.mirrored ? '#b0b0b0' : key.color;
+  ctx.fillStyle = keyColor;
   ctx.beginPath();
-  ctx.roundRect(x + 3, y + 3, width - 4, height - 4, 4);
+  ctx.roundRect(x, y, width, height, cornerRadius);
   ctx.fill();
 
-  // Draw key base
-  ctx.fillStyle = key.mirrored ? '#a0a0a0' : key.color;
+  // Draw key border
+  ctx.strokeStyle = isSelected
+    ? theme.colors.accent
+    : adjustColor(keyColor, -40);
+  ctx.lineWidth = isSelected ? 2 : 1;
   ctx.beginPath();
-  ctx.roundRect(x + 2, y + 2, width - 4, height - 4, 4);
-  ctx.fill();
+  ctx.roundRect(x, y, width, height, cornerRadius);
+  ctx.stroke();
 
-  // Draw key top (inset)
-  const inset = 4;
-  ctx.fillStyle = key.mirrored ? '#c0c0c0' : adjustColor(key.color, 20);
-  ctx.beginPath();
-  ctx.roundRect(
-    x + inset,
-    y + inset,
-    width - inset * 2,
-    height - inset * 2 - 2,
-    3
-  );
-  ctx.fill();
-
-  // Draw selection border
+  // Draw selection highlight and center crosshair
   if (isSelected) {
+    // Draw outer glow/highlight
     ctx.strokeStyle = theme.colors.accent;
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.roundRect(x + 1, y + 1, width - 2, height - 2, 5);
+    ctx.roundRect(x - 2, y - 2, width + 4, height + 4, cornerRadius + 2);
     ctx.stroke();
-  }
 
-  // Draw key border
-  ctx.strokeStyle = isSelected ? theme.colors.accent : 'rgba(0, 0, 0, 0.3)';
-  ctx.lineWidth = isSelected ? 2 : 1;
-  ctx.beginPath();
-  ctx.roundRect(x + 2, y + 2, width - 4, height - 4, 4);
-  ctx.stroke();
+    // Draw center crosshair
+    const crosshairSize = Math.min(12 * zoom, width / 3, height / 3);
+    const circleRadius = crosshairSize * 0.6;
 
-  // Draw key label
-  if (key.name) {
-    ctx.fillStyle = '#333';
-    ctx.font = `${Math.max(10, 12 * zoom)}px ${theme.fonts.body}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const labelText =
-      key.name.length > 8 ? key.name.slice(0, 7) + '…' : key.name;
-    ctx.fillText(labelText, x + width / 2, y + height / 2);
+    // Crosshair lines
+    ctx.strokeStyle = theme.colors.accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    // Horizontal line
+    ctx.moveTo(centerX - crosshairSize, centerY);
+    ctx.lineTo(centerX + crosshairSize, centerY);
+    // Vertical line
+    ctx.moveTo(centerX, centerY - crosshairSize);
+    ctx.lineTo(centerX, centerY + crosshairSize);
+    ctx.stroke();
+
+    // Circle around crosshair
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Center dot
+    ctx.fillStyle = theme.colors.accent;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
