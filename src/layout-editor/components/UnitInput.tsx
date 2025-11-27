@@ -60,7 +60,7 @@ const Input = styled.input`
   color: ${theme.colors.text};
   font-family: ${theme.fonts.code};
   font-size: ${theme.fontSizes.bodySmall};
-  padding: 0 8px;
+  padding: 0 4px;
   text-align: right;
   height: 100%;
 
@@ -86,10 +86,10 @@ const UnitSelector = styled.button`
   color: ${theme.colors.textDark};
   font-family: ${theme.fonts.code};
   font-size: ${theme.fontSizes.bodySmall};
-  padding: 0 8px;
+  padding: 0 2px;
   height: 100%;
   cursor: pointer;
-  min-width: 32px;
+  min-width: 20px;
   transition: all 0.15s ease;
 
   &:hover {
@@ -102,7 +102,7 @@ const Controls = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 20px;
+  width: 16px;
 `;
 
 const ControlButton = styled.button`
