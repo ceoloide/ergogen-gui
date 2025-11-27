@@ -99,6 +99,8 @@ export const EditorToolbar: React.FC = () => {
     canUndo,
     canRedo,
     handleAddKeyButtonClick,
+    zoom,
+    resetView,
   } = useLayoutEditor();
 
   const { mode, selection } = state;
@@ -168,23 +170,17 @@ export const EditorToolbar: React.FC = () => {
         <ToolbarItem
           icon="zoom_in"
           title="Zoom In"
-          onClick={() => {
-            // Handled by context
-          }}
+          onClick={() => zoom(0.1)}
         />
         <ToolbarItem
           icon="zoom_out"
           title="Zoom Out"
-          onClick={() => {
-            // Handled by context
-          }}
+          onClick={() => zoom(-0.1)}
         />
         <ToolbarItem
           icon="fit_screen"
           title="Fit to View"
-          onClick={() => {
-            // TODO: Implement fit to view
-          }}
+          onClick={resetView}
         />
       </ToolSection>
 
