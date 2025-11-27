@@ -558,12 +558,33 @@ const SettingsPanel: React.FC = () => {
       <SettingsSection>
         <SettingsTitle>Meta</SettingsTitle>
         <SettingsRow>
-          <SettingsLabel>Engine Version</SettingsLabel>
+          <SettingsLabel>Name</SettingsLabel>
           <SettingsInput
             type="text"
-            value={layout.meta.engine}
-            style={{ width: '100px' }}
-            readOnly
+            value={layout.meta.name || ''}
+            onChange={(e) => dispatch({ type: 'UPDATE_META', payload: { name: e.target.value } })}
+            placeholder="Keyboard Name"
+            style={{ width: '120px', textAlign: 'left' }}
+          />
+        </SettingsRow>
+        <SettingsRow>
+          <SettingsLabel>Version</SettingsLabel>
+          <SettingsInput
+            type="text"
+            value={layout.meta.version || ''}
+            onChange={(e) => dispatch({ type: 'UPDATE_META', payload: { version: e.target.value } })}
+            placeholder="0.1"
+            style={{ width: '60px' }}
+          />
+        </SettingsRow>
+        <SettingsRow>
+          <SettingsLabel>Author</SettingsLabel>
+          <SettingsInput
+            type="text"
+            value={layout.meta.author || ''}
+            onChange={(e) => dispatch({ type: 'UPDATE_META', payload: { author: e.target.value } })}
+            placeholder="Your Name"
+            style={{ width: '120px', textAlign: 'left' }}
           />
         </SettingsRow>
       </SettingsSection>

@@ -25,10 +25,29 @@ export function layoutToYaml(layout: EditorLayout): string {
   // Add meta section
   config.meta = {
     engine: layout.meta.engine,
-    ...Object.fromEntries(
-      Object.entries(layout.meta).filter(([key]) => key !== 'engine')
-    ),
   };
+
+  if (layout.meta.version) {
+    (config.meta as Record<string, unknown>).version = layout.meta.version;
+  }
+  if (layout.meta.author) {
+    (config.meta as Record<string, unknown>).author = layout.meta.author;
+  }
+  if (layout.meta.name) {
+    (config.meta as Record<string, unknown>).name = layout.meta.name;
+  }
+
+  // Add any other meta fields
+  Object.entries(layout.meta).forEach(([key, value]) => {
+    if (
+      key !== 'engine' &&
+      key !== 'version' &&
+      key !== 'author' &&
+      key !== 'name'
+    ) {
+      (config.meta as Record<string, unknown>)[key] = value;
+    }
+  });
 
   // Build points section
   const points: Record<string, unknown> = {};
@@ -235,16 +254,23 @@ export function yamlToLayout(yamlString: string): EditorLayout {
     },
     globalRotation: 0,
     meta: {
-      engine: '4.1.0',
+      engine: '4.2.1',
     },
   };
 
   // Parse meta section
   if (config.meta && typeof config.meta === 'object') {
+    const meta = config.meta as Record<string, unknown>;
     layout.meta = {
       ...layout.meta,
-      ...(config.meta as Record<string, unknown>),
+      ...meta,
     };
+
+    // Ensure known fields are strings if present
+    if (typeof meta.version === 'string') layout.meta.version = meta.version;
+    if (typeof meta.author === 'string') layout.meta.author = meta.author;
+    if (typeof meta.name === 'string') layout.meta.name = meta.name;
+    if (typeof meta.engine === 'string') layout.meta.engine = meta.engine;
   }
 
   // Parse points section
@@ -472,7 +498,7 @@ function _generateSimpleLayout(
     },
     globalRotation: 0,
     meta: {
-      engine: '4.1.0',
+      engine: '4.2.1',
     },
   };
 

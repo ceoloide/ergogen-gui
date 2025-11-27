@@ -47,7 +47,10 @@ function createEmptyLayout(): EditorLayout {
     },
     globalRotation: 0,
     meta: {
-      engine: '4.1.0',
+      engine: '4.2.1',
+      version: '0.1',
+      author: '',
+      name: '',
     },
   };
 }
@@ -115,6 +118,7 @@ type EditorAction =
   | { type: 'SET_GRID_SIZE'; payload: number }
   | { type: 'SET_MIRROR'; payload: Partial<EditorLayout['mirror']> }
   | { type: 'SET_GLOBAL_ROTATION'; payload: number }
+  | { type: 'UPDATE_META'; payload: Partial<EditorLayout['meta']> }
   | { type: 'MARK_CLEAN' };
 
 /**
@@ -539,6 +543,28 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         isDirty: true,
       };
 
+    case 'UPDATE_META': {
+      const newMeta = { ...state.layout.meta, ...action.payload };
+      
+      // Validate engine version if it's being updated
+      if (action.payload.engine) {
+        const semverRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+        if (!semverRegex.test(action.payload.engine)) {
+          // Ignore invalid engine version
+          return state;
+        }
+      }
+
+      return {
+        ...state,
+        layout: {
+          ...state.layout,
+          meta: newMeta,
+        },
+        isDirty: true,
+      };
+    }
+
     case 'MARK_CLEAN':
       return { ...state, isDirty: false };
 
@@ -579,6 +605,7 @@ interface LayoutEditorContextType {
   canUndo: boolean;
   canRedo: boolean;
   selectedKeys: EditorKey[];
+  updateMeta: (changes: Partial<EditorLayout['meta']>) => void;
   // Add key overlay state
   showAddKeyOverlay: boolean;
   setShowAddKeyOverlay: (show: boolean) => void;
@@ -799,6 +826,10 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SAVE_HISTORY', payload: description });
   }, []);
 
+  const updateMeta = useCallback((changes: Partial<EditorLayout['meta']>) => {
+    dispatch({ type: 'UPDATE_META', payload: changes });
+  }, []);
+
   const canUndo = state.historyIndex > 0;
   const canRedo = state.historyIndex < state.history.length - 1;
 
@@ -882,6 +913,7 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     canUndo,
     canRedo,
     selectedKeys,
+    updateMeta,
     showAddKeyOverlay,
     setShowAddKeyOverlay,
     handleAddKeyButtonClick,

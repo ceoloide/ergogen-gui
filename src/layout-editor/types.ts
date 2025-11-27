@@ -129,6 +129,9 @@ export interface EditorLayout {
   /** Ergogen meta settings */
   meta: {
     engine: string;
+    author?: string;
+    version?: string;
+    name?: string;
     [key: string]: unknown;
   };
 }
