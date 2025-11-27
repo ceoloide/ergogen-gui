@@ -88,6 +88,7 @@ interface LayoutCanvasProps {
 
 /**
  * Renders a single key on the canvas (kle-ng style).
+ * Key coordinates (x, y) represent the CENTER of the key.
  */
 function renderKey(
   ctx: CanvasRenderingContext2D,
@@ -98,13 +99,18 @@ function renderKey(
   panY: number
 ) {
   const scale = PIXELS_PER_UNIT * zoom;
-  const x = key.x * scale + panX;
-  // Flip Y axis: positive Y goes up, negative Y goes down
-  const y = -key.y * scale + panY - key.height * scale;
   const width = key.width * scale;
   const height = key.height * scale;
-  const centerX = x + width / 2;
-  const centerY = y + height / 2;
+
+  // Key coordinates are the CENTER - convert to screen center position
+  const centerX = key.x * scale + panX;
+  // Flip Y axis: positive Y goes up, negative Y goes down
+  const centerY = -key.y * scale + panY;
+
+  // Calculate top-left corner from center
+  const x = centerX - width / 2;
+  const y = centerY - height / 2;
+
   const cornerRadius = Math.min(4 * zoom, width / 4, height / 4);
 
   ctx.save();
@@ -236,6 +242,7 @@ function renderGrid(
 
 /**
  * Checks if a point is inside a key.
+ * Key coordinates (x, y) represent the CENTER of the key.
  */
 function isPointInKey(
   px: number,
@@ -246,16 +253,20 @@ function isPointInKey(
   panY: number
 ): boolean {
   const scale = PIXELS_PER_UNIT * zoom;
-  const x = key.x * scale + panX;
-  // Flip Y axis: positive Y goes up, negative Y goes down
-  const y = -key.y * scale + panY - key.height * scale;
   const width = key.width * scale;
   const height = key.height * scale;
 
+  // Key coordinates are the CENTER
+  const centerX = key.x * scale + panX;
+  // Flip Y axis: positive Y goes up, negative Y goes down
+  const centerY = -key.y * scale + panY;
+
+  // Calculate top-left corner from center
+  const x = centerX - width / 2;
+  const y = centerY - height / 2;
+
   if (key.rotation !== 0) {
     // For rotated keys, transform the point to key's local space
-    const centerX = x + width / 2;
-    const centerY = y + height / 2;
     const angle = (-key.rotation * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
@@ -568,11 +579,17 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
 
         layout.keys.forEach((key, id) => {
           const scale = PIXELS_PER_UNIT * zoom;
-          const keyX = key.x * scale + adjustedPanX;
-          // Flip Y axis: positive Y goes up
-          const keyY = -key.y * scale + adjustedPanY - key.height * scale;
           const keyWidth = key.width * scale;
           const keyHeight = key.height * scale;
+
+          // Key coordinates are the CENTER
+          const keyCenterX = key.x * scale + adjustedPanX;
+          // Flip Y axis: positive Y goes up
+          const keyCenterY = -key.y * scale + adjustedPanY;
+
+          // Calculate top-left corner from center
+          const keyX = keyCenterX - keyWidth / 2;
+          const keyY = keyCenterY - keyHeight / 2;
 
           // Check if key overlaps with selection rectangle
           if (

@@ -230,14 +230,13 @@ export const AddKeyOverlay: React.FC<AddKeyOverlayProps> = ({
   const blockedDirections = getBlockedDirections(selectedKey, zone, allKeys);
 
   // Calculate screen position of the selected key's center
+  // Key coordinates (x, y) already represent the CENTER
   const scale = PIXELS_PER_UNIT * zoom;
   const adjustedPanX = panX + canvasWidth / 2;
   const adjustedPanY = panY + canvasHeight / 2;
-  const screenX =
-    selectedKey.x * scale + adjustedPanX + (selectedKey.width * scale) / 2;
+  const screenX = selectedKey.x * scale + adjustedPanX;
   // Flip Y axis: positive Y goes up on screen
-  const screenY =
-    -selectedKey.y * scale + adjustedPanY - (selectedKey.height * scale) / 2;
+  const screenY = -selectedKey.y * scale + adjustedPanY;
 
   const directions: CardinalDirection[] = ['up', 'down', 'left', 'right'];
 
