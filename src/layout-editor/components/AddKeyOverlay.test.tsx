@@ -93,8 +93,21 @@ describe('AddKeyOverlay', () => {
     });
 
     it('should render direction buttons with correct aria labels', () => {
-      // Arrange
-      render(<AddKeyOverlay {...defaultProps} />);
+      // Arrange - use a key at row2, col2 so all directions are enabled
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row2',
+        column: 'col2',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
 
       // Assert
       expect(screen.getByLabelText('Add key up')).toBeInTheDocument();
@@ -117,8 +130,21 @@ describe('AddKeyOverlay', () => {
     });
 
     it('should call onDirectionClick with "down" when down button is clicked', () => {
-      // Arrange
-      render(<AddKeyOverlay {...defaultProps} />);
+      // Arrange - use a key at row2 so down is enabled
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row2',
+        column: 'col1',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
 
       // Act
       fireEvent.click(screen.getByTestId('add-key-down'));
@@ -128,8 +154,21 @@ describe('AddKeyOverlay', () => {
     });
 
     it('should call onDirectionClick with "left" when left button is clicked', () => {
-      // Arrange
-      render(<AddKeyOverlay {...defaultProps} />);
+      // Arrange - use a key at col2 so left is enabled
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row1',
+        column: 'col2',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
 
       // Act
       fireEvent.click(screen.getByTestId('add-key-left'));
@@ -151,11 +190,55 @@ describe('AddKeyOverlay', () => {
   });
 
   describe('blocked directions', () => {
-    it('should disable "up" button when there is a key above', () => {
-      // Arrange
+    it('should disable "down" button when row is 1', () => {
+      // Arrange - key at row1 cannot go down
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row1',
+        column: 'col1',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
+
+      // Assert
+      const downButton = screen.getByTestId('add-key-down');
+      expect(downButton).toBeDisabled();
+    });
+
+    it('should disable "left" button when column is 1', () => {
+      // Arrange - key at col1 cannot go left
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row1',
+        column: 'col1',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
+
+      // Assert
+      const leftButton = screen.getByTestId('add-key-left');
+      expect(leftButton).toBeDisabled();
+    });
+
+    it('should disable "up" button when there is a key above (higher row number)', () => {
+      // Arrange - key at row2, another key at row3 (above)
       const keyAbove = createTestKey({
         id: 'key-above',
-        row: 'row1',
+        row: 'row3',
         column: 'col1',
       });
       const selectedKey = createTestKey({
@@ -167,14 +250,12 @@ describe('AddKeyOverlay', () => {
         ['key-above', keyAbove],
         ['selected-key', selectedKey],
       ]);
-      const zone = createTestZone();
 
       render(
         <AddKeyOverlay
           {...defaultProps}
           selectedKey={selectedKey}
           allKeys={allKeys}
-          zone={zone}
         />
       );
 
@@ -199,14 +280,12 @@ describe('AddKeyOverlay', () => {
         ['key-right', keyRight],
         ['selected-key', selectedKey],
       ]);
-      const zone = createTestZone();
 
       render(
         <AddKeyOverlay
           {...defaultProps}
           selectedKey={selectedKey}
           allKeys={allKeys}
-          zone={zone}
         />
       );
 
@@ -216,21 +295,13 @@ describe('AddKeyOverlay', () => {
     });
 
     it('should not call onDirectionClick when clicking disabled button', () => {
-      // Arrange
-      const keyAbove = createTestKey({
-        id: 'key-above',
+      // Arrange - key at row1, col1 - down and left are disabled
+      const selectedKey = createTestKey({
+        id: 'selected-key',
         row: 'row1',
         column: 'col1',
       });
-      const selectedKey = createTestKey({
-        id: 'selected-key',
-        row: 'row2',
-        column: 'col1',
-      });
-      const allKeys = new Map([
-        ['key-above', keyAbove],
-        ['selected-key', selectedKey],
-      ]);
+      const allKeys = new Map([['selected-key', selectedKey]]);
 
       render(
         <AddKeyOverlay
@@ -240,48 +311,88 @@ describe('AddKeyOverlay', () => {
         />
       );
 
-      // Act
-      fireEvent.click(screen.getByTestId('add-key-up'));
+      // Act - try to click disabled down button
+      fireEvent.click(screen.getByTestId('add-key-down'));
 
       // Assert
       expect(defaultProps.onDirectionClick).not.toHaveBeenCalled();
     });
 
-    it('should enable all buttons when no adjacent keys exist', () => {
-      // Arrange - single key with no neighbors
-      const selectedKey = createTestKey();
-      const allKeys = new Map([['test-key-1', selectedKey]]);
-      const zone = createTestZone();
+    it('should enable down button when row > 1 and no key below', () => {
+      // Arrange - key at row2 can go down
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row2',
+        column: 'col1',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
 
       render(
         <AddKeyOverlay
           {...defaultProps}
           selectedKey={selectedKey}
           allKeys={allKeys}
-          zone={zone}
         />
       );
 
       // Assert
-      expect(screen.getByTestId('add-key-up')).not.toBeDisabled();
       expect(screen.getByTestId('add-key-down')).not.toBeDisabled();
+    });
+
+    it('should enable left button when column > 1 and no key to the left', () => {
+      // Arrange - key at col2 can go left
+      const selectedKey = createTestKey({
+        id: 'selected-key',
+        row: 'row1',
+        column: 'col2',
+      });
+      const allKeys = new Map([['selected-key', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
+
+      // Assert
       expect(screen.getByTestId('add-key-left')).not.toBeDisabled();
+    });
+
+    it('should enable up and right buttons for key at row1, col1', () => {
+      // Arrange - single key with no neighbors at row1, col1
+      const selectedKey = createTestKey();
+      const allKeys = new Map([['test-key-1', selectedKey]]);
+
+      render(
+        <AddKeyOverlay
+          {...defaultProps}
+          selectedKey={selectedKey}
+          allKeys={allKeys}
+        />
+      );
+
+      // Assert - up and right should be enabled, down and left disabled
+      expect(screen.getByTestId('add-key-up')).not.toBeDisabled();
       expect(screen.getByTestId('add-key-right')).not.toBeDisabled();
+      expect(screen.getByTestId('add-key-down')).toBeDisabled();
+      expect(screen.getByTestId('add-key-left')).toBeDisabled();
     });
   });
 
   describe('no zone', () => {
-    it('should check for adjacent keys by position when no zone', () => {
-      // Arrange
+    it('should still block based on column/row names even without zone', () => {
+      // Arrange - key at col1, row1 with another at col2, row1
       const keyRight = createTestKey({
         id: 'key-right',
-        x: 1,
-        y: 0,
+        column: 'col2',
+        row: 'row1',
       });
       const selectedKey = createTestKey({
         id: 'selected-key',
-        x: 0,
-        y: 0,
+        column: 'col1',
+        row: 'row1',
       });
       const allKeys = new Map([
         ['key-right', keyRight],
@@ -297,9 +408,12 @@ describe('AddKeyOverlay', () => {
         />
       );
 
-      // Assert - right should be disabled because there's a key at x+1
+      // Assert - right should be disabled because there's a key at col2
       const rightButton = screen.getByTestId('add-key-right');
       expect(rightButton).toBeDisabled();
+      // Down and left should also be disabled (at row1, col1)
+      expect(screen.getByTestId('add-key-down')).toBeDisabled();
+      expect(screen.getByTestId('add-key-left')).toBeDisabled();
     });
   });
 });

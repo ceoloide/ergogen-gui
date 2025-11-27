@@ -224,73 +224,59 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       const refKey = state.layout.keys.get(referenceKeyId);
       if (!refKey) return state;
 
-      const zone = state.layout.zones.get(refKey.zone);
       const id = generateId('key');
 
-      // Calculate new position and column/row
+      // Extract numeric suffix from column/row names
+      const extractNumber = (name: string): number => {
+        const match = name.match(/(\d+)$/);
+        return match ? parseInt(match[1], 10) : 1;
+      };
+
+      // Get prefix (e.g., "col" from "col1", "row" from "row2")
+      const getPrefix = (name: string): string => name.replace(/\d+$/, '');
+
+      const colNum = extractNumber(refKey.column);
+      const rowNum = extractNumber(refKey.row);
+      const colPrefix = getPrefix(refKey.column);
+      const rowPrefix = getPrefix(refKey.row);
+
+      // Calculate new position and column/row based on direction
       let newX = refKey.x;
       let newY = refKey.y;
       let newColumn = refKey.column;
       let newRow = refKey.row;
 
-      if (zone) {
-        const colIndex = zone.columns.findIndex(
-          (c) => c.name === refKey.column
-        );
-        const rowIndex = zone.rows.findIndex((r) => r.name === refKey.row);
-
-        switch (direction) {
-          case 'up':
-            newY = refKey.y - 1;
-            if (rowIndex > 0) {
-              newRow = zone.rows[rowIndex - 1]?.name || `row${rowIndex}`;
-            } else {
-              // Need to create a new row - for now use a generated name
-              newRow = `row_above_${refKey.row}`;
-            }
-            break;
-          case 'down':
+      switch (direction) {
+        case 'up':
+          // Up = higher row number, move up in Y (negative Y is up)
+          newY = refKey.y - 1;
+          newRow = `${rowPrefix}${rowNum + 1}`;
+          break;
+        case 'down':
+          // Down = lower row number (min 1), move down in Y
+          if (rowNum > 1) {
             newY = refKey.y + 1;
-            if (rowIndex < zone.rows.length - 1) {
-              newRow = zone.rows[rowIndex + 1]?.name || `row${rowIndex + 2}`;
-            } else {
-              newRow = `row_below_${refKey.row}`;
-            }
-            break;
-          case 'left':
+            newRow = `${rowPrefix}${rowNum - 1}`;
+          } else {
+            // Should not happen if UI blocks this, but guard anyway
+            return state;
+          }
+          break;
+        case 'right':
+          // Right = higher column number
+          newX = refKey.x + 1;
+          newColumn = `${colPrefix}${colNum + 1}`;
+          break;
+        case 'left':
+          // Left = lower column number (min 1)
+          if (colNum > 1) {
             newX = refKey.x - 1;
-            if (colIndex > 0) {
-              newColumn = zone.columns[colIndex - 1]?.name || `col${colIndex}`;
-            } else {
-              newColumn = `col_left_${refKey.column}`;
-            }
-            break;
-          case 'right':
-            newX = refKey.x + 1;
-            if (colIndex < zone.columns.length - 1) {
-              newColumn =
-                zone.columns[colIndex + 1]?.name || `col${colIndex + 2}`;
-            } else {
-              newColumn = `col_right_${refKey.column}`;
-            }
-            break;
-        }
-      } else {
-        // No zone - just adjust position
-        switch (direction) {
-          case 'up':
-            newY = refKey.y - 1;
-            break;
-          case 'down':
-            newY = refKey.y + 1;
-            break;
-          case 'left':
-            newX = refKey.x - 1;
-            break;
-          case 'right':
-            newX = refKey.x + 1;
-            break;
-        }
+            newColumn = `${colPrefix}${colNum - 1}`;
+          } else {
+            // Should not happen if UI blocks this, but guard anyway
+            return state;
+          }
+          break;
       }
 
       const newKey: EditorKey = {

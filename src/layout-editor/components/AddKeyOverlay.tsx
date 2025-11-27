@@ -140,6 +140,15 @@ function getDirectionTitle(
 }
 
 /**
+ * Extracts the numeric suffix from a name like "col1", "row2", etc.
+ * Returns 1 if no number is found.
+ */
+function extractNumber(name: string): number {
+  const match = name.match(/(\d+)$/);
+  return match ? parseInt(match[1], 10) : 1;
+}
+
+/**
  * Determines which directions are blocked for adding a new key.
  */
 function getBlockedDirections(
@@ -149,92 +158,58 @@ function getBlockedDirections(
 ): Set<CardinalDirection> {
   const blocked = new Set<CardinalDirection>();
 
-  if (!zone) {
-    // No zone - check by position only
-    const keysArray = Array.from(allKeys.values());
-    const hasKeyAt = (x: number, y: number) =>
-      keysArray.some(
-        (k) =>
-          k.id !== selectedKey.id &&
-          Math.abs(k.x - x) < 0.1 &&
-          Math.abs(k.y - y) < 0.1
-      );
+  // Extract current row and column numbers
+  const rowNum = extractNumber(selectedKey.row);
+  const colNum = extractNumber(selectedKey.column);
 
-    if (hasKeyAt(selectedKey.x, selectedKey.y - 1)) blocked.add('up');
-    if (hasKeyAt(selectedKey.x, selectedKey.y + 1)) blocked.add('down');
-    if (hasKeyAt(selectedKey.x - 1, selectedKey.y)) blocked.add('left');
-    if (hasKeyAt(selectedKey.x + 1, selectedKey.y)) blocked.add('right');
-
-    return blocked;
+  // Block "down" if row is 1 (can't go below 1)
+  if (rowNum <= 1) {
+    blocked.add('down');
   }
 
-  // Find the column and row indices
-  const colIndex = zone.columns.findIndex((c) => c.name === selectedKey.column);
-  const rowIndex = zone.rows.findIndex((r) => r.name === selectedKey.row);
+  // Block "left" if column is 1 (can't go below 1)
+  if (colNum <= 1) {
+    blocked.add('left');
+  }
 
-  // Get all keys in the same zone
-  const zoneKeys = Array.from(allKeys.values()).filter(
-    (k) => k.zone === zone.name && k.id !== selectedKey.id
+  // Check for existing keys in each direction
+  const keysArray = Array.from(allKeys.values()).filter(
+    (k) => k.id !== selectedKey.id && k.zone === selectedKey.zone
   );
 
-  // Check if there's a key in each direction
-  // Up = previous row (lower row index)
-  if (rowIndex <= 0) {
-    // At the first row, can add up (will create new row)
-  } else {
-    const prevRowName = zone.rows[rowIndex - 1]?.name;
-    if (
-      prevRowName &&
-      zoneKeys.some(
-        (k) => k.column === selectedKey.column && k.row === prevRowName
-      )
-    ) {
-      blocked.add('up');
-    }
+  // Helper to check if a key exists at a specific row/column
+  const hasKeyAt = (col: string, row: string) =>
+    keysArray.some((k) => k.column === col && k.row === row);
+
+  // Generate expected names for adjacent positions
+  const colPrefix = selectedKey.column.replace(/\d+$/, '');
+  const rowPrefix = selectedKey.row.replace(/\d+$/, '');
+
+  // Up = higher row number
+  const upRowName = `${rowPrefix}${rowNum + 1}`;
+  if (hasKeyAt(selectedKey.column, upRowName)) {
+    blocked.add('up');
   }
 
-  // Down = next row (higher row index)
-  if (rowIndex >= zone.rows.length - 1) {
-    // At the last row, can add down (will create new row)
-  } else {
-    const nextRowName = zone.rows[rowIndex + 1]?.name;
-    if (
-      nextRowName &&
-      zoneKeys.some(
-        (k) => k.column === selectedKey.column && k.row === nextRowName
-      )
-    ) {
+  // Down = lower row number (already blocked if rowNum <= 1)
+  if (rowNum > 1) {
+    const downRowName = `${rowPrefix}${rowNum - 1}`;
+    if (hasKeyAt(selectedKey.column, downRowName)) {
       blocked.add('down');
     }
   }
 
-  // Left = previous column (lower column index)
-  if (colIndex <= 0) {
-    // At the first column, can add left (will create new column)
-  } else {
-    const prevColName = zone.columns[colIndex - 1]?.name;
-    if (
-      prevColName &&
-      zoneKeys.some(
-        (k) => k.row === selectedKey.row && k.column === prevColName
-      )
-    ) {
-      blocked.add('left');
-    }
+  // Right = higher column number
+  const rightColName = `${colPrefix}${colNum + 1}`;
+  if (hasKeyAt(rightColName, selectedKey.row)) {
+    blocked.add('right');
   }
 
-  // Right = next column (higher column index)
-  if (colIndex >= zone.columns.length - 1) {
-    // At the last column, can add right (will create new column)
-  } else {
-    const nextColName = zone.columns[colIndex + 1]?.name;
-    if (
-      nextColName &&
-      zoneKeys.some(
-        (k) => k.row === selectedKey.row && k.column === nextColName
-      )
-    ) {
-      blocked.add('right');
+  // Left = lower column number (already blocked if colNum <= 1)
+  if (colNum > 1) {
+    const leftColName = `${colPrefix}${colNum - 1}`;
+    if (hasKeyAt(leftColName, selectedKey.row)) {
+      blocked.add('left');
     }
   }
 
