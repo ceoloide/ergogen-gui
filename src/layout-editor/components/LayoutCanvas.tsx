@@ -191,7 +191,9 @@ function adjustColor(color: string, amount: number): string {
 }
 
 /**
- * Renders the grid on the canvas.
+ * Renders the grid on the canvas with major and minor grid lines.
+ * Major grid: 1 U intervals, offset by 0.5 U so origin is centered between lines
+ * Minor grid: 0.125 U (1/8 U) intervals
  */
 function renderGrid(
   ctx: CanvasRenderingContext2D,
@@ -200,43 +202,85 @@ function renderGrid(
   zoom: number,
   panX: number,
   panY: number,
-  gridSize: number
+  _gridSize: number // Currently unused, kept for API compatibility
 ) {
-  const scale = PIXELS_PER_UNIT * zoom * gridSize;
+  const pixelsPerUnit = PIXELS_PER_UNIT * zoom;
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  // Minor grid: 0.125 U (1/8 U)
+  const minorGridSize = 0.125;
+  const minorScale = pixelsPerUnit * minorGridSize;
+
+  // Major grid: 1 U, offset by 0.5 U so origin is between major lines
+  const majorGridSize = 1;
+  const majorScale = pixelsPerUnit * majorGridSize;
+  const majorOffset = 0.5 * pixelsPerUnit; // Offset so [0,0] is centered between major lines
+
+  // Draw minor grid lines (lighter)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
   ctx.lineWidth = 1;
 
-  // Calculate grid offset to center it
-  const offsetX = panX % scale;
-  const offsetY = panY % scale;
+  // Calculate minor grid offset
+  const minorOffsetX = ((panX % minorScale) + minorScale) % minorScale;
+  const minorOffsetY = ((panY % minorScale) + minorScale) % minorScale;
 
-  // Draw vertical lines
-  for (let x = offsetX; x < width; x += scale) {
+  // Draw minor vertical lines
+  for (let x = minorOffsetX; x < width; x += minorScale) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, height);
     ctx.stroke();
   }
 
-  // Draw horizontal lines
-  for (let y = offsetY; y < height; y += scale) {
+  // Draw minor horizontal lines
+  for (let y = minorOffsetY; y < height; y += minorScale) {
     ctx.beginPath();
     ctx.moveTo(0, y);
     ctx.lineTo(width, y);
     ctx.stroke();
   }
 
-  // Draw origin marker
-  ctx.strokeStyle = 'rgba(40, 167, 69, 0.5)';
+  // Draw major grid lines (more visible)
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1;
+
+  // Calculate major grid offset (including the 0.5 U shift)
+  const majorOffsetX =
+    (((panX + majorOffset) % majorScale) + majorScale) % majorScale;
+  const majorOffsetY =
+    (((panY + majorOffset) % majorScale) + majorScale) % majorScale;
+
+  // Draw major vertical lines
+  for (let x = majorOffsetX; x < width; x += majorScale) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+
+  // Draw major horizontal lines
+  for (let y = majorOffsetY; y < height; y += majorScale) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+
+  // Draw origin marker (crosshair at [0,0])
+  ctx.strokeStyle = 'rgba(40, 167, 69, 0.7)';
   ctx.lineWidth = 2;
+  const originMarkerSize = 15;
   ctx.beginPath();
-  ctx.moveTo(panX - 10, panY);
-  ctx.lineTo(panX + 10, panY);
+  ctx.moveTo(panX - originMarkerSize, panY);
+  ctx.lineTo(panX + originMarkerSize, panY);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(panX, panY - 10);
-  ctx.lineTo(panX, panY + 10);
+  ctx.moveTo(panX, panY - originMarkerSize);
+  ctx.lineTo(panX, panY + originMarkerSize);
+  ctx.stroke();
+
+  // Draw small circle at origin
+  ctx.beginPath();
+  ctx.arc(panX, panY, 3, 0, Math.PI * 2);
   ctx.stroke();
 }
 
