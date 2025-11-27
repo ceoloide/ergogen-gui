@@ -94,6 +94,7 @@ function renderKey(
   ctx: CanvasRenderingContext2D,
   key: EditorKey,
   isSelected: boolean,
+  isBeingDragged: boolean,
   zoom: number,
   panX: number,
   panY: number
@@ -114,6 +115,11 @@ function renderKey(
   const cornerRadius = Math.min(4 * zoom, width / 4, height / 4);
 
   ctx.save();
+
+  // Make key semi-transparent when being dragged for easier grid alignment
+  if (isBeingDragged) {
+    ctx.globalAlpha = 0.5;
+  }
 
   // Apply rotation around key center
   if (key.rotation !== 0) {
@@ -437,15 +443,17 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     keysArray
       .filter((key) => !selection.keys.has(key.id))
       .forEach((key) => {
-        renderKey(ctx, key, false, zoom, adjustedPanX, adjustedPanY);
+        renderKey(ctx, key, false, false, zoom, adjustedPanX, adjustedPanY);
       });
 
     keysArray
       .filter((key) => selection.keys.has(key.id))
       .forEach((key) => {
-        renderKey(ctx, key, true, zoom, adjustedPanX, adjustedPanY);
+        // Keys being dragged are semi-transparent
+        const isBeingDragged = isDragging && selection.keys.size > 0;
+        renderKey(ctx, key, true, isBeingDragged, zoom, adjustedPanX, adjustedPanY);
       });
-  }, [layout.keys, selection.keys, zoom, panX, panY, canvasSize, grid]);
+  }, [layout.keys, selection.keys, zoom, panX, panY, canvasSize, grid, isDragging]);
 
   // Find key at position
   const findKeyAtPosition = useCallback(
