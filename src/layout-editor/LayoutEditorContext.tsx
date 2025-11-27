@@ -248,14 +248,14 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
       switch (direction) {
         case 'up':
-          // Up = higher row number, move up in Y (negative Y is up)
-          newY = refKey.y - 1;
+          // Up = higher row number, positive Y direction
+          newY = refKey.y + 1;
           newRow = `${rowPrefix}${rowNum + 1}`;
           break;
         case 'down':
-          // Down = lower row number (min 1), move down in Y
+          // Down = lower row number (min 1), negative Y direction
           if (rowNum > 1) {
-            newY = refKey.y + 1;
+            newY = refKey.y - 1;
             newRow = `${rowPrefix}${rowNum - 1}`;
           } else {
             // Should not happen if UI blocks this, but guard anyway
@@ -263,12 +263,12 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
           }
           break;
         case 'right':
-          // Right = higher column number
+          // Right = higher column number, positive X direction
           newX = refKey.x + 1;
           newColumn = `${colPrefix}${colNum + 1}`;
           break;
         case 'left':
-          // Left = lower column number (min 1)
+          // Left = lower column number (min 1), negative X direction
           if (colNum > 1) {
             newX = refKey.x - 1;
             newColumn = `${colPrefix}${colNum - 1}`;
