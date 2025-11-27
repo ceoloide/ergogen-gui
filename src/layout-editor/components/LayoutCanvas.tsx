@@ -115,8 +115,10 @@ function renderKey(
 
   // Outer and inner rectangle parameters
   const outerRadius = Math.min(6 * zoom, width / 4, height / 4);
-  const innerInset = Math.max(3 * zoom, 4); // Inset from outer edge
-  const innerRadius = Math.min(4 * zoom, (width - innerInset * 2) / 4, (height - innerInset * 2) / 4);
+  // Inner rectangle is 15% smaller (7.5% inset on each side)
+  const innerInsetX = width * 0.075;
+  const innerInsetY = height * 0.075;
+  const innerRadius = Math.min(4 * zoom, (width - innerInsetX * 2) / 4, (height - innerInsetY * 2) / 4);
   const topOffset = Math.max(1.5 * zoom, 2); // Inner rect is slightly offset upward
 
   ctx.save();
@@ -152,10 +154,10 @@ function renderKey(
   ctx.stroke();
 
   // Draw inner rectangle (top surface of keycap) - slightly offset upward
-  const innerX = x + innerInset;
-  const innerY = y + innerInset - topOffset; // Offset upward
-  const innerWidth = width - innerInset * 2;
-  const innerHeight = height - innerInset * 2;
+  const innerX = x + innerInsetX;
+  const innerY = y + innerInsetY - topOffset; // Offset upward
+  const innerWidth = width - innerInsetX * 2;
+  const innerHeight = height - innerInsetY * 2;
 
   ctx.fillStyle = innerColor;
   ctx.beginPath();
