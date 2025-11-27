@@ -116,7 +116,7 @@ export interface CanvasKey {
 }
 
 // Tool types
-type ToolType = 'select' | 'move-exactly' | 'rotate' | 'mirror';
+type ToolType = 'select' | 'add-key' | 'move-exactly' | 'rotate' | 'mirror';
 
 // Convert screen coordinates to canvas coordinates
 const screenToCanvas = (
@@ -187,11 +187,17 @@ const CanvasEditor: React.FC = () => {
   }, [gridUnit, gridSize]);
 
   // Keyboard shortcuts
-  useHotkeys('a', () => {
-    if (selectedKeys.size === keys.length) {
-      setSelectedKeys(new Set());
+  useHotkeys('a', (e) => {
+    // If Ctrl/Cmd is held, select all
+    if (e.ctrlKey || e.metaKey) {
+      if (selectedKeys.size === keys.length) {
+        setSelectedKeys(new Set());
+      } else {
+        setSelectedKeys(new Set(keys.map((k) => k.id)));
+      }
     } else {
-      setSelectedKeys(new Set(keys.map((k) => k.id)));
+      // Otherwise, switch to add-key tool
+      setCurrentTool('add-key');
     }
   });
 
@@ -328,7 +334,10 @@ const CanvasEditor: React.FC = () => {
         return;
       }
 
-      if (currentTool === 'select') {
+      if (currentTool === 'add-key') {
+        // Add a new key at the clicked position
+        handleAddKey(canvasPos.x, canvasPos.y);
+      } else if (currentTool === 'select') {
         // Check if clicking on a key
         const clickedKey = keys.find((key) => {
           const keyWidth = uToMm(key.width, gridUnit) * gridSize;
@@ -734,10 +743,11 @@ const CanvasEditor: React.FC = () => {
   const cursor = useMemo(() => {
     if (isPanning) return 'grabbing';
     if (currentTool === 'select') return 'default';
+    if (currentTool === 'add-key') return 'crosshair';
     if (currentTool === 'move-exactly') return 'move';
     if (currentTool === 'rotate') return 'grab';
     if (currentTool === 'mirror') return 'grab';
-    return 'crosshair';
+    return 'default';
   }, [currentTool, isPanning]);
 
   return (
@@ -756,6 +766,14 @@ const CanvasEditor: React.FC = () => {
           title="Selection Tool (S)"
         >
           <span className="material-symbols-outlined">select_all</span>
+        </OutlineIconButton>
+        <OutlineIconButton
+          className={currentTool === 'add-key' ? 'active' : ''}
+          onClick={() => setCurrentTool('add-key')}
+          aria-label="Add key tool"
+          title="Add Key Tool (A)"
+        >
+          <span className="material-symbols-outlined">add</span>
         </OutlineIconButton>
         <OutlineIconButton
           className={currentTool === 'move-exactly' ? 'active' : ''}
