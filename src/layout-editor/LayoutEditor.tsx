@@ -15,6 +15,7 @@ import {
 import { layoutToYaml, yamlToLayout } from './utils/yamlConverter';
 import { theme } from '../theme/theme';
 import ResizablePanel from '../molecules/ResizablePanel';
+import { useConfigContext } from '../context/ConfigContext';
 
 // Main container for the layout editor
 const EditorContainer = styled.div`
@@ -181,6 +182,7 @@ type PropertiesTab = 'key' | 'zone' | 'settings';
 const LayoutEditorContent: React.FC = () => {
   const navigate = useNavigate();
   const { state, dispatch, saveHistory } = useLayoutEditor();
+  const configContext = useConfigContext();
   const [activeTab, setActiveTab] = useState<PropertiesTab>('key');
   const [showHelp, setShowHelp] = useState(false);
 
@@ -209,19 +211,29 @@ const LayoutEditorContent: React.FC = () => {
   }, [layout, dispatch]);
 
   // Handle send to Ergogen editor
-  const handleSendToEditor = useCallback(() => {
+  const handleSendToEditor = useCallback(async () => {
+    if (!configContext) {
+      console.error('Config context not available');
+      return;
+    }
+
     try {
       const yaml = layoutToYaml(layout);
 
-      // Store in localStorage for the main editor to pick up
-      localStorage.setItem('ergogen:config', JSON.stringify(yaml));
+      // Update the config in the context (this will also update localStorage)
+      configContext.setConfigInput(yaml);
+
+      // Generate the output
+      await configContext.generateNow(yaml, configContext.injectionInput, {
+        pointsonly: false,
+      });
 
       // Navigate to the main editor
       navigate('/');
     } catch (error) {
       console.error('Failed to send to editor:', error);
     }
-  }, [layout, navigate]);
+  }, [layout, navigate, configContext]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
