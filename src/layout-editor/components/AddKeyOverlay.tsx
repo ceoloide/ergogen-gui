@@ -112,17 +112,8 @@ interface AddKeyOverlayProps {
 /**
  * Gets the icon for a direction.
  */
-function getDirectionIcon(direction: CardinalDirection): string {
-  switch (direction) {
-    case 'up':
-      return 'arrow_upward';
-    case 'down':
-      return 'arrow_downward';
-    case 'left':
-      return 'arrow_back';
-    case 'right':
-      return 'arrow_forward';
-  }
+function getDirectionIcon(_direction: CardinalDirection): string {
+  return 'add';
 }
 
 /**

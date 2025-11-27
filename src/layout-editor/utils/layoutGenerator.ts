@@ -1,4 +1,4 @@
-import { EditorZone, EditorKey, EditorColumn, EditorRow, KEY_UNIT_MM, DEFAULT_KEY } from '../types';
+import { EditorZone, EditorKey, KEY_UNIT_MM, DEFAULT_KEY } from '../types';
 
 /**
  * Converts degrees to radians
@@ -37,7 +37,9 @@ export function recalculateZone(
   allKeys: Map<string, EditorKey>
 ): Map<string, Partial<EditorKey>> {
   const updates = new Map<string, Partial<EditorKey>>();
-  const zoneKeys = Array.from(allKeys.values()).filter((k) => k.zone === zone.name);
+  const zoneKeys = Array.from(allKeys.values()).filter(
+    (k) => k.zone === zone.name
+  );
 
   if (zoneKeys.length === 0) return updates;
 
@@ -45,100 +47,7 @@ export function recalculateZone(
   // Each column has a position (x, y) and rotation relative to the zone origin
   const colTransforms: { x: number; y: number; rotation: number }[] = [];
 
-  let currentX = 0;
-  let currentY = 0;
-  let currentRot = 0;
-
-  zone.columns.forEach((col) => {
-    // Apply splay (rotation)
-    // Splay origin is relative to the current column's position
-    // But typically in ergogen, splay rotates the *current* column relative to the *previous* one
-    // The splay origin is usually [0,0] (center of key) or specified
-
-    // For simplicity, we'll accumulate rotation first, then move
-    // This mimics a simple "turtle graphics" approach often used in ergogen
-
-    // Apply spread (x offset) from previous column
-    // Note: The first column usually starts at 0,0 (relative to zone anchor)
-    // Subsequent columns are offset by 'spread'
-
-    // Actually, let's follow a standard approach:
-    // Col 0 is at 0,0, rot 0 (unless modified)
-    // Col i is at Col i-1 + spread/rotate
-
-    // Adjust for splay
-    if (col.splay !== 0) {
-      currentRot += col.splay;
-      // If splay has an origin, we might need to adjust x/y, but for now let's just rotate direction
-    }
-
-    // Calculate position for this column
-    // The 'spread' is the distance from the previous column center to this column center
-    // If this is the first column, it's at 0,0 (relative to zone start)
-    // If not, we move 'spread' units in the current direction
-
-    // Wait, the first column shouldn't have spread applied *before* it.
-    // Spread is usually "distance to next" or "distance from previous".
-    // In ergogen, it's often "width" or "shift".
-    // Let's assume standard grid:
-    // Col 0: 0,0
-    // Col 1: Col 0 + spread
-
-    // But we are iterating.
-    // Let's store the transform for THIS column.
-
-    // If it's the first column, we start at 0,0
-    // But wait, the loop structure:
-    // We need to calculate the transform for col[i] based on col[i-1]
-
-    // Let's rebuild the array of transforms
-  });
-
   // Re-loop with index to handle previous col
-  for (let i = 0; i < zone.columns.length; i++) {
-    const col = zone.columns[i];
-
-    if (i === 0) {
-      // First column starts at 0,0, 0 rot
-      // But it might have its own properties?
-      // Usually spread/splay applies to the relationship with the *next* or *previous*
-      // Let's assume standard: Col 0 is anchor.
-      // But wait, if we edit Col 0 properties, does it move?
-      // Usually spread is "width of this column" or "distance to next".
-      // Let's assume "spread" on Col i is distance from Col i-1.
-      // So Col 0 spread is ignored? Or is it offset from anchor?
-      // In ergogen, `spread` defaults to 19.05 (1u).
-      // If we have multiple columns, they are spaced by spread.
-
-      // Let's assume:
-      // x, y, rot start at 0
-      // For i > 0:
-      //   Move by prevCol.spread in x direction (rotated)
-      //   Rotate by col.splay
-      //   Move by col.stagger in y direction (rotated)
-
-      // Let's try this logic:
-      // Cursor starts at 0,0, 0 deg
-      // For each col:
-      //   Save cursor as col origin
-      //   Move cursor for NEXT col:
-      //     x += col.spread
-      //     y += col.stagger
-      //     rot += col.splay
-
-      // This means Col 0 is at 0,0.
-      // Col 1 is at (Col 0 spread, Col 0 stagger) rotated by Col 0 splay?
-      // Actually, stagger is usually vertical offset of the *current* column relative to neighbors.
-      // Spread is horizontal spacing.
-
-      // Let's use a simpler model compatible with the UI:
-      // x = sum(previous spreads)
-      // y = current stagger
-      // rot = sum(previous splays)
-
-      // But splay affects the direction of spread.
-    }
-  }
 
   // Let's restart the loop with a cumulative transform approach
   let x = 0;
@@ -158,7 +67,6 @@ export function recalculateZone(
     // Position of the "spine" point for this column
     const spineX = x;
     const spineY = y;
-    const spineRot = rot;
 
     // Apply splay for THIS column (rotation relative to previous)
     // Usually splay is "rotate this column by X".
@@ -208,8 +116,8 @@ export function recalculateZone(
     // We rely on naming convention or metadata?
     // The key object has `column` and `row` properties which are names (e.g. "col1", "row1")
 
-    const colIndex = zone.columns.findIndex(c => c.name === key.column);
-    const rowIndex = zone.rows.findIndex(r => r.name === key.row);
+    const colIndex = zone.columns.findIndex((c) => c.name === key.column);
+    const rowIndex = zone.rows.findIndex((r) => r.name === key.row);
 
     if (colIndex === -1 || rowIndex === -1) return;
 
@@ -282,7 +190,9 @@ export function generateMissingKeys(
   idGenerator: () => string
 ): EditorKey[] {
   const newKeys: EditorKey[] = [];
-  const zoneKeys = Array.from(existingKeys.values()).filter((k) => k.zone === zone.name);
+  const zoneKeys = Array.from(existingKeys.values()).filter(
+    (k) => k.zone === zone.name
+  );
 
   // Iterate through all expected positions
   zone.columns.forEach((col) => {

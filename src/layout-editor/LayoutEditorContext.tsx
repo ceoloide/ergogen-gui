@@ -413,11 +413,11 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       const { name, changes } = action.payload;
       const existingZone = state.layout.zones.get(name);
       if (!existingZone) return state;
-      
+
       const updatedZone = { ...existingZone, ...changes };
       const newZones = new Map(state.layout.zones);
       newZones.set(name, updatedZone);
-      
+
       // Generate missing keys (e.g. if columns/rows were added)
       const newKeys = new Map(state.layout.keys);
       const generatedKeys = generateMissingKeys(
@@ -429,7 +429,7 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
       // Recalculate key positions for this zone
       const keyUpdates = recalculateZone(updatedZone, newKeys);
-      
+
       keyUpdates.forEach((update, keyId) => {
         const existingKey = newKeys.get(keyId);
         if (existingKey) {
@@ -622,8 +622,10 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
         // newPanX = center.x - (center.x - oldPanX) * (newZoom / oldZoom)
 
         const scaleChange = newZoom / oldZoom;
-        const newPanX = center.x - (center.x - state.viewport.panX) * scaleChange;
-        const newPanY = center.y - (center.y - state.viewport.panY) * scaleChange;
+        const newPanX =
+          center.x - (center.x - state.viewport.panX) * scaleChange;
+        const newPanY =
+          center.y - (center.y - state.viewport.panY) * scaleChange;
 
         dispatch({
           type: 'SET_VIEWPORT',

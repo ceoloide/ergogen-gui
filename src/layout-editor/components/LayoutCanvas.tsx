@@ -119,7 +119,11 @@ function renderKey(
   // Inner rectangle is 15% smaller (7.5% inset on each side)
   const innerInsetX = width * 0.1;
   const innerInsetY = height * 0.1;
-  const innerRadius = Math.min(4 * zoom, (width - innerInsetX * 2) / 4, (height - innerInsetY * 2) / 4);
+  const innerRadius = Math.min(
+    4 * zoom,
+    (width - innerInsetX * 2) / 4,
+    (height - innerInsetY * 2) / 4
+  );
   const topOffset = Math.max(4 * zoom, 2); // Inner rect is slightly offset upward
 
   ctx.save();
@@ -429,7 +433,6 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       observer.disconnect();
     };
   }, []);
-
 
   // Render the canvas
   useEffect(() => {
