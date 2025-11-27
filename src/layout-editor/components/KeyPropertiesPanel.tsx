@@ -6,6 +6,7 @@ import React, { useCallback } from 'react';
 import styled from 'styled-components';
 import { useLayoutEditor } from '../LayoutEditorContext';
 import { theme } from '../../theme/theme';
+import { UnitInput } from './UnitInput';
 
 const PanelContainer = styled.div`
   display: flex;
@@ -80,6 +81,7 @@ const SmallInput = styled(PropertyInput)`
 
 const InputWithLabel = styled.div`
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
 `;
@@ -278,28 +280,18 @@ export const KeyPropertiesPanel: React.FC = () => {
           <PropertyInputGroup>
             <InputWithLabel>
               <SmallLabel>X</SmallLabel>
-              <SmallInput
-                type="number"
-                step="0.25"
+              <UnitInput
                 value={singleKey!.x}
-                onChange={(e) =>
-                  handlePropertyChange('x', parseFloat(e.target.value) || 0)
-                }
-                onBlur={handleBlur}
-                aria-label="X position"
+                onChange={(val) => handlePropertyChange('x', val)}
+                step={0.25}
               />
             </InputWithLabel>
             <InputWithLabel>
               <SmallLabel>Y</SmallLabel>
-              <SmallInput
-                type="number"
-                step="0.25"
+              <UnitInput
                 value={singleKey!.y}
-                onChange={(e) =>
-                  handlePropertyChange('y', parseFloat(e.target.value) || 0)
-                }
-                onBlur={handleBlur}
-                aria-label="Y position"
+                onChange={(val) => handlePropertyChange('y', val)}
+                step={0.25}
               />
             </InputWithLabel>
           </PropertyInputGroup>
@@ -310,36 +302,20 @@ export const KeyPropertiesPanel: React.FC = () => {
           <PropertyInputGroup>
             <InputWithLabel>
               <SmallLabel>Width</SmallLabel>
-              <SmallInput
-                type="number"
-                step="0.25"
-                min="0.25"
+              <UnitInput
                 value={singleKey!.width}
-                onChange={(e) =>
-                  handlePropertyChange(
-                    'width',
-                    Math.max(0.25, parseFloat(e.target.value) || 1)
-                  )
-                }
-                onBlur={handleBlur}
-                aria-label="Width"
+                onChange={(val) => handlePropertyChange('width', Math.max(0.25, val))}
+                step={0.25}
+                min={0.25}
               />
             </InputWithLabel>
             <InputWithLabel>
               <SmallLabel>Height</SmallLabel>
-              <SmallInput
-                type="number"
-                step="0.25"
-                min="0.25"
+              <UnitInput
                 value={singleKey!.height}
-                onChange={(e) =>
-                  handlePropertyChange(
-                    'height',
-                    Math.max(0.25, parseFloat(e.target.value) || 1)
-                  )
-                }
-                onBlur={handleBlur}
-                aria-label="Height"
+                onChange={(val) => handlePropertyChange('height', Math.max(0.25, val))}
+                step={0.25}
+                min={0.25}
               />
             </InputWithLabel>
           </PropertyInputGroup>
@@ -348,20 +324,12 @@ export const KeyPropertiesPanel: React.FC = () => {
         <PropertyRow>
           <PropertyLabel>Rotation</PropertyLabel>
           <PropertyInputGroup>
-            <PropertyInput
-              type="number"
-              step="5"
+            <UnitInput
+              type="angle"
               value={singleKey!.rotation}
-              onChange={(e) =>
-                handlePropertyChange(
-                  'rotation',
-                  parseFloat(e.target.value) || 0
-                )
-              }
-              onBlur={handleBlur}
-              aria-label="Rotation angle"
+              onChange={(val) => handlePropertyChange('rotation', val)}
+              step={5}
             />
-            <SmallLabel style={{ alignSelf: 'center' }}>degrees</SmallLabel>
           </PropertyInputGroup>
         </PropertyRow>
       </PanelSection>

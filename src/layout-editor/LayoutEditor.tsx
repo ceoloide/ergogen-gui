@@ -11,6 +11,7 @@ import {
   EditorToolbar,
   KeyPropertiesPanel,
   ZonePropertiesPanel,
+  UnitInput,
 } from './components';
 import { layoutToYaml, yamlToLayout } from './utils/yamlConverter';
 import { theme } from '../theme/theme';
@@ -492,17 +493,16 @@ const SettingsPanel: React.FC = () => {
         </SettingsRow>
         <SettingsRow>
           <SettingsLabel>Grid Size</SettingsLabel>
-          <SettingsInput
-            type="number"
-            step="0.25"
-            min="0.25"
+          <UnitInput
             value={grid.size}
-            onChange={(e) =>
+            onChange={(val) =>
               dispatch({
                 type: 'SET_GRID_SIZE',
-                payload: Math.max(0.25, parseFloat(e.target.value) || 1),
+                payload: Math.max(0.25, val),
               })
             }
+            step={0.25}
+            min={0.25}
           />
         </SettingsRow>
       </SettingsSection>
@@ -523,17 +523,16 @@ const SettingsPanel: React.FC = () => {
           />
         </SettingsRow>
         <SettingsRow>
-          <SettingsLabel>Distance (mm)</SettingsLabel>
-          <SettingsInput
-            type="number"
-            step="1"
+          <SettingsLabel>Distance</SettingsLabel>
+          <UnitInput
             value={layout.mirror.distance}
-            onChange={(e) =>
+            onChange={(val) =>
               dispatch({
                 type: 'SET_MIRROR',
-                payload: { distance: parseFloat(e.target.value) || 100 },
+                payload: { distance: val },
               })
             }
+            step={1}
             disabled={!layout.mirror.enabled}
           />
         </SettingsRow>
@@ -542,17 +541,17 @@ const SettingsPanel: React.FC = () => {
       <SettingsSection>
         <SettingsTitle>Global Transform</SettingsTitle>
         <SettingsRow>
-          <SettingsLabel>Rotation (deg)</SettingsLabel>
-          <SettingsInput
-            type="number"
-            step="5"
+          <SettingsLabel>Rotation</SettingsLabel>
+          <UnitInput
+            type="angle"
             value={layout.globalRotation}
-            onChange={(e) =>
+            onChange={(val) =>
               dispatch({
                 type: 'SET_GLOBAL_ROTATION',
-                payload: parseFloat(e.target.value) || 0,
+                payload: val,
               })
             }
+            step={5}
           />
         </SettingsRow>
       </SettingsSection>

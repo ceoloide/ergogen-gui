@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import { useLayoutEditor } from '../LayoutEditorContext';
 import { EditorColumn, DEFAULT_COLUMN, DEFAULT_ROW } from '../types';
 import { theme } from '../../theme/theme';
+import { UnitInput } from './UnitInput';
 
 const PanelContainer = styled.div`
   display: flex;
@@ -191,17 +192,6 @@ const SmallInput = styled(PropertyInput)`
   width: 50px;
   padding: 4px 6px;
   font-size: 11px;
-`;
-
-const InputWithUnit = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-const Unit = styled.span`
-  font-size: 10px;
-  color: ${theme.colors.textDarkest};
 `;
 
 const EmptyState = styled.div`
@@ -473,19 +463,16 @@ export const ZonePropertiesPanel: React.FC = () => {
                 <ZoneContent>
                   <PropertyRow>
                     <PropertyLabel>Rotate</PropertyLabel>
-                    <InputWithUnit>
-                      <SmallInput
-                        type="number"
-                        step="5"
-                        value={zone.rotate}
-                        onChange={(e) =>
-                          updateZone(zone.name, {
-                            rotate: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                      />
-                      <Unit>deg</Unit>
-                    </InputWithUnit>
+                    <UnitInput
+                      type="angle"
+                      value={zone.rotate}
+                      onChange={(val) =>
+                        updateZone(zone.name, {
+                          rotate: val,
+                        })
+                      }
+                      step={5}
+                    />
                   </PropertyRow>
 
                   <SubsectionTitle>
@@ -510,34 +497,27 @@ export const ZonePropertiesPanel: React.FC = () => {
                           }
                           style={{ width: '60px' }}
                         />
-                        <InputWithUnit>
-                          <SmallInput
-                            type="number"
-                            step="1"
-                            value={col.stagger}
-                            onChange={(e) =>
-                              handleUpdateColumn(zone.name, i, {
-                                stagger: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                            title="Stagger"
-                          />
-                          <Unit>stg</Unit>
-                        </InputWithUnit>
-                        <InputWithUnit>
-                          <SmallInput
-                            type="number"
-                            step="1"
-                            value={col.splay}
-                            onChange={(e) =>
-                              handleUpdateColumn(zone.name, i, {
-                                splay: parseFloat(e.target.value) || 0,
-                              })
-                            }
-                            title="Splay"
-                          />
-                          <Unit>spl</Unit>
-                        </InputWithUnit>
+                        <UnitInput
+                          value={col.stagger}
+                          onChange={(val) =>
+                            handleUpdateColumn(zone.name, i, {
+                              stagger: val,
+                            })
+                          }
+                          step={0.25}
+                          style={{ width: '90px' }}
+                        />
+                        <UnitInput
+                          type="angle"
+                          value={col.splay}
+                          onChange={(val) =>
+                            handleUpdateColumn(zone.name, i, {
+                              splay: val,
+                            })
+                          }
+                          step={5}
+                          style={{ width: '90px' }}
+                        />
                         <IconButton
                           className="danger"
                           onClick={() => handleDeleteColumn(zone.name, i)}
