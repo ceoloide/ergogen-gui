@@ -96,6 +96,7 @@ function renderKey(
   key: EditorKey,
   isSelected: boolean,
   isBeingDragged: boolean,
+  isPendingSelection: boolean,
   zoom: number,
   panX: number,
   panY: number
@@ -147,8 +148,13 @@ function renderKey(
   ctx.fill();
 
   // Draw outer border
-  ctx.strokeStyle = isSelected ? theme.colors.accent : borderColor;
-  ctx.lineWidth = isSelected ? 2 : 1;
+  if (isPendingSelection) {
+    ctx.strokeStyle = theme.colors.accent; // Green/Accent for pending selection
+    ctx.lineWidth = 2;
+  } else {
+    ctx.strokeStyle = isSelected ? theme.colors.accent : borderColor;
+    ctx.lineWidth = isSelected ? 2 : 1;
+  }
   ctx.beginPath();
   ctx.roundRect(x, y, width, height, outerRadius);
   ctx.stroke();
@@ -387,9 +393,15 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     zoom: zoomFn,
     addKey,
     addKeyInDirection,
+    deleteSelectedKeys,
     selectedKeys,
     showAddKeyOverlay,
     setShowAddKeyOverlay,
+    setMode,
+    undo,
+    redo,
+    handleAddKeyButtonClick,
+    selectAll,
   } = useLayoutEditor();
 
   const { layout, viewport, selection, grid, mode } = state;
@@ -418,13 +430,6 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     };
   }, []);
 
-  // Close add key overlay when selection changes
-  useEffect(() => {
-    // Close overlay if selection becomes empty or multi-select
-    if (showAddKeyOverlay && selection.keys.size !== 1) {
-      setShowAddKeyOverlay(false);
-    }
-  }, [selection.keys.size, showAddKeyOverlay, setShowAddKeyOverlay]);
 
   // Render the canvas
   useEffect(() => {
@@ -471,7 +476,40 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     keysArray
       .filter((key) => !selection.keys.has(key.id))
       .forEach((key) => {
-        renderKey(ctx, key, false, false, zoom, adjustedPanX, adjustedPanY);
+        let isPendingSelection = false;
+        if (selectionRect) {
+          const minX = Math.min(selectionRect.startX, selectionRect.endX);
+          const maxX = Math.max(selectionRect.startX, selectionRect.endX);
+          const minY = Math.min(selectionRect.startY, selectionRect.endY);
+          const maxY = Math.max(selectionRect.startY, selectionRect.endY);
+
+          const scale = PIXELS_PER_UNIT * zoom;
+          const keyWidth = key.width * scale;
+          const keyHeight = key.height * scale;
+          const keyCenterX = key.x * scale + adjustedPanX;
+          const keyCenterY = -key.y * scale + adjustedPanY;
+          const keyX = keyCenterX - keyWidth / 2;
+          const keyY = keyCenterY - keyHeight / 2;
+
+          if (
+            keyX + keyWidth > minX &&
+            keyX < maxX &&
+            keyY + keyHeight > minY &&
+            keyY < maxY
+          ) {
+            isPendingSelection = true;
+          }
+        }
+        renderKey(
+          ctx,
+          key,
+          false,
+          false,
+          isPendingSelection,
+          zoom,
+          adjustedPanX,
+          adjustedPanY
+        );
       });
 
     keysArray
@@ -479,9 +517,28 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       .forEach((key) => {
         // Keys being dragged are semi-transparent
         const isBeingDragged = isDragging && selection.keys.size > 0;
-        renderKey(ctx, key, true, isBeingDragged, zoom, adjustedPanX, adjustedPanY);
+        renderKey(
+          ctx,
+          key,
+          true,
+          isBeingDragged,
+          false, // Already selected, so not pending
+          zoom,
+          adjustedPanX,
+          adjustedPanY
+        );
       });
-  }, [layout.keys, selection.keys, zoom, panX, panY, canvasSize, grid, isDragging]);
+  }, [
+    layout.keys,
+    selection.keys,
+    zoom,
+    panX,
+    panY,
+    canvasSize,
+    grid,
+    isDragging,
+    selectionRect,
+  ]);
 
   // Find key at position
   const findKeyAtPosition = useCallback(
@@ -552,8 +609,13 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           // Select only this key
           selectKey(clickedKey.id, false);
         }
-        // Start dragging
-        setIsDragging(true);
+        // Start dragging only if in move mode
+        if (mode === 'move') {
+          setIsDragging(true);
+        } else {
+          // In select mode, we might want to start a selection rectangle if we didn't just select the key
+          // But for now, just don't drag
+        }
       } else {
         // Clicked on empty space - start selection rectangle
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
@@ -717,9 +779,21 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     (e: React.WheelEvent<HTMLCanvasElement>) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      zoomFn(delta);
+
+      // Calculate mouse position relative to canvas center (which is 0,0 for pan)
+      // The pan values are offsets from the center of the canvas
+      const rect = e.currentTarget.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Convert to coordinates relative to the center of the canvas
+      // This matches the coordinate system used by panX/panY
+      const centerX = mouseX - canvasSize.width / 2;
+      const centerY = mouseY - canvasSize.height / 2;
+
+      zoomFn(delta, { x: centerX, y: centerY });
     },
-    [zoomFn]
+    [zoomFn, canvasSize]
   );
 
   // Handle add key in direction
@@ -748,7 +822,9 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       switch (e.key) {
         case 'Delete':
         case 'Backspace':
-          // Delete selected keys is handled by context
+          if (selection.keys.size > 0) {
+            deleteSelectedKeys();
+          }
           break;
         case 'Escape':
           if (showAddKeyOverlay) {
@@ -757,10 +833,38 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
             clearSelection();
           }
           break;
+        case 'v':
+        case 'V':
+          setMode('select');
+          break;
+        case 'm':
+        case 'M':
+          setMode('move');
+          break;
+        case 'r':
+        case 'R':
+          if (selection.keys.size > 0) {
+            setMode('rotate');
+          }
+          break;
         case 'a':
+        case 'A':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            // Select all would be handled here
+            selectAll();
+          } else {
+            handleAddKeyButtonClick();
+          }
+          break;
+        case 'z':
+        case 'Z':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              redo();
+            } else {
+              undo();
+            }
           }
           break;
       }
@@ -768,7 +872,18 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection, showAddKeyOverlay, setShowAddKeyOverlay]);
+  }, [
+    clearSelection,
+    showAddKeyOverlay,
+    setShowAddKeyOverlay,
+    selection.keys.size,
+    deleteSelectedKeys,
+    setMode,
+    undo,
+    redo,
+    handleAddKeyButtonClick,
+    selectAll,
+  ]);
 
   // Calculate grid position for display
   const gridPos = screenToGrid(mousePos.x, mousePos.y);

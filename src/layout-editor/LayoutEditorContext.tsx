@@ -8,6 +8,7 @@ import React, {
   useReducer,
   useCallback,
   useState,
+  useEffect,
   ReactNode,
 } from 'react';
 import {
@@ -24,6 +25,7 @@ import {
   DEFAULT_ROW,
   HistoryEntry,
 } from './types';
+import { recalculateZone, generateMissingKeys } from './utils/layoutGenerator';
 
 // Generate unique IDs
 let idCounter = 0;
@@ -381,9 +383,28 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       };
       const newZones = new Map(state.layout.zones);
       newZones.set(action.payload.name, newZone);
+
+      // Generate keys for the new zone
+      const newKeys = new Map(state.layout.keys);
+      const generatedKeys = generateMissingKeys(
+        newZone,
+        state.layout.keys,
+        () => generateId('key')
+      );
+      generatedKeys.forEach((key) => newKeys.set(key.id, key));
+
+      // Recalculate key positions
+      const keyUpdates = recalculateZone(newZone, newKeys);
+      keyUpdates.forEach((update, keyId) => {
+        const existingKey = newKeys.get(keyId);
+        if (existingKey) {
+          newKeys.set(keyId, { ...existingKey, ...update });
+        }
+      });
+
       return {
         ...state,
-        layout: { ...state.layout, zones: newZones },
+        layout: { ...state.layout, zones: newZones, keys: newKeys },
         isDirty: true,
       };
     }
@@ -392,11 +413,33 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       const { name, changes } = action.payload;
       const existingZone = state.layout.zones.get(name);
       if (!existingZone) return state;
+      
+      const updatedZone = { ...existingZone, ...changes };
       const newZones = new Map(state.layout.zones);
-      newZones.set(name, { ...existingZone, ...changes });
+      newZones.set(name, updatedZone);
+      
+      // Generate missing keys (e.g. if columns/rows were added)
+      const newKeys = new Map(state.layout.keys);
+      const generatedKeys = generateMissingKeys(
+        updatedZone,
+        state.layout.keys,
+        () => generateId('key')
+      );
+      generatedKeys.forEach((key) => newKeys.set(key.id, key));
+
+      // Recalculate key positions for this zone
+      const keyUpdates = recalculateZone(updatedZone, newKeys);
+      
+      keyUpdates.forEach((update, keyId) => {
+        const existingKey = newKeys.get(keyId);
+        if (existingKey) {
+          newKeys.set(keyId, { ...existingKey, ...update });
+        }
+      });
+
       return {
         ...state,
-        layout: { ...state.layout, zones: newZones },
+        layout: { ...state.layout, zones: newZones, keys: newKeys },
         isDirty: true,
       };
     }
@@ -513,7 +556,7 @@ interface LayoutEditorContextType {
   dispatch: React.Dispatch<EditorAction>;
   // Convenience methods
   setMode: (mode: EditorMode) => void;
-  zoom: (delta: number) => void;
+  zoom: (delta: number, center?: { x: number; y: number }) => void;
   pan: (dx: number, dy: number) => void;
   resetView: () => void;
   selectKey: (id: string, extend?: boolean) => void;
@@ -551,17 +594,46 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(editorReducer, createInitialState());
   const [showAddKeyOverlay, setShowAddKeyOverlay] = useState(false);
 
+  // Automatically show add key overlay when exactly one key is selected
+  useEffect(() => {
+    if (state.selection.keys.size === 1) {
+      setShowAddKeyOverlay(true);
+    } else {
+      setShowAddKeyOverlay(false);
+    }
+  }, [state.selection.keys.size]);
+
   const setMode = useCallback(
     (mode: EditorMode) => dispatch({ type: 'SET_MODE', payload: mode }),
     []
   );
 
   const zoom = useCallback(
-    (delta: number) => {
-      const newZoom = Math.max(0.1, Math.min(5, state.viewport.zoom + delta));
-      dispatch({ type: 'SET_VIEWPORT', payload: { zoom: newZoom } });
+    (delta: number, center?: { x: number; y: number }) => {
+      const oldZoom = state.viewport.zoom;
+      const newZoom = Math.max(0.1, Math.min(5, oldZoom + delta));
+
+      if (center) {
+        // Calculate new pan to keep the point under mouse stationary
+        // The formula is derived from:
+        // worldPoint = (screenPoint - pan) / zoom
+        // We want worldPoint to be the same before and after zoom
+        // (center.x - oldPanX) / oldZoom = (center.x - newPanX) / newZoom
+        // newPanX = center.x - (center.x - oldPanX) * (newZoom / oldZoom)
+
+        const scaleChange = newZoom / oldZoom;
+        const newPanX = center.x - (center.x - state.viewport.panX) * scaleChange;
+        const newPanY = center.y - (center.y - state.viewport.panY) * scaleChange;
+
+        dispatch({
+          type: 'SET_VIEWPORT',
+          payload: { zoom: newZoom, panX: newPanX, panY: newPanY },
+        });
+      } else {
+        dispatch({ type: 'SET_VIEWPORT', payload: { zoom: newZoom } });
+      }
     },
-    [state.viewport.zoom]
+    [state.viewport.zoom, state.viewport.panX, state.viewport.panY]
   );
 
   const pan = useCallback(
