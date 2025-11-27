@@ -615,10 +615,11 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     (direction: CardinalDirection) => {
       if (selectedKeys.length === 1 && selectedKeys[0]) {
         addKeyInDirection(selectedKeys[0].id, direction);
-        setShowAddKeyOverlay(false);
+        // Keep overlay open - the new key will be selected automatically
+        // and the overlay will update to show directions for the new key
       }
     },
-    [selectedKeys, addKeyInDirection, setShowAddKeyOverlay]
+    [selectedKeys, addKeyInDirection]
   );
 
   // Handle keyboard shortcuts
