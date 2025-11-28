@@ -11,6 +11,7 @@ type ResizablePanelProps = {
   minWidth?: number;
   maxWidth?: number | string;
   side?: 'left' | 'right';
+  resizable?: boolean;
   'data-testid'?: string;
   style?: React.CSSProperties;
 };
@@ -25,6 +26,7 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
   minWidth = 10,
   maxWidth = '100%',
   side = 'left',
+  resizable = true,
   style,
   'data-testid': dataTestId,
 }) => {
@@ -146,12 +148,14 @@ const ResizablePanel: React.FC<ResizablePanelProps> = ({
       data-testid={dataTestId}
     >
       {children}
-      <ResizeHandle
-        $side={side}
-        onMouseDown={handleResizeStart}
-        onTouchStart={handleResizeStart}
-        data-testid={dataTestId && `${dataTestId}-resize-handle`}
-      />
+      {resizable && (
+        <ResizeHandle
+          $side={side}
+          onMouseDown={handleResizeStart}
+          onTouchStart={handleResizeStart}
+          data-testid={dataTestId && `${dataTestId}-resize-handle`}
+        />
+      )}
     </PanelContainer>
   );
 };
