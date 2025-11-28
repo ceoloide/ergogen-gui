@@ -208,8 +208,8 @@ export interface EditorState {
 export const DEFAULT_KEY: Omit<EditorKey, 'id'> = {
   x: 0,
   y: 0,
-  width: 1,
-  height: 1,
+  width: 18,
+  height: 18,
   rotation: 0,
   rotationOriginX: 0,
   rotationOriginY: 0,

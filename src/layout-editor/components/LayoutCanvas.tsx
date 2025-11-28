@@ -102,7 +102,7 @@ function renderKey(
   panY: number,
   globalRotation: number
 ) {
-  const scale = PIXELS_PER_UNIT * zoom;
+  const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
   const width = key.width * scale;
   const height = key.height * scale;
 
@@ -343,7 +343,7 @@ function isPointInKey(
   panY: number,
   globalRotation: number
 ): boolean {
-  const scale = PIXELS_PER_UNIT * zoom;
+  const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
   const width = key.width * scale;
   const height = key.height * scale;
 
@@ -490,7 +490,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           const minY = Math.min(selectionRect.startY, selectionRect.endY);
           const maxY = Math.max(selectionRect.startY, selectionRect.endY);
 
-          const scale = PIXELS_PER_UNIT * zoom;
+          const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
           const keyWidth = key.width * scale;
           const keyHeight = key.height * scale;
           const keyCenterX = key.x * scale + adjustedPanX;
@@ -582,7 +582,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     (screenX: number, screenY: number): { x: number; y: number } => {
       const adjustedPanX = panX + canvasSize.width / 2;
       const adjustedPanY = panY + canvasSize.height / 2;
-      const scale = PIXELS_PER_UNIT * zoom;
+      const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
       return {
         x: (screenX - adjustedPanX) / scale,
         // Flip Y axis: screen Y down = negative grid Y
@@ -611,8 +611,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       if (mode === 'add-key') {
         // Add key at click position, snap to minor grid (gridSize / 8)
         const gridPos = screenToGrid(x, y);
-        const gridSizeU = grid.size / KEY_UNIT_MM;
-        const snapStep = gridSizeU / 8;
+        const snapStep = grid.size / 8;
         const snappedX = grid.snap
           ? Math.round(gridPos.x / snapStep) * snapStep
           : gridPos.x;
@@ -688,15 +687,14 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           setDragStart({ x, y });
         } else if (selection.keys.size > 0) {
           // Moving selected keys
-          const scale = PIXELS_PER_UNIT * zoom;
+          const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
           let moveX = dx / scale;
           // Flip Y axis: screen down = negative grid Y
           let moveY = -dy / scale;
 
           if (grid.snap) {
             // Snap to minor grid (gridSize / 8)
-            const gridSizeU = grid.size / KEY_UNIT_MM;
-            const snapStep = gridSizeU / 8;
+            const snapStep = grid.size / 8;
             moveX = Math.round(moveX / snapStep) * snapStep;
             moveY = Math.round(moveY / snapStep) * snapStep;
           }
@@ -748,7 +746,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
         const selectedIds: string[] = [];
 
         layout.keys.forEach((key, id) => {
-          const scale = PIXELS_PER_UNIT * zoom;
+          const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
           const keyWidth = key.width * scale;
           const keyHeight = key.height * scale;
 

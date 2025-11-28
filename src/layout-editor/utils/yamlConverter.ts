@@ -176,9 +176,10 @@ export function layoutToYaml(layout: EditorLayout): string {
           keys.reduce((sum, k) => sum + k.rotation, 0) / keys.length;
 
         if (index > 0) {
-          const stagger = (avgX - prevX - 1) * KEY_UNIT_MM;
-          if (Math.abs(stagger) > 0.5) {
-            colConfig['key.stagger'] = Math.round(stagger * 10) / 10;
+          // Calculate spread (horizontal distance)
+          const spread = avgX - prevX;
+          if (Math.abs(spread - KEY_UNIT_MM) > 0.1) {
+            colConfig['key.spread'] = Math.round(spread * 10) / 10;
           }
         }
 
@@ -393,11 +394,11 @@ export function yamlToLayout(yamlString: string): EditorLayout {
       }
 
       // Create keys for each column/row combination
-      let colX = zone.anchor.shiftX / KEY_UNIT_MM;
+      let colX = zone.anchor.shiftX;
       let baseRotation = zone.anchor.rotate || 0;
 
       zone.columns.forEach((column) => {
-        const colStagger = column.stagger / KEY_UNIT_MM;
+        const colStagger = column.stagger;
         const colSplay = column.splay;
 
         zone.rows.forEach((row, rowIndex) => {
@@ -412,7 +413,7 @@ export function yamlToLayout(yamlString: string): EditorLayout {
             column: column.name,
             row: row.name,
             x: colX,
-            y: currentY + rowIndex + colStagger,
+            y: currentY + rowIndex * KEY_UNIT_MM + colStagger,
             rotation: baseRotation + colSplay,
           };
 
@@ -420,11 +421,11 @@ export function yamlToLayout(yamlString: string): EditorLayout {
           zone.keys.push(id);
         });
 
-        colX += 1;
+        colX += column.spread || KEY_UNIT_MM;
         baseRotation += colSplay;
       });
 
-      currentY += zone.rows.length + 1;
+      currentY += (zone.rows.length + 1) * KEY_UNIT_MM;
 
       layout.zones.set(zoneName, zone);
     });
@@ -541,8 +542,8 @@ function _generateSimpleLayout(
         zone: zoneName,
         column: columns[c]!.name,
         row: rows[r]!.name,
-        x: c,
-        y: r,
+        x: c * KEY_UNIT_MM,
+        y: r * KEY_UNIT_MM,
       };
       layout.keys.set(id, key);
       zone.keys.push(id);
