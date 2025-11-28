@@ -111,9 +111,9 @@ function renderKey(
 
   // Outer and inner rectangle parameters
   const outerRadius = Math.min(6 * zoom, width / 4, height / 4);
-  // Inner rectangle is 15% smaller (7.5% inset on each side)
-  const innerInsetX = width * 0.1;
-  const innerInsetY = height * 0.1;
+  // Inner rectangle has a fixed margin of 1.8mm (based on 10% of standard 18mm key)
+  const innerInsetX = 1.8 * scale;
+  const innerInsetY = 1.8 * scale;
   const innerRadius = Math.min(
     4 * zoom,
     (width - innerInsetX * 2) / 4,
