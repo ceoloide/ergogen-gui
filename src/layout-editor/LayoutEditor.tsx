@@ -562,7 +562,12 @@ const SettingsPanel: React.FC = () => {
           <SettingsInput
             type="text"
             value={layout.meta.name || ''}
-            onChange={(e) => dispatch({ type: 'UPDATE_META', payload: { name: e.target.value } })}
+            onChange={(e) =>
+              dispatch({
+                type: 'UPDATE_META',
+                payload: { name: e.target.value },
+              })
+            }
             placeholder="Keyboard Name"
             style={{ width: '120px', textAlign: 'left' }}
           />
@@ -572,7 +577,12 @@ const SettingsPanel: React.FC = () => {
           <SettingsInput
             type="text"
             value={layout.meta.version || ''}
-            onChange={(e) => dispatch({ type: 'UPDATE_META', payload: { version: e.target.value } })}
+            onChange={(e) =>
+              dispatch({
+                type: 'UPDATE_META',
+                payload: { version: e.target.value },
+              })
+            }
             placeholder="0.1"
             style={{ width: '60px' }}
           />
@@ -582,7 +592,12 @@ const SettingsPanel: React.FC = () => {
           <SettingsInput
             type="text"
             value={layout.meta.author || ''}
-            onChange={(e) => dispatch({ type: 'UPDATE_META', payload: { author: e.target.value } })}
+            onChange={(e) =>
+              dispatch({
+                type: 'UPDATE_META',
+                payload: { author: e.target.value },
+              })
+            }
             placeholder="Your Name"
             style={{ width: '120px', textAlign: 'left' }}
           />

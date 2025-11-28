@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { theme } from '../../theme/theme';
 
-export type UnitType = 'U' | 'u' | 'mm' | 'deg';
+type UnitType = 'U' | 'u' | 'mm' | 'deg';
 
 interface UnitDefinition {
   value: UnitType;
@@ -17,9 +17,7 @@ const LENGTH_UNITS: UnitDefinition[] = [
   { value: 'mm', label: 'mm', factor: 1 },
 ];
 
-const DEGREE_UNIT: UnitDefinition[] = [
-  { value: 'deg', label: '°', factor: 1 },
-];
+const DEGREE_UNIT: UnitDefinition[] = [{ value: 'deg', label: '°', factor: 1 }];
 
 interface UnitInputProps {
   value: number;
@@ -150,14 +148,11 @@ export const UnitInput: React.FC<UnitInputProps> = ({
   const [inputValue, setInputValue] = useState<string>('');
 
   // Calculate displayed value based on current unit
-  const getDisplayValue = useCallback(
-    (val: number, unit: UnitDefinition) => {
-      const converted = val * unit.factor;
-      // Round to 3 decimal places to avoid floating point errors
-      return Math.round(converted * 1000) / 1000;
-    },
-    []
-  );
+  const getDisplayValue = useCallback((val: number, unit: UnitDefinition) => {
+    const converted = val * unit.factor;
+    // Round to 3 decimal places to avoid floating point errors
+    return Math.round(converted * 1000) / 1000;
+  }, []);
 
   // Update input value when prop value or unit changes
   useEffect(() => {
@@ -188,7 +183,7 @@ export const UnitInput: React.FC<UnitInputProps> = ({
     const currentVal = parseFloat(inputValue) || 0;
     const actualStep = step || (currentUnit.value === 'mm' ? 1 : 0.25);
     const newVal = currentVal + actualStep;
-    
+
     // Check max
     if (max !== undefined && newVal / currentUnit.factor > max) return;
 

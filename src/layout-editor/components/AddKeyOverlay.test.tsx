@@ -40,24 +40,28 @@ describe('AddKeyOverlay', () => {
     columns: [
       {
         name: 'col1',
-        spread: 19.05,
-        stagger: 0,
-        splay: 0,
-        splayOrigin: [0, 0],
-        ergogenProps: {},
+        key: {
+          spread: 19.05,
+          stagger: 0,
+          splay: 0,
+          origin: [0, 0],
+        },
+        rows: {},
       },
       {
         name: 'col2',
-        spread: 19.05,
-        stagger: 0,
-        splay: 0,
-        splayOrigin: [0, 0],
-        ergogenProps: {},
+        key: {
+          spread: 19.05,
+          stagger: 0,
+          splay: 0,
+          origin: [0, 0],
+        },
+        rows: {},
       },
     ],
     rows: [
-      { name: 'row1', ergogenProps: {} },
-      { name: 'row2', ergogenProps: {} },
+      { name: 'row1', key: {} },
+      { name: 'row2', key: {} },
     ],
     ...overrides,
   });

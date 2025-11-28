@@ -74,8 +74,6 @@ const StatusItem = styled.span`
   gap: 4px;
 `;
 
-
-
 interface LayoutCanvasProps {
   className?: string;
 }
@@ -951,7 +949,6 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
         />
       )}
       <StatusBar>
-
         <StatusItem>Keys: {layout.keys.size}</StatusItem>
         <StatusItem>Selected: {selection.keys.size}</StatusItem>
         <StatusItem>Zoom: {Math.round(zoom * 100)}%</StatusItem>
