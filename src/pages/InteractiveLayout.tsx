@@ -56,6 +56,8 @@ const InnerLayout = () => {
             minWidth={50}
             maxWidth="200px"
             side="left"
+            resizable={false}
+            data-testid="tools-panel"
           >
             <PanelContent style={{ padding: '0.5rem 0' }}>
               <InteractiveTools />
