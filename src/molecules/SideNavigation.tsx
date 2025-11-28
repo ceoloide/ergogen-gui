@@ -192,7 +192,16 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             <span className="material-symbols-outlined">close</span>
           </CloseButton>
         </Header>
-        <Content>{/* Content area - can be expanded in the future */}</Content>
+        <Content>
+          <NavButton to="/" onClick={onClose}>
+            <span className="material-symbols-outlined">code</span>
+            <span>Code Editor</span>
+          </NavButton>
+          <NavButton to="/interactive-layout" onClick={onClose}>
+            <span className="material-symbols-outlined">view_quilt</span>
+            <span>Layout Editor</span>
+          </NavButton>
+        </Content>
         <Footer>
           <ButtonGroup>
             <OutlineButton
@@ -424,6 +433,28 @@ const ResizeHandle = styled.div`
 
   @media (max-width: 639px) {
     display: none;
+  }
+`;
+
+const NavButton = styled(Link)`
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  background-color: ${theme.colors.background};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  color: ${theme.colors.text};
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+  }
+
+  .material-symbols-outlined {
+    margin-right: 12px;
   }
 `;
 
