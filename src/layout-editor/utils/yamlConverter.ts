@@ -251,7 +251,7 @@ export function yamlToLayout(yamlString: string): EditorLayout {
     mirror: {
       enabled: false,
       ref: '',
-      distance: 100,
+      distance: 190.5,
     },
     globalRotation: 0,
     meta: {
@@ -495,7 +495,7 @@ function _generateSimpleLayout(
     mirror: {
       enabled: false,
       ref: '',
-      distance: 100,
+      distance: 190.5,
     },
     globalRotation: 0,
     meta: {

@@ -44,7 +44,7 @@ function createEmptyLayout(): EditorLayout {
     mirror: {
       enabled: false,
       ref: '',
-      distance: 100,
+      distance: 190.5,
     },
     globalRotation: 0,
     meta: {
