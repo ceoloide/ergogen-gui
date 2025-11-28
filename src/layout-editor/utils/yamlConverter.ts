@@ -1,5 +1,11 @@
 /**
  * YAML Converter - Utilities for converting between visual layout and ergogen YAML configuration.
+ *
+ * This module handles the conversion between:
+ * - EditorLayout (visual representation with EditorKey, EditorZone, etc.)
+ * - Ergogen YAML configuration format
+ *
+ * The conversion maintains consistency with Ergogen's config structure.
  */
 import yaml from 'js-yaml';
 import {
@@ -13,8 +19,10 @@ import {
   DEFAULT_COLUMN,
   DEFAULT_ROW,
   KEY_UNIT_MM,
+  ERGOGEN_DEFAULTS,
 } from '../types';
 import { generateId } from '../LayoutEditorContext';
+import { renderZonePoints } from './layoutGenerator';
 
 /**
  * Converts a visual layout to ergogen YAML configuration.
@@ -39,12 +47,7 @@ export function layoutToYaml(layout: EditorLayout): string {
 
   // Add any other meta fields
   Object.entries(layout.meta).forEach(([key, value]) => {
-    if (
-      key !== 'engine' &&
-      key !== 'version' &&
-      key !== 'author' &&
-      key !== 'name'
-    ) {
+    if (!['engine', 'version', 'author', 'name'].includes(key)) {
       (config.meta as Record<string, unknown>)[key] = value;
     }
   });
@@ -53,38 +56,38 @@ export function layoutToYaml(layout: EditorLayout): string {
   const points: Record<string, unknown> = {};
   const zones: Record<string, unknown> = {};
 
-  // Group keys by zone
-  const keysByZone = new Map<string, EditorKey[]>();
-  layout.keys.forEach((key) => {
-    const zoneName = key.zone || 'matrix';
-    if (!keysByZone.has(zoneName)) {
-      keysByZone.set(zoneName, []);
-    }
-    keysByZone.get(zoneName)!.push(key);
-  });
-
   // Process each zone
   layout.zones.forEach((zone, zoneName) => {
     const zoneConfig: Record<string, unknown> = {};
 
     // Add anchor if defined
-    if (
+    const hasAnchor =
       zone.anchor.ref ||
-      zone.anchor.shiftX ||
-      zone.anchor.shiftY ||
-      zone.anchor.rotate
-    ) {
+      zone.anchor.shift[0] !== 0 ||
+      zone.anchor.shift[1] !== 0 ||
+      zone.anchor.rotate !== 0;
+
+    if (hasAnchor) {
       const anchor: Record<string, unknown> = {};
       if (zone.anchor.ref) {
         anchor.ref = zone.anchor.ref;
       }
-      if (zone.anchor.shiftX || zone.anchor.shiftY) {
-        anchor.shift = [zone.anchor.shiftX, zone.anchor.shiftY];
+      if (zone.anchor.shift[0] !== 0 || zone.anchor.shift[1] !== 0) {
+        anchor.shift = zone.anchor.shift;
       }
-      if (zone.anchor.rotate) {
+      if (zone.anchor.rotate !== 0) {
         anchor.rotate = zone.anchor.rotate;
       }
       zoneConfig.anchor = anchor;
+    }
+
+    // Add zone-level key defaults if present
+    if (Object.keys(zone.key).length > 0) {
+      const keyConfig: Record<string, unknown> = {};
+      Object.entries(zone.key).forEach(([k, v]) => {
+        keyConfig[`key.${k}`] = v;
+      });
+      Object.assign(zoneConfig, keyConfig);
     }
 
     // Build columns
@@ -94,23 +97,35 @@ export function layoutToYaml(layout: EditorLayout): string {
         const colConfig: Record<string, unknown> = {};
 
         // Only add non-default values
-        if (col.stagger !== 0) {
-          colConfig['key.stagger'] = col.stagger;
+        if (col.key.stagger !== ERGOGEN_DEFAULTS.stagger) {
+          colConfig['key.stagger'] = col.key.stagger;
         }
-        if (col.splay !== 0) {
-          colConfig['key.splay'] = col.splay;
-          if (col.splayOrigin[0] !== 0 || col.splayOrigin[1] !== 0) {
-            colConfig['key.origin'] = col.splayOrigin;
+        if (col.key.splay !== ERGOGEN_DEFAULTS.splay) {
+          colConfig['key.splay'] = col.key.splay;
+          if (col.key.origin[0] !== 0 || col.key.origin[1] !== 0) {
+            colConfig['key.origin'] = col.key.origin;
           }
         }
-        if (col.spread !== KEY_UNIT_MM && index > 0) {
-          colConfig['key.spread'] = col.spread;
+        if (col.key.spread !== ERGOGEN_DEFAULTS.spread && index > 0) {
+          colConfig['key.spread'] = col.key.spread;
         }
 
-        // Add any additional ergogen props
-        Object.entries(col.ergogenProps).forEach(([key, value]) => {
-          colConfig[key] = value;
-        });
+        // Add row-level overrides within this column
+        if (Object.keys(col.rows).length > 0) {
+          const rowsConfig: Record<string, unknown> = {};
+          Object.entries(col.rows).forEach(([rowName, rowKey]) => {
+            const rowConfig: Record<string, unknown> = {};
+            Object.entries(rowKey).forEach(([k, v]) => {
+              rowConfig[k] = v;
+            });
+            if (Object.keys(rowConfig).length > 0) {
+              rowsConfig[rowName] = rowConfig;
+            }
+          });
+          if (Object.keys(rowsConfig).length > 0) {
+            colConfig.rows = rowsConfig;
+          }
+        }
 
         // If column has no config, still add it (ergogen requires column presence)
         columns[col.name] = Object.keys(colConfig).length > 0 ? colConfig : {};
@@ -124,36 +139,50 @@ export function layoutToYaml(layout: EditorLayout): string {
       zone.rows.forEach((row) => {
         const rowConfig: Record<string, unknown> = {};
 
-        // Add any additional ergogen props
-        Object.entries(row.ergogenProps).forEach(([key, value]) => {
-          rowConfig[key] = value;
-        });
+        // Add row-level key config
+        if (row.key && Object.keys(row.key).length > 0) {
+          Object.entries(row.key).forEach(([k, v]) => {
+            rowConfig[k] = v;
+          });
+        }
 
         rows[row.name] = Object.keys(rowConfig).length > 0 ? rowConfig : {};
       });
       zoneConfig.rows = rows;
     }
 
-    // Add zone rotation if defined
+    // Add zone rotation
     if (zone.rotate !== 0) {
-      // Note: zone-level rotate goes at the points level, not inside zone
+      zoneConfig.rotate = zone.rotate;
     }
 
-    // Add any additional zone ergogen props
-    Object.entries(zone.ergogenProps).forEach(([key, value]) => {
-      zoneConfig[key] = value;
-    });
+    // Add zone-level mirroring
+    if (zone.mirror) {
+      const mirrorConfig: Record<string, unknown> = {};
+      if (zone.mirror.ref) {
+        mirrorConfig.ref = zone.mirror.ref;
+      }
+      if (zone.mirror.distance !== 0) {
+        mirrorConfig.distance = zone.mirror.distance;
+      }
+      if (Object.keys(mirrorConfig).length > 0) {
+        zoneConfig.mirror = mirrorConfig;
+      }
+    }
 
     zones[zoneName] = zoneConfig;
   });
 
-  // If there are keys without zones, create a default matrix zone
-  const keysWithoutZone = keysByZone.get('') || [];
+  // Handle keys without zones (create inferred matrix zone)
+  const keysWithoutZone = Array.from(layout.keys.values()).filter(
+    (k) => !k.zone || !layout.zones.has(k.zone)
+  );
+
   if (keysWithoutZone.length > 0 && !layout.zones.has('matrix')) {
     // Group keys by their column and row
     const columnMap = new Map<string, EditorKey[]>();
     keysWithoutZone.forEach((key) => {
-      const colName = key.column || `col${Math.floor(key.x)}`;
+      const colName = key.column || `col${Math.floor(key.x / KEY_UNIT_MM)}`;
       if (!columnMap.has(colName)) {
         columnMap.set(colName, []);
       }
@@ -176,7 +205,6 @@ export function layoutToYaml(layout: EditorLayout): string {
           keys.reduce((sum, k) => sum + k.rotation, 0) / keys.length;
 
         if (index > 0) {
-          // Calculate spread (horizontal distance)
           const spread = avgX - prevX;
           if (Math.abs(spread - KEY_UNIT_MM) > 0.1) {
             colConfig['key.spread'] = Math.round(spread * 10) / 10;
@@ -194,7 +222,7 @@ export function layoutToYaml(layout: EditorLayout): string {
     // Infer rows
     const rowNames = new Set<string>();
     keysWithoutZone.forEach((key) => {
-      rowNames.add(key.row || `row${Math.floor(key.y)}`);
+      rowNames.add(key.row || `row${Math.floor(key.y / KEY_UNIT_MM)}`);
     });
     const rows: Record<string, unknown> = {};
     Array.from(rowNames)
@@ -203,10 +231,7 @@ export function layoutToYaml(layout: EditorLayout): string {
         rows[rowName] = {};
       });
 
-    zones.matrix = {
-      columns,
-      rows,
-    };
+    zones.matrix = { columns, rows };
   }
 
   if (Object.keys(zones).length > 0) {
@@ -218,7 +243,7 @@ export function layoutToYaml(layout: EditorLayout): string {
     points.rotate = layout.globalRotation;
   }
 
-  // Add mirror settings
+  // Add global mirror settings
   if (layout.mirror.enabled) {
     const mirror: Record<string, unknown> = {};
     if (layout.mirror.ref) {
@@ -262,10 +287,7 @@ export function yamlToLayout(yamlString: string): EditorLayout {
   // Parse meta section
   if (config.meta && typeof config.meta === 'object') {
     const meta = config.meta as Record<string, unknown>;
-    layout.meta = {
-      ...layout.meta,
-      ...meta,
-    };
+    layout.meta = { ...layout.meta, ...meta };
 
     // Ensure known fields are strings if present
     if (typeof meta.version === 'string') layout.meta.version = meta.version;
@@ -285,7 +307,7 @@ export function yamlToLayout(yamlString: string): EditorLayout {
     layout.globalRotation = points.rotate;
   }
 
-  // Parse mirror settings
+  // Parse global mirror settings
   const mirrorConfig = points.mirror as Record<string, unknown> | undefined;
   if (mirrorConfig) {
     layout.mirror.enabled = true;
@@ -300,18 +322,15 @@ export function yamlToLayout(yamlString: string): EditorLayout {
   // Parse zones
   const zonesConfig = points.zones as Record<string, unknown> | undefined;
   if (zonesConfig) {
-    let currentY = 0;
-
     Object.entries(zonesConfig).forEach(([zoneName, zoneData]) => {
       const zoneConfig = zoneData as Record<string, unknown>;
 
-      // Create zone
+      // Create zone with defaults
       const zone: EditorZone = {
         ...DEFAULT_ZONE,
         name: zoneName,
         columns: [],
         rows: [],
-        keys: [],
       };
 
       // Parse anchor
@@ -323,11 +342,42 @@ export function yamlToLayout(yamlString: string): EditorLayout {
           zone.anchor.ref = anchorConfig.ref;
         }
         if (Array.isArray(anchorConfig.shift)) {
-          zone.anchor.shiftX = (anchorConfig.shift[0] as number) || 0;
-          zone.anchor.shiftY = (anchorConfig.shift[1] as number) || 0;
+          zone.anchor.shift = [
+            (anchorConfig.shift[0] as number) || 0,
+            (anchorConfig.shift[1] as number) || 0,
+          ];
         }
         if (typeof anchorConfig.rotate === 'number') {
           zone.anchor.rotate = anchorConfig.rotate;
+        }
+      }
+
+      // Parse zone-level key defaults
+      const zoneKeyConfig: Record<string, unknown> = {};
+      Object.entries(zoneConfig).forEach(([key, value]) => {
+        if (key.startsWith('key.')) {
+          zoneKeyConfig[key.substring(4)] = value;
+        }
+      });
+      if (Object.keys(zoneKeyConfig).length > 0) {
+        zone.key = zoneKeyConfig;
+      }
+
+      // Parse zone rotation
+      if (typeof zoneConfig.rotate === 'number') {
+        zone.rotate = zoneConfig.rotate;
+      }
+
+      // Parse zone mirror
+      const zoneMirrorConfig = zoneConfig.mirror as
+        | Record<string, unknown>
+        | undefined;
+      if (zoneMirrorConfig) {
+        zone.mirror = {
+          distance: (zoneMirrorConfig.distance as number) || 0,
+        };
+        if (typeof zoneMirrorConfig.ref === 'string') {
+          zone.mirror.ref = zoneMirrorConfig.ref;
         }
       }
 
@@ -335,97 +385,85 @@ export function yamlToLayout(yamlString: string): EditorLayout {
       const columnsConfig = zoneConfig.columns as
         | Record<string, unknown>
         | undefined;
-      const columnNames: string[] = [];
       if (columnsConfig) {
         Object.entries(columnsConfig).forEach(([colName, colData]) => {
-          const colConfig = colData as Record<string, unknown>;
+          const colConfig = (colData || {}) as Record<string, unknown>;
           const column: EditorColumn = {
             ...DEFAULT_COLUMN,
             name: colName,
           };
 
+          // Parse column-level key settings
           if (typeof colConfig['key.stagger'] === 'number') {
-            column.stagger = colConfig['key.stagger'];
+            column.key.stagger = colConfig['key.stagger'];
           }
           if (typeof colConfig['key.splay'] === 'number') {
-            column.splay = colConfig['key.splay'];
+            column.key.splay = colConfig['key.splay'];
           }
           if (typeof colConfig['key.spread'] === 'number') {
-            column.spread = colConfig['key.spread'];
+            column.key.spread = colConfig['key.spread'];
           }
           if (Array.isArray(colConfig['key.origin'])) {
-            column.splayOrigin = [
+            column.key.origin = [
               (colConfig['key.origin'][0] as number) || 0,
               (colConfig['key.origin'][1] as number) || 0,
             ];
           }
 
-          // Store other ergogen props
-          Object.entries(colConfig).forEach(([key, value]) => {
-            if (!key.startsWith('key.')) {
-              column.ergogenProps[key] = value;
-            }
-          });
+          // Parse row overrides within this column
+          const rowOverrides = colConfig.rows as
+            | Record<string, unknown>
+            | undefined;
+          if (rowOverrides) {
+            Object.entries(rowOverrides).forEach(([rowName, rowConfig]) => {
+              column.rows[rowName] = rowConfig as Record<string, unknown>;
+            });
+          }
 
           zone.columns.push(column);
-          columnNames.push(colName);
         });
       }
 
       // Parse rows
       const rowsConfig = zoneConfig.rows as Record<string, unknown> | undefined;
-      const rowNames: string[] = [];
       if (rowsConfig) {
         Object.entries(rowsConfig).forEach(([rowName, rowData]) => {
-          const rowConfig = rowData as Record<string, unknown>;
+          const rowConfig = (rowData || {}) as Record<string, unknown>;
           const row: EditorRow = {
             ...DEFAULT_ROW,
             name: rowName,
-            ergogenProps: {},
+            key: { ...rowConfig },
           };
-
-          Object.entries(rowConfig).forEach(([key, value]) => {
-            row.ergogenProps[key] = value;
-          });
-
           zone.rows.push(row);
-          rowNames.push(rowName);
         });
       }
 
-      // Create keys for each column/row combination
-      let colX = zone.anchor.shiftX;
-      let baseRotation = zone.anchor.rotate || 0;
+      // Generate keys using the Point-based rendering
+      const renderedPoints = renderZonePoints(zone, DEFAULT_KEY);
+      renderedPoints.forEach((point, pointName) => {
+        const id = generateId('key');
+        const meta = point.meta;
 
-      zone.columns.forEach((column) => {
-        const colStagger = column.stagger;
-        const colSplay = column.splay;
+        const key: EditorKey = {
+          ...DEFAULT_KEY,
+          id,
+          name: pointName,
+          zone: zoneName,
+          column: (meta.col as { name: string })?.name || '',
+          row: (meta.row as string) || '',
+          x: point.x,
+          y: point.y,
+          rotation: point.r,
+          width: (meta.width as number) || ERGOGEN_DEFAULTS.width,
+          height: (meta.height as number) || ERGOGEN_DEFAULTS.height,
+          stagger: (meta.stagger as number) || ERGOGEN_DEFAULTS.stagger,
+          spread: (meta.spread as number) || ERGOGEN_DEFAULTS.spread,
+          splay: (meta.splay as number) || ERGOGEN_DEFAULTS.splay,
+          padding: (meta.padding as number) || ERGOGEN_DEFAULTS.padding,
+        };
 
-        zone.rows.forEach((row, rowIndex) => {
-          const keyName = `${zoneName}_${column.name}_${row.name}`;
-          const id = generateId('key');
-
-          const key: EditorKey = {
-            ...DEFAULT_KEY,
-            id,
-            name: keyName,
-            zone: zoneName,
-            column: column.name,
-            row: row.name,
-            x: colX,
-            y: currentY + rowIndex * KEY_UNIT_MM + colStagger,
-            rotation: baseRotation + colSplay,
-          };
-
-          layout.keys.set(id, key);
-          zone.keys.push(id);
-        });
-
-        colX += column.spread || KEY_UNIT_MM;
-        baseRotation += colSplay;
+        layout.keys.set(id, key);
       });
-
-      currentY += (zone.rows.length + 1) * KEY_UNIT_MM;
 
       layout.zones.set(zoneName, zone);
     });
@@ -528,27 +566,28 @@ function _generateSimpleLayout(
     name: zoneName,
     columns,
     rows,
-    keys: [],
   };
 
-  // Create keys
-  for (let c = 0; c < numColumns; c++) {
-    for (let r = 0; r < numRows; r++) {
-      const id = generateId('key');
-      const key: EditorKey = {
-        ...DEFAULT_KEY,
-        id,
-        name: `${zoneName}_${columns[c]!.name}_${rows[r]!.name}`,
-        zone: zoneName,
-        column: columns[c]!.name,
-        row: rows[r]!.name,
-        x: c * KEY_UNIT_MM,
-        y: r * KEY_UNIT_MM,
-      };
-      layout.keys.set(id, key);
-      zone.keys.push(id);
-    }
-  }
+  // Generate keys using Point-based rendering
+  const renderedPoints = renderZonePoints(zone, DEFAULT_KEY);
+  renderedPoints.forEach((point, pointName) => {
+    const id = generateId('key');
+    const meta = point.meta;
+
+    const key: EditorKey = {
+      ...DEFAULT_KEY,
+      id,
+      name: pointName,
+      zone: zoneName,
+      column: (meta.col as { name: string })?.name || '',
+      row: (meta.row as string) || '',
+      x: point.x,
+      y: point.y,
+      rotation: point.r,
+    };
+
+    layout.keys.set(id, key);
+  });
 
   layout.zones.set(zoneName, zone);
 

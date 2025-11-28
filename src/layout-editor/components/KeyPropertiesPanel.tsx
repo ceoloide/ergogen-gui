@@ -74,11 +74,6 @@ const PropertyInputGroup = styled.div`
   flex: 1;
 `;
 
-const SmallInput = styled(PropertyInput)`
-  width: 60px;
-  flex: none;
-`;
-
 const InputWithLabel = styled.div`
   display: flex;
   flex: 1;
@@ -304,7 +299,9 @@ export const KeyPropertiesPanel: React.FC = () => {
               <SmallLabel>Width</SmallLabel>
               <UnitInput
                 value={singleKey!.width}
-                onChange={(val) => handlePropertyChange('width', Math.max(0.25, val))}
+                onChange={(val) =>
+                  handlePropertyChange('width', Math.max(0.25, val))
+                }
                 step={0.25}
                 min={0.25}
               />
@@ -313,7 +310,9 @@ export const KeyPropertiesPanel: React.FC = () => {
               <SmallLabel>Height</SmallLabel>
               <UnitInput
                 value={singleKey!.height}
-                onChange={(val) => handlePropertyChange('height', Math.max(0.25, val))}
+                onChange={(val) =>
+                  handlePropertyChange('height', Math.max(0.25, val))
+                }
                 step={0.25}
                 min={0.25}
               />

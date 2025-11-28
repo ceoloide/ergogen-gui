@@ -167,11 +167,7 @@ export const EditorToolbar: React.FC = () => {
 
       <ToolSection>
         <SectionLabel>View</SectionLabel>
-        <ToolbarItem
-          icon="zoom_in"
-          title="Zoom In"
-          onClick={() => zoom(0.1)}
-        />
+        <ToolbarItem icon="zoom_in" title="Zoom In" onClick={() => zoom(0.1)} />
         <ToolbarItem
           icon="zoom_out"
           title="Zoom Out"

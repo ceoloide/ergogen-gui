@@ -498,10 +498,10 @@ export const ZonePropertiesPanel: React.FC = () => {
                           style={{ width: '60px' }}
                         />
                         <UnitInput
-                          value={col.stagger}
+                          value={col.key.stagger}
                           onChange={(val) =>
                             handleUpdateColumn(zone.name, i, {
-                              stagger: val,
+                              key: { ...col.key, stagger: val },
                             })
                           }
                           step={0.25}
@@ -509,10 +509,10 @@ export const ZonePropertiesPanel: React.FC = () => {
                         />
                         <UnitInput
                           type="angle"
-                          value={col.splay}
+                          value={col.key.splay}
                           onChange={(val) =>
                             handleUpdateColumn(zone.name, i, {
-                              splay: val,
+                              key: { ...col.key, splay: val },
                             })
                           }
                           step={5}

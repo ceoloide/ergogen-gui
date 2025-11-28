@@ -9,4 +9,3 @@
 import { LayoutEditor } from './LayoutEditor';
 
 export { LayoutEditor };
-

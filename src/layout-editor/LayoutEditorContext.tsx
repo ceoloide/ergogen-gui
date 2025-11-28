@@ -130,7 +130,11 @@ function cloneLayout(layout: EditorLayout): EditorLayout {
     keys: new Map(
       Array.from(layout.keys.entries()).map(([k, v]) => [
         k,
-        { ...v, ergogenProps: { ...v.ergogenProps } },
+        {
+          ...v,
+          rotationOrigin: [...v.rotationOrigin] as [number, number],
+          meta: { ...v.meta },
+        },
       ])
     ),
     zones: new Map(
@@ -138,18 +142,24 @@ function cloneLayout(layout: EditorLayout): EditorLayout {
         k,
         {
           ...v,
-          anchor: { ...v.anchor },
+          anchor: {
+            ...v.anchor,
+            shift: [...v.anchor.shift] as [number, number],
+          },
+          key: { ...v.key },
           columns: v.columns.map((c) => ({
             ...c,
-            splayOrigin: [...c.splayOrigin] as [number, number],
-            ergogenProps: { ...c.ergogenProps },
+            key: {
+              ...c.key,
+              origin: [...c.key.origin] as [number, number],
+            },
+            rows: { ...c.rows },
           })),
           rows: v.rows.map((r) => ({
             ...r,
-            ergogenProps: { ...r.ergogenProps },
+            key: { ...r.key },
           })),
-          keys: [...v.keys],
-          ergogenProps: { ...v.ergogenProps },
+          mirror: v.mirror ? { ...v.mirror } : undefined,
         },
       ])
     ),
@@ -546,10 +556,11 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
     case 'UPDATE_META': {
       const newMeta = { ...state.layout.meta, ...action.payload };
-      
+
       // Validate engine version if it's being updated
       if (action.payload.engine) {
-        const semverRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+        const semverRegex =
+          /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
         if (!semverRegex.test(action.payload.engine)) {
           // Ignore invalid engine version
           return state;
@@ -732,14 +743,16 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
           columns: [
             {
               name: 'col1',
-              spread: 19.05,
-              stagger: 0,
-              splay: 0,
-              splayOrigin: [0, 0],
-              ergogenProps: {},
+              key: {
+                spread: KEY_UNIT_MM,
+                stagger: 0,
+                splay: 0,
+                origin: [0, 0],
+              },
+              rows: {},
             },
           ],
-          rows: [{ name: 'row1', ergogenProps: {} }],
+          rows: [{ name: 'row1', key: {} }],
         },
       });
     }
@@ -850,14 +863,16 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
             columns: [
               {
                 name: 'col1',
-                spread: 19.05,
-                stagger: 0,
-                splay: 0,
-                splayOrigin: [0, 0],
-                ergogenProps: {},
+                key: {
+                  spread: KEY_UNIT_MM,
+                  stagger: 0,
+                  splay: 0,
+                  origin: [0, 0],
+                },
+                rows: {},
               },
             ],
-            rows: [{ name: 'row1', ergogenProps: {} }],
+            rows: [{ name: 'row1', key: {} }],
           },
         });
       }
