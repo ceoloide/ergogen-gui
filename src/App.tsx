@@ -5,6 +5,7 @@ import styled from 'styled-components';
 
 import Ergogen from './Ergogen';
 import Welcome from './pages/Welcome';
+import InteractiveLayout from './pages/InteractiveLayout';
 import Header from './atoms/Header';
 import LoadingBar from './atoms/LoadingBar';
 import Banners from './organisms/Banners';
@@ -404,6 +405,7 @@ const AppContent = ({
             element={configInput ? <Ergogen /> : <Navigate to="/new" replace />}
           />
           <Route path="/new" element={<Welcome />} />
+          <Route path="/interactive-layout" element={<InteractiveLayout />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageWrapper>
