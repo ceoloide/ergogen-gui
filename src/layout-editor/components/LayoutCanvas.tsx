@@ -74,13 +74,7 @@ const StatusItem = styled.span`
   gap: 4px;
 `;
 
-const StatusDot = styled.span<{ $active?: boolean }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: ${(p) =>
-    p.$active ? theme.colors.accent : theme.colors.textDarkest};
-`;
+
 
 interface LayoutCanvasProps {
   className?: string;
@@ -957,10 +951,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
         />
       )}
       <StatusBar>
-        <StatusItem>
-          <StatusDot $active />
-          Active
-        </StatusItem>
+
         <StatusItem>Keys: {layout.keys.size}</StatusItem>
         <StatusItem>Selected: {selection.keys.size}</StatusItem>
         <StatusItem>Zoom: {Math.round(zoom * 100)}%</StatusItem>
