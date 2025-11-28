@@ -13,6 +13,9 @@
 // Import core types
 import { EditorPoint, UNIT_U, ERGOGEN_DEFAULTS, type KeyConfig } from './core';
 
+// Re-export ERGOGEN_DEFAULTS for use by other modules
+export { ERGOGEN_DEFAULTS };
+
 /**
  * Represents a single key in the layout editor.
  *
