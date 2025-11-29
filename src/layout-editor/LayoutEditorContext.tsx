@@ -220,17 +220,44 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
     case 'ADD_KEY': {
       const id = generateId('key');
+      
+      // Determine zone
+      let zoneName = action.payload.zone;
+      let newZones = state.layout.zones;
+
+      if (!zoneName) {
+        // Create a new zone for this key
+        zoneName = id; // Zone name matches key ID
+        
+        const newZone: EditorZone = {
+          ...DEFAULT_ZONE,
+          name: zoneName,
+          columns: [],
+          rows: [],
+        };
+        
+        newZones = new Map(state.layout.zones);
+        newZones.set(zoneName, newZone);
+      }
+
       const newKey: EditorKey = {
         ...DEFAULT_KEY,
         ...action.payload,
         id,
-        name: action.payload.name || `key_${id}`,
+        name: action.payload.name || id,
+        zone: zoneName,
       };
+
       const newKeys = new Map(state.layout.keys);
       newKeys.set(id, newKey);
+
       return {
         ...state,
-        layout: { ...state.layout, keys: newKeys },
+        layout: { 
+          ...state.layout, 
+          keys: newKeys, 
+          zones: newZones === state.layout.zones ? state.layout.zones : newZones 
+        },
         selection: { keys: new Set([id]), zone: null },
         isDirty: true,
       };
@@ -767,43 +794,17 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addFirstKey = useCallback(() => {
-    // Add the first key at [0,0] with default zone, column, and row
-    // Also create the default zone if it doesn't exist
-    if (!state.layout.zones.has('matrix')) {
-      dispatch({
-        type: 'ADD_ZONE',
-        payload: {
-          name: 'matrix',
-          columns: [
-            {
-              name: 'col1',
-              key: {
-                spread: KEY_UNIT_MM,
-                stagger: 0,
-                splay: 0,
-                origin: [0, 0],
-              },
-              rows: {},
-            },
-          ],
-          rows: [{ name: 'row1', key: {} }],
-        },
-      });
-    }
-
+    // Add the first key at [0,0]
+    // The ADD_KEY reducer will handle creating a new zone for it
     dispatch({
       type: 'ADD_KEY',
       payload: {
         x: 0,
         y: 0,
-        zone: 'matrix',
-        column: 'col1',
-        row: 'row1',
-        name: 'matrix_col1_row1',
       },
     });
     dispatch({ type: 'SAVE_HISTORY', payload: 'Add first key' });
-  }, [state.layout.zones]);
+  }, []);
 
   const addKeyInDirection = useCallback(
     (referenceKeyId: string, direction: Direction) => {
@@ -886,46 +887,6 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     .filter((k): k is EditorKey => k !== undefined);
 
   const handleAddKeyButtonClick = useCallback(() => {
-    // If no keys exist, add the first key at [0,0]
-    if (state.layout.keys.size === 0) {
-      // Add the default zone if it doesn't exist
-      if (!state.layout.zones.has('matrix')) {
-        dispatch({
-          type: 'ADD_ZONE',
-          payload: {
-            name: 'matrix',
-            columns: [
-              {
-                name: 'col1',
-                key: {
-                  spread: KEY_UNIT_MM,
-                  stagger: 0,
-                  splay: 0,
-                  origin: [0, 0],
-                },
-                rows: {},
-              },
-            ],
-            rows: [{ name: 'row1', key: {} }],
-          },
-        });
-      }
-
-      dispatch({
-        type: 'ADD_KEY',
-        payload: {
-          x: 0,
-          y: 0,
-          zone: 'matrix',
-          column: 'col1',
-          row: 'row1',
-          name: 'matrix_col1_row1',
-        },
-      });
-      dispatch({ type: 'SAVE_HISTORY', payload: 'Add first key' });
-      return;
-    }
-
     // If exactly one key is selected, show the overlay
     if (state.selection.keys.size === 1) {
       setShowAddKeyOverlay(true);
@@ -934,7 +895,7 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
 
     // Otherwise, switch to add-key mode for click-to-add behavior
     dispatch({ type: 'SET_MODE', payload: 'add-key' });
-  }, [state.layout.keys.size, state.layout.zones, state.selection.keys.size]);
+  }, [state.selection.keys.size]);
 
   const value: LayoutEditorContextType = {
     state,

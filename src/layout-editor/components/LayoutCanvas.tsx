@@ -179,7 +179,7 @@ function renderKey(
   ctx.stroke();
 
   // Draw selection highlight and center crosshair
-  if (isSelected) {
+  if (isSelected || isPendingSelection) {
     // Draw outer glow/highlight
     ctx.strokeStyle = theme.colors.accent;
     ctx.lineWidth = 2;

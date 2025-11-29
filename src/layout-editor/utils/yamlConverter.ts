@@ -391,6 +391,11 @@ export function yamlToLayout(yamlString: string): EditorLayout {
           const column: EditorColumn = {
             ...DEFAULT_COLUMN,
             name: colName,
+            key: {
+              ...DEFAULT_COLUMN.key,
+              origin: [...DEFAULT_COLUMN.key.origin] as [number, number],
+            },
+            rows: {},
           };
 
           // Parse column-level key settings
@@ -517,79 +522,4 @@ function _validateYaml(yamlString: string): string[] {
   }
 
   return errors;
-}
-
-/**
- * Generates a simple keyboard layout with the specified number of rows and columns.
- */
-function _generateSimpleLayout(
-  numColumns: number,
-  numRows: number,
-  zoneName: string = 'matrix'
-): EditorLayout {
-  const layout: EditorLayout = {
-    keys: new Map(),
-    zones: new Map(),
-    mirror: {
-      enabled: false,
-      ref: '',
-      distance: 190.5,
-    },
-    globalRotation: 0,
-    meta: {
-      engine: '4.2.1',
-    },
-  };
-
-  // Create column and row definitions
-  const columns: EditorColumn[] = [];
-  const rows: EditorRow[] = [];
-  const rowNames = ['bottom', 'home', 'top', 'num'];
-
-  for (let c = 0; c < numColumns; c++) {
-    columns.push({
-      ...DEFAULT_COLUMN,
-      name: `col${c + 1}`,
-    });
-  }
-
-  for (let r = 0; r < numRows; r++) {
-    rows.push({
-      ...DEFAULT_ROW,
-      name: rowNames[r] || `row${r + 1}`,
-    });
-  }
-
-  // Create zone
-  const zone: EditorZone = {
-    ...DEFAULT_ZONE,
-    name: zoneName,
-    columns,
-    rows,
-  };
-
-  // Generate keys using Point-based rendering
-  const renderedPoints = renderZonePoints(zone, DEFAULT_KEY);
-  renderedPoints.forEach((point, pointName) => {
-    const id = generateId('key');
-    const meta = point.meta;
-
-    const key: EditorKey = {
-      ...DEFAULT_KEY,
-      id,
-      name: pointName,
-      zone: zoneName,
-      column: (meta.col as { name: string })?.name || '',
-      row: (meta.row as string) || '',
-      x: point.x,
-      y: point.y,
-      rotation: point.r,
-    };
-
-    layout.keys.set(id, key);
-  });
-
-  layout.zones.set(zoneName, zone);
-
-  return layout;
 }
