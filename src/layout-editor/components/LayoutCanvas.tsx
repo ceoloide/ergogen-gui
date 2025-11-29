@@ -91,8 +91,7 @@ function renderKey(
   isPendingSelection: boolean,
   zoom: number,
   panX: number,
-  panY: number,
-  globalRotation: number
+  panY: number
 ) {
   const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
   const width = key.width * scale;
@@ -130,7 +129,10 @@ function renderKey(
   // Note: Canvas rotation is clockwise for positive angles, but Ergogen uses
   // counter-clockwise (standard math convention). Since Y-axis is flipped,
   // we negate the rotation to get counter-clockwise behavior.
-  const totalRotation = key.rotation + globalRotation;
+  // Note: Canvas rotation is clockwise for positive angles, but Ergogen uses
+  // counter-clockwise (standard math convention). Since Y-axis is flipped,
+  // we negate the rotation to get counter-clockwise behavior.
+  const totalRotation = key.rotation;
   if (totalRotation !== 0) {
     ctx.translate(centerX, centerY);
     ctx.rotate((-totalRotation * Math.PI) / 180);
@@ -335,8 +337,7 @@ function isPointInKey(
   key: EditorKey,
   zoom: number,
   panX: number,
-  panY: number,
-  globalRotation: number
+  panY: number
 ): boolean {
   const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
   const width = key.width * scale;
@@ -351,7 +352,7 @@ function isPointInKey(
   const x = centerX - width / 2;
   const y = centerY - height / 2;
 
-  const totalRotation = key.rotation + globalRotation;
+  const totalRotation = key.rotation;
   if (totalRotation !== 0) {
     // For rotated keys, transform the point to key's local space.
     // Since we render with -totalRotation (to make positive angles counter-clockwise),
@@ -407,10 +408,14 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     redo,
     handleAddKeyButtonClick,
     selectAll,
+    renderedKeys,
   } = useLayoutEditor();
 
   const { layout, viewport, selection, grid, mode } = state;
   const { zoom, panX, panY } = viewport;
+
+  // Use rendered keys if available, otherwise fall back to layout keys
+  const keysToRender = renderedKeys;
 
   // Handle window resize
   useEffect(() => {
@@ -472,7 +477,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
     }
 
     // Draw keys
-    const keysArray = Array.from(layout.keys.values());
+    const keysArray = Array.from(keysToRender.values());
     const adjustedPanX = panX + canvasSize.width / 2;
     const adjustedPanY = panY + canvasSize.height / 2;
 
@@ -512,8 +517,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           isPendingSelection,
           zoom,
           adjustedPanX,
-          adjustedPanY,
-          layout.globalRotation
+          adjustedPanY
         );
       });
 
@@ -530,12 +534,11 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
           false, // Already selected, so not pending
           zoom,
           adjustedPanX,
-          adjustedPanY,
-          layout.globalRotation
+          adjustedPanY
         );
       });
   }, [
-    layout.keys,
+    keysToRender,
     selection.keys,
     zoom,
     panX,
@@ -553,7 +556,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       const adjustedPanY = panY + canvasSize.height / 2;
 
       // Check keys in reverse order (topmost first)
-      const keysArray = Array.from(layout.keys.values()).reverse();
+      const keysArray = Array.from(keysToRender.values()).reverse();
       for (const key of keysArray) {
         if (
           isPointInKey(
@@ -562,8 +565,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
             key,
             zoom,
             adjustedPanX,
-            adjustedPanY,
-            layout.globalRotation
+            adjustedPanY
           )
         ) {
           return key;
@@ -571,7 +573,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       }
       return null;
     },
-    [layout.keys, zoom, panX, panY, canvasSize]
+    [keysToRender, zoom, panX, panY, canvasSize]
   );
 
   // Convert screen coordinates to grid coordinates
@@ -654,6 +656,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       addKey,
       screenToGrid,
       grid.snap,
+      grid.size,
     ]
   );
 
@@ -718,6 +721,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       selection.keys.size,
       zoom,
       grid.snap,
+      grid.size,
       pan,
       moveSelectedKeys,
     ]
@@ -742,7 +746,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
         const adjustedPanY = panY + canvasSize.height / 2;
         const selectedIds: string[] = [];
 
-        layout.keys.forEach((key, id) => {
+        keysToRender.forEach((key, id) => {
           const scale = (PIXELS_PER_UNIT / KEY_UNIT_MM) * zoom;
           const keyWidth = key.width * scale;
           const keyHeight = key.height * scale;
@@ -786,7 +790,7 @@ export const LayoutCanvas: React.FC<LayoutCanvasProps> = ({ className }) => {
       selectionRect,
       isDragging,
       selection.keys.size,
-      layout.keys,
+      keysToRender,
       zoom,
       panX,
       panY,

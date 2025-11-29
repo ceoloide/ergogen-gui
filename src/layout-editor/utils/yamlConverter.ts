@@ -111,8 +111,9 @@ export function layoutToYaml(layout: EditorLayout): string {
         }
 
         // Add row-level overrides within this column
+        const rowsConfig: Record<string, unknown> = {};
+
         if (Object.keys(col.rows).length > 0) {
-          const rowsConfig: Record<string, unknown> = {};
           Object.entries(col.rows).forEach(([rowName, rowKey]) => {
             const rowConfig: Record<string, unknown> = {};
             Object.entries(rowKey).forEach(([k, v]) => {
@@ -122,9 +123,24 @@ export function layoutToYaml(layout: EditorLayout): string {
               rowsConfig[rowName] = rowConfig;
             }
           });
-          if (Object.keys(rowsConfig).length > 0) {
-            colConfig.rows = rowsConfig;
+        }
+
+        // Add IDs for all keys in this column
+        zone.rows.forEach((row) => {
+          const key = Array.from(layout.keys.values()).find(
+            (k) =>
+              k.zone === zoneName && k.column === col.name && k.row === row.name
+          );
+          if (key) {
+            const rowConfig =
+              (rowsConfig[row.name] as Record<string, unknown>) || {};
+            rowConfig.id = key.id;
+            rowsConfig[row.name] = rowConfig;
           }
+        });
+
+        if (Object.keys(rowsConfig).length > 0) {
+          colConfig.rows = rowsConfig;
         }
 
         // If column has no config, still add it (ergogen requires column presence)
@@ -466,6 +482,11 @@ export function yamlToLayout(yamlString: string): EditorLayout {
           splay: (meta.splay as number) || ERGOGEN_DEFAULTS.splay,
           padding: (meta.padding as number) || ERGOGEN_DEFAULTS.padding,
         };
+
+        // Preserve the ID if it exists in metadata
+        if (meta.id && typeof meta.id === 'string') {
+          key.id = meta.id;
+        }
 
         layout.keys.set(id, key);
       });

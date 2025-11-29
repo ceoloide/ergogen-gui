@@ -355,6 +355,7 @@ export function renderZonePoints(
         padding,
         skip,
         asym,
+        id: (rowKey.id as string) || undefined,
       };
 
       if (!skip) {

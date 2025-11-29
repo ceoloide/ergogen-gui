@@ -9,6 +9,8 @@ import React, {
   useCallback,
   useState,
   useEffect,
+  useRef,
+  useMemo,
   ReactNode,
 } from 'react';
 import {
@@ -27,6 +29,10 @@ import {
   HistoryEntry,
 } from './types';
 import { recalculateZone, generateMissingKeys } from './utils/layoutGenerator';
+import debounce from 'lodash.debounce';
+import { createErgogenWorker } from '../workers/workerFactory';
+import { WorkerResponse } from '../workers/ergogen.worker.types';
+import { layoutToYaml } from './utils/yamlConverter';
 
 // Generate unique IDs
 let idCounter = 0;
@@ -683,6 +689,7 @@ interface LayoutEditorContextType {
   showAddKeyOverlay: boolean;
   setShowAddKeyOverlay: (show: boolean) => void;
   handleAddKeyButtonClick: () => void;
+  renderedKeys: Map<string, EditorKey>;
 }
 
 const LayoutEditorContext = createContext<LayoutEditorContextType | null>(null);
@@ -693,6 +700,106 @@ const LayoutEditorContext = createContext<LayoutEditorContextType | null>(null);
 export function LayoutEditorProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(editorReducer, createInitialState());
   const [showAddKeyOverlay, setShowAddKeyOverlay] = useState(false);
+
+  // Rendered keys state (from Ergogen)
+  const [renderedKeys, setRenderedKeys] = useState<Map<string, EditorKey>>(
+    new Map()
+  );
+  const workerRef = useRef<Worker | null>(null);
+
+interface ErgogenResults {
+  points?: Record<
+    string,
+    {
+      x: number;
+      y: number;
+      r: number;
+      meta?: {
+        id?: string;
+        width?: number;
+        height?: number;
+        zone?: { name: string };
+        col?: { name: string };
+        row?: string;
+        [key: string]: unknown;
+      };
+      [key: string]: unknown;
+    }
+  >;
+  [key: string]: unknown;
+}
+
+  // Initialize worker
+  useEffect(() => {
+    const worker = createErgogenWorker();
+    workerRef.current = worker;
+
+    if (worker) {
+      worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+        const { data } = event;
+        if (data.type === 'success' && data.results) {
+          const results = data.results as ErgogenResults;
+          if (results.points) {
+            const points = results.points;
+            const newRenderedKeys = new Map<string, EditorKey>();
+
+            Object.entries(points).forEach(([name, point]) => {
+              // Convert point to EditorKey
+              // We need to recover the ID from metadata
+              const meta = point.meta || {};
+              const id = meta.id;
+
+              if (id) {
+                const key: EditorKey = {
+                  ...DEFAULT_KEY,
+                  id,
+                  name,
+                  x: point.x,
+                  y: point.y,
+                  rotation: point.r,
+                  width: meta.width || DEFAULT_KEY.width,
+                  height: meta.height || DEFAULT_KEY.height,
+                  zone: meta.zone?.name || '',
+                  column: meta.col?.name || '',
+                  row: meta.row || '',
+                };
+                newRenderedKeys.set(id, key);
+              }
+            });
+
+            setRenderedKeys(newRenderedKeys);
+          }
+        }
+      };
+    }
+
+    return () => {
+      worker?.terminate();
+      workerRef.current = null;
+    };
+  }, []);
+
+  // Process layout changes
+  // Process layout changes
+  const processLayout = useMemo(
+    () =>
+      debounce((layout: EditorLayout) => {
+        if (!workerRef.current) return;
+
+        const yamlConfig = layoutToYaml(layout);
+        workerRef.current.postMessage({
+          type: 'generate',
+          inputConfig: yamlConfig,
+          requestId: `layout-editor-${Date.now()}`,
+          options: { pointsonly: true },
+        });
+      }, 200),
+    []
+  );
+
+  useEffect(() => {
+    processLayout(state.layout);
+  }, [state.layout, processLayout]);
 
   // Automatically show add key overlay when exactly one key is selected
   useEffect(() => {
@@ -928,6 +1035,7 @@ export function LayoutEditorProvider({ children }: { children: ReactNode }) {
     showAddKeyOverlay,
     setShowAddKeyOverlay,
     handleAddKeyButtonClick,
+    renderedKeys,
   };
 
   return (
