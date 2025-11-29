@@ -127,10 +127,13 @@ function renderKey(
   }
 
   // Apply rotation around key center
+  // Note: Canvas rotation is clockwise for positive angles, but Ergogen uses
+  // counter-clockwise (standard math convention). Since Y-axis is flipped,
+  // we negate the rotation to get counter-clockwise behavior.
   const totalRotation = key.rotation + globalRotation;
   if (totalRotation !== 0) {
     ctx.translate(centerX, centerY);
-    ctx.rotate((totalRotation * Math.PI) / 180);
+    ctx.rotate((-totalRotation * Math.PI) / 180);
     ctx.translate(-centerX, -centerY);
   }
 
@@ -350,8 +353,10 @@ function isPointInKey(
 
   const totalRotation = key.rotation + globalRotation;
   if (totalRotation !== 0) {
-    // For rotated keys, transform the point to key's local space
-    const angle = (-totalRotation * Math.PI) / 180;
+    // For rotated keys, transform the point to key's local space.
+    // Since we render with -totalRotation (to make positive angles counter-clockwise),
+    // we use +totalRotation here to transform the point back to local space.
+    const angle = (totalRotation * Math.PI) / 180;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     const dx = px - centerX;
