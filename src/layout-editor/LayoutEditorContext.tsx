@@ -433,11 +433,30 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       const newZones = new Map(state.layout.zones);
       newZones.set(name, updatedZone);
 
-      // Generate missing keys (e.g. if columns/rows were added)
+      // Get the new column and row names
+      const newColumnNames = new Set(updatedZone.columns.map((c) => c.name));
+      const newRowNames = new Set(updatedZone.rows.map((r) => r.name));
+
+      // Start with existing keys, but remove keys for deleted columns/rows
       const newKeys = new Map(state.layout.keys);
+      const newSelection = new Set(state.selection.keys);
+
+      // Delete keys that belong to columns or rows that no longer exist
+      newKeys.forEach((key, keyId) => {
+        if (key.zone === name) {
+          const columnExists = newColumnNames.has(key.column);
+          const rowExists = newRowNames.has(key.row);
+          if (!columnExists || !rowExists) {
+            newKeys.delete(keyId);
+            newSelection.delete(keyId);
+          }
+        }
+      });
+
+      // Generate missing keys (e.g. if columns/rows were added)
       const generatedKeys = generateMissingKeys(
         updatedZone,
-        state.layout.keys,
+        newKeys,
         () => generateId('key')
       );
       generatedKeys.forEach((key) => newKeys.set(key.id, key));
@@ -455,16 +474,31 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       return {
         ...state,
         layout: { ...state.layout, zones: newZones, keys: newKeys },
+        selection: { ...state.selection, keys: newSelection },
         isDirty: true,
       };
     }
 
     case 'DELETE_ZONE': {
+      const zoneName = action.payload;
       const newZones = new Map(state.layout.zones);
-      newZones.delete(action.payload);
+      newZones.delete(zoneName);
+
+      // Delete all keys that belong to the deleted zone
+      const newKeys = new Map(state.layout.keys);
+      const newSelection = new Set(state.selection.keys);
+
+      newKeys.forEach((key, keyId) => {
+        if (key.zone === zoneName) {
+          newKeys.delete(keyId);
+          newSelection.delete(keyId);
+        }
+      });
+
       return {
         ...state,
-        layout: { ...state.layout, zones: newZones },
+        layout: { ...state.layout, zones: newZones, keys: newKeys },
+        selection: { ...state.selection, keys: newSelection },
         isDirty: true,
       };
     }
