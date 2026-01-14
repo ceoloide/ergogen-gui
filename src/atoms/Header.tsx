@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { theme } from '../theme/theme';
@@ -7,6 +7,7 @@ import { createZip } from '../utils/zip';
 import { createShareableUri } from '../utils/share';
 import { trackEvent } from '../utils/analytics';
 import ShareDialog from '../molecules/ShareDialog';
+import ErgogenBranding from './ErgogenBranding';
 
 /**
  * A styled container for the entire header.
@@ -48,39 +49,6 @@ const RightContainer = styled.div`
   gap: 10px;
 `;
 
-/**
- * A styled container for the Ergogen logo and name.
- */
-const ErgogenLogo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`;
-
-/**
- * A styled div for the application name.
- */
-const AppName = styled.div`
-  font-size: ${theme.fontSizes.base};
-  font-weight: ${theme.fontWeights.semiBold};
-  color: ${theme.colors.white};
-  @media (max-width: 420px) {
-    display: none;
-  }
-`;
-
-/**
- * A styled anchor tag for displaying the version number.
- */
-const VersionText = styled.a`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.accent};
-  text-decoration: none;
-  align-items: center;
-  @media (max-width: 350px) {
-    display: none;
-  }
-`;
 
 /**
  * A styled button with an outline style, typically for icons.
@@ -139,23 +107,6 @@ const NewButtonText = styled.span`
 
 const ArchiveIconButton = styled(OutlineIconButton)``;
 
-/**
- * A responsive button that is only visible on smaller screens.
- * Note: This component is defined but not currently used in the Header.
- */
-const LogoButton = styled(Link)`
-  display: block;
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
-  flex-shrink: 0;
-`;
-
-const LogoImage = styled.img`
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-`;
 
 /**
  * The main header component for the application.
@@ -252,28 +203,7 @@ const Header = (): JSX.Element => {
           >
             <span className="material-symbols-outlined">side_navigation</span>
           </SideNavButton>
-          <ErgogenLogo>
-            <LogoButton
-              to="/"
-              aria-label="Go to home page"
-              data-testid="logo-button"
-            >
-              <LogoImage
-                src={`${process.env.PUBLIC_URL}/ergogen.png`}
-                alt="Ergogen logo"
-              />
-            </LogoButton>
-            <AppName>Ergogen</AppName>
-            <VersionText
-              href="https://github.com/ergogen/ergogen"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="View Ergogen v4.2.1 on GitHub"
-              data-testid="version-link"
-            >
-              v4.2.1
-            </VersionText>
-          </ErgogenLogo>
+          <ErgogenBranding data-testid="header-branding" />
         </LeftContainer>
         <RightContainer>
           {location.pathname === '/' && (
