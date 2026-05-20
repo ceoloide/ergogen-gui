@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
+import ErgogenBranding from '../atoms/ErgogenBranding';
 
 /**
  * Props for the SideNavigation component.
@@ -161,28 +161,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
         />
         <Header>
           <LogoSection>
-            <LogoButton
-              to="/"
+            <ErgogenBranding
               onClick={onClose}
-              aria-label="Go to home page"
-              data-testid="side-nav-logo-button"
-            >
-              <LogoImage
-                src={`${process.env.PUBLIC_URL}/ergogen.png`}
-                alt="Ergogen logo"
-              />
-            </LogoButton>
-            <AppName onClick={onClose}>Ergogen</AppName>
-            <VersionText
-              href="https://github.com/ergogen/ergogen"
-              target="_blank"
-              rel="noreferrer"
-              onClick={onClose}
-              aria-label="View Ergogen v4.2.1 on GitHub"
-              data-testid="side-nav-version-link"
-            >
-              v4.2.1
-            </VersionText>
+              data-testid="side-nav-branding"
+            />
           </LogoSection>
           <CloseButton
             onClick={onClose}
@@ -300,34 +282,6 @@ const LogoSection = styled.div`
   gap: 6px;
   flex: 1;
   min-width: 0;
-`;
-
-const LogoButton = styled(Link)`
-  display: block;
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
-  flex-shrink: 0;
-`;
-
-const LogoImage = styled.img`
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-`;
-
-const AppName = styled.div`
-  font-size: ${theme.fontSizes.base};
-  font-weight: ${theme.fontWeights.semiBold};
-  color: ${theme.colors.white};
-  cursor: pointer;
-`;
-
-const VersionText = styled.a`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.accent};
-  text-decoration: none;
-  align-items: center;
 `;
 
 const CloseButton = styled.button`
