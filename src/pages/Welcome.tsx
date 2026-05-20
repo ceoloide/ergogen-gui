@@ -514,6 +514,20 @@ const Welcome = () => {
 
         <OptionsContainer>
           <OptionBox>
+            <h2>Visual Editor</h2>
+            <p>
+              Design your keyboard layout visually by placing and arranging keys
+              on a canvas, similar to KLE.
+            </p>
+            <Button
+              onClick={() => navigate('/kle-editor')}
+              aria-label="Open visual keyboard layout editor"
+              data-testid="visual-editor-button"
+            >
+              Open Visual Editor
+            </Button>
+          </OptionBox>
+          <OptionBox>
             <h2>Start Fresh</h2>
             <p>Begin with a completely blank slate.</p>
             <Button

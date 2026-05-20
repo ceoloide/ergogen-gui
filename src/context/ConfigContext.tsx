@@ -55,18 +55,7 @@ type Results = {
   [key: string]: unknown;
 };
 
-declare global {
-  interface Window {
-    ergogen: {
-      process: (
-        config: unknown,
-        debug: boolean,
-        logger: (m: string) => void
-      ) => unknown;
-      inject: (type: string, name: string, value: unknown) => void;
-    };
-  }
-}
+// Window type definitions are in src/types/window.d.ts
 
 /**
  * Props for the ConfigContextProvider component.
