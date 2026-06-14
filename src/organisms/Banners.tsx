@@ -45,7 +45,7 @@ const Banner = styled.div<{ type: 'info' | 'warning' | 'error' | 'success' }>`
   display: flex;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  color: ${bannerColors.text};
+  color: ${({ type }) => bannerColors[type].text};
   background-color: ${({ type }) => bannerColors[type].background};
   border: 1px solid ${({ type }) => bannerColors[type].text};
 
@@ -71,7 +71,7 @@ const BannersContainer = styled.div`
 const CloseButton = styled.button`
   background: none;
   border: none;
-  color: ${bannerColors.text};
+  color: inherit;
   font-size: ${theme.fontSizes.h3};
   cursor: pointer;
   padding: 0;
