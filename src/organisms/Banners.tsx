@@ -20,7 +20,6 @@ const bannerColors = {
     background: theme.colors.success,
     text: theme.colors.successDark,
   },
-  text: theme.colors.text,
 };
 
 const BannerIcon = styled.span.attrs({
