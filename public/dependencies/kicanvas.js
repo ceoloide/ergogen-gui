@@ -13478,7 +13478,7 @@ var i3 = new te("kicanvas:embedtag")
                 width: 100%;
                 max-height: 100%;
                 aspect-ratio: 1.414;
-                background-color: aqua;
+                background-color: transparent;
                 color: var(--fg);
                 font-family:
                     "Nunito", ui-rounded, "Hiragino Maru Gothic ProN",
