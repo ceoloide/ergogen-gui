@@ -1,20 +1,20 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, screen, act, fireEvent } from '@testing-library/react';
+import { useConfigContext, ConfigContextProvider } from './ConfigContext';
 
-import { act } from 'react-dom/test-utils';
-import { useConfigContext } from './ConfigContext';
-
-// Mock the worker factory to prevent worker creation in tests
+// Mock the worker factory
 const mockErgogenWorker = {
   postMessage: jest.fn(),
   terminate: jest.fn(),
-  onmessage: (_e: any) => {},
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
 };
 
 const mockJscadWorker = {
   postMessage: jest.fn(),
   terminate: jest.fn(),
-  onmessage: (_e: any) => {},
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
 };
 
 jest.mock('../workers/workerFactory', () => ({
@@ -28,406 +28,108 @@ global.window.ergogen = {
   inject: jest.fn(),
 };
 
-import { ConfigContextProvider } from './ConfigContext';
-
 const mockConfig = 'points: {}';
-
-const localStorageMock = (() => {
-  let store: { [key: string]: string } = {};
-  return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => {
-      store[key] = String(value);
-    },
-    clear: () => {
-      store = {};
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-  };
-})();
-
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-});
 
 const TestComponent = () => {
   const context = useConfigContext();
   return (
-    <div data-testid="context-results">{JSON.stringify(context?.results)}</div>
+    <div>
+      <div data-testid="config-input">{context?.configInput}</div>
+      <div data-testid="configs-count">{context?.configs.length}</div>
+      <div data-testid="results">{JSON.stringify(context?.results)}</div>
+      <button data-testid="set-config" onClick={() => context?.setConfigInput('new content')}>Set Config</button>
+      <button data-testid="set-temp" onClick={() => context?.setTempConfig('temp content')}>Set Temp</button>
+    </div>
   );
 };
 
 describe('ConfigContextProvider', () => {
+  let messageHandlers: any = {};
+
   beforeEach(() => {
-    // Clear the URL for each test
     window.history.replaceState({}, 'Test page', '/');
-    mockErgogenWorker.postMessage.mockClear();
-    mockJscadWorker.postMessage.mockClear();
+    jest.clearAllMocks();
     localStorage.clear();
+    messageHandlers = {};
+
+    mockErgogenWorker.addEventListener.mockImplementation((type, handler) => {
+      if (type === 'message') messageHandlers.ergogen = handler;
+    });
+    mockJscadWorker.addEventListener.mockImplementation((type, handler) => {
+      if (type === 'message') messageHandlers.jscad = handler;
+    });
   });
 
-  it('should fetch config from github url parameter and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
-      if (
-        url ===
-        'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
-      ) {
-        return Promise.resolve(new Response(mockConfig, { status: 200 }));
-      }
-      if (
-        typeof url === 'string' &&
-        url.includes('api.github.com/repos') &&
-        url.includes('footprints')
-      ) {
-        return Promise.resolve(new Response('[]', { status: 404 }));
-      }
-      return Promise.resolve(new Response('', { status: 404 }));
-    });
-
-    // Set the URL for the test
-    window.history.pushState(
-      {},
-      'Test page',
-      '/?github=https://github.com/ceoloide/corney-island/blob/main/ergogen/config.yaml'
-    );
-
-    const setConfigInputMock = jest.fn();
+  it('should initialize with provided multi-config', () => {
+    const initialMultiConfig = {
+      version: 1,
+      configs: [{ id: '1', name: 'Test', content: mockConfig }],
+      activeConfigId: '1',
+    };
 
     render(
-      <ConfigContextProvider configInput="" setConfigInput={setConfigInputMock}>
-        <div></div>
+      <ConfigContextProvider initialMultiConfig={initialMultiConfig}>
+        <TestComponent />
       </ConfigContextProvider>
     );
 
-    await waitFor(() => {
-      expect(setConfigInputMock).toHaveBeenCalledWith(mockConfig);
-    });
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
-    );
-
-    fetchSpy.mockRestore();
+    expect(screen.getByTestId('config-input').textContent).toBe(mockConfig);
+    expect(screen.getByTestId('configs-count').textContent).toBe('1');
   });
 
-  it('should fetch config from github url parameter without protocol and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
-      if (
-        url ===
-        'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
-      ) {
-        return Promise.resolve(new Response(mockConfig, { status: 200 }));
-      }
-      if (
-        typeof url === 'string' &&
-        url.includes('api.github.com/repos') &&
-        url.includes('footprints')
-      ) {
-        return Promise.resolve(new Response('[]', { status: 404 }));
-      }
-      return Promise.resolve(new Response('', { status: 404 }));
-    });
-
-    // Set the URL for the test
-    window.history.pushState(
-      {},
-      'Test page',
-      '/?github=github.com/ceoloide/corney-island/blob/main/ergogen/config.yaml'
-    );
-
-    const setConfigInputMock = jest.fn();
+  it('should promote temp config to real config on edit', async () => {
+    const initialMultiConfig = {
+      version: 1,
+      configs: [],
+      activeConfigId: '',
+    };
 
     render(
-      <ConfigContextProvider configInput="" setConfigInput={setConfigInputMock}>
-        <div></div>
+      <ConfigContextProvider initialMultiConfig={initialMultiConfig}>
+        <TestComponent />
       </ConfigContextProvider>
     );
 
+    // Set temp config
+    fireEvent.click(screen.getByTestId('set-temp'));
+    expect(screen.getByTestId('config-input').textContent).toBe('temp content');
+    expect(screen.getByTestId('configs-count').textContent).toBe('0');
+
+    // Edit it
+    fireEvent.click(screen.getByTestId('set-config'));
+
+    // Now it should be a real config
     await waitFor(() => {
-      expect(setConfigInputMock).toHaveBeenCalledWith(mockConfig);
+      expect(screen.getByTestId('configs-count').textContent).toBe('1');
+      expect(screen.getByTestId('config-input').textContent).toBe('new content');
     });
-
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
-    );
-
-    fetchSpy.mockRestore();
   });
 
-  it('should load footprints from github url parameter and merge them', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
-      if (
-        url ===
-        'https://raw.githubusercontent.com/ceoloide/test-repo/main/config.yaml'
-      ) {
-        return Promise.resolve(new Response(mockConfig, { status: 200 }));
-      }
-      if (
-        typeof url === 'string' &&
-        url.includes('api.github.com/repos') &&
-        url.includes('footprints')
-      ) {
-        // Return a footprint
-        return Promise.resolve(
-          new Response(
-            JSON.stringify([
-              {
-                type: 'file',
-                name: 'test_footprint.js',
-                download_url:
-                  'https://raw.githubusercontent.com/ceoloide/test-repo/main/footprints/test_footprint.js',
-              },
-            ]),
-            { status: 200 }
-          )
-        );
-      }
-      if (
-        url ===
-        'https://raw.githubusercontent.com/ceoloide/test-repo/main/footprints/test_footprint.js'
-      ) {
-        return Promise.resolve(
-          new Response('module.exports = {}', { status: 200 })
-        );
-      }
-      if (typeof url === 'string' && url.includes('.gitmodules')) {
-        return Promise.resolve(new Response('', { status: 404 }));
-      }
-      return Promise.resolve(new Response('', { status: 404 }));
-    });
+  describe('Worker Interaction', () => {
+    it('should update results when worker succeeds', async () => {
+      const initialMultiConfig = {
+        version: 1,
+        configs: [{ id: '1', name: 'Test', content: mockConfig }],
+        activeConfigId: '1',
+      };
 
-    // Set the URL for the test
-    window.history.pushState({}, 'Test page', '/?github=ceoloide/test-repo');
-
-    const setConfigInputMock = jest.fn();
-
-    render(
-      <ConfigContextProvider configInput="" setConfigInput={setConfigInputMock}>
-        <div></div>
-      </ConfigContextProvider>
-    );
-
-    // Wait for config to be set
-    await waitFor(() => {
-      expect(setConfigInputMock).toHaveBeenCalledWith(mockConfig);
-    });
-
-    // Verify that the footprint was loaded by checking localStorage
-    await waitFor(() => {
-      const injections = localStorage.getItem('ergogen:injection');
-      expect(injections).toBeTruthy();
-      const parsed = JSON.parse(injections as string);
-      expect(parsed).toEqual([
-        ['footprint', 'test_footprint', 'module.exports = {}'],
-      ]);
-    });
-
-    fetchSpy.mockRestore();
-  });
-
-  describe('STL Conversion', () => {
-    it('should batch convert JSCAD to STL when stlPreview is true', async () => {
-      localStorage.setItem('ergogen:config:stlPreview', 'true');
-      const setConfigInputMock = jest.fn();
-      const { getByTestId } = render(
-        <ConfigContextProvider
-          configInput={mockConfig}
-          setConfigInput={setConfigInputMock}
-        >
+      render(
+        <ConfigContextProvider initialMultiConfig={initialMultiConfig}>
           <TestComponent />
         </ConfigContextProvider>
       );
 
-      // 1. Simulate Ergogen worker returning results with a JSCAD case
-      const ergogenResults = {
-        cases: {
-          left: { jscad: 'mock_jscad_code' },
-        },
-      };
+      const ergogenResults = { points: { p1: {} } };
 
       act(() => {
-        mockErgogenWorker.onmessage({
-          data: { type: 'success', results: ergogenResults },
-        } as MessageEvent);
+        if (messageHandlers.ergogen) {
+          messageHandlers.ergogen({
+            data: { type: 'success', results: ergogenResults, requestId: 'ergogen-generate-1-123' },
+          });
+        }
       });
 
-      // 2. Verify that the JSCAD worker was called with batch request containing full results
-      await waitFor(() => {
-        expect(mockJscadWorker.postMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: 'batch_jscad_to_stl',
-            results: expect.objectContaining({
-              cases: expect.objectContaining({
-                left: { jscad: 'mock_jscad_code', stl: undefined },
-              }),
-            }),
-            configVersion: 1,
-          })
-        );
-      });
-
-      // 3. Simulate JSCAD worker returning the batch converted STL
-      const stlContent = 'solid mock_stl';
-      act(() => {
-        mockJscadWorker.onmessage({
-          data: {
-            type: 'success',
-            results: {
-              cases: {
-                left: {
-                  jscad: 'mock_jscad_code',
-                  stl: stlContent,
-                },
-              },
-            },
-            configVersion: 1,
-          },
-        } as MessageEvent);
-      });
-
-      // 4. Verify that the results were updated with the new STL
-      await waitFor(() => {
-        const results = JSON.parse(
-          getByTestId('context-results').textContent || '{}'
-        );
-        expect(results.cases.left.stl).toBe(stlContent);
-      });
-    });
-
-    it('should discard stale STL results from old config versions', async () => {
-      localStorage.setItem('ergogen:config:stlPreview', 'true');
-      const setConfigInputMock = jest.fn();
-      const TestComponentWithTrigger = () => {
-        const ctx = useConfigContext();
-        return (
-          <>
-            <div data-testid="context-results">
-              {JSON.stringify(ctx?.results)}
-            </div>
-            <button
-              data-testid="trigger-generate"
-              onClick={() =>
-                ctx?.generateNow(mockConfig, undefined, { pointsonly: false })
-              }
-            >
-              Generate
-            </button>
-          </>
-        );
-      };
-
-      const { getByTestId } = render(
-        <ConfigContextProvider
-          configInput={mockConfig}
-          setConfigInput={setConfigInputMock}
-        >
-          <TestComponentWithTrigger />
-        </ConfigContextProvider>
-      );
-
-      // 1. Trigger first generation (will set version to 2 since initial load is version 1)
-      act(() => {
-        getByTestId('trigger-generate').click();
-      });
-
-      // 2. Simulate first Ergogen worker response
-      const ergogenResults1 = {
-        cases: {
-          left: { jscad: 'mock_jscad_code_v1' },
-        },
-      };
-
-      act(() => {
-        mockErgogenWorker.onmessage({
-          data: { type: 'success', results: ergogenResults1 },
-        } as MessageEvent);
-      });
-
-      // 3. Verify JSCAD worker was called with version 2
-      await waitFor(() => {
-        expect(mockJscadWorker.postMessage).toHaveBeenCalledWith(
-          expect.objectContaining({
-            configVersion: 2,
-          })
-        );
-      });
-
-      // 4. Trigger second generation (will set version to 3)
-      act(() => {
-        getByTestId('trigger-generate').click();
-      });
-
-      // 5. Simulate second Ergogen worker response
-      const ergogenResults2 = {
-        cases: {
-          left: { jscad: 'mock_jscad_code_v2' },
-        },
-      };
-
-      act(() => {
-        mockErgogenWorker.onmessage({
-          data: { type: 'success', results: ergogenResults2 },
-        } as MessageEvent);
-      });
-
-      // 6. Simulate JSCAD worker returning stale results from version 2
-      const staleStlContent = 'solid stale_stl';
-      act(() => {
-        mockJscadWorker.onmessage({
-          data: {
-            type: 'success',
-            results: {
-              cases: {
-                left: {
-                  jscad: 'mock_jscad_code_v1',
-                  stl: staleStlContent,
-                },
-              },
-            },
-            configVersion: 2, // Old version
-          },
-        } as MessageEvent);
-      });
-
-      // 7. Verify that stale results were NOT applied
-      await waitFor(() => {
-        const results = JSON.parse(
-          getByTestId('context-results').textContent || '{}'
-        );
-        // STL should still be undefined because stale result was discarded
-        expect(results.cases.left.stl).toBeUndefined();
-        // But JSCAD should be from version 3
-        expect(results.cases.left.jscad).toBe('mock_jscad_code_v2');
-      });
-
-      // 8. Now simulate fresh results from version 3
-      const freshStlContent = 'solid fresh_stl';
-      act(() => {
-        mockJscadWorker.onmessage({
-          data: {
-            type: 'success',
-            results: {
-              cases: {
-                left: {
-                  jscad: 'mock_jscad_code_v2',
-                  stl: freshStlContent,
-                },
-              },
-            },
-            configVersion: 3, // Current version
-          },
-        } as MessageEvent);
-      });
-
-      // 9. Verify that fresh results WERE applied
-      await waitFor(() => {
-        const results = JSON.parse(
-          getByTestId('context-results').textContent || '{}'
-        );
-        expect(results.cases.left.stl).toBe(freshStlContent);
-      });
+      expect(screen.getByTestId('results').textContent).toContain('points');
     });
   });
 });

@@ -1,3 +1,6 @@
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+import { createZipFolder } from "../utils/zip";
 import React, {
   createContext,
   Dispatch,
@@ -13,6 +16,7 @@ import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
+import { v4 as uuidv4 } from 'uuid';
 import {
   createErgogenWorker,
   createJscadWorker,
@@ -21,11 +25,12 @@ import { trackEvent } from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import { useConfigLoader } from '../hooks/useConfigLoader';
+import { MultiConfigStorage, Configuration } from './types';
+import { MULTI_CONFIG_STORAGE_KEY, MULTI_CONFIG_VERSION } from './constants';
+import { getNextDefaultName } from '../utils/naming';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
-  JscadWorkerRequest,
   JscadWorkerResponse,
-  ResultsLike,
 } from '../workers/jscad.worker.types';
 
 // Strongly-typed shape for Ergogen results used in the UI
@@ -43,7 +48,6 @@ type CaseOutput = {
 };
 type PcbsOutput = Record<string, string>;
 
-// Backward-compatible results type with known top-level keys and an index signature
 type Results = {
   canonical?: unknown;
   points?: unknown;
@@ -68,63 +72,16 @@ declare global {
   }
 }
 
-/**
- * Props for the ConfigContextProvider component.
- * @typedef {object} Props
- * @property {string | undefined} configInput - The current YAML/JSON configuration string.
- * @property {Dispatch<SetStateAction<string | undefined>>} setConfigInput - Function to update the config input.
- * @property {string[][]} [initialInjectionInput] - The initial array of code injections.
- * @property {string | null} [hashError] - Error message from hash fragment decoding, if any.
- * @property {React.ReactNode[] | React.ReactNode} children - The child components to be wrapped by the provider.
- */
-type Props = {
-  configInput: string | undefined;
-  setConfigInput: Dispatch<SetStateAction<string | undefined>>;
-  initialInjectionInput?: string[][];
-  hashError?: string | null;
-  children: React.ReactNode[] | React.ReactNode;
-};
-
-/**
- * Defines the shape of the data and functions provided by the ConfigContext.
- * @typedef {object} ContextProps
- * @property {string | undefined} configInput - The current YAML/JSON configuration string.
- * @property {Dispatch<SetStateAction<string | undefined>>} setConfigInput - Function to update the config input.
- * @property {string[][] | undefined} injectionInput - The current array of code injections.
- * @property {Dispatch<SetStateAction<string[][] | undefined>>} setInjectionInput - Function to update the injections.
- * @property {DebouncedFunc<...>} processInput - Debounced function to process the configuration.
- * @property {(textInput: string | undefined, injectionInput: string[][] | undefined, options?: ProcessOptions) => Promise<void>} generateNow - Immediate function to process the configuration.
- * @property {string | null} error - Any error message from the Ergogen process.
- * @property {Dispatch<SetStateAction<string | null>>} setError - Function to set an error message.
- * @property {() => void} clearError - Function to clear the current error message.
- * @property {string | null} deprecationWarning - Any deprecation warnings from the process.
- * @property {() => void} clearWarning - Function to clear the current deprecation warning.
- * @property {Results | null} results - The results from the Ergogen process.
- * @property {number} resultsVersion - A version number that increments with each new result.
- * @property {Dispatch<SetStateAction<number>>} setResultsVersion - Function to update the results version.
- * @property {boolean} showSettings - Flag to control the visibility of the settings panel.
- * @property {Dispatch<SetStateAction<boolean>>} setShowSettings - Function to toggle the settings panel.
- * @property {boolean} showSideNav - Flag to control the visibility of the side navigation panel.
- * @property {Dispatch<SetStateAction<boolean>>} setShowSideNav - Function to toggle the side navigation panel.
- * @property {boolean} showConfig - Flag to control the visibility of the configuration editor.
- * @property {Dispatch<SetStateAction<boolean>>} setShowConfig - Function to toggle the config editor.
- * @property {boolean} showDownloads - Flag to control the visibility of the downloads panel.
- * @property {Dispatch<SetStateAction<boolean>>} setShowDownloads - Function to toggle the downloads panel.
- * @property {boolean} debug - Flag to enable debug mode.
- * @property {Dispatch<SetStateAction<boolean>>} setDebug - Function to set debug mode.
- * @property {boolean} autoGen - Flag to enable automatic regeneration of previews.
- * @property {Dispatch<SetStateAction<boolean>>} setAutoGen - Function to toggle auto-generation.
- * @property {boolean} autoGen3D - Flag to enable automatic regeneration of 3D previews.
- * @property {Dispatch<SetStateAction<boolean>>} setAutoGen3D - Function to toggle 3D auto-generation.
- * @property {boolean} kicanvasPreview - Flag to enable the KiCanvas preview for PCBs.
- * @property {Dispatch<SetStateAction<boolean>>} setKicanvasPreview - Function to toggle the KiCanvas preview.
- * @property {boolean} stlPreview - Flag to enable the STL 3D preview and conversion.
- * @property {Dispatch<SetStateAction<boolean>>} setStlPreview - Function to toggle the STL preview.
- * @property {string | null} experiment - The value of any 'exp' query parameter.
- */
 type ContextProps = {
   configInput: string | undefined;
-  setConfigInput: Dispatch<SetStateAction<string | undefined>>;
+  setConfigInput: (content: string) => void;
+  configs: Configuration[];
+  activeConfigId: string | null;
+  addConfig: (name: string, content: string) => string;
+  deleteConfig: (id: string) => void;
+  renameConfig: (id: string, name: string) => void;
+  duplicateConfig: (id: string) => void;
+  switchConfig: (id: string) => void;
   injectionInput: string[][] | undefined;
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>;
   processInput: DebouncedFunc<
@@ -169,606 +126,410 @@ type ContextProps = {
   isGenerating: boolean;
   setIsGenerating: Dispatch<SetStateAction<boolean>>;
   isJscadConverting: boolean;
+  exportAll: () => Promise<void>;
+  isExporting: boolean;
+  saveActiveConfig: () => void;
+  setTempConfig: (content: string) => void;
 };
 
-/**
- * Options for the `processInput` function.
- * @typedef {object} ProcessOptions
- * @property {boolean} pointsonly - If true, only the points will be processed, skipping PCBs and cases.
- */
 type ProcessOptions = {
-  pointsonly: boolean;
+  pointsonly?: boolean;
 };
 
-/**
- * The main React context for managing Ergogen configuration and results.
- */
 const ConfigContext = createContext<ContextProps | null>(null);
 
-/**
- * Retrieves a value from local storage, or returns a default value if not found.
- * @param {string} key - The local storage key.
- * @param {any} defaultValue - The default value to return if the key is not found.
- * @returns {any} The parsed value from local storage or the default value.
- */
-const localStorageOrDefault = (key: string, defaultValue: unknown) => {
-  const storedValue = localStorage.getItem(key);
-  if (storedValue) {
-    return JSON.parse(storedValue);
-  } else {
-    return defaultValue;
-  }
+type Props = {
+  initialMultiConfig?: MultiConfigStorage | null;
+  initialInjectionInput?: string[][];
+  hashError?: string | null;
+  children: React.ReactNode[] | React.ReactNode;
 };
 
-/**
- * The provider component for the ConfigContext.
- * It manages all state related to configuration, injections, settings, and results.
- * It also handles fetching initial config from URL parameters and persisting settings to local storage.
- *
- * @param {Props} props - The props for the component.
- * @returns {JSX.Element} The context provider wrapping the children.
- */
 const ConfigContextProvider = ({
-  configInput,
-  setConfigInput,
+  initialMultiConfig,
   initialInjectionInput,
   hashError,
   children,
 }: Props) => {
-  const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
-    'ergogen:injection',
-    initialInjectionInput
+  const [multiConfig, setMultiConfig] = useLocalStorage<MultiConfigStorage>(
+    MULTI_CONFIG_STORAGE_KEY,
+    initialMultiConfig || {
+      version: MULTI_CONFIG_VERSION,
+      configs: [],
+      activeConfigId: '',
+    }
   );
-  const [error, setError] = useState<string | null>(null);
-  const [deprecationWarning, setDeprecationWarning] = useState<string | null>(
-    null
-  );
-  const [results, setResults] = useState<Results | null>(null);
-  const [resultsVersion, setResultsVersion] = useState<number>(0);
-  const [debug, setDebug] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:debug', false)
-  );
-  const [autoGen, setAutoGen] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:autoGen', true)
-  );
-  const [autoGen3D, setAutoGen3D] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:autoGen3D', true)
-  );
-  const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:kicanvasPreview', true)
-  );
-  const [stlPreview, setStlPreview] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:stlPreview', true)
-  );
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [showSideNav, setShowSideNav] = useState<boolean>(false);
-  const [showConfig, setShowConfig] = useState<boolean>(true);
-  const [showDownloads, setShowDownloads] = useState<boolean>(true);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
-  // Worker refs
+  const [tempConfig, _setTempConfig] = useState<string | null>(null);
+
+  const configs = useMemo(() => multiConfig?.configs || [], [multiConfig]);
+  const activeConfigId = multiConfig?.activeConfigId || null;
+
+  const activeConfig = useMemo(() => {
+    if (tempConfig !== null) return { id: 'temp', name: 'Shared', content: tempConfig };
+    return configs.find((c) => c.id === activeConfigId) || null;
+  }, [configs, activeConfigId, tempConfig]);
+
+  const configInput = activeConfig?.content || '';
+
+  const setTempConfig = useCallback((content: string) => {
+    _setTempConfig(content);
+    setMultiConfig(prev => prev ? { ...prev, activeConfigId: '' } : prev);
+  }, [setMultiConfig]);
+
+  const addConfig = useCallback(
+    (name: string, content: string) => {
+      const id = uuidv4();
+      setMultiConfig((prev) => {
+        const newConfigs = [...(prev?.configs || []), { id, name, content }];
+        return { version: MULTI_CONFIG_VERSION, configs: newConfigs, activeConfigId: id };
+      });
+      _setTempConfig(null);
+      isPromotingRef.current = false;
+      return id;
+    },
+    [setMultiConfig]
+  );
+
+  const setConfigInput = useCallback(
+    (content: string) => {
+      if (tempConfig !== null) {
+        if (isPromotingRef.current) return;
+        isPromotingRef.current = true;
+        const name = getNextDefaultName('Shared', configs.map(c => c.name));
+        addConfig(name, content);
+        return;
+      }
+      if (!activeConfigId) return;
+      setMultiConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          configs: prev.configs.map((c) =>
+            c.id === activeConfigId ? { ...c, content } : c
+          ),
+        };
+      });
+    },
+    [activeConfigId, tempConfig, configs, addConfig, setMultiConfig]
+  );
+
+  const switchConfig = useCallback(
+    (id: string) => {
+      _setTempConfig(null);
+      isPromotingRef.current = false;
+      isPromotingRef.current = false;
+      setMultiConfig((prev) => (prev ? { ...prev, activeConfigId: id } : prev));
+    },
+    [setMultiConfig]
+  );
+
+  const deleteConfig = useCallback(
+    (id: string) => {
+      setMultiConfig((prev) => {
+        if (!prev) return prev;
+        const newConfigs = prev.configs.filter((c) => c.id !== id);
+        let newActiveId = prev.activeConfigId;
+        if (newActiveId === id) {
+          newActiveId = newConfigs.length > 0 ? newConfigs[0].id : '';
+        }
+        return { ...prev, configs: newConfigs, activeConfigId: newActiveId };
+      });
+    },
+    [setMultiConfig]
+  );
+
+  const renameConfig = useCallback(
+    (id: string, name: string) => {
+      setMultiConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          configs: prev.configs.map((c) => (c.id === id ? { ...c, name } : c)),
+        };
+      });
+    },
+    [setMultiConfig]
+  );
+
+  const duplicateConfig = useCallback(
+    (id: string) => {
+      const configToDup = configs.find((c) => c.id === id);
+      if (!configToDup) return;
+      const newId = uuidv4();
+      setMultiConfig((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          configs: [...prev.configs, { ...configToDup, id: newId, name: `${configToDup.name} (Copy)` }],
+          activeConfigId: newId,
+        };
+      });
+    },
+    [configs, setMultiConfig]
+  );
+
+  const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>('ergogen:injection', initialInjectionInput || []);
+  const [error, setError] = useState<string | null>(hashError || null);
+  const clearError = useCallback(() => setError(null), []);
+  const [deprecationWarning, setDeprecationWarning] = useState<string | null>(null);
+  const clearWarning = useCallback(() => setDeprecationWarning(null), []);
+  const [results, setResults] = useState<Results | null>(null);
+  const [resultsVersion, setResultsVersion] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showSideNav, setShowSideNav] = useState(false);
+  const [showConfig, setShowConfig] = useState(true);
+  const [showDownloads, setShowDownloads] = useState(false);
+
+  const [debugRaw, setDebug] = useLocalStorage<boolean>('ergogen:debug', false);
+  const debug = !!debugRaw;
+  const [autoGenRaw, setAutoGen] = useLocalStorage<boolean>('ergogen:autogen', true);
+  const autoGen = !!autoGenRaw;
+  const [autoGen3DRaw, setAutoGen3D] = useLocalStorage<boolean>('ergogen:autogen3d', false);
+  const autoGen3D = !!autoGen3DRaw;
+  const [kicanvasPreviewRaw, setKicanvasPreview] = useLocalStorage<boolean>('ergogen:kicanvas', true);
+  const kicanvasPreview = !!kicanvasPreviewRaw;
+  const [stlPreviewRaw, setStlPreview] = useLocalStorage<boolean>('ergogen:stl', true);
+  const stlPreview = !!stlPreviewRaw;
+
+    const [isExporting, setIsExporting] = useState(false);
+
+  const saveActiveConfig = useCallback(() => {
+    if (tempConfig !== null) {
+      const name = getNextDefaultName('Shared', configs.map(c => c.name));
+      addConfig(name, tempConfig);
+    }
+  }, [tempConfig, configs, addConfig]);
+
+    const parseConfig = useCallback((inputString: string): [string, any] => {
+    let type = 'UNKNOWN', parsed = null;
+    try { parsed = JSON.parse(inputString); type = 'json'; } catch (_e) {}
+    try { parsed = yaml.load(inputString); type = 'yaml'; } catch (_e) {}
+    return [type, parsed];
+  }, []);
+
+const exportAll = useCallback(async () => {
+    if (configs.length === 0 && tempConfig === null) return;
+    setIsExporting(true);
+    const mainZip = new JSZip();
+
+    const exportOne = async (name: string, content: string, zip: JSZip) => {
+      const folder = zip.folder(name);
+      if (!folder) return;
+
+      return new Promise<void>((resolve) => {
+        const requestId = `export-${uuidv4()}`;
+        const timeout = setTimeout(() => {
+          folder.file('config.yaml', content);
+          folder.file('ERROR.txt', 'Export timed out or failed to generate outputs');
+          resolve();
+        }, 10000);
+
+        const handler = async (e: MessageEvent<ErgogenWorkerResponse>) => {
+          const data = e.data;
+          if (data.requestId === requestId) {
+            clearTimeout(timeout);
+            ergogenWorkerRef.current?.removeEventListener('message', handler);
+            if (data.type === 'success') {
+              await createZipFolder(folder, data.results as Results, content, injectionInput, debug, stlPreview);
+            } else {
+              folder.file('config.yaml', content);
+              folder.file('ERROR.txt', data.error || 'Unknown error');
+            }
+            resolve();
+          }
+        };
+
+        ergogenWorkerRef.current?.addEventListener('message', handler);
+        const [, parsed] = parseConfig(content);
+        let inputConfig: any = content;
+        if (parsed?.points) {
+           // We don't want pointsonly for export
+        }
+        ergogenWorkerRef.current?.postMessage({
+          type: 'generate',
+          inputConfig,
+          injectionInput,
+          requestId,
+          options: { debug, svg: true },
+        });
+      });
+    };
+
+    for (const config of configs) {
+      await exportOne(config.name, config.content, mainZip);
+    }
+    if (tempConfig !== null) {
+      await exportOne('Shared (Unsaved)', tempConfig, mainZip);
+    }
+
+    const blob = await mainZip.generateAsync({ type: 'blob' });
+    saveAs(blob, `ergogen-all-configs-${new Date().toISOString().split('T')[0]}.zip`);
+    setIsExporting(false);
+  }, [configs, tempConfig, injectionInput, debug, stlPreview, parseConfig]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isJscadConverting, setIsJscadConverting] = useState(false);
+
   const ergogenWorkerRef = useRef<Worker | null>(null);
   const jscadWorkerRef = useRef<Worker | null>(null);
-
-  // Config version tracking
-  const currentConfigVersion = useRef<number>(0);
-  const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
-  const isInitialMountRef = useRef<boolean>(true);
+  const currentConfigVersion = useRef(0);
+  const isInitialMountRef = useRef(true);
+  const isPromotingRef = useRef(false);
 
   useEffect(() => {
-    console.log('--- ConfigContextProvider mounted ---');
+    ergogenWorkerRef.current = createErgogenWorker();
+    jscadWorkerRef.current = createJscadWorker();
+
+    const handleErgogenMessage = (e: MessageEvent<ErgogenWorkerResponse>) => {
+      const data = e.data;
+      if (data.type === 'success') {
+        const requestId = data.requestId;
+        const requestVersion = parseInt(requestId?.split('-')[2] || '0');
+        if (requestVersion >= currentConfigVersion.current) {
+          setResults(data.results as Results);
+          setResultsVersion((v) => v + 1);
+          setIsGenerating(false);
+        }
+      } else if (data.type === 'error') {
+        setError(data.error || 'Unknown Ergogen error');
+        setIsGenerating(false);
+      }
+    };
+
+    const handleJscadMessage = (e: MessageEvent<JscadWorkerResponse>) => {
+      const data = e.data;
+      if (data.type === 'success' && data.results) {
+        if (data.configVersion >= currentConfigVersion.current) {
+          setResults(data.results as Results);
+          setIsJscadConverting(false);
+        }
+      }
+    };
+
+    ergogenWorkerRef.current?.addEventListener('message', handleErgogenMessage);
+    jscadWorkerRef.current?.addEventListener('message', handleJscadMessage);
     return () => {
-      console.log('--- ConfigContextProvider unmounted ---');
+      ergogenWorkerRef.current?.terminate();
+      jscadWorkerRef.current?.terminate();
     };
   }, []);
 
-  /**
-   * Effect to set error from hash fragment decoding if present.
-   * This handles errors from initial page load with invalid shared configurations.
-   */
   useEffect(() => {
-    if (hashError) {
-      setError(hashError);
-    }
-  }, [hashError]); // setError is stable from useState, doesn't need to be in deps
-
-  const clearError = useCallback(() => setError(null), []);
-  const clearWarning = useCallback(() => setDeprecationWarning(null), []);
-
-  /**
-   * Handler for messages received from the Ergogen worker.
-   * Processes success, error, and warning responses from the worker.
-   */
-  const handleErgogenWorkerMessage = useCallback(
-    (event: MessageEvent<ErgogenWorkerResponse>) => {
-      const response = event.data;
-      console.log('<<< Received message from Ergogen worker:', response.type);
-
-      if (response.type === 'error') {
-        console.error('--- Ergogen worker error:', response.error);
-        setError(response.error);
-        setIsGenerating(false);
-        setIsJscadConverting(false);
-        return;
-      }
-
-      if (response.type === 'success') {
-        console.log('--- Ergogen worker success, processing results...');
-
-        // Handle warnings
-        if (response.warnings && response.warnings.length > 0) {
-          setDeprecationWarning(
-            (prev) => (prev ? prev + '\n' : '') + response.warnings.join('\n')
-          );
-        }
-
-        // Set results and trigger STL conversion if needed
-        if (response.results) {
-          const newResults = response.results as Results;
-          let willConvertStl = false;
-
-          if (
-            stlPreview &&
-            newResults.cases &&
-            Object.keys(newResults.cases).length > 0
-          ) {
-            // Mark STL as pending for all cases that have JSCAD
-            for (const name of Object.keys(newResults.cases)) {
-              const caseObj = newResults.cases[name];
-              if (caseObj?.jscad) {
-                newResults.cases[name].stl = undefined;
-              }
-            }
-
-            if (jscadWorkerRef.current) {
-              willConvertStl = true;
-              setIsJscadConverting(true);
-              console.log(
-                '>>> Sending full results to JSCAD worker for STL conversion'
-              );
-              const request: JscadWorkerRequest = {
-                type: 'batch_jscad_to_stl',
-                results: newResults as ResultsLike,
-                configVersion: currentConfigVersion.current,
-              };
-              jscadWorkerRef.current.postMessage(request);
-            }
-          }
-
-          setResults(newResults);
-          setResultsVersion((v) => v + 1);
-
-          // Only clear isGenerating if we're not waiting for STL conversion
-          if (!willConvertStl) {
-            setIsGenerating(false);
-          }
-        } else {
-          setIsGenerating(false);
-        }
-      } else {
-        setIsGenerating(false);
-      }
-    },
-    [stlPreview]
-  );
-
-  /**
-   * Handler for messages received from the JSCAD worker.
-   */
-  const handleJscadWorkerMessage = useCallback(
-    (event: MessageEvent<JscadWorkerResponse>) => {
-      const response = event.data;
-      console.log('<<< Received message from JSCAD worker:', response.type);
-
-      if (response.configVersion !== currentConfigVersion.current) {
-        console.log(
-          `Discarding stale STL result for version ${response.configVersion} (current: ${currentConfigVersion.current})`
-        );
-        return;
-      }
-
-      if (response.type === 'error') {
-        console.error('--- JSCAD worker error:', response.error);
-        setIsJscadConverting(false);
-        setIsGenerating(false);
-      } else if (response.type === 'success' && response.results) {
-        console.log('--- JSCAD worker success, applying updated results');
-
-        setResults(response.results as Results);
-        setResultsVersion((v) => v + 1);
-        setIsJscadConverting(false);
-        setIsGenerating(false);
-      }
-    },
-    []
-  );
-
-  /**
-   * Effect to initialize and terminate workers.
-   */
-  useEffect(() => {
-    if (!ergogenWorkerRef.current) {
-      console.log('Initializing Ergogen worker...');
-      ergogenWorkerRef.current = createErgogenWorker();
-      if (ergogenWorkerRef.current) {
-        ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
-        console.log('Ergogen worker initialized.');
-      } else {
-        console.warn('Failed to initialize Ergogen worker.');
+    if (stlPreview && results?.cases && !isGenerating && !isJscadConverting) {
+      if (Object.values(results.cases).some(c => c.jscad && !c.stl)) {
+        setIsJscadConverting(true);
+        jscadWorkerRef.current?.postMessage({
+          type: 'batch_jscad_to_stl',
+          results,
+          configVersion: currentConfigVersion.current,
+        });
       }
     }
+  }, [results, stlPreview, isGenerating, isJscadConverting]);
 
-    if (!jscadWorkerRef.current) {
-      console.log('Initializing JSCAD worker...');
-      jscadWorkerRef.current = createJscadWorker();
-      if (jscadWorkerRef.current) {
-        jscadWorkerRef.current.onmessage = handleJscadWorkerMessage;
-        console.log('JSCAD worker initialized.');
-      } else {
-        console.warn('Failed to initialize JSCAD worker.');
-      }
-    }
-
-    return () => {
-      if (ergogenWorkerRef.current) {
-        ergogenWorkerRef.current.terminate();
-        ergogenWorkerRef.current = null;
-        console.log('Ergogen worker terminated.');
-      }
-      if (jscadWorkerRef.current) {
-        jscadWorkerRef.current.terminate();
-        jscadWorkerRef.current = null;
-        console.log('JSCAD worker terminated.');
-      }
-    };
-  }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
-
-  /**
-   * Effect to save user settings to local storage whenever they change.
-   */
   useEffect(() => {
-    localStorage.setItem('ergogen:config:debug', JSON.stringify(debug));
-    localStorage.setItem('ergogen:config:autoGen', JSON.stringify(autoGen));
-    localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
-    localStorage.setItem(
-      'ergogen:config:kicanvasPreview',
-      JSON.stringify(kicanvasPreview)
-    );
-    localStorage.setItem(
-      'ergogen:config:stlPreview',
-      JSON.stringify(stlPreview)
-    );
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
-
-  /**
-   * Effect to track settings loaded and changes.
-   * Tracks settings_loaded every time settings are available (including on mount and remounts).
-   * Tracks setting_changed when settings actually change (not on initial mount).
-   */
-  useEffect(() => {
-    // Track settings_loaded every time settings are available
-    trackEvent('settings_loaded', {
-      debug,
-      autoGen,
-      autoGen3D,
-      kicanvasPreview,
-      stlPreview,
-    });
-
-    // Track setting_changed only when settings actually change (not on initial mount)
     if (isInitialMountRef.current) {
+      trackEvent('settings_loaded', { debug, autoGen, autoGen3D, kicanvasPreview, stlPreview });
       isInitialMountRef.current = false;
     } else {
-      trackEvent('setting_changed', {
-        debug,
-        autoGen,
-        autoGen3D,
-        kicanvasPreview,
-        stlPreview,
-      });
+      trackEvent('setting_changed', { debug, autoGen, autoGen3D, kicanvasPreview, stlPreview });
     }
   }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
 
-  /**
-   * Parses a string as either JSON or YAML.
-   * @param {string} inputString - The string to parse.
-   * @returns {[string, object | null]} A tuple containing the detected type ('json', 'yaml', or 'UNKNOWN') and the parsed object, or null if parsing fails.
-   */
-  const parseConfig = useCallback(
-    (inputString: string): [string, { [key: string]: unknown[] } | null] => {
-      let type = 'UNKNOWN';
-      let parsedConfig = null;
 
-      try {
-        parsedConfig = JSON.parse(inputString);
-        type = 'json';
-      } catch (_e: unknown) {
-        // Input is not valid JSON
-      }
 
-      try {
-        parsedConfig = yaml.load(inputString);
-        type = 'yaml';
-      } catch (_e: unknown) {
-        // Input is not valid YAML
-      }
-
-      return [type, parsedConfig];
-    },
-    []
-  );
-
-  /**
-   * The core function that runs the Ergogen generation process.
-   */
   const runGeneration = useCallback(
-    async (
-      textInput: string | undefined,
-      injectionInput: string[][] | undefined,
-      options: ProcessOptions = { pointsonly: true }
-    ) => {
-      if (!textInput) {
-        return;
-      }
-      let inputConfig: string | object = textInput ?? '';
-      const inputInjection: string[][] | undefined = injectionInput;
-      const [, parsedConfig] = parseConfig(textInput ?? '');
-
-      setError(null);
-      setDeprecationWarning(null);
-      setIsGenerating(true);
-      currentConfigVersion.current += 1; // Increment version at the start of generation
-
-      // Check for deprecated KiCad 5 footprints in the config and warn the user
-      if (parsedConfig && parsedConfig.pcbs) {
-        const pcbs = Object.values(parsedConfig.pcbs) as Record<
-          string,
-          unknown
-        >[];
-        let warningFound = false;
-        for (const pcb of pcbs) {
-          if (!pcb.template || pcb.template === 'kicad5') {
-            if (pcb.footprints) {
-              const footprints = Object.values(
-                pcb.footprints as Record<string, unknown>
-              ) as Record<string, unknown>[];
-              for (const footprint of footprints) {
-                if (
-                  footprint &&
-                  typeof footprint.what === 'string' &&
-                  footprint.what.startsWith('ceoloide')
-                ) {
-                  setDeprecationWarning(
-                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
-                  );
-                  warningFound = true;
-                  break;
-                }
-              }
-            }
-          }
-          if (warningFound) {
-            break;
-          }
-        }
-      }
-
-      // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
-      // a simplified preview.
-      // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
+    async (textInput: string | undefined, injectionInput: string[][] | undefined, options: ProcessOptions = { pointsonly: true }) => {
+      if (!textInput) return;
+      let inputConfig: any = textInput;
+      const [, parsedConfig] = parseConfig(textInput);
+      setError(null); setDeprecationWarning(null); setIsGenerating(true);
+      currentConfigVersion.current += 1;
       if (parsedConfig?.points && options?.pointsonly) {
-        inputConfig = {
-          ...parsedConfig,
-          pcbs: undefined,
-          cases: undefined,
-        };
+        inputConfig = { ...parsedConfig, pcbs: undefined, cases: undefined };
       }
-
-      try {
-        // Run the Ergogen process
-        if (ergogenWorkerRef.current) {
-          console.log('>>> Sending Ergogen process requestt...');
-          ergogenWorkerRef.current.postMessage({
-            type: 'generate',
-            inputConfig,
-            injectionInput: inputInjection,
-            requestId: `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`,
-            options: {
-              debug: debug,
-              svg: true,
-            },
-          });
-        } else {
-          console.error('Worker not available for processing request.');
-        }
-      } catch (e: unknown) {
-        setIsGenerating(false);
-        if (!e) return;
-
-        if (typeof e === 'string') {
-          setError(e);
-        }
-        if (typeof e === 'object' && e !== null) {
-          setError(e.toString());
-        }
-        return;
-      }
+      ergogenWorkerRef.current?.postMessage({
+        type: 'generate',
+        inputConfig,
+        injectionInput,
+        requestId: `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`,
+        options: { debug, svg: true },
+      });
     },
-    [parseConfig, setError, setDeprecationWarning, setIsGenerating, debug]
+    [parseConfig, debug]
   );
 
-  /**
-   * A debounced version of runGeneration for auto-generation.
-   */
-  const processInput = useMemo(
-    () => debounce(runGeneration, 300),
-    [runGeneration]
-  );
+  const processInput = useMemo(() => debounce(runGeneration, 300), [runGeneration]);
 
-  /**
-   * An immediate version for the "Generate" button that cancels any pending auto-generations.
-   */
   const generateNow = useCallback(
-    async (
-      textInput: string | undefined,
-      injectionInput: string[][] | undefined,
-      options: ProcessOptions = { pointsonly: true }
-    ) => {
+    async (textInput: string | undefined, injectionInput: string[][] | undefined, options: ProcessOptions = { pointsonly: true }) => {
       processInput.cancel();
       await runGeneration(textInput, injectionInput, options);
     },
     [processInput, runGeneration]
   );
 
-  // Memoize callbacks for the conflict resolution hook to prevent unnecessary re-renders
-  const conflictResolutionCallbacks = useMemo(
-    () => ({
-      setInjectionInput,
-      setConfigInput,
-      generateNow,
-      getCurrentInjections: () => injectionInput || [],
-      setError,
-    }),
-    [injectionInput, generateNow, setInjectionInput, setConfigInput, setError]
-  );
-
-  // Use the injection conflict resolution hook
   const {
     currentConflict,
     processInjectionsWithConflictResolution,
     handleConflictResolution,
     handleConflictCancel,
-  } = useInjectionConflictResolution(conflictResolutionCallbacks);
-
-  // Use the config loader hook
-  const { isLoading: isConfigLoading } = useConfigLoader({
-    processInjectionsWithConflictResolution,
+  } = useInjectionConflictResolution({
+    setInjectionInput, setConfigInput, generateNow,
+    getCurrentInjections: () => injectionInput || [],
     setError,
   });
 
-  /**
-   * Effect to process the input configuration on the initial load.
-   * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
-   * Note: Hash fragment loading (including injections) is handled in App.tsx by storing in localStorage.
-   * If there's a hashError, skip initial generation to prevent clearing the error.
-   */
+  const { isLoading: isConfigLoading } = useConfigLoader({ processInjectionsWithConflictResolution, setError });
+
   useEffect(() => {
-    // If there's a hash error, don't run initial generation (error will be displayed)
-    if (hashError) {
-      return;
-    }
-
-    // If we are loading from GitHub, wait for that to finish
-    if (isConfigLoading) {
-      return;
-    }
-
-    // If not loading from GitHub, and we have configInput, generate it
-    // This handles the case where we have config from localStorage or hash fragment
-    // but NOT from a GitHub URL (which is handled by useConfigLoader)
-    const queryParameters = new URLSearchParams(window.location.search);
-    const githubUrl = queryParameters.get('github');
-
-    if (!githubUrl && configInput) {
+    if (!hashError && !isConfigLoading && configInput) {
       generateNow(configInput, injectionInput, { pointsonly: false });
     }
-    // eslint-disable-next-line
   }, [isConfigLoading]);
 
-  /**
-   * Effect to process the input configuration whenever it or the auto-generation settings change.
-   * Also persists the injection input to local storage.
-   */
   useEffect(() => {
     localStorage.setItem('ergogen:injection', JSON.stringify(injectionInput));
-    if (autoGen) {
+    if (autoGen && configInput) {
       processInput(configInput, injectionInput, { pointsonly: !autoGen3D });
     }
   }, [configInput, injectionInput, autoGen, autoGen3D, processInput]);
 
-  const experiment = useMemo(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('exp');
-  }, []);
+    const contextValue = useMemo(() => ({
+    configInput, setConfigInput, configs, activeConfigId, addConfig, deleteConfig, renameConfig, duplicateConfig, switchConfig,
+    injectionInput, setInjectionInput, processInput, generateNow, error, setError, clearError, deprecationWarning, clearWarning,
+    results, resultsVersion, setResultsVersion, showSettings, setShowSettings, showSideNav, setShowSideNav, showConfig, setShowConfig,
+    showDownloads, setShowDownloads,
+    debug, setDebug: (val: any) => setDebug(val),
+    autoGen, setAutoGen: (val: any) => setAutoGen(val),
+    autoGen3D, setAutoGen3D: (val: any) => setAutoGen3D(val),
+    kicanvasPreview, setKicanvasPreview: (val: any) => setKicanvasPreview(val),
+    stlPreview, setStlPreview: (val: any) => setStlPreview(val),
+    isGenerating, setIsGenerating, isJscadConverting, exportAll, isExporting, saveActiveConfig, setTempConfig,
+    experiment: new URLSearchParams(window.location.search).get('exp')
+  }), [
+    configInput, setConfigInput, configs, activeConfigId, addConfig, deleteConfig, renameConfig, duplicateConfig, switchConfig,
+    injectionInput, setInjectionInput, processInput, generateNow, error, setError, clearError, deprecationWarning, clearWarning,
+    results, resultsVersion, setResultsVersion, showSettings, setShowSettings, showSideNav, setShowSideNav, showConfig, setShowConfig,
+    showDownloads, setShowDownloads, debug, setDebug, autoGen, setAutoGen, autoGen3D, setAutoGen3D, kicanvasPreview, setKicanvasPreview,
+    stlPreview, setStlPreview, isGenerating, setIsGenerating, isJscadConverting, exportAll, isExporting, saveActiveConfig, setTempConfig
+  ]);
 
-  const contextValue = useMemo(
-    () => ({
-      configInput,
-      setConfigInput,
-      injectionInput,
-      setInjectionInput,
-      processInput,
-      generateNow,
-      error,
-      setError,
-      clearError,
-      deprecationWarning,
-      clearWarning,
-      results,
-      resultsVersion,
-      setResultsVersion,
-      showSettings,
-      setShowSettings,
-      showSideNav,
-      setShowSideNav,
-      showConfig,
-      setShowConfig,
-      showDownloads,
-      setShowDownloads,
-      debug,
-      setDebug,
-      autoGen,
-      setAutoGen,
-      autoGen3D,
-      setAutoGen3D,
-      kicanvasPreview,
-      setKicanvasPreview,
-      stlPreview,
-      setStlPreview,
-      experiment,
-      isGenerating,
-      setIsGenerating,
-      isJscadConverting,
-    }),
-    [
-      configInput,
-      setConfigInput,
-      injectionInput,
-      setInjectionInput,
-      processInput,
-      generateNow,
-      error,
-      setError,
-      clearError,
-      deprecationWarning,
-      clearWarning,
-      results,
-      resultsVersion,
-      setResultsVersion,
-      showSettings,
-      setShowSettings,
-      showSideNav,
-      setShowSideNav,
-      showConfig,
-      setShowConfig,
-      showDownloads,
-      setShowDownloads,
-      debug,
-      setDebug,
-      autoGen,
-      setAutoGen,
-      autoGen3D,
-      setAutoGen3D,
-      kicanvasPreview,
-      setKicanvasPreview,
-      stlPreview,
-      setStlPreview,
-      experiment,
-      isGenerating,
-      setIsGenerating,
-      isJscadConverting,
-    ]
-  );
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveActiveConfig();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'n') {
+        e.preventDefault();
+        window.location.href = '/new';
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [saveActiveConfig]);
 
   return (
     <ConfigContext.Provider value={contextValue}>
@@ -779,7 +540,6 @@ const ConfigContextProvider = ({
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
         />
       )}
     </ConfigContext.Provider>
@@ -787,9 +547,4 @@ const ConfigContextProvider = ({
 };
 
 export { ConfigContextProvider };
-
-/**
- * A custom hook to easily consume the ConfigContext.
- * @returns {ContextProps | null} The context value, or null if used outside a provider.
- */
 export const useConfigContext = () => useContext(ConfigContext);
