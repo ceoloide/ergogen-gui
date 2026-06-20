@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 import { theme } from '../theme/theme';
+import { getErgogenVersionInfo } from '../utils/version';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
 import { useConfigContext } from '../context/ConfigContext';
@@ -28,6 +29,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   const isResizingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
+
+  const versionInfo = getErgogenVersionInfo();
 
   useEffect(() => {
     if (!isOpen) {
@@ -86,7 +89,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
       const name = config.name.toLowerCase();
       return searchWords.some(word => name.includes(word));
     });
-  }, [configContext?.configs, searchFilter]);
+  }, [configContext?.configs, configContext?.activeConfigId, configContext?.configInput, searchFilter]);
 
   const handleStartRename = (id: string, name: string) => {
     setEditingId(id);
@@ -111,7 +114,16 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               <LogoImage src={`${process.env.PUBLIC_URL}/ergogen.png`} alt="Logo" />
             </LogoButton>
             <AppName onClick={onClose}>Ergogen</AppName>
-            <VersionText href="https://github.com/ergogen/ergogen" target="_blank">v4.2.1</VersionText>
+            <VersionText
+              href={versionInfo.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={onClose}
+              aria-label={`View Ergogen ${versionInfo.label} on GitHub`}
+              data-testid="side-nav-version-link"
+            >
+              {versionInfo.label}
+            </VersionText>
           </LogoSection>
           <CloseButton onClick={onClose} aria-label="Close">
             <span className="material-symbols-outlined">close</span>
@@ -190,7 +202,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 
         <Footer>
           <ButtonGroup>
-<OutlineButton onClick={() => configContext?.exportAll()} disabled={configContext?.isExporting} title="Export all configurations as ZIP">
+            <OutlineButton onClick={() => configContext?.exportAll()} disabled={configContext?.isExporting} title="Export all configurations as ZIP">
               <span className="material-symbols-outlined">{configContext?.isExporting ? 'sync' : 'download_for_offline'}</span>
               <span>{configContext?.isExporting ? 'Exporting...' : 'Export All'}</span>
             </OutlineButton>
@@ -257,7 +269,6 @@ const ConfigItem = styled.div<{ $isActive: boolean }>`
   display: flex; align-items: center; justify-content: space-between;
   &:hover { background: ${theme.colors.backgroundLighter}; }
 `;
-
 
 const UnsavedBadge = styled.span`
   background: ${theme.colors.warningDark};

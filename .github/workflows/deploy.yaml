@@ -36,13 +36,22 @@ jobs:
         with:
           node-version: "20"
           cache: yarn
+      - name: Configure Git to use HTTPS for GitHub
+        run: |
+          git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
+          git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+          git config --global --add url."https://github.com/".insteadOf "git+ssh://git@github.com/"
+          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
       - name: Yarn install
         run: yarn install --frozen-lockfile
+        env:
+          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Yarn build
         run: yarn build
         env:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Create 404.html for SPA routing
         run: cp ./build/index.html ./build/404.html
       - name: Conditionally create CNAME
