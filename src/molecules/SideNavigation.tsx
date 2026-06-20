@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
-import { formatErgogenVersion } from '../utils/version';
+import { getErgogenVersionInfo } from '../utils/version';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
 
@@ -127,8 +127,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     };
   }, [isOpen, onClose]);
 
-  const ergogenVersion = useMemo(
-    () => formatErgogenVersion(process.env.REACT_APP_ERGOGEN_VERSION),
+  const versionInfo = useMemo(
+    () => getErgogenVersionInfo(process.env.REACT_APP_ERGOGEN_VERSION),
     []
   );
 
@@ -180,14 +180,14 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             </LogoButton>
             <AppName onClick={onClose}>Ergogen</AppName>
             <VersionText
-              href="https://github.com/ergogen/ergogen"
+              href={versionInfo.url}
               target="_blank"
               rel="noreferrer"
               onClick={onClose}
-              aria-label={`View Ergogen ${ergogenVersion} on GitHub`}
+              aria-label={`View Ergogen ${versionInfo.label} on GitHub`}
               data-testid="side-nav-version-link"
             >
-              {ergogenVersion}
+              {versionInfo.label}
             </VersionText>
           </LogoSection>
           <CloseButton

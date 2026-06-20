@@ -1,31 +1,51 @@
+export interface VersionInfo {
+  label: string;
+  url: string;
+}
+
 /**
- * Formats the Ergogen version string for display in the UI.
+ * Gets the Ergogen version label and GitHub URL for display in the UI.
  *
  * @param version The version string from the environment variable.
- * @returns A formatted version string.
+ * @returns An object containing the formatted label and the corresponding URL.
  */
-export const formatErgogenVersion = (version?: string): string => {
+export const getErgogenVersionInfo = (version?: string): VersionInfo => {
+  const defaultVersion = 'v4.2.1';
+  const defaultUrl = 'https://github.com/ergogen/ergogen';
+
   if (!version) {
-    return 'v4.2.1';
+    return { label: defaultVersion, url: defaultUrl };
   }
 
-  // Handle "latest" for the main repository
-  if (version === 'ergogen/ergogen' || version === 'github:ergogen/ergogen') {
-    return 'latest';
+  // Handle NPM version (e.g., ergogen@4.2.0)
+  if (version.includes('@')) {
+    return {
+      label: version,
+      url: version.startsWith('ergogen@')
+        ? `${defaultUrl}/releases/tag/v${version.split('@')[1]}`
+        : `https://www.npmjs.com/package/${version.split('@')[0]}`
+    };
   }
 
-  // Extract branch or tag from "user/repo#branch" or "github:user/repo#branch"
-  const parts = version.split('#');
-  if (parts.length > 1) {
-    return parts[1];
+  // Remove "github:" prefix if present for uniform processing
+  const cleanVersion = version.startsWith('github:') ? version.slice(7) : version;
+
+  // Split into repo and branch
+  const [repo, branch] = cleanVersion.split('#');
+  const isOfficial = repo === 'ergogen/ergogen';
+  const baseUrl = `https://github.com/${repo}`;
+
+  if (isOfficial) {
+    if (!branch) {
+      return { label: 'latest', url: baseUrl };
+    }
+    // For official repo, only show the branch/tag
+    return { label: branch, url: `${baseUrl}/tree/${branch}` };
   }
 
-  // Extract repo name if no branch is specified (e.g., "user/repo")
-  const repoParts = parts[0].split('/');
-  if (repoParts.length > 1) {
-    return repoParts[1];
-  }
-
-  // Return the version as is (e.g., "ergogen@4.2.0")
-  return version;
+  // For custom repos, show the full clean version string (e.g., user/repo or user/repo#branch)
+  return {
+    label: cleanVersion,
+    url: branch ? `${baseUrl}/tree/${branch}` : baseUrl
+  };
 };
