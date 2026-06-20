@@ -241,7 +241,7 @@ To use a custom version locally, set the `ERGOGEN_VERSION` variable before runni
 ERGOGEN_VERSION=ergogen@4.2.0 yarn install
 
 # Using a GitHub branch
-ERGOGEN_VERSION=mrzealot/ergogen#develop yarn install
+ERGOGEN_VERSION=github:mrzealot/ergogen#develop yarn install
 
 # After installation, start as usual
 yarn start
@@ -255,7 +255,7 @@ To use a custom Ergogen version for your GitHub Pages deployment:
 2. Navigate to **Settings** > **Secrets and variables** > **Actions**.
 3. Select the **Variables** tab and click **New repository variable**.
 4. For the **Name**, enter `ERGOGEN_VERSION`.
-5. For the **Value**, enter your desired version (e.g., `ergogen@4.2.0` or `username/ergogen#branch`).
+5. For the **Value**, enter your desired version (e.g., `ergogen@4.2.0` or `github:username/ergogen#branch`).
 6. Re-run your deployment workflow.
 
 The deployment workflow will automatically pick up this variable and use it during the build process.
