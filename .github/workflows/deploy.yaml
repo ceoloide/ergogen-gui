@@ -38,11 +38,14 @@ jobs:
           cache: yarn
       - name: Yarn install
         run: yarn install --frozen-lockfile
+        env:
+          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Yarn build
         run: yarn build
         env:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Create 404.html for SPA routing
         run: cp ./build/index.html ./build/404.html
       - name: Conditionally create CNAME

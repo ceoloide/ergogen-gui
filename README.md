@@ -228,22 +228,48 @@ The codebase is organized into the following main directories:
   - `utils/`: Utility functions, such as for fetching data from GitHub.
 - `patch/`: Contains scripts and patches for customizing the `ergogen` dependency.
 
-## Using a Custom Ergogen Branch
+## Using a Custom Ergogen Version or Branch
 
-To test this GUI with a specific branch of Ergogen from GitHub:
+By default, the GUI uses the Ergogen version specified in `package.json`. You can override this at build or deploy time using the `ERGOGEN_VERSION` environment variable. This is useful for testing specific versions, branches, or forks without modifying the source code.
 
-1. Open the `package.json` file.
-2. Find the `dependencies` section and modify the `ergogen` entry to point to your desired branch using the format `<username>/<repo>#<branch>`:
+### Local Development
 
+To use a custom version locally, set the `ERGOGEN_VERSION` variable before running the install or build commands:
+
+```shell
+# Using a specific npm version
+ERGOGEN_VERSION=ergogen@4.2.0 yarn install
+
+# Using a GitHub branch
+ERGOGEN_VERSION=mrzealot/ergogen#develop yarn install
+
+# After installation, start as usual
+yarn start
+```
+
+### GitHub Pages Deployment
+
+To use a custom Ergogen version for your GitHub Pages deployment:
+
+1. Go to your repository on GitHub.
+2. Navigate to **Settings** > **Secrets and variables** > **Actions**.
+3. Select the **Variables** tab and click **New repository variable**.
+4. For the **Name**, enter `ERGOGEN_VERSION`.
+5. For the **Value**, enter your desired version (e.g., `ergogen@4.2.0` or `username/ergogen#branch`).
+6. Re-run your deployment workflow.
+
+The deployment workflow will automatically pick up this variable and use it during the build process.
+
+### Manual Override in package.json
+
+Alternatively, you can still manually modify `package.json`:
+
+1. Open `package.json`.
+2. Update the `ergogen` dependency:
    ```json
    "ergogen": "ergogen/ergogen#develop",
    ```
-
-3. Re-install dependencies and start the application:
-
-   ```shell
-   yarn install && yarn start
-   ```
+3. Run `yarn install && yarn start`.
 
 ## Contributing
 
