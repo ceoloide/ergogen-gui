@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
+import { formatErgogenVersion } from '../utils/version';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
 
@@ -126,6 +127,11 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     };
   }, [isOpen, onClose]);
 
+  const ergogenVersion = useMemo(
+    () => formatErgogenVersion(process.env.REACT_APP_ERGOGEN_VERSION),
+    []
+  );
+
   // Prevent body scroll when panel is open
   useEffect(() => {
     if (isOpen) {
@@ -178,10 +184,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               target="_blank"
               rel="noreferrer"
               onClick={onClose}
-              aria-label="View Ergogen v4.2.1 on GitHub"
+              aria-label={`View Ergogen ${ergogenVersion} on GitHub`}
               data-testid="side-nav-version-link"
             >
-              v4.2.1
+              {ergogenVersion}
             </VersionText>
           </LogoSection>
           <CloseButton

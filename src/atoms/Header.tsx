@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
+import { formatErgogenVersion } from '../utils/version';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
 import { createShareableUri } from '../utils/share';
@@ -230,6 +231,11 @@ const Header = (): JSX.Element => {
     configContext?.setShowSideNav(!configContext?.showSideNav);
   };
 
+  const ergogenVersion = useMemo(
+    () => formatErgogenVersion(process.env.REACT_APP_ERGOGEN_VERSION),
+    []
+  );
+
   return (
     <>
       {showShareDialog && (
@@ -268,10 +274,10 @@ const Header = (): JSX.Element => {
               href="https://github.com/ergogen/ergogen"
               target="_blank"
               rel="noreferrer"
-              aria-label="View Ergogen v4.2.1 on GitHub"
+              aria-label={`View Ergogen ${ergogenVersion} on GitHub`}
               data-testid="version-link"
             >
-              v4.2.1
+              {ergogenVersion}
             </VersionText>
           </ErgogenLogo>
         </LeftContainer>
