@@ -230,7 +230,7 @@ The codebase is organized into the following main directories:
 
 ## Using a Custom Ergogen Version or Branch
 
-By default, the GUI uses the Ergogen version specified in `package.json`. You can override this at build or deploy time using the `ERGOGEN_VERSION` environment variable. This is useful for testing specific versions, branches, or forks without modifying the source code.
+By default, the GUI uses the Ergogen version specified in `package.json`. You can override this at build or deploy time using the `ERGOGEN_VERSION` environment variable. This is useful for testing specific versions, branches, or forks without modifying the source code. The active version will be displayed in the application header and side navigation.
 
 ### Local Development
 
