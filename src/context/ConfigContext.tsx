@@ -20,6 +20,7 @@ import {
 import { trackEvent } from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
+import { ConflictResolutionStrategy } from "../utils/injections";
 import { useConfigLoader } from '../hooks/useConfigLoader';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
 import type {
@@ -138,6 +139,12 @@ type ContextProps = {
     textInput: string | undefined,
     injectionInput: string[][] | undefined,
     options?: ProcessOptions
+  ) => Promise<void>;
+  processInjectionsWithConflictResolution: (
+    newInjections: string[][],
+    config: string,
+    resolution?: ConflictResolutionStrategy | null,
+    currentInjections?: string[][]
   ) => Promise<void>;
   error: string | null;
   setError: Dispatch<SetStateAction<string | null>>;
@@ -698,6 +705,7 @@ const ConfigContextProvider = ({
       injectionInput,
       setInjectionInput,
       processInput,
+      processInjectionsWithConflictResolution,
       generateNow,
       error,
       setError,
@@ -736,6 +744,7 @@ const ConfigContextProvider = ({
       injectionInput,
       setInjectionInput,
       processInput,
+      processInjectionsWithConflictResolution,
       generateNow,
       error,
       setError,

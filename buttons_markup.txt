@@ -1,0 +1,41 @@
+      <ActionsContainer>
+        <GrowButton
+          onClick={handleNewFootprint}
+          data-testid="add-footprint"
+          aria-label="Add new custom footprint"
+        >
+          <span className="material-symbols-outlined">add</span>
+        </GrowButton>
+        <IconButton
+          onClick={() => fileInputRef.current?.click()}
+          data-testid="load-footprint-files"
+          aria-label="Load custom footprint files"
+          title="Load footprint files"
+        >
+          <span className="material-symbols-outlined">upload_file</span>
+        </IconButton>
+        <IconButton
+          onClick={() => folderInputRef.current?.click()}
+          data-testid="load-footprint-folder"
+          aria-label="Load custom footprint folder"
+          title="Load footprint folder"
+        >
+          <span className="material-symbols-outlined">folder_open</span>
+        </IconButton>
+      </ActionsContainer>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleLoadFiles}
+        accept=".js"
+        multiple
+        style={{ display: 'none' }}
+      />
+      <input
+        type="file"
+        ref={folderInputRef}
+        onChange={handleLoadFolder}
+        accept=".js"
+        style={{ display: 'none' }}
+        {...{ webkitdirectory: '', directory: '' } as any}
+      />

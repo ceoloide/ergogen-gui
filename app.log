@@ -1,0 +1,48 @@
+yarn run v1.22.22
+$ yarn run generate-previews
+$ ts-node --project scripts/tsconfig.json scripts/generate-previews.js
+Generating preview for Absolem...
+  -> Saved to /app/public/images/previews/absolem.svg
+Generating preview for Atreus...
+  -> Saved to /app/public/images/previews/atreus.svg
+Generating preview for A. Dux...
+  -> Saved to /app/public/images/previews/a._dux.svg
+Generating preview for Corney Island...
+  -> Saved to /app/public/images/previews/corney_island.svg
+Generating preview for Sweep-like...
+  -> Saved to /app/public/images/previews/sweep-like.svg
+Generating preview for Reviung41...
+  -> Saved to /app/public/images/previews/reviung41.svg
+Generating preview for Tiny20...
+  -> Saved to /app/public/images/previews/tiny20.svg
+Generating preview for Wubbo...
+  -> Saved to /app/public/images/previews/wubbo.svg
+Generating preview for Alpha...
+  -> Saved to /app/public/images/previews/alpha.svg
+Generating preview for Plank...
+  -> Saved to /app/public/images/previews/plank.svg
+Generated previews:
+a._dux.svg
+absolem.svg
+alpha.svg
+atreus.svg
+corney_island.svg
+plank.svg
+reviung41.svg
+sweep-like.svg
+tiny20.svg
+wubbo.svg
+$ REACT_APP_ERGOGEN_VERSION=$ERGOGEN_VERSION react-scripts --openssl-legacy-provider start
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Cannot find module 'ajv/dist/compile/codegen'
+Require stack:
+- /app/node_modules/ajv-keywords/dist/definitions/typeof.js
+- /app/node_modules/ajv-keywords/dist/keywords/typeof.js
+- /app/node_modules/ajv-keywords/dist/keywords/index.js
+- /app/node_modules/ajv-keywords/dist/index.js
+- /app/node_modules/schema-utils/dist/validate.js
+- /app/node_modules/schema-utils/dist/index.js
+- /app/node_modules/webpack-dev-server/lib/Server.js
+- /app/node_modules/react-scripts/scripts/start.js
+error Command failed with exit code 1.
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.

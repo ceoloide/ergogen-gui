@@ -2,8 +2,20 @@ import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction, useRef } from "react";
 import GrowButton from '../atoms/GrowButton';
+
+const ActionsContainer = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+`;
+
+const IconButton = styled(GrowButton)`
+  flex-grow: 0;
+  width: 34px;
+  padding: 0;
+`;
 
 /**
  * A styled container for the injections list.
@@ -54,6 +66,8 @@ const Injections = ({
 }: Props) => {
   const footprints: InjectionArr = [];
   const templates: InjectionArr = [];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
   if (!configContext) return null;
 
@@ -99,6 +113,58 @@ const Injections = ({
     }
   };
 
+  const handleLoadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newInjections: string[][] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.name.endsWith('.js')) {
+        const content = await file.text();
+        const name = file.name.replace(/\.js$/, '');
+        newInjections.push(['footprint', name, content]);
+      }
+    }
+
+    if (newInjections.length > 0 && configContext.processInjectionsWithConflictResolution) {
+      await configContext.processInjectionsWithConflictResolution(
+        newInjections,
+        configContext.configInput || ''
+      );
+    }
+    // Reset input
+    event.target.value = '';
+  };
+
+  const handleLoadFolder = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newInjections: string[][] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.name.endsWith('.js')) {
+        const content = await file.text();
+        // webkitRelativePath looks like "foldername/subfolder/file.js"
+        // The requirement is to exclude the selected folder name itself.
+        const pathParts = file.webkitRelativePath.split('/');
+        pathParts.shift(); // Remove the top-level folder
+        const name = pathParts.join('/').replace(/\.js$/, '');
+        newInjections.push(['footprint', name, content]);
+      }
+    }
+
+    if (newInjections.length > 0 && configContext.processInjectionsWithConflictResolution) {
+      await configContext.processInjectionsWithConflictResolution(
+        newInjections,
+        configContext.configInput || ''
+      );
+    }
+    // Reset input
+    event.target.value = '';
+  };
+
   return (
     <InjectionsContainer data-testid={dataTestId}>
       <Title>Custom Footprints</Title>
@@ -128,13 +194,48 @@ const Injections = ({
           }
         )
       } */}
-      <GrowButton
-        onClick={handleNewFootprint}
-        data-testid="add-footprint"
-        aria-label="Add new custom footprint"
-      >
-        <span className="material-symbols-outlined">add</span>
-      </GrowButton>
+
+      <ActionsContainer>
+        <GrowButton
+          onClick={handleNewFootprint}
+          data-testid="add-footprint"
+          aria-label="Add new custom footprint"
+        >
+          <span className="material-symbols-outlined">add</span>
+        </GrowButton>
+        <IconButton
+          onClick={() => fileInputRef.current?.click()}
+          data-testid="load-footprint-files"
+          aria-label="Load custom footprint files"
+          title="Load footprint files"
+        >
+          <span className="material-symbols-outlined">upload_file</span>
+        </IconButton>
+        <IconButton
+          onClick={() => folderInputRef.current?.click()}
+          data-testid="load-footprint-folder"
+          aria-label="Load custom footprint folder"
+          title="Load footprint folder"
+        >
+          <span className="material-symbols-outlined">folder_open</span>
+        </IconButton>
+      </ActionsContainer>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleLoadFiles}
+        accept=".js"
+        multiple
+        style={{ display: 'none' }}
+      />
+      <input
+        type="file"
+        ref={folderInputRef}
+        onChange={handleLoadFolder}
+        accept=".js"
+        style={{ display: 'none' }}
+        {...({ webkitdirectory: '', directory: '' } as any)}
+      />
     </InjectionsContainer>
   );
 };

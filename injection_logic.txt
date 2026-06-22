@@ -1,0 +1,51 @@
+  const handleLoadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newInjections: string[][] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.name.endsWith('.js')) {
+        const content = await file.text();
+        const name = file.name.replace(/\.js$/, '');
+        newInjections.push(['footprint', name, content]);
+      }
+    }
+
+    if (newInjections.length > 0 && configContext.processInjectionsWithConflictResolution) {
+      await configContext.processInjectionsWithConflictResolution(
+        newInjections,
+        configContext.configInput || ''
+      );
+    }
+    // Reset input
+    event.target.value = '';
+  };
+
+  const handleLoadFolder = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newInjections: string[][] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.name.endsWith('.js')) {
+        const content = await file.text();
+        // webkitRelativePath looks like "foldername/subfolder/file.js"
+        // The requirement is to exclude the selected folder name itself.
+        const pathParts = file.webkitRelativePath.split('/');
+        pathParts.shift(); // Remove the top-level folder
+        const name = pathParts.join('/').replace(/\.js$/, '');
+        newInjections.push(['footprint', name, content]);
+      }
+    }
+
+    if (newInjections.length > 0 && configContext.processInjectionsWithConflictResolution) {
+      await configContext.processInjectionsWithConflictResolution(
+        newInjections,
+        configContext.configInput || ''
+      );
+    }
+    // Reset input
+    event.target.value = '';
+  };
