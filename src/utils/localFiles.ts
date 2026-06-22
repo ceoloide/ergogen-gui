@@ -1,12 +1,13 @@
 import JSZip from 'jszip';
-import { GitHubFootprint } from './github';
+import { GitHubInjection } from './github';
 
 /**
  * Result of loading a local file.
  */
 type LocalFileLoadResult = {
   config: string;
-  footprints: GitHubFootprint[];
+  footprints: GitHubInjection[];
+  outlines: GitHubInjection[];
 };
 
 /**
@@ -44,6 +45,20 @@ const extractFootprintName = (path: string): string => {
 };
 
 /**
+ * Extracts outline name from a file path within the outlines folder.
+ * Removes the 'outlines/' prefix and the '.js' extension.
+ * @param path - The full path within the zip (e.g., 'outlines/my_outline.js').
+ * @returns The outline name (e.g., 'my_outline').
+ */
+const extractOutlineName = (path: string): string => {
+  // Remove 'outlines/' prefix
+  let name = path.replace(/^outlines\//, '');
+  // Remove '.js' extension
+  name = name.replace(/\.js$/, '');
+  return name;
+};
+
+/**
  * Loads a zip or ekb archive and extracts config.yaml and footprints.
  * @param file - The zip/ekb file to load.
  * @returns A promise that resolves with the config and footprints.
@@ -68,7 +83,7 @@ const loadZipArchive = async (file: File): Promise<LocalFileLoadResult> => {
   const config = await configFile.async('string');
 
   // Extract footprints from the footprints folder
-  const footprints: GitHubFootprint[] = [];
+  const footprints: GitHubInjection[] = [];
   const footprintsPromises: Promise<void>[] = [];
 
   zip.forEach((relativePath, file) => {
@@ -89,7 +104,29 @@ const loadZipArchive = async (file: File): Promise<LocalFileLoadResult> => {
   // Wait for all footprint files to be read
   await Promise.all(footprintsPromises);
 
-  return { config, footprints };
+  // Extract outlines from the outlines folder
+  const outlines: GitHubInjection[] = [];
+  const outlinesPromises: Promise<void>[] = [];
+
+  zip.forEach((relativePath, file) => {
+    // Check if the file is a .js file within the outlines folder
+    if (
+      relativePath.startsWith('outlines/') &&
+      relativePath.endsWith('.js') &&
+      !file.dir
+    ) {
+      const promise = file.async('string').then((content) => {
+        const name = extractOutlineName(relativePath);
+        outlines.push({ name, content });
+      });
+      outlinesPromises.push(promise);
+    }
+  });
+
+  // Wait for all outline files to be read
+  await Promise.all(outlinesPromises);
+
+  return { config, footprints, outlines };
 };
 
 /**
@@ -107,7 +144,7 @@ export const loadLocalFile = async (
   if (extension === 'yaml' || extension === 'yml' || extension === 'json') {
     // Load as text file
     const config = await loadTextFile(file);
-    return { config, footprints: [] };
+    return { config, footprints: [], outlines: [] };
   } else if (extension === 'zip' || extension === 'ekb') {
     // Load as zip archive
     return await loadZipArchive(file);

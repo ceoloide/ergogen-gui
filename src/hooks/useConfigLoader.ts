@@ -21,11 +21,6 @@ export const useConfigLoader = ({
       const queryParameters = new URLSearchParams(window.location.search);
       const githubUrl = queryParameters.get('github');
 
-      // Check for hash error (passed via props or context usually, but here we check URL hash if needed,
-      // though typically hash parsing happens before this hook runs in the main App)
-      // For this hook, we'll assume hash handling is done elsewhere or we can add it if needed.
-      // The original code had `hashError` prop. We might need to pass it in if we want to respect it.
-
       if (githubUrl) {
         setIsLoading(true);
         console.log('[useConfigLoader] Loading from URL parameter:', githubUrl);
@@ -35,6 +30,7 @@ export const useConfigLoader = ({
           console.log('[useConfigLoader] Fetch result:', {
             configLength: result.config.length,
             footprintsCount: result.footprints.length,
+            outlinesCount: result.outlines.length,
             configPath: result.configPath,
             rateLimitWarning: result.rateLimitWarning,
           });
@@ -44,12 +40,19 @@ export const useConfigLoader = ({
             setError(result.rateLimitWarning);
           }
 
-          // Convert footprints to injection array format
-          const newInjections: string[][] = result.footprints.map((fp) => [
-            'footprint',
-            fp.name,
-            fp.content,
-          ]);
+          // Convert footprints and outlines to injection array format
+          const newInjections: string[][] = [
+            ...result.footprints.map((fp) => [
+              'footprint',
+              fp.name,
+              fp.content,
+            ]),
+            ...result.outlines.map((ol) => [
+              'outline',
+              ol.name,
+              ol.content,
+            ]),
+          ];
 
           // Process injections with conflict resolution
           await processInjectionsWithConflictResolution(

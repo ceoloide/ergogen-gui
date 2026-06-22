@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
-import { exampleOptions, ConfigOption } from '../examples';
-import EmptyYAML from '../examples/empty_yaml';
-import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
+import {
+  exampleOptions,
+  ConfigOption,
+} from '../examples';
+import { fetchConfigFromUrl, GitHubInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
 import Button from '../atoms/Button';
@@ -18,110 +20,104 @@ const WelcomePageWrapper = styled.div<{ $isDragging?: boolean }>`
   background-color: ${theme.colors.background};
   color: ${theme.colors.white};
   flex-grow: 1;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow-y: auto;
+  min-height: 100vh;
   position: relative;
-  transition: border-color 0.2s ease;
+`;
 
-  ${(props) =>
-    props.$isDragging &&
-    `
-    border: 3px dashed ${theme.colors.accent};
-    border-radius: 8px;
-  `}
+const WelcomeContainer = styled.div`
+  max-width: 1000px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 `;
 
 const DropOverlay = styled.div<{ $isVisible: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
   display: ${(props) => (props.$isVisible ? 'flex' : 'none')};
-  align-items: center;
   justify-content: center;
-  z-index: 999;
+  align-items: center;
+  z-index: 1000;
   pointer-events: none;
+  border: 4px dashed ${theme.colors.accent};
 `;
 
 const DropMessage = styled.div`
-  background-color: ${theme.colors.backgroundLight};
-  border: 3px dashed ${theme.colors.accent};
-  border-radius: 8px;
-  padding: 2rem;
-  font-size: ${theme.fontSizes.h3};
-  color: ${theme.colors.text};
-  text-align: center;
-`;
-
-const WelcomeContainer = styled.div`
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
-
-  @media (max-width: 640px) {
-    padding: 1rem 0.5rem;
-  }
+  font-size: 2rem;
+  font-weight: bold;
+  color: ${theme.colors.white};
+  background-color: ${theme.colors.background};
+  padding: 2rem 4rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 `;
 
 const Header = styled.h1`
-  font-size: ${theme.fontSizes.h1};
+  font-size: 3.5rem;
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  color: ${theme.colors.white};
+
+  @media (max-width: 640px) {
+    font-size: 2.5rem;
+  }
 `;
 
 const SubHeader = styled.p`
-  font-size: ${theme.fontSizes.lg};
+  font-size: 1.2rem;
   text-align: center;
-  margin-bottom: 3rem;
-  color: ${theme.colors.textDark};
+  color: ${theme.colors.white}aa;
+  margin-bottom: 2rem;
+  line-height: 1.6;
 `;
 
 const OptionsContainer = styled.div`
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 2rem;
   margin-bottom: 3rem;
-  justify-content: center;
-  flex-wrap: wrap;
-
-  @media (max-width: 900px) {
-    flex-direction: column;
-    gap: 1.5rem;
-  }
 `;
 
 const OptionBox = styled.div`
   background-color: ${theme.colors.backgroundLight};
   padding: 2rem;
-  border-radius: 8px;
-  border: 1px solid ${theme.colors.border};
-  flex: 1;
-  min-width: 0;
+  border-radius: 1rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  gap: 1.5rem;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  border: 1px solid ${theme.colors.backgroundLight};
 
-  @media (max-width: 900px) {
-    width: 100%;
-    padding: 1.5rem 1rem;
-  }
-
-  @media (min-width: 901px) {
-    max-width: 350px;
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    border-color: ${theme.colors.accent}44;
   }
 
   h2 {
-    margin-top: 0;
-    margin-bottom: 1rem;
+    margin: 0;
+    font-size: 1.5rem;
+    color: ${theme.colors.accent};
   }
 
   p {
-    color: ${theme.colors.textDarker};
-    margin-bottom: 1.5rem;
+    margin: 0;
+    color: ${theme.colors.white}cc;
+    font-size: 0.95rem;
+    line-height: 1.5;
     flex-grow: 1;
   }
 `;
@@ -129,39 +125,21 @@ const OptionBox = styled.div`
 const GitHubInputContainer = styled.div`
   display: flex;
   gap: 0.5rem;
-  width: 100%;
-  min-width: 0;
-
-  button {
-    flex-shrink: 0;
-  }
 `;
 
 const GitHubInput = styled.input`
-  flex: 1;
-  min-width: 0;
-  background-color: ${theme.colors.backgroundLighter};
-  border: 1px solid ${theme.colors.border};
-  border-radius: 6px;
-  padding: 0.75rem 1rem;
-  color: ${theme.colors.text};
-  font-family: ${theme.fonts.body};
-  font-size: ${theme.fontSizes.base};
-  outline: none;
-  transition: border-color 0.15s ease-in-out;
+  flex-grow: 1;
+  background-color: ${theme.colors.background};
+  border: 1px solid ${theme.colors.backgroundLight};
+  border-radius: 4px;
+  padding: 0.75rem;
+  color: ${theme.colors.white};
+  font-family: ${theme.fonts.code};
+  font-size: 0.9rem;
 
   &:focus {
-    border-color: ${theme.colors.accent};
-  }
-
-  &::selection {
-    background-color: ${theme.colors.accent};
-    color: ${theme.colors.white};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    outline: 2px solid ${theme.colors.accent};
+    border-color: transparent;
   }
 `;
 
@@ -171,54 +149,74 @@ const HiddenFileInput = styled.input`
 
 const ExamplesGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1.5rem;
+  margin-bottom: 4rem;
 `;
 
 const ExampleCard = styled.div`
   background-color: ${theme.colors.backgroundLight};
-  border-radius: 8px;
-  border: 1px solid ${theme.colors.border};
+  border-radius: 0.75rem;
+  overflow: hidden;
   cursor: pointer;
   transition:
     transform 0.2s,
     box-shadow 0.2s;
-  overflow: hidden;
+  border: 1px solid transparent;
 
   &:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    border-color: ${theme.colors.accent}66;
   }
 `;
 
 const ExampleImage = styled.img`
   width: 100%;
-  height: 150px;
-  object-fit: contain;
-  padding: 8px;
-  box-sizing: border-box;
-  background-color: ${theme.colors.backgroundLighter};
+  height: 120px;
+  object-fit: cover;
+  background-color: ${theme.colors.background};
+  border-bottom: 1px solid ${theme.colors.backgroundLight};
 `;
 
 const ExampleName = styled.div`
   padding: 1rem;
-  font-weight: ${theme.fontWeights.semiBold};
   text-align: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: ${theme.colors.white};
 `;
 
-// Flatten examples into a single list, excluding the "Empty" one which has a dedicated button
-const allExamples: ConfigOption[] = exampleOptions
-  .flatMap((group) => group.options)
-  .filter((ex) => ex.label !== 'Empty YAML configuration');
-
-const Welcome = () => {
+const Welcome: React.FC = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
-  const [githubInput, setGithubInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [shouldNavigate, setShouldNavigate] = useState(false);
-
+  const [githubInput, setGitHubInput] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Flatten all examples for the grid
+  const allExamples = exampleOptions.reduce((acc, group) => {
+    return [...acc, ...group.options];
+  }, [] as ConfigOption[]);
+
+  // Memoize callbacks for the conflict resolution hook
+  const conflictResolutionCallbacks = React.useMemo(
+    () => ({
+      setInjectionInput: (injections: string[][]) =>
+        configContext?.setInjectionInput(injections),
+      setConfigInput: (config: string) => configContext?.setConfigInput(config),
+      generateNow: async (
+        config: string,
+        injections: string[][],
+        options?: any
+      ) => {
+        await configContext?.generateNow(config, injections, options);
+      },
+      getCurrentInjections: () => configContext?.injectionInput || [],
+      setError: (error: string) => configContext?.setError(error),
+    }),
+    [configContext]
+  );
 
   // Use the injection conflict resolution hook
   const {
@@ -226,66 +224,31 @@ const Welcome = () => {
     processInjectionsWithConflictResolution,
     handleConflictResolution: handleConflictResolutionBase,
     handleConflictCancel: handleConflictCancelBase,
-  } = useInjectionConflictResolution({
-    setInjectionInput: (injections) =>
-      configContext?.setInjectionInput(injections),
-    setConfigInput: (config) => configContext?.setConfigInput(config),
-    generateNow: async (config, injections, options) => {
-      if (configContext) {
-        await configContext.generateNow(config, injections, options);
-      }
-    },
-    getCurrentInjections: () => configContext?.injectionInput || [],
-    onComplete: async () => {
-      setShouldNavigate(true);
-    },
-    setError: (error) => configContext?.setError(error),
-  });
+  } = useInjectionConflictResolution(conflictResolutionCallbacks);
 
-  // Navigate to home when config has been set
+  // Auto-redirect if we already have a config (and not loading from URL)
   useEffect(() => {
-    if (shouldNavigate && configContext?.configInput) {
+    const queryParameters = new URLSearchParams(window.location.search);
+    const githubUrl = queryParameters.get('github');
+
+    if (!githubUrl && configContext?.configInput && !isLoading) {
       navigate('/');
-      setShouldNavigate(false);
     }
-  }, [shouldNavigate, configContext?.configInput, navigate]);
+  }, [configContext, navigate, isLoading]);
 
-  const handleSelectExample = async (configValue: string) => {
-    if (configContext) {
-      // Determine if this is the empty config
-      const isEmptyConfig = configValue === EmptyYAML.value;
-
-      // Find the example name by searching through all examples
-      let exampleName = 'unknown';
-      if (isEmptyConfig) {
-        exampleName = 'empty_configuration';
-      } else {
-        const foundExample = allExamples.find((ex) => ex.value === configValue);
-        if (foundExample) {
-          exampleName = foundExample.label.toLowerCase().replace(/\s+/g, '_');
-        }
-      }
-
-      trackEvent('example_loaded', {
-        example_name: exampleName,
-        is_empty: isEmptyConfig,
-      });
-      configContext.setConfigInput(configValue);
-      await configContext.generateNow(
-        configValue,
-        configContext.injectionInput,
-        { pointsonly: false }
-      );
-      setShouldNavigate(true);
-    }
+  const handleSelectExample = (config: string) => {
+    configContext?.setConfigInput(config);
+    configContext?.setInjectionInput([]);
+    navigate('/');
   };
 
   /**
    * Processes footprints (or any injections) with conflict resolution.
-   * Converts GitHubFootprint[] to string[][] and uses the conflict resolution hook.
+   * Converts GitHubInjection[] to string[][] and uses the conflict resolution hook.
    */
   const processFootprints = async (
-    footprints: GitHubFootprint[],
+    footprints: GitHubInjection[],
+    outlines: GitHubInjection[],
     config: string,
     resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]
@@ -295,11 +258,10 @@ const Welcome = () => {
     }
 
     // Convert footprints to injection array format
-    const injections: string[][] = footprints.map((fp) => [
-      'footprint',
-      fp.name,
-      fp.content,
-    ]);
+    const injections: string[][] = [
+      ...footprints.map((fp) => ['footprint', fp.name, fp.content]),
+      ...outlines.map((ol) => ['outline', ol.name, ol.content]),
+    ];
 
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
@@ -320,9 +282,6 @@ const Welcome = () => {
   ) => {
     // Call the base handler - it handles all remaining injections internally
     await handleConflictResolutionBase(action, applyToAllConflicts);
-
-    // Clean up footprint-specific state after processing completes
-    // (The hook manages its own internal state)
   };
 
   const handleConflictCancel = () => {
@@ -335,30 +294,23 @@ const Welcome = () => {
     if (!githubInput || !configContext) return;
     const { setError, clearError, setIsGenerating } = configContext;
     setIsLoading(true);
-    setIsGenerating(true); // Show progress bar during GitHub loading
+    setIsGenerating(true);
     clearError();
 
-    // Track GitHub loading
     trackEvent('github_loaded', {
       github_url: githubInput,
     });
 
-    // Reset any pending conflict resolution state from previous loads
-    // Note: currentConflict is managed by the hook, so we only reset local state
-
     fetchConfigFromUrl(githubInput)
       .then(async (result) => {
         if (configContext) {
-          // Show rate limit warning if present
           if (result.rateLimitWarning) {
             setError(result.rateLimitWarning);
           }
 
           try {
-            // Process footprints with conflict resolution
-            await processFootprints(result.footprints, result.config);
+            await processFootprints(result.footprints, result.outlines, result.config);
           } catch (error) {
-            // If footprint processing fails, don't load the config
             throw new Error(
               `Failed to process footprints: ${error instanceof Error ? error.message : 'Unknown error'}`
             );
@@ -367,13 +319,11 @@ const Welcome = () => {
       })
       .catch((e) => {
         setError(`Failed to load from GitHub: ${e.message}`);
-        // Ensure we reset loading state and don't navigate
         setIsLoading(false);
         setIsGenerating(false);
       })
       .finally(() => {
         setIsLoading(false);
-        // Note: isGenerating will be reset by generateNow or needs explicit reset on error
       });
   };
 
@@ -383,40 +333,31 @@ const Welcome = () => {
     fileInputRef.current?.click();
   };
 
-  // Shared function to process a file
   const processFile = async (file: File) => {
     if (!configContext) return;
 
     const { setError, clearError, setIsGenerating } = configContext;
     setIsLoading(true);
-    setIsGenerating(true); // Show progress bar during file loading
+    setIsGenerating(true);
     clearError();
 
-    // Track local file loading
     trackEvent('local_file_loaded', {
       file_name: file.name,
       file_type: file.type || 'unknown',
       file_size: file.size,
     });
 
-    // Reset any pending conflict resolution state from previous loads
-    // Note: currentConflict is managed by the hook, so we only reset local state
-
     try {
       const result = await loadLocalFile(file);
-
-      // Process footprints with conflict resolution
-      await processFootprints(result.footprints, result.config);
+      await processFootprints(result.footprints, result.outlines, result.config);
     } catch (error) {
       setError(
         `Failed to load local file: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
-      // Ensure we reset loading state and don't navigate
       setIsLoading(false);
       setIsGenerating(false);
     } finally {
       setIsLoading(false);
-      // Note: isGenerating will be reset by generateNow or needs explicit reset on error
     }
   };
 
@@ -425,14 +366,10 @@ const Welcome = () => {
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    // Reset the file input so the same file can be selected again
     event.target.value = '';
-
     await processFile(file);
   };
 
-  // Drag and drop handlers
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -447,11 +384,8 @@ const Welcome = () => {
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Check if we're actually leaving the wrapper element
     const currentTarget = e.currentTarget as HTMLElement;
     const relatedTarget = e.relatedTarget as HTMLElement | null;
-
-    // Only hide drag state if we're leaving the wrapper (not moving to a child)
     if (!relatedTarget || !currentTarget.contains(relatedTarget)) {
       setIsDragging(false);
     }
@@ -465,7 +399,6 @@ const Welcome = () => {
     const files = Array.from(e.dataTransfer.files);
     const acceptedExtensions = ['.yaml', '.yml', '.json', '.zip', '.ekb'];
 
-    // Find the first valid file
     const validFile = files.find((file) => {
       const fileName = file.name.toLowerCase();
       return acceptedExtensions.some((ext) => fileName.endsWith(ext));
@@ -474,7 +407,6 @@ const Welcome = () => {
     if (validFile) {
       await processFile(validFile);
     } else if (files.length > 0) {
-      // Show error if files were dropped but none were valid
       if (configContext) {
         configContext.setError(
           'Invalid file type. Accepted formats: *.yaml, *.json, *.zip, *.ekb'
@@ -517,7 +449,10 @@ const Welcome = () => {
             <h2>Start Fresh</h2>
             <p>Begin with a completely blank slate.</p>
             <Button
-              onClick={() => handleSelectExample(EmptyYAML.value)}
+              onClick={() => {
+                const emptyExample = allExamples.find(ex => ex.label === 'Empty');
+                handleSelectExample(emptyExample?.value || '');
+              }}
               aria-label="Start with empty configuration"
               data-testid="empty-config-button"
             >
@@ -558,7 +493,7 @@ const Welcome = () => {
               <GitHubInput
                 placeholder="github.com/ceoloide/corney-island"
                 value={githubInput}
-                onChange={(e) => setGithubInput(e.target.value)}
+                onChange={(e) => setGitHubInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (
                     e.key === 'Enter' &&

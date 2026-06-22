@@ -86,19 +86,20 @@ const checkRateLimit = (
 };
 
 /**
- * Represents a footprint loaded from GitHub.
+ * Represents an injection loaded from GitHub.
  */
-export type GitHubFootprint = {
+export type GitHubInjection = {
   name: string;
   content: string;
 };
 
 /**
- * Represents the result of loading from GitHub, including config and footprints.
+ * Represents the result of loading from GitHub, including config, footprints, and outlines.
  */
 type GitHubLoadResult = {
   config: string;
-  footprints: GitHubFootprint[];
+  footprints: GitHubInjection[];
+  outlines: GitHubInjection[];
   configPath: string;
   rateLimitWarning?: string;
 };
@@ -151,21 +152,21 @@ const parseGitmodules = (
  * @param {string} owner - The repository owner.
  * @param {string} repo - The repository name.
  * @param {string} branch - The branch to fetch from.
- * @param {string} basePath - The base path for constructing footprint names.
+ * @param {string} basePath - The base path for constructing injection names.
  * @param {{warning: string | null}} rateLimitTracker - Mutable object to track rate limit warnings.
- * @returns {Promise<GitHubFootprint[]>} A promise that resolves with the list of footprints.
+ * @returns {Promise<GitHubInjection[]>} A promise that resolves with the list of injections.
  */
-const fetchFootprintsFromRepo = async (
+const fetchInjectionsFromRepo = async (
   owner: string,
   repo: string,
   branch: string,
   basePath: string = '',
   rateLimitTracker: { warning: string | null } = { warning: null }
-): Promise<GitHubFootprint[]> => {
+): Promise<GitHubInjection[]> => {
   console.log(
-    `[GitHub] Fetching footprints from repo ${owner}/${repo} (branch: ${branch}, path: ${basePath || 'root'})`
+    `[GitHub] Fetching injections from repo ${owner}/${repo} (branch: ${branch}, path: ${basePath || 'root'})`
   );
-  const footprints: GitHubFootprint[] = [];
+  const injections: GitHubInjection[] = [];
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${basePath ? basePath : ''}?ref=${branch}`;
 
   try {
@@ -184,7 +185,7 @@ const fetchFootprintsFromRepo = async (
       console.log(
         `[GitHub] Failed to fetch from ${apiUrl}: ${response.status}`
       );
-      return footprints;
+      return injections;
     }
 
     const items = await response.json();
@@ -209,49 +210,49 @@ const fetchFootprintsFromRepo = async (
 
           if (contentResponse.ok) {
             const content = await contentResponse.text();
-            // Construct the footprint name from path and filename without extension
+            // Construct the injection name from path and filename without extension
             const fileName = item.name.replace(/\.js$/, '');
             const name = basePath ? `${basePath}/${fileName}` : fileName;
-            console.log(`[GitHub] Loaded footprint: ${name}`);
-            footprints.push({ name, content });
+            console.log(`[GitHub] Loaded injection: ${name}`);
+            injections.push({ name, content });
           }
         } else if (item.type === 'dir') {
           // Recursively fetch from subdirectory
           const subPath = basePath ? `${basePath}/${item.name}` : item.name;
-          const subFootprints = await fetchFootprintsFromRepo(
+          const subInjections = await fetchInjectionsFromRepo(
             owner,
             repo,
             branch,
             subPath,
             rateLimitTracker
           );
-          footprints.push(...subFootprints);
+          injections.push(...subInjections);
         }
       })
     );
   } catch (error) {
-    console.warn('[GitHub] Failed to fetch footprints from repo:', error);
+    console.warn('[GitHub] Failed to fetch injections from repo:', error);
   }
 
   console.log(
-    `[GitHub] Loaded ${footprints.length} footprints from ${owner}/${repo}`
+    `[GitHub] Loaded ${injections.length} injections from ${owner}/${repo}`
   );
-  return footprints;
+  return injections;
 };
 
 /**
  * Recursively fetches all .js files from a GitHub directory and its subdirectories.
  * @param {string} apiUrl - The GitHub API URL for the directory.
- * @param {string} basePath - The base path for constructing footprint names.
- * @returns {Promise<GitHubFootprint[]>} A promise that resolves with the list of footprints.
+ * @param {string} basePath - The base path for constructing injection names.
+ * @returns {Promise<GitHubInjection[]>} A promise that resolves with the list of injections.
  */
-const fetchFootprintsFromDirectory = async (
+const fetchInjectionsFromDirectory = async (
   apiUrl: string,
   basePath: string = '',
   rateLimitTracker: { warning: string | null } = { warning: null }
-): Promise<GitHubFootprint[]> => {
-  console.log(`[GitHub] Fetching footprints from directory: ${apiUrl}`);
-  const footprints: GitHubFootprint[] = [];
+): Promise<GitHubInjection[]> => {
+  console.log(`[GitHub] Fetching injections from directory: ${apiUrl}`);
+  const injections: GitHubInjection[] = [];
 
   try {
     const response = await fetch(apiUrl);
@@ -268,7 +269,7 @@ const fetchFootprintsFromDirectory = async (
     if (!response.ok) {
       // Directory doesn't exist or is inaccessible, return empty array
       console.log(`[GitHub] Directory not found or inaccessible: ${apiUrl}`);
-      return footprints;
+      return injections;
     }
 
     const items = await response.json();
@@ -293,40 +294,40 @@ const fetchFootprintsFromDirectory = async (
 
           if (contentResponse.ok) {
             const content = await contentResponse.text();
-            // Construct the footprint name from path and filename without extension
+            // Construct the injection name from path and filename without extension
             const fileName = item.name.replace(/\.js$/, '');
             const name = basePath ? `${basePath}/${fileName}` : fileName;
-            console.log(`[GitHub] Loaded footprint: ${name}`);
-            footprints.push({ name, content });
+            console.log(`[GitHub] Loaded injection: ${name}`);
+            injections.push({ name, content });
           }
         } else if (item.type === 'dir') {
           // Recursively fetch from subdirectory
           const subPath = basePath ? `${basePath}/${item.name}` : item.name;
-          const subFootprints = await fetchFootprintsFromDirectory(
+          const subInjections = await fetchInjectionsFromDirectory(
             item.url,
             subPath,
             rateLimitTracker
           );
-          footprints.push(...subFootprints);
+          injections.push(...subInjections);
         }
       })
     );
   } catch (error) {
     // Silently fail if directory doesn't exist or can't be accessed
-    console.warn('[GitHub] Failed to fetch footprints from directory:', error);
+    console.warn('[GitHub] Failed to fetch injections from directory:', error);
   }
 
-  console.log(`[GitHub] Loaded ${footprints.length} footprints from directory`);
-  return footprints;
+  console.log(`[GitHub] Loaded ${injections.length} injections from directory`);
+  return injections;
 };
 
 /**
  * Fetches a configuration file (`config.yaml`) from a given GitHub URL.
  * It handles repository root URLs and direct file URLs, automatically trying common branches ('main', 'master')
  * and locations (`/config.yaml`, `/ergogen/config.yaml`).
- * Also attempts to load footprints from a `footprints` folder alongside the config file.
+ * Also attempts to load footprints and outlines from corresponding folders alongside the config file.
  * @param {string} url - The GitHub URL to fetch the configuration from.
- * @returns {Promise<GitHubLoadResult>} A promise that resolves with the config content, footprints, and config path.
+ * @returns {Promise<GitHubLoadResult>} A promise that resolves with the config content, footprints, outlines, and config path.
  * @throws {Error} Throws an error if the fetch fails for all attempted locations.
  */
 export const fetchConfigFromUrl = async (
@@ -425,6 +426,7 @@ export const fetchConfigFromUrl = async (
       return {
         config,
         footprints: [],
+        outlines: [],
         configPath: '',
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -446,6 +448,7 @@ export const fetchConfigFromUrl = async (
       return {
         config,
         footprints: [],
+        outlines: [],
         configPath: '',
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -456,9 +459,16 @@ export const fetchConfigFromUrl = async (
     const footprintsPath = dirPath ? `${dirPath}/footprints` : 'footprints';
     console.log(`[GitHub] Looking for footprints in: ${footprintsPath}`);
 
-    const footprintsApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`;
-    const footprints = await fetchFootprintsFromDirectory(
-      footprintsApiUrl,
+    const footprints = await fetchInjectionsFromDirectory(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`,
+      '',
+      rateLimitTracker
+    );
+
+    const outlinesPathDirect = dirPath ? `${dirPath}/outlines` : 'outlines';
+    console.log(`[GitHub] Looking for outlines in: ${outlinesPathDirect}`);
+    const outlines = await fetchInjectionsFromDirectory(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPathDirect}?ref=${branch}`,
       '',
       rateLimitTracker
     );
@@ -493,7 +503,7 @@ export const fetchConfigFromUrl = async (
         for (const submodule of submodules) {
           if (submodule.path.startsWith(footprintsPath)) {
             console.log(
-              `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
+              `[GitHub] Processing submodule (footprints): ${submodule.path} -> ${submodule.url}`
             );
             const submoduleMatch = submodule.url.match(
               /github\.com[/:]([^/]+)\/([^/.]+)/
@@ -505,9 +515,9 @@ export const fetchConfigFromUrl = async (
               );
               console.log(`[GitHub] Submodule relative path: ${relativePath}`);
 
-              let submoduleFootprints: GitHubFootprint[] = [];
+              let submoduleInjections: GitHubInjection[] = [];
               try {
-                submoduleFootprints = await fetchFootprintsFromRepo(
+                submoduleInjections = await fetchInjectionsFromRepo(
                   subOwner,
                   subRepo,
                   'main',
@@ -516,7 +526,7 @@ export const fetchConfigFromUrl = async (
                 );
               } catch (_e) {
                 try {
-                  submoduleFootprints = await fetchFootprintsFromRepo(
+                  submoduleInjections = await fetchInjectionsFromRepo(
                     subOwner,
                     subRepo,
                     'master',
@@ -530,34 +540,75 @@ export const fetchConfigFromUrl = async (
                 }
               }
 
-              const prefixedFootprints = submoduleFootprints.map((fp) => ({
+              const prefixedInjections = submoduleInjections.map((fp) => ({
                 name: relativePath ? `${relativePath}/${fp.name}` : fp.name,
                 content: fp.content,
               }));
               console.log(
-                `[GitHub] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
+                `[GitHub] Added ${prefixedInjections.length} injections from submodule ${submodule.path}`
               );
-              footprints.push(...prefixedFootprints);
+              footprints.push(...prefixedInjections);
             }
-          } else {
+          } else if (submodule.path.startsWith(outlinesPathDirect)) {
             console.log(
-              `[GitHub] Skipping submodule (not in footprints): ${submodule.path}`
+              `[GitHub] Processing submodule (outlines): ${submodule.path} -> ${submodule.url}`
             );
+            const submoduleMatch = submodule.url.match(
+              /github\.com[/:]([^/]+)\/([^/.]+)/
+            );
+            if (submoduleMatch) {
+              const [, subOwner, subRepo] = submoduleMatch;
+              const relativePath = submodule.path.substring(
+                outlinesPathDirect.length + 1
+              );
+              console.log(`[GitHub] Submodule relative path: ${relativePath}`);
+
+              let submoduleInjections: GitHubInjection[] = [];
+              try {
+                submoduleInjections = await fetchInjectionsFromRepo(
+                  subOwner,
+                  subRepo,
+                  'main',
+                  '',
+                  rateLimitTracker
+                );
+              } catch (_e) {
+                try {
+                  submoduleInjections = await fetchInjectionsFromRepo(
+                    subOwner,
+                    subRepo,
+                    'master',
+                    '',
+                    rateLimitTracker
+                  );
+                } catch (_e2) {
+                  console.warn(
+                    `Failed to fetch submodule outlines from ${submodule.url}`
+                  );
+                }
+              }
+
+              const prefixedInjections = submoduleInjections.map((ol) => ({
+                name: relativePath ? `${relativePath}/${ol.name}` : ol.name,
+                content: ol.content,
+              }));
+              console.log(
+                `[GitHub] Added ${prefixedInjections.length} injections from submodule ${submodule.path}`
+              );
+              outlines.push(...prefixedInjections);
+            }
           }
         }
-      } else {
-        console.log('[GitHub] No .gitmodules file found');
       }
     } catch (error) {
-      console.warn('[GitHub] Error checking for .gitmodules:', error);
+      console.warn('[GitHub] No .gitmodules found or failed to parse:', error);
     }
 
-    console.log(
-      `[GitHub] Loaded ${footprints.length} footprints from direct link`
-    );
+    console.log(`[GitHub] Total footprints loaded: ${footprints.length}, Total outlines loaded: ${outlines.length}`);
     return {
       config,
       footprints,
+      outlines,
       configPath: dirPath,
       rateLimitWarning: rateLimitTracker.warning || undefined,
     };
@@ -608,7 +659,6 @@ export const fetchConfigFromUrl = async (
         }
 
         const items = await response.json();
-        if (!Array.isArray(items)) continue;
 
         await Promise.all(
           items.map(async (item: { type: string; name: string; download_url: string; path: string; url: string }) => {
@@ -654,9 +704,9 @@ export const fetchConfigFromUrl = async (
   };
 
   /**
-   * Attempts to fetch `config.yaml` and footprints from standard locations within a specific branch of a repository.
+   * Attempts to fetch `config.yaml` and footprints/outlines from standard locations within a specific branch of a repository.
    * @param {string} branch - The branch to check (e.g., 'main', 'master').
-   * @returns {Promise<GitHubLoadResult>} A promise that resolves with the config, footprints, and config path.
+   * @returns {Promise<GitHubLoadResult>} A promise that resolves with the config, footprints, outlines, and config path.
    * @throws {Error} Throws an error if the file cannot be fetched from any location in the branch.
    */
   const fetchWithBranch = async (branch: string): Promise<GitHubLoadResult> => {
@@ -753,14 +803,15 @@ export const fetchConfigFromUrl = async (
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    // Only load footprints if we found a config.yaml file
+    // Only load footprints and outlines if we found a config.yaml file
     if (!shouldLoadFootprints) {
       console.log(
-        '[GitHub] Skipping footprint loading for non-config.yaml file'
+        '[GitHub] Skipping footprint/outline loading for non-config.yaml file'
       );
       return {
         config,
         footprints: [],
+        outlines: [],
         configPath,
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -771,9 +822,17 @@ export const fetchConfigFromUrl = async (
       ? `${configPath}/footprints`
       : 'footprints';
     console.log(`[GitHub] Looking for footprints in: ${footprintsPath}`);
-    const footprintsApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`;
-    const footprints = await fetchFootprintsFromDirectory(
-      footprintsApiUrl,
+    const footprints = await fetchInjectionsFromDirectory(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`,
+      '',
+      rateLimitTracker
+    );
+
+    // Now fetch outlines from the outlines folder
+    const outlinesPath = configPath ? `${configPath}/outlines` : 'outlines';
+    console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
+    const outlines = await fetchInjectionsFromDirectory(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`,
       '',
       rateLimitTracker
     );
@@ -803,11 +862,11 @@ export const fetchConfigFromUrl = async (
         const gitmodulesContent = await gitmodulesResponse.text();
         const submodules = parseGitmodules(gitmodulesContent);
 
-        // Filter submodules that are within the footprints folder
+        // Filter submodules
         for (const submodule of submodules) {
           if (submodule.path.startsWith(footprintsPath)) {
             console.log(
-              `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
+              `[GitHub] Processing submodule (footprints): ${submodule.path} -> ${submodule.url}`
             );
             // Extract owner and repo from submodule URL
             const submoduleMatch = submodule.url.match(
@@ -821,9 +880,9 @@ export const fetchConfigFromUrl = async (
               );
               console.log(`[GitHub] Submodule relative path: ${relativePath}`);
               // Try both main and master branches for the submodule
-              let submoduleFootprints: GitHubFootprint[] = [];
+              let submoduleInjections: GitHubInjection[] = [];
               try {
-                submoduleFootprints = await fetchFootprintsFromRepo(
+                submoduleInjections = await fetchInjectionsFromRepo(
                   subOwner,
                   subRepo,
                   'main',
@@ -832,7 +891,7 @@ export const fetchConfigFromUrl = async (
                 );
               } catch (_e) {
                 try {
-                  submoduleFootprints = await fetchFootprintsFromRepo(
+                  submoduleInjections = await fetchInjectionsFromRepo(
                     subOwner,
                     subRepo,
                     'master',
@@ -845,34 +904,77 @@ export const fetchConfigFromUrl = async (
                   );
                 }
               }
-              // Prefix the footprint names with the relative path
-              const prefixedFootprints = submoduleFootprints.map((fp) => ({
+              // Prefix the injection names with the relative path
+              const prefixedInjections = submoduleInjections.map((fp) => ({
                 name: relativePath ? `${relativePath}/${fp.name}` : fp.name,
                 content: fp.content,
               }));
               console.log(
-                `[GitHub] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
+                `[GitHub] Added ${prefixedInjections.length} injections from submodule ${submodule.path}`
               );
-              footprints.push(...prefixedFootprints);
+              footprints.push(...prefixedInjections);
             }
-          } else {
+          } else if (submodule.path.startsWith(outlinesPath)) {
             console.log(
-              `[GitHub] Skipping submodule (not in footprints): ${submodule.path}`
+              `[GitHub] Processing submodule (outlines): ${submodule.path} -> ${submodule.url}`
             );
+            const submoduleMatch = submodule.url.match(
+              /github\.com[/:]([^/]+)\/([^/.]+)/
+            );
+            if (submoduleMatch) {
+              const [, subOwner, subRepo] = submoduleMatch;
+              const relativePath = submodule.path.substring(
+                outlinesPath.length + 1
+              );
+              console.log(`[GitHub] Submodule relative path: ${relativePath}`);
+
+              let submoduleInjections: GitHubInjection[] = [];
+              try {
+                submoduleInjections = await fetchInjectionsFromRepo(
+                  subOwner,
+                  subRepo,
+                  'main',
+                  '',
+                  rateLimitTracker
+                );
+              } catch (_e) {
+                try {
+                  submoduleInjections = await fetchInjectionsFromRepo(
+                    subOwner,
+                    subRepo,
+                    'master',
+                    '',
+                    rateLimitTracker
+                  );
+                } catch (_e2) {
+                  console.warn(
+                    `Failed to fetch submodule outlines from ${submodule.url}`
+                  );
+                }
+              }
+
+              const prefixedInjections = submoduleInjections.map((ol) => ({
+                name: relativePath ? `${relativePath}/${ol.name}` : ol.name,
+                content: ol.content,
+              }));
+              console.log(
+                `[GitHub] Added ${prefixedInjections.length} injections from submodule ${submodule.path}`
+              );
+              outlines.push(...prefixedInjections);
+            }
           }
         }
-      } else {
-        console.log('[GitHub] No .gitmodules file found');
       }
     } catch (error) {
       // .gitmodules doesn't exist or couldn't be parsed, continue without submodules
       console.warn('[GitHub] No .gitmodules found or failed to parse:', error);
     }
 
-    console.log(`[GitHub] Total footprints loaded: ${footprints.length}`);
+    console.log(`[GitHub] Total footprints loaded: ${footprints.length}, Total outlines loaded: ${outlines.length}`);
     return {
       config,
       footprints,
+      outlines,
       configPath,
       rateLimitWarning: rateLimitTracker.warning || undefined,
     };
