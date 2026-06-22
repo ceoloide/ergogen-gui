@@ -2,8 +2,10 @@ import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import { Dispatch, SetStateAction, useRef } from "react";
+import { Dispatch, SetStateAction, useRef } from 'react';
 import GrowButton from '../atoms/GrowButton';
+import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
+import ConflictResolutionDialog from './ConflictResolutionDialog';
 
 const ActionsContainer = styled.div`
   display: flex;
@@ -69,6 +71,24 @@ const Injections = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
+
+  // Use the injection conflict resolution hook
+  const {
+    currentConflict,
+    processInjectionsWithConflictResolution,
+    handleConflictResolution,
+    handleConflictCancel,
+  } = useInjectionConflictResolution({
+    setInjectionInput: (injections) =>
+      configContext?.setInjectionInput(injections),
+    setConfigInput: (config) => configContext?.setConfigInput(config),
+    generateNow: async (config, injections, options) => {
+      await configContext?.generateNow(config, injections, options);
+    },
+    getCurrentInjections: () => configContext?.injectionInput || [],
+    setError: (error) => configContext?.setError(error),
+  });
+
   if (!configContext) return null;
 
   const { injectionInput } = configContext;
@@ -113,7 +133,9 @@ const Injections = ({
     }
   };
 
-  const handleLoadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadFiles = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -127,8 +149,8 @@ const Injections = ({
       }
     }
 
-    if (newInjections.length > 0 && configContext.processInjectionsWithConflictResolution) {
-      await configContext.processInjectionsWithConflictResolution(
+    if (newInjections.length > 0) {
+      await processInjectionsWithConflictResolution(
         newInjections,
         configContext.configInput || ''
       );
@@ -137,7 +159,9 @@ const Injections = ({
     event.target.value = '';
   };
 
-  const handleLoadFolder = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadFolder = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -155,8 +179,8 @@ const Injections = ({
       }
     }
 
-    if (newInjections.length > 0 && configContext.processInjectionsWithConflictResolution) {
-      await configContext.processInjectionsWithConflictResolution(
+    if (newInjections.length > 0) {
+      await processInjectionsWithConflictResolution(
         newInjections,
         configContext.configInput || ''
       );
@@ -167,6 +191,15 @@ const Injections = ({
 
   return (
     <InjectionsContainer data-testid={dataTestId}>
+      {currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={currentConflict.name}
+          injectionType={currentConflict.type}
+          onResolve={handleConflictResolution}
+          onCancel={handleConflictCancel}
+          data-testid="conflict-resolution-dialog"
+        />
+      )}
       <Title>Custom Footprints</Title>
       {footprints.map((footprint) => {
         return (
@@ -234,6 +267,7 @@ const Injections = ({
         onChange={handleLoadFolder}
         accept=".js"
         style={{ display: 'none' }}
+        /* eslint-disable-next-line */
         {...({ webkitdirectory: '', directory: '' } as any)}
       />
     </InjectionsContainer>
