@@ -217,7 +217,7 @@ const Injections = ({
           aria-label="Load custom footprint folder"
           title="Load footprint folder"
         >
-          <span className="material-symbols-outlined">folder_open</span>
+          <span className="material-symbols-outlined">drive_folder_upload</span>
         </IconButton>
       </ActionsContainer>
       <input
