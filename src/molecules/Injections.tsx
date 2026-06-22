@@ -2,7 +2,7 @@ import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
-import { Dispatch, SetStateAction, useRef } from 'react';
+import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import GrowButton from '../atoms/GrowButton';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
@@ -67,10 +67,12 @@ const Injections = ({
   'data-testid': dataTestId,
 }: Props) => {
   const footprints: InjectionArr = [];
+  const outlines: InjectionArr = [];
   const templates: InjectionArr = [];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
+  const [activeUploadType, setActiveUploadType] = useState<'footprint' | 'outline'>('footprint');
 
   // Use the injection conflict resolution hook
   const {
@@ -89,6 +91,8 @@ const Injections = ({
     setError: (error) => configContext?.setError(error),
   });
 
+
+
   if (!configContext) return null;
 
   const { injectionInput } = configContext;
@@ -100,8 +104,12 @@ const Injections = ({
     for (let i = 0; i < injectionInput.length; i++) {
       const injection = injectionInput[i];
       if (injection.length === 3) {
-        const collection =
-          injection[0] === 'footprint' ? footprints : templates;
+        let collection = templates;
+        if (injection[0] === 'footprint') {
+          collection = footprints;
+        } else if (injection[0] === 'outline') {
+          collection = outlines;
+        }
         collection.push({
           key: i,
           type: injection[0],
@@ -133,6 +141,23 @@ const Injections = ({
     }
   };
 
+  const handleNewOutline = () => {
+    const nextKey = configContext?.injectionInput?.length || 0;
+    const newInjection = {
+      key: nextKey,
+      type: 'outline',
+      name: `custom_outline_${nextKey + 1}`,
+      content:
+        "module.exports = {\n  params: {\n    designator: '',\n  },\n  body: p => ``\n}",
+    };
+    setInjectionToEdit(newInjection);
+    // Show editor on mobile when new injection is created
+    if (onInjectionSelect) {
+      onInjectionSelect();
+    }
+  };
+
+
   const handleLoadFiles = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -145,7 +170,7 @@ const Injections = ({
       if (file.name.endsWith('.js')) {
         const content = await file.text();
         const name = file.name.replace(/\.js$/, '');
-        newInjections.push(['footprint', name, content]);
+        newInjections.push([activeUploadType, name, content]);
       }
     }
 
@@ -175,7 +200,7 @@ const Injections = ({
         const pathParts = file.webkitRelativePath.split('/');
         pathParts.shift(); // Remove the top-level folder
         const name = pathParts.join('/').replace(/\.js$/, '');
-        newInjections.push(['footprint', name, content]);
+        newInjections.push([activeUploadType, name, content]);
       }
     }
 
@@ -219,6 +244,25 @@ const Injections = ({
           />
         );
       })}
+      <Title>Custom Outlines</Title>
+      {outlines.map((outline) => {
+        return (
+          <InjectionRow
+            key={outline.key}
+            injection={outline}
+            setInjectionToEdit={(injection) => {
+              setInjectionToEdit(injection);
+              // Show editor on mobile when injection is selected
+              if (onInjectionSelect) {
+                onInjectionSelect();
+              }
+            }}
+            deleteInjection={deleteInjection}
+            previewKey={injectionToEdit.name}
+            data-testid={dataTestId && `${dataTestId}-${outline.name}`}
+          />
+        );
+      })}
       {/* <h3>Custom Templates</h3>
       {
         templates.map(
@@ -233,11 +277,15 @@ const Injections = ({
           onClick={handleNewFootprint}
           data-testid="add-footprint"
           aria-label="Add new custom footprint"
+          title="Add footprint"
         >
           <span className="material-symbols-outlined">add</span>
         </GrowButton>
         <IconButton
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            setActiveUploadType('footprint');
+            setTimeout(() => fileInputRef.current?.click(), 0);
+          }}
           data-testid="load-footprint-files"
           aria-label="Load custom footprint files"
           title="Load footprint files"
@@ -245,10 +293,46 @@ const Injections = ({
           <span className="material-symbols-outlined">upload_file</span>
         </IconButton>
         <IconButton
-          onClick={() => folderInputRef.current?.click()}
+          onClick={() => {
+            setActiveUploadType('footprint');
+            setTimeout(() => folderInputRef.current?.click(), 0);
+          }}
           data-testid="load-footprint-folder"
           aria-label="Load custom footprint folder"
           title="Load footprint folder"
+        >
+          <span className="material-symbols-outlined">drive_folder_upload</span>
+        </IconButton>
+      </ActionsContainer>
+
+      <ActionsContainer>
+        <GrowButton
+          onClick={handleNewOutline}
+          data-testid="add-outline"
+          aria-label="Add new custom outline"
+          title="Add outline"
+        >
+          <span className="material-symbols-outlined">add</span>
+        </GrowButton>
+        <IconButton
+          onClick={() => {
+            setActiveUploadType('outline');
+            setTimeout(() => fileInputRef.current?.click(), 0);
+          }}
+          data-testid="load-outline-files"
+          aria-label="Load custom outline files"
+          title="Load outline files"
+        >
+          <span className="material-symbols-outlined">upload_file</span>
+        </IconButton>
+        <IconButton
+          onClick={() => {
+            setActiveUploadType('outline');
+            setTimeout(() => folderInputRef.current?.click(), 0);
+          }}
+          data-testid="load-outline-folder"
+          aria-label="Load custom outline folder"
+          title="Load outline folder"
         >
           <span className="material-symbols-outlined">drive_folder_upload</span>
         </IconButton>
