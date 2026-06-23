@@ -1,6 +1,7 @@
 import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
+import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import GrowButton from '../atoms/GrowButton';
@@ -27,9 +28,32 @@ const InjectionsContainer = styled.div`
   flex-direction: column;
   flex-grow: 1;
 `;
+const TabsContainer = styled.div`
+  display: flex;
+  border-bottom: 1px solid ${theme.colors.border};
+  margin-bottom: 1rem;
+  gap: 16px;
+`;
+
+const TabButton = styled.button<{ $active: boolean }>`
+  background: none;
+  border: none;
+  color: ${(props) => (props.$active ? theme.colors.text : theme.colors.textDark)};
+  padding: 0.75rem 0;
+  cursor: pointer;
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
+  border-bottom: 2px solid
+    ${(props) => (props.$active ? theme.colors.accent : 'transparent')};
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    color: ${theme.colors.text};
+  }
+`;
+
 
 // Use the shared Title component from atoms
-import Title from '../atoms/Title';
 
 /**
  * Props for the Injections component.
@@ -73,6 +97,7 @@ const Injections = ({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
   const [activeUploadType, setActiveUploadType] = useState<'footprint' | 'outline'>('footprint');
+  const [activeTab, setActiveTab] = useState<'footprints' | 'outlines'>('footprints');
 
   // Use the injection conflict resolution hook
   const {
@@ -215,7 +240,7 @@ const Injections = ({
   };
 
   return (
-    <InjectionsContainer data-testid={dataTestId}>
+        <InjectionsContainer data-testid={dataTestId}>
       {currentConflict && (
         <ConflictResolutionDialog
           injectionName={currentConflict.name}
@@ -225,118 +250,140 @@ const Injections = ({
           data-testid="conflict-resolution-dialog"
         />
       )}
-      <Title>Custom Footprints</Title>
-      {footprints.map((footprint) => {
-        return (
-          <InjectionRow
-            key={footprint.key}
-            injection={footprint}
-            setInjectionToEdit={(injection) => {
-              setInjectionToEdit(injection);
-              // Show editor on mobile when injection is selected
-              if (onInjectionSelect) {
-                onInjectionSelect();
-              }
-            }}
-            deleteInjection={deleteInjection}
-            previewKey={injectionToEdit.name}
-            data-testid={dataTestId && `${dataTestId}-${footprint.name}`}
-          />
-        );
-      })}
-      <Title>Custom Outlines</Title>
-      {outlines.map((outline) => {
-        return (
-          <InjectionRow
-            key={outline.key}
-            injection={outline}
-            setInjectionToEdit={(injection) => {
-              setInjectionToEdit(injection);
-              // Show editor on mobile when injection is selected
-              if (onInjectionSelect) {
-                onInjectionSelect();
-              }
-            }}
-            deleteInjection={deleteInjection}
-            previewKey={injectionToEdit.name}
-            data-testid={dataTestId && `${dataTestId}-${outline.name}`}
-          />
-        );
-      })}
-      {/* <h3>Custom Templates</h3>
-      {
-        templates.map(
-          (template, i) => {
-            return <InjectionRow key={i} {...template} setInjection={setInjection} />;
-          }
-        )
-      } */}
-
-      <ActionsContainer>
-        <GrowButton
-          onClick={handleNewFootprint}
-          data-testid="add-footprint"
-          aria-label="Add new custom footprint"
-          title="Add footprint"
-        >
-          <span className="material-symbols-outlined">add</span>
-        </GrowButton>
-        <IconButton
+      <TabsContainer>
+        <TabButton
+          $active={activeTab === 'footprints'}
           onClick={() => {
+            setActiveTab('footprints');
             setActiveUploadType('footprint');
-            setTimeout(() => fileInputRef.current?.click(), 0);
           }}
-          data-testid="load-footprint-files"
-          aria-label="Load custom footprint files"
-          title="Load footprint files"
+          data-testid="tab-footprints"
         >
-          <span className="material-symbols-outlined">upload_file</span>
-        </IconButton>
-        <IconButton
+          Footprints
+        </TabButton>
+        <TabButton
+          $active={activeTab === 'outlines'}
           onClick={() => {
-            setActiveUploadType('footprint');
-            setTimeout(() => folderInputRef.current?.click(), 0);
+            setActiveTab('outlines');
+            setActiveUploadType('outline');
           }}
-          data-testid="load-footprint-folder"
-          aria-label="Load custom footprint folder"
-          title="Load footprint folder"
+          data-testid="tab-outlines"
         >
-          <span className="material-symbols-outlined">drive_folder_upload</span>
-        </IconButton>
-      </ActionsContainer>
+          Outlines
+        </TabButton>
+      </TabsContainer>
 
-      <ActionsContainer>
-        <GrowButton
-          onClick={handleNewOutline}
-          data-testid="add-outline"
-          aria-label="Add new custom outline"
-          title="Add outline"
-        >
-          <span className="material-symbols-outlined">add</span>
-        </GrowButton>
-        <IconButton
-          onClick={() => {
-            setActiveUploadType('outline');
-            setTimeout(() => fileInputRef.current?.click(), 0);
-          }}
-          data-testid="load-outline-files"
-          aria-label="Load custom outline files"
-          title="Load outline files"
-        >
-          <span className="material-symbols-outlined">upload_file</span>
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            setActiveUploadType('outline');
-            setTimeout(() => folderInputRef.current?.click(), 0);
-          }}
-          data-testid="load-outline-folder"
-          aria-label="Load custom outline folder"
-          title="Load outline folder"
-        >
-          <span className="material-symbols-outlined">drive_folder_upload</span>
-        </IconButton>
-      </ActionsContainer>
+      {activeTab === 'footprints' && (
+        <>
+          {footprints.map((footprint) => {
+            return (
+              <InjectionRow
+                key={footprint.key}
+                injection={footprint}
+                setInjectionToEdit={(injection) => {
+                  setInjectionToEdit(injection);
+                  // Show editor on mobile when injection is selected
+                  if (onInjectionSelect) {
+                    onInjectionSelect();
+                  }
+                }}
+                deleteInjection={deleteInjection}
+                previewKey={injectionToEdit.name}
+                data-testid={dataTestId && `${dataTestId}-${footprint.name}`}
+              />
+            );
+          })}
+
+          <ActionsContainer>
+            <GrowButton
+              onClick={handleNewFootprint}
+              data-testid="add-footprint"
+              aria-label="Add new custom footprint"
+              title="Add footprint"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </GrowButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('footprint');
+                setTimeout(() => fileInputRef.current?.click(), 0);
+              }}
+              data-testid="load-footprint-files"
+              aria-label="Load custom footprint files"
+              title="Load footprint files"
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+            </IconButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('footprint');
+                setTimeout(() => folderInputRef.current?.click(), 0);
+              }}
+              data-testid="load-footprint-folder"
+              aria-label="Load custom footprint folder"
+              title="Load footprint folder"
+            >
+              <span className="material-symbols-outlined">drive_folder_upload</span>
+            </IconButton>
+          </ActionsContainer>
+        </>
+      )}
+
+      {activeTab === 'outlines' && (
+        <>
+          {outlines.map((outline) => {
+            return (
+              <InjectionRow
+                key={outline.key}
+                injection={outline}
+                setInjectionToEdit={(injection) => {
+                  setInjectionToEdit(injection);
+                  // Show editor on mobile when injection is selected
+                  if (onInjectionSelect) {
+                    onInjectionSelect();
+                  }
+                }}
+                deleteInjection={deleteInjection}
+                previewKey={injectionToEdit.name}
+                data-testid={dataTestId && `${dataTestId}-${outline.name}`}
+              />
+            );
+          })}
+
+          <ActionsContainer>
+            <GrowButton
+              onClick={handleNewOutline}
+              data-testid="add-outline"
+              aria-label="Add new custom outline"
+              title="Add outline"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </GrowButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('outline');
+                setTimeout(() => fileInputRef.current?.click(), 0);
+              }}
+              data-testid="load-outline-files"
+              aria-label="Load custom outline files"
+              title="Load outline files"
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+            </IconButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('outline');
+                setTimeout(() => folderInputRef.current?.click(), 0);
+              }}
+              data-testid="load-outline-folder"
+              aria-label="Load custom outline folder"
+              title="Load outline folder"
+            >
+              <span className="material-symbols-outlined">drive_folder_upload</span>
+            </IconButton>
+          </ActionsContainer>
+        </>
+      )}
       <input
         type="file"
         ref={fileInputRef}

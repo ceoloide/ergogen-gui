@@ -745,7 +745,7 @@ const Ergogen = () => {
                   value={injectionToEdit.name}
                   onChange={handleInjectionNameChange}
                   disabled={injectionToEdit.key === -1}
-                  aria-label="{injectionToEdit.type || 'Footprint'} name"
+                  aria-label={`${injectionToEdit.type || "footprint"} name`}
                   data-testid="footprint-name-input"
                 />
                 <Title as="h4">{injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} code</Title>
