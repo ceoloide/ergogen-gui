@@ -660,7 +660,7 @@ const Ergogen = () => {
             >
               <SettingsPaneContainer>
                 <OptionContainer>
-                  <Title style={{ margin: "1.5rem 0 1rem 0" }}>Options</Title>
+                  <Title>Options</Title>
                   <GenOption
                     optionId={'autogen'}
                     label={'Auto-generate'}
@@ -722,7 +722,7 @@ const Ergogen = () => {
               <EditorContainer>
                 {isMobile && (
                   <MobileEditorHeader>
-                    <Title as="h4">{injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} name</Title>
+                    <Title as="h4" style={{ marginTop: 0 }}>{injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} name</Title>
                     <MobileCloseButton
                       onClick={() => {
                         setShowMobileEditor(false);

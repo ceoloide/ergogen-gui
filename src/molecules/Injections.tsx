@@ -251,7 +251,7 @@ const Injections = ({
           data-testid="conflict-resolution-dialog"
         />
       )}
-      <Title style={{ margin: "1.5rem 0 1rem 0" }}>Custom Libraries</Title>
+      <Title>Custom Libraries</Title>
       <TabsContainer>
         <TabButton
           $active={activeTab === 'footprints'}
