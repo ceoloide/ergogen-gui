@@ -7,6 +7,7 @@ import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import GrowButton from '../atoms/GrowButton';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
+import Title from "../atoms/Title";
 
 const ActionsContainer = styled.div`
   display: flex;
@@ -250,6 +251,7 @@ const Injections = ({
           data-testid="conflict-resolution-dialog"
         />
       )}
+      <Title>Custom Libraries</Title>
       <TabsContainer>
         <TabButton
           $active={activeTab === 'footprints'}
