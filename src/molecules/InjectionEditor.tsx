@@ -85,6 +85,7 @@ const EditorWrapper = styled.div`
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin-left: 0.5rem;
 `;
 
 export default InjectionEditor;

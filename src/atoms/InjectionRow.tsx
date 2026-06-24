@@ -39,7 +39,7 @@ const Row = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 0;
+  padding: 0.5rem;
 `;
 
 /**

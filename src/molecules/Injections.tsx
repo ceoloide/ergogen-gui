@@ -10,7 +10,8 @@ import ConflictResolutionDialog from './ConflictResolutionDialog';
 import Title from "../atoms/Title";
 
 const ActionsContainer = styled.div`
-  display: flex;
+  display: flex; margin-left: 0.5rem;
+  margin-left: 0.5rem;
   gap: 8px;
   margin-top: 0.5rem;
 `;
@@ -26,13 +27,16 @@ const IconButton = styled(GrowButton)`
  */
 const InjectionsContainer = styled.div`
   display: flex;
+  margin-left: 0.5rem;
   flex-direction: column;
   flex-grow: 1;
   gap: 0.5rem;
 `;
 const TabsContainer = styled.div`
   display: flex;
+  margin-left: 0.5rem;
   border-bottom: 1px solid ${theme.colors.border};
+  margin-left: 0.5rem;
   gap: 16px;
 `;
 
