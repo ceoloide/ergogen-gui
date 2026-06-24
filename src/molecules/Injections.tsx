@@ -12,7 +12,7 @@ import Title from "../atoms/Title";
 const ActionsContainer = styled.div`
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 0.5rem;
 `;
 
 const IconButton = styled(GrowButton)`
@@ -28,11 +28,11 @@ const InjectionsContainer = styled.div`
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  gap: 0.5rem;
 `;
 const TabsContainer = styled.div`
   display: flex;
   border-bottom: 1px solid ${theme.colors.border};
-  margin-bottom: 1rem;
   gap: 16px;
 `;
 
@@ -251,7 +251,7 @@ const Injections = ({
           data-testid="conflict-resolution-dialog"
         />
       )}
-      <Title>Custom Libraries</Title>
+      <Title style={{ margin: "1rem 0 0.5rem 0" }}>Custom Libraries</Title>
       <TabsContainer>
         <TabButton
           $active={activeTab === 'footprints'}

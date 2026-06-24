@@ -5,7 +5,7 @@ const Title = styled.h3`
   font-size: ${theme.fontSizes.base};
   font-weight: ${theme.fontWeights.semiBold};
   color: ${theme.colors.white};
-  margin: 1rem;
+  margin: 0;
 `;
 
 export default Title;

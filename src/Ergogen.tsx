@@ -660,7 +660,7 @@ const Ergogen = () => {
             >
               <SettingsPaneContainer>
                 <OptionContainer>
-                  <Title>Options</Title>
+                  <Title style={{ margin: "1rem 0 0.5rem 0" }}>Options</Title>
                   <GenOption
                     optionId={'autogen'}
                     label={'Auto-generate'}
