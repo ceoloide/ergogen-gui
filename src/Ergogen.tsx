@@ -722,7 +722,7 @@ const Ergogen = () => {
               <EditorContainer>
                 {isMobile && (
                   <MobileEditorHeader>
-                    <Title as="h4">Footprint name</Title>
+                    <Title as="h4" style={{ marginTop: 0 }}>{injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} name</Title>
                     <MobileCloseButton
                       onClick={() => {
                         setShowMobileEditor(false);
@@ -740,15 +740,15 @@ const Ergogen = () => {
                     </MobileCloseButton>
                   </MobileEditorHeader>
                 )}
-                {!isMobile && <Title as="h4">Footprint name</Title>}
+                {!isMobile && <Title as="h4">{injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} name</Title>}
                 <Input
                   value={injectionToEdit.name}
                   onChange={handleInjectionNameChange}
                   disabled={injectionToEdit.key === -1}
-                  aria-label="Footprint name"
+                  aria-label={`${injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : "Footprint"} name`}
                   data-testid="footprint-name-input"
                 />
-                <Title as="h4">Footprint code</Title>
+                <Title as="h4">{injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} code</Title>
                 <InjectionEditor
                   injection={injectionToEdit}
                   setInjection={setInjectionToEdit}
