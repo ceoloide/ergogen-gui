@@ -6377,7 +6377,7 @@ https-proxy-agent@^5.0.0:
 
 "hull@github:andriiheonia/hull":
   version "1.0.13"
-  resolved "git+ssh://git@github.com/andriiheonia/hull.git#ffcf93dbd4df5a8c59f0541af5a9926d01528c5d"
+  resolved "git+https://github.com/andriiheonia/hull.git#ffcf93dbd4df5a8c59f0541af5a9926d01528c5d"
   dependencies:
     monotone-convex-hull-2d "1.0.1"
     robust-segment-intersect "1.0.1"
@@ -7638,7 +7638,7 @@ kind-of@^6.0.2:
 
 "kle-serial@github:ergogen/kle-serial#ergogen":
   version "0.15.1"
-  resolved "git+ssh://git@github.com/ergogen/kle-serial.git#61f29f317d87bbfed0b0b7e646e1b91d4384ac02"
+  resolved "git+https://github.com/ergogen/kle-serial.git#61f29f317d87bbfed0b0b7e646e1b91d4384ac02"
   dependencies:
     json5 "^2.1.0"
 
