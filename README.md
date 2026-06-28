@@ -266,9 +266,11 @@ Alternatively, you can still manually modify `package.json`:
 
 1. Open `package.json`.
 2. Update the `ergogen` dependency:
+
    ```json
    "ergogen": "ergogen/ergogen#develop",
    ```
+
 3. Run `yarn install && yarn start`.
 
 ## Contributing

@@ -1,3 +1,5 @@
+import ergogenPkg from 'ergogen/package.json';
+
 export interface VersionInfo {
   label: string;
   url: string;
@@ -10,8 +12,20 @@ export interface VersionInfo {
  * @returns An object containing the formatted label and the corresponding URL.
  */
 export const getErgogenVersionInfo = (version?: string): VersionInfo => {
-  const defaultVersion = 'v4.2.1';
-  const defaultUrl = 'https://github.com/ergogen/ergogen';
+  const defaultVersion = `v${ergogenPkg.version}`;
+
+  const repoStr =
+    typeof ergogenPkg.repository === 'string'
+      ? ergogenPkg.repository
+      : typeof ergogenPkg.repository === 'object' &&
+          ergogenPkg.repository !== null &&
+          'url' in ergogenPkg.repository
+        ? (ergogenPkg.repository as { url: string }).url
+        : 'https://github.com/ergogen/ergogen';
+
+  const defaultUrl = repoStr.startsWith('github:')
+    ? repoStr.replace('github:', 'https://github.com/')
+    : repoStr.replace(/^git\+/, '').replace(/\.git$/, '');
 
   if (!version) {
     return { label: defaultVersion, url: defaultUrl };
@@ -23,12 +37,14 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
       label: version,
       url: version.startsWith('ergogen@')
         ? `${defaultUrl}/releases/tag/v${version.split('@')[1]}`
-        : `https://www.npmjs.com/package/${version.split('@')[0]}`
+        : `https://www.npmjs.com/package/${version.split('@')[0]}`,
     };
   }
 
   // Remove "github:" prefix if present for uniform processing
-  const cleanVersion = version.startsWith('github:') ? version.slice(7) : version;
+  const cleanVersion = version.startsWith('github:')
+    ? version.slice(7)
+    : version;
 
   // Split into repo and branch
   const [repo, branch] = cleanVersion.split('#');
@@ -46,6 +62,6 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
   // For custom repos, show the full clean version string (e.g., user/repo or user/repo#branch)
   return {
     label: cleanVersion,
-    url: branch ? `${baseUrl}/tree/${branch}` : baseUrl
+    url: branch ? `${baseUrl}/tree/${branch}` : baseUrl,
   };
 };

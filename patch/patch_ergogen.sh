@@ -30,6 +30,12 @@ if [ -d node_modules/ergogen ]; then
   # Add the footprints to the index
   echo "Patching footprints/index.js..."
   cp -f patch/footprints_index.js node_modules/ergogen/src/footprints/index.js
+
+  # Clear Webpack compile cache to force rebuilds when dependencies or files in node_modules change
+  if [ -d node_modules/.cache ]; then
+    echo "Clearing Webpack cache..."
+    rm -rf node_modules/.cache
+  fi
 else
   echo "Directory node_modules/ergogen not found."
 fi
