@@ -49,13 +49,21 @@ export const isValidInjection = (inj: unknown): inj is string[] => {
  * @param type - The type of injection to check (e.g., 'footprint', 'template').
  * @param name - The name of the injection to check.
  * @param existingInjections - The array of existing injections.
+ * @param existingNamesSet - Optional pre-calculated Set of names for the given type.
  * @returns A conflict check result indicating if there's a conflict and the name.
  */
 const checkForInjectionConflict = (
   type: string,
   name: string,
-  existingInjections: string[][] | undefined
+  existingInjections: string[][] | undefined,
+  existingNamesSet?: Set<string>
 ): ConflictCheckResult => {
+  if (existingNamesSet) {
+    return existingNamesSet.has(name)
+      ? { hasConflict: true, conflictingName: name }
+      : { hasConflict: false };
+  }
+
   if (!existingInjections || existingInjections.length === 0) {
     return { hasConflict: false };
   }
@@ -85,6 +93,18 @@ export const getInjectionConflicts = (
     return [];
   }
 
+  // Pre-calculate name sets grouped by type for O(1) lookups
+  const nameSetsByType: Record<string, Set<string>> = {};
+  for (const inj of existingInjections) {
+    if (isValidInjection(inj)) {
+      const [type, name] = inj;
+      if (!nameSetsByType[type]) {
+        nameSetsByType[type] = new Set();
+      }
+      nameSetsByType[type].add(name);
+    }
+  }
+
   const conflicts: { injection: string[]; conflict: ConflictCheckResult }[] =
     [];
 
@@ -92,7 +112,8 @@ export const getInjectionConflicts = (
     if (!isValidInjection(inj)) continue;
 
     const [type, name] = inj;
-    const conflict = checkForInjectionConflict(type, name, existingInjections);
+    const typeSet = nameSetsByType[type];
+    const conflict = checkForInjectionConflict(type, name, undefined, typeSet);
 
     if (conflict.hasConflict) {
       conflicts.push({ injection: inj, conflict });
@@ -107,14 +128,21 @@ export const getInjectionConflicts = (
  * This is a footprint-specific wrapper around checkForInjectionConflict.
  * @param name - The name of the footprint to check.
  * @param existingInjections - The array of existing injections.
+ * @param existingNamesSet - Optional pre-calculated Set of names for the 'footprint' type.
  * @returns A conflict check result indicating if there's a conflict and the name.
  * @deprecated Use checkForInjectionConflict instead for generic injection type support.
  */
 export const checkForConflict = (
   name: string,
-  existingInjections: string[][] | undefined
+  existingInjections: string[][] | undefined,
+  existingNamesSet?: Set<string>
 ): ConflictCheckResult => {
-  return checkForInjectionConflict('footprint', name, existingInjections);
+  return checkForInjectionConflict(
+    'footprint',
+    name,
+    existingInjections,
+    existingNamesSet
+  );
 };
 
 /**
@@ -122,22 +150,28 @@ export const checkForConflict = (
  * @param type - The type of injection (e.g., 'footprint', 'template').
  * @param baseName - The base name to make unique.
  * @param existingInjections - The array of existing injections.
+ * @param existingNamesSet - Optional pre-calculated Set of names for the given type.
  * @returns A unique name.
  */
 export const generateUniqueInjectionName = (
   type: string,
   baseName: string,
-  existingInjections: string[][] | undefined
+  existingInjections: string[][] | undefined,
+  existingNamesSet?: Set<string>
 ): string => {
-  if (!existingInjections || existingInjections.length === 0) {
+  const existingNames =
+    existingNamesSet ||
+    (existingInjections && existingInjections.length > 0
+      ? new Set(
+          existingInjections
+            .filter((inj) => isValidInjection(inj) && inj[0] === type)
+            .map((inj) => inj[1])
+        )
+      : new Set<string>());
+
+  if (existingNames.size === 0) {
     return baseName;
   }
-
-  const existingNames = new Set(
-    existingInjections
-      .filter((inj) => isValidInjection(inj) && inj[0] === type)
-      .map((inj) => inj[1])
-  );
 
   let counter = 1;
   let newName = `${baseName}_${counter}`;
@@ -183,12 +217,25 @@ export const mergeInjections = (
 ): string[][] => {
   const result = existingInjections ? [...existingInjections] : [];
 
+  // Pre-calculate footprint name set for O(1) lookups
+  const footprintNames = new Set<string>();
+  for (const inj of result) {
+    if (isValidInjection(inj) && inj[0] === 'footprint') {
+      footprintNames.add(inj[1]);
+    }
+  }
+
   for (const footprint of newFootprints) {
-    const conflictCheck = checkForConflict(footprint.name, result);
+    const conflictCheck = checkForConflict(
+      footprint.name,
+      undefined,
+      footprintNames
+    );
 
     if (!conflictCheck.hasConflict) {
       // No conflict, add directly
       result.push(['footprint', footprint.name, footprint.content]);
+      footprintNames.add(footprint.name);
     } else {
       // Handle conflict based on resolution strategy
       if (resolution === 'skip') {
@@ -204,15 +251,18 @@ export const mergeInjections = (
         );
         if (index !== -1) {
           result[index] = ['footprint', footprint.name, footprint.content];
+          // Set already contains the name
         }
       } else if (resolution === 'keep-both') {
         // Generate a unique name and add
         const uniqueName = generateUniqueInjectionName(
           'footprint',
           footprint.name,
-          result
+          undefined,
+          footprintNames
         );
         result.push(['footprint', uniqueName, footprint.content]);
+        footprintNames.add(uniqueName);
       }
     }
   }
@@ -240,6 +290,18 @@ export const mergeInjectionArraysWithResolution = (
 ): string[][] => {
   const result = existingInjections ? [...existingInjections] : [];
 
+  // Pre-calculate name sets grouped by type for O(1) lookups
+  const nameSetsByType: Record<string, Set<string>> = {};
+  for (const inj of result) {
+    if (isValidInjection(inj)) {
+      const [type, name] = inj;
+      if (!nameSetsByType[type]) {
+        nameSetsByType[type] = new Set();
+      }
+      nameSetsByType[type].add(name);
+    }
+  }
+
   // Process each new injection
   for (const newInj of newInjections) {
     // Validate injection format
@@ -253,12 +315,23 @@ export const mergeInjectionArraysWithResolution = (
 
     const [type, name, content] = newInj;
 
+    if (!nameSetsByType[type]) {
+      nameSetsByType[type] = new Set();
+    }
+    const typeSet = nameSetsByType[type];
+
     // Check for conflict
-    const conflictCheck = checkForInjectionConflict(type, name, result);
+    const conflictCheck = checkForInjectionConflict(
+      type,
+      name,
+      undefined,
+      typeSet
+    );
 
     if (!conflictCheck.hasConflict) {
       // No conflict, add directly
       result.push([type, name, content]);
+      typeSet.add(name);
     } else {
       // Handle conflict based on resolution strategy
       if (resolution === 'skip') {
@@ -271,11 +344,18 @@ export const mergeInjectionArraysWithResolution = (
         );
         if (existingIndex !== -1) {
           result[existingIndex] = [type, name, content];
+          // typeSet already contains name
         }
       } else if (resolution === 'keep-both') {
         // Generate a unique name and add
-        const uniqueName = generateUniqueInjectionName(type, name, result);
+        const uniqueName = generateUniqueInjectionName(
+          type,
+          name,
+          undefined,
+          typeSet
+        );
         result.push([type, uniqueName, content]);
+        typeSet.add(uniqueName);
       }
     }
   }
