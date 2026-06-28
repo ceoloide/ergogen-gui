@@ -97,126 +97,167 @@ self.onerror = (error) => {
 };
 
 /**
+ * Helper to send a response back to the main thread.
+ */
+const sendResponse = (response: JscadWorkerResponse) => {
+  self.postMessage(response);
+};
+
+/**
+ * Decodes the raw JSCAD output into an STL string.
+ * Supports string, ArrayBuffer, and ArrayBufferView.
+ */
+function decodeStlContent(data: unknown): string | null {
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  if (!utf8Decoder) {
+    return null;
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return utf8Decoder.decode(new Uint8Array(data));
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    const view = data as ArrayBufferViewLike;
+    const array = new Uint8Array(
+      view.buffer,
+      view.byteOffset,
+      view.byteLength
+    );
+    return utf8Decoder.decode(array);
+  }
+
+  return null;
+}
+
+/**
+ * Processes a single JSCAD case: converts source to STL and post-processes it.
+ */
+function processJscadCase(name: string, jscad: string): string | null {
+  if (!convertFn) {
+    throw new Error('JSCAD convert function is unavailable.');
+  }
+
+  const result = convertFn({ source: jscad, format: 'stla' });
+  const firstPart = result?.data?.[0];
+  let stlContent = decodeStlContent(firstPart);
+
+  if (!stlContent) {
+    console.warn(
+      `Generated STL content is empty or unsupported type for case: ${name}`
+    );
+    return null;
+  }
+
+  // Rename default STL header from "solid csg.js" to the specific case name for clarity
+  stlContent = stlContent.replace(/^solid csg\.js\b/, `solid ${name}`);
+
+  if (!stlContent || stlContent.trim() === '') {
+    console.warn(`Generated STL content is empty for case: ${name}`);
+    return null;
+  }
+
+  return stlContent;
+}
+
+/**
+ * Orchestrates batch conversion of multiple JSCAD cases.
+ */
+function performBatchConversion(
+  results: ResultsLike,
+  configVersion: number
+): void {
+  // Clone shallowly to avoid mutating caller's object directly
+  const updatedResults: ResultsLike = { ...results };
+  if (results.cases) {
+    updatedResults.cases = { ...results.cases };
+  } else {
+    throw new Error('No cases provided to process.');
+  }
+
+  const entries = Object.entries(updatedResults.cases);
+  if (entries.length === 0) {
+    throw new Error('No JSCAD cases to process.');
+  }
+
+  // Process each case sequentially
+  for (const [name, caseObj] of entries) {
+    const jscad = caseObj?.jscad as string | undefined;
+    if (!jscad || jscad.trim() === '') {
+      continue;
+    }
+
+    try {
+      const stl = processJscadCase(name, jscad);
+      if (stl) {
+        updatedResults.cases[name] = {
+          ...(updatedResults.cases[name] as any),
+          stl,
+        };
+      }
+    } catch (caseError: unknown) {
+      const errorMessage =
+        caseError instanceof Error ? caseError.message : String(caseError);
+      console.error(`Failed to convert case ${name}: ${errorMessage}`);
+      // Continue with other cases even if one fails
+    }
+  }
+
+  sendResponse({
+    type: 'success',
+    results: updatedResults,
+    configVersion,
+  });
+}
+
+/**
  * Main worker message handler.
  */
 self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
   const { type, results, configVersion } = event.data || {};
 
   if (initializationError) {
-    const response: JscadWorkerResponse = {
+    sendResponse({
       type: 'error',
       error: `JSCAD library initialization failed: ${initializationError.message}`,
       configVersion,
-    };
-    self.postMessage(response);
+    });
     return;
   }
 
   if (!convertFn) {
-    const response: JscadWorkerResponse = {
+    sendResponse({
       type: 'error',
       error: 'JSCAD convert function is unavailable.',
       configVersion,
-    };
-    self.postMessage(response);
+    });
     return;
   }
 
   if (type !== 'batch_jscad_to_stl') {
-    const response: JscadWorkerResponse = {
+    sendResponse({
       type: 'error',
       error: `Unknown message type: ${type}`,
       configVersion,
-    };
-    self.postMessage(response);
+    });
     return;
   }
 
   try {
-    const originalResults: ResultsLike | undefined = results;
-    if (!originalResults || !originalResults.cases) {
+    if (!results || !results.cases) {
       throw new Error('No results or cases provided to process.');
     }
-
-    // Clone shallowly to avoid mutating caller's object directly
-    const updatedResults: ResultsLike = { ...originalResults };
-    updatedResults.cases = { ...originalResults.cases };
-
-    const entries = Object.entries(updatedResults.cases);
-    if (entries.length === 0) {
-      throw new Error('No JSCAD cases to process.');
-    }
-
-    // Process each case sequentially
-    for (const [name, caseObj] of entries) {
-      const jscad = caseObj?.jscad as string | undefined;
-      if (!jscad || jscad.trim() === '') {
-        // Keep existing entry as-is
-        continue;
-      }
-
-      try {
-        // Convert JSCAD to STL
-        const result = convertFn({ source: jscad, format: 'stla' });
-
-        const firstPart = result?.data?.[0];
-        let stlContent: string | null = null;
-
-        if (typeof firstPart === 'string') {
-          stlContent = firstPart;
-        } else if (firstPart instanceof ArrayBuffer && utf8Decoder) {
-          stlContent = utf8Decoder.decode(new Uint8Array(firstPart));
-        } else if (ArrayBuffer.isView(firstPart) && utf8Decoder) {
-          const view = firstPart as ArrayBufferViewLike;
-          const array = new Uint8Array(
-            view.buffer,
-            view.byteOffset,
-            view.byteLength
-          );
-          stlContent = utf8Decoder.decode(array);
-        }
-
-        if (!stlContent) {
-          console.warn(
-            `Generated STL content is empty or unsupported type for case: ${name}`
-          );
-          continue;
-        }
-
-        // Rename default STL header from "solid csg.js" to the specific case name for clarity
-        stlContent = stlContent.replace(/^solid csg\.js\b/, `solid ${name}`);
-
-        if (!stlContent || stlContent.trim() === '') {
-          console.warn(`Generated STL content is empty for case: ${name}`);
-          continue;
-        }
-
-        updatedResults.cases[name] = {
-          ...(updatedResults.cases[name] as any),
-          stl: stlContent,
-        };
-      } catch (caseError: unknown) {
-        const errorMessage =
-          caseError instanceof Error ? caseError.message : String(caseError);
-        console.error(`Failed to convert case ${name}: ${errorMessage}`);
-        // Continue with other cases even if one fails
-      }
-    }
-
-    const response: JscadWorkerResponse = {
-      type: 'success',
-      results: updatedResults,
-      configVersion,
-    };
-    self.postMessage(response);
+    performBatchConversion(results, configVersion);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const response: JscadWorkerResponse = {
+    sendResponse({
       type: 'error',
       error: `JSCAD to STL batch conversion failed: ${errorMessage}`,
       configVersion,
-    };
-    self.postMessage(response);
+    });
   }
 };
 
