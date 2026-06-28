@@ -183,7 +183,6 @@ const CameraController: React.FC<{
       perspectiveCamera.lookAt(boxCenter);
       perspectiveCamera.updateProjectionMatrix();
 
-      console.log('Camera positioned at distance:', distance);
     }
   }, [geometry, camera, size]);
 
@@ -215,7 +214,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
 
   React.useEffect(() => {
     try {
-      console.log('Parsing STL, length:', stl.length);
 
       // Parse STL data
       const parseStl = (stlString: string) => {
@@ -228,18 +226,10 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
           startsWithSolid &&
           (stlString.includes('facet') || stlString.includes('FACET'));
 
-        console.log('STL format detection:', {
-          startsWithSolid,
-          hasRequiredKeywords,
-          length: stlString.length,
-          preview: stlString.substring(0, 100),
-        });
 
         if (hasRequiredKeywords) {
-          console.log('Parsing as ASCII STL');
           return parseAsciiStl(stlString);
         } else {
-          console.log('Parsing as Binary STL');
           return parseBinaryStl(stlString);
         }
       };
@@ -313,9 +303,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         // Calculate expected file size
         const expectedSize = 84 + numTriangles * 50; // header + count + (50 bytes per triangle)
 
-        console.log(
-          `Binary STL: ${numTriangles} triangles, buffer size: ${buffer.byteLength}, expected: ${expectedSize}`
-        );
 
         if (buffer.byteLength < expectedSize) {
           throw new Error(
@@ -363,7 +350,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         return;
       }
 
-      console.log('Parsed vertices:', vertices.length / 3, 'triangles');
 
       // Create Three.js BufferGeometry
       const newGeometry = new THREE.BufferGeometry();
@@ -381,10 +367,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         const center = new THREE.Vector3();
         newGeometry.boundingBox.getCenter(center);
         newGeometry.translate(-center.x, -center.y, -center.z);
-        console.log(
-          'Geometry centered, bounding sphere radius:',
-          newGeometry.boundingSphere?.radius
-        );
       }
 
       setGeometry(newGeometry);
