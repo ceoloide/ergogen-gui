@@ -605,77 +605,81 @@ export const fetchConfigFromUrl = async (
     const visited = new Set<string>();
 
     while (queue.length > 0) {
-      const currentPath = queue.shift()!;
-      if (visited.has(currentPath)) continue;
-      visited.add(currentPath);
+      // Process current level of directories in parallel
+      const currentPaths = queue.splice(0, queue.length);
+      await Promise.all(
+        currentPaths.map(async (currentPath) => {
+          if (visited.has(currentPath)) return;
+          visited.add(currentPath);
 
-      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}?ref=${branch}`;
+          const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}?ref=${branch}`;
 
-      try {
-        const response = await fetch(apiUrl);
+          try {
+            const response = await fetch(apiUrl);
 
-        // Check rate limit
-        const bfsRateLimitCheck = checkRateLimit(response, apiUrl);
-        if (bfsRateLimitCheck.error && !rateLimitTracker.warning) {
-          rateLimitTracker.warning = bfsRateLimitCheck.error;
-        }
-        if (bfsRateLimitCheck.isLimitExceeded) {
-          throw new Error(bfsRateLimitCheck.error || 'Rate limit exceeded');
-        }
+            // Check rate limit
+            const bfsRateLimitCheck = checkRateLimit(response, apiUrl);
+            if (bfsRateLimitCheck.error && !rateLimitTracker.warning) {
+              rateLimitTracker.warning = bfsRateLimitCheck.error;
+            }
+            if (bfsRateLimitCheck.isLimitExceeded) {
+              throw new Error(bfsRateLimitCheck.error || 'Rate limit exceeded');
+            }
 
-        if (!response.ok) {
-          continue;
-        }
+            if (!response.ok) {
+              return;
+            }
 
-        const items = await response.json();
-        if (!Array.isArray(items)) continue;
+            const items = await response.json();
+            if (!Array.isArray(items)) return;
 
-        await Promise.all(
-          items.map(
-            async (item: {
-              type: string;
-              name: string;
-              download_url: string;
-              path: string;
-              url: string;
-            }) => {
-              if (item.type === 'file' && item.name.endsWith('.yaml')) {
-                const fileResponse = await fetch(item.download_url);
+            await Promise.all(
+              items.map(
+                async (item: {
+                  type: string;
+                  name: string;
+                  download_url: string;
+                  path: string;
+                  url: string;
+                }) => {
+                  if (item.type === 'file' && item.name.endsWith('.yaml')) {
+                    const fileResponse = await fetch(item.download_url);
 
-                // Check rate limit for YAML file download
-                const yamlRateLimitCheck = checkRateLimit(
-                  fileResponse,
-                  item.download_url
-                );
-                if (yamlRateLimitCheck.error && !rateLimitTracker.warning) {
-                  rateLimitTracker.warning = yamlRateLimitCheck.error;
-                }
-                if (yamlRateLimitCheck.isLimitExceeded) {
-                  throw new Error(
-                    yamlRateLimitCheck.error || 'Rate limit exceeded'
-                  );
-                }
+                    // Check rate limit for YAML file download
+                    const yamlRateLimitCheck = checkRateLimit(
+                      fileResponse,
+                      item.download_url
+                    );
+                    if (yamlRateLimitCheck.error && !rateLimitTracker.warning) {
+                      rateLimitTracker.warning = yamlRateLimitCheck.error;
+                    }
+                    if (yamlRateLimitCheck.isLimitExceeded) {
+                      throw new Error(
+                        yamlRateLimitCheck.error || 'Rate limit exceeded'
+                      );
+                    }
 
-                if (fileResponse.ok) {
-                  const content = await fileResponse.text();
-                  const filePath = item.path;
+                    if (fileResponse.ok) {
+                      const content = await fileResponse.text();
+                      const filePath = item.path;
 
-                  if (item.name === 'config.yaml') {
-                    configYamls.push({ path: filePath, content });
-                  } else {
-                    anyYamls.push({ path: filePath, content });
+                      if (item.name === 'config.yaml') {
+                        configYamls.push({ path: filePath, content });
+                      } else {
+                        anyYamls.push({ path: filePath, content });
+                      }
+                    }
+                  } else if (item.type === 'dir') {
+                    queue.push(item.path);
                   }
                 }
-              } else if (item.type === 'dir') {
-                queue.push(item.path);
-              }
-            }
-          )
-        );
-      } catch (_error) {
-        // Continue searching other directories
-        continue;
-      }
+              )
+            );
+          } catch (_error) {
+            // Continue searching other directories
+          }
+        })
+      );
     }
 
     return { configYamls, anyYamls };
@@ -794,107 +798,117 @@ export const fetchConfigFromUrl = async (
       };
     }
 
-    // Now fetch footprints from the footprints folder
+    // Now fetch footprints and .gitmodules in parallel
     const footprintsPath = configPath
       ? `${configPath}/footprints`
       : 'footprints';
     console.log(`[GitHub] Looking for footprints in: ${footprintsPath}`);
     const footprintsApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`;
-    const footprints = await fetchFootprintsFromDirectory(
-      footprintsApiUrl,
-      '',
-      rateLimitTracker
-    );
+    const gitmodulesUrl = getRawUrl(`${baseUrl}/blob/${branch}/.gitmodules`);
+
+    const [footprints, gitmodulesResponse] = await Promise.all([
+      fetchFootprintsFromDirectory(footprintsApiUrl, '', rateLimitTracker),
+      fetch(gitmodulesUrl).catch((err) => {
+        console.warn('[GitHub] Failed to fetch .gitmodules:', err);
+        return null;
+      }),
+    ]);
 
     // Check for .gitmodules to handle submodules
-    console.log('[GitHub] Checking for .gitmodules file');
-    try {
-      const gitmodulesUrl = getRawUrl(`${baseUrl}/blob/${branch}/.gitmodules`);
-      const gitmodulesResponse = await fetch(gitmodulesUrl);
+    if (gitmodulesResponse) {
+      console.log('[GitHub] Checking for .gitmodules file');
+      try {
+        // Check rate limit for .gitmodules fetch
+        const gitmodulesRateLimitCheck = checkRateLimit(
+          gitmodulesResponse,
+          gitmodulesUrl
+        );
+        if (gitmodulesRateLimitCheck.error && !rateLimitTracker.warning) {
+          rateLimitTracker.warning = gitmodulesRateLimitCheck.error;
+        }
+        if (gitmodulesRateLimitCheck.isLimitExceeded) {
+          throw new Error(
+            gitmodulesRateLimitCheck.error || 'Rate limit exceeded'
+          );
+        }
 
-      // Check rate limit for .gitmodules fetch
-      const gitmodulesRateLimitCheck = checkRateLimit(
-        gitmodulesResponse,
-        gitmodulesUrl
-      );
-      if (gitmodulesRateLimitCheck.error && !rateLimitTracker.warning) {
-        rateLimitTracker.warning = gitmodulesRateLimitCheck.error;
-      }
-      if (gitmodulesRateLimitCheck.isLimitExceeded) {
-        throw new Error(
-          gitmodulesRateLimitCheck.error || 'Rate limit exceeded'
+        if (gitmodulesResponse.ok) {
+          console.log('[GitHub] .gitmodules found, parsing submodules');
+          const gitmodulesContent = await gitmodulesResponse.text();
+          const submodules = parseGitmodules(gitmodulesContent);
+
+          // Process all submodules concurrently
+          await Promise.all(
+            submodules.map(async (submodule) => {
+              if (submodule.path.startsWith(footprintsPath)) {
+                console.log(
+                  `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
+                );
+                // Extract owner and repo from submodule URL
+                const submoduleMatch = submodule.url.match(
+                  /github\.com[/:]([^/]+)\/([^/.]+)/
+                );
+                if (submoduleMatch) {
+                  const [, subOwner, subRepo] = submoduleMatch;
+                  // Calculate the relative path for naming
+                  const relativePath = submodule.path.substring(
+                    footprintsPath.length + 1
+                  );
+                  console.log(
+                    `[GitHub] Submodule relative path: ${relativePath}`
+                  );
+                  // Try both main and master branches for the submodule
+                  let submoduleFootprints: GitHubFootprint[] = [];
+                  try {
+                    submoduleFootprints = await fetchFootprintsFromRepo(
+                      subOwner,
+                      subRepo,
+                      'main',
+                      '',
+                      rateLimitTracker
+                    );
+                  } catch (_e) {
+                    try {
+                      submoduleFootprints = await fetchFootprintsFromRepo(
+                        subOwner,
+                        subRepo,
+                        'master',
+                        '',
+                        rateLimitTracker
+                      );
+                    } catch (_e2) {
+                      console.warn(
+                        `Failed to fetch submodule footprints from ${submodule.url}`
+                      );
+                    }
+                  }
+                  // Prefix the footprint names with the relative path
+                  const prefixedFootprints = submoduleFootprints.map((fp) => ({
+                    name: relativePath ? `${relativePath}/${fp.name}` : fp.name,
+                    content: fp.content,
+                  }));
+                  console.log(
+                    `[GitHub] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
+                  );
+                  footprints.push(...prefixedFootprints);
+                }
+              } else {
+                console.log(
+                  `[GitHub] Skipping submodule (not in footprints): ${submodule.path}`
+                );
+              }
+            })
+          );
+        } else {
+          console.log('[GitHub] No .gitmodules file found');
+        }
+      } catch (error) {
+        // .gitmodules doesn't exist or couldn't be parsed, continue without submodules
+        console.warn(
+          '[GitHub] No .gitmodules found or failed to parse:',
+          error
         );
       }
-
-      if (gitmodulesResponse.ok) {
-        console.log('[GitHub] .gitmodules found, parsing submodules');
-        const gitmodulesContent = await gitmodulesResponse.text();
-        const submodules = parseGitmodules(gitmodulesContent);
-
-        // Filter submodules that are within the footprints folder
-        for (const submodule of submodules) {
-          if (submodule.path.startsWith(footprintsPath)) {
-            console.log(
-              `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
-            );
-            // Extract owner and repo from submodule URL
-            const submoduleMatch = submodule.url.match(
-              /github\.com[/:]([^/]+)\/([^/.]+)/
-            );
-            if (submoduleMatch) {
-              const [, subOwner, subRepo] = submoduleMatch;
-              // Calculate the relative path for naming
-              const relativePath = submodule.path.substring(
-                footprintsPath.length + 1
-              );
-              console.log(`[GitHub] Submodule relative path: ${relativePath}`);
-              // Try both main and master branches for the submodule
-              let submoduleFootprints: GitHubFootprint[] = [];
-              try {
-                submoduleFootprints = await fetchFootprintsFromRepo(
-                  subOwner,
-                  subRepo,
-                  'main',
-                  '',
-                  rateLimitTracker
-                );
-              } catch (_e) {
-                try {
-                  submoduleFootprints = await fetchFootprintsFromRepo(
-                    subOwner,
-                    subRepo,
-                    'master',
-                    '',
-                    rateLimitTracker
-                  );
-                } catch (_e2) {
-                  console.warn(
-                    `Failed to fetch submodule footprints from ${submodule.url}`
-                  );
-                }
-              }
-              // Prefix the footprint names with the relative path
-              const prefixedFootprints = submoduleFootprints.map((fp) => ({
-                name: relativePath ? `${relativePath}/${fp.name}` : fp.name,
-                content: fp.content,
-              }));
-              console.log(
-                `[GitHub] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
-              );
-              footprints.push(...prefixedFootprints);
-            }
-          } else {
-            console.log(
-              `[GitHub] Skipping submodule (not in footprints): ${submodule.path}`
-            );
-          }
-        }
-      } else {
-        console.log('[GitHub] No .gitmodules file found');
-      }
-    } catch (error) {
-      // .gitmodules doesn't exist or couldn't be parsed, continue without submodules
-      console.warn('[GitHub] No .gitmodules found or failed to parse:', error);
     }
 
     console.log(`[GitHub] Total footprints loaded: ${footprints.length}`);
