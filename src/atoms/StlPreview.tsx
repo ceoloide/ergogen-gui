@@ -323,10 +323,11 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
           );
         }
 
-        const vertices: number[] = [];
-        const normals: number[] = [];
+        const vertices = new Float32Array(numTriangles * 9);
+        const normals = new Float32Array(numTriangles * 9);
 
         let offset = 84;
+        let vOffset = 0;
         for (let i = 0; i < numTriangles; i++) {
           // Normal vector
           const nx = view.getFloat32(offset, true);
@@ -336,12 +337,15 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
 
           // Three vertices
           for (let j = 0; j < 3; j++) {
-            vertices.push(
-              view.getFloat32(offset, true),
-              view.getFloat32(offset + 4, true),
-              view.getFloat32(offset + 8, true)
-            );
-            normals.push(nx, ny, nz);
+            vertices[vOffset] = view.getFloat32(offset, true);
+            vertices[vOffset + 1] = view.getFloat32(offset + 4, true);
+            vertices[vOffset + 2] = view.getFloat32(offset + 8, true);
+
+            normals[vOffset] = nx;
+            normals[vOffset + 1] = ny;
+            normals[vOffset + 2] = nz;
+
+            vOffset += 3;
             offset += 12;
           }
 
@@ -350,8 +354,8 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         }
 
         return {
-          vertices: new Float32Array(vertices),
-          normals: new Float32Array(normals),
+          vertices,
+          normals,
         };
       };
 
