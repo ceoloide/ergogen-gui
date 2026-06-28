@@ -255,12 +255,6 @@ const ConfigContextProvider = ({
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
 
-  useEffect(() => {
-    console.log('--- ConfigContextProvider mounted ---');
-    return () => {
-      console.log('--- ConfigContextProvider unmounted ---');
-    };
-  }, []);
 
   /**
    * Effect to set error from hash fragment decoding if present.
@@ -282,7 +276,6 @@ const ConfigContextProvider = ({
   const handleErgogenWorkerMessage = useCallback(
     (event: MessageEvent<ErgogenWorkerResponse>) => {
       const response = event.data;
-      console.log('<<< Received message from Ergogen worker:', response.type);
 
       if (response.type === 'error') {
         console.error('--- Ergogen worker error:', response.error);
@@ -293,7 +286,6 @@ const ConfigContextProvider = ({
       }
 
       if (response.type === 'success') {
-        console.log('--- Ergogen worker success, processing results...');
 
         // Handle warnings
         if (response.warnings && response.warnings.length > 0) {
@@ -323,9 +315,6 @@ const ConfigContextProvider = ({
             if (jscadWorkerRef.current) {
               willConvertStl = true;
               setIsJscadConverting(true);
-              console.log(
-                '>>> Sending full results to JSCAD worker for STL conversion'
-              );
               const request: JscadWorkerRequest = {
                 type: 'batch_jscad_to_stl',
                 results: newResults as ResultsLike,
@@ -358,12 +347,8 @@ const ConfigContextProvider = ({
   const handleJscadWorkerMessage = useCallback(
     (event: MessageEvent<JscadWorkerResponse>) => {
       const response = event.data;
-      console.log('<<< Received message from JSCAD worker:', response.type);
 
       if (response.configVersion !== currentConfigVersion.current) {
-        console.log(
-          `Discarding stale STL result for version ${response.configVersion} (current: ${currentConfigVersion.current})`
-        );
         return;
       }
 
@@ -372,7 +357,6 @@ const ConfigContextProvider = ({
         setIsJscadConverting(false);
         setIsGenerating(false);
       } else if (response.type === 'success' && response.results) {
-        console.log('--- JSCAD worker success, applying updated results');
 
         setResults(response.results as Results);
         setResultsVersion((v) => v + 1);
@@ -388,22 +372,18 @@ const ConfigContextProvider = ({
    */
   useEffect(() => {
     if (!ergogenWorkerRef.current) {
-      console.log('Initializing Ergogen worker...');
       ergogenWorkerRef.current = createErgogenWorker();
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
-        console.log('Ergogen worker initialized.');
       } else {
         console.warn('Failed to initialize Ergogen worker.');
       }
     }
 
     if (!jscadWorkerRef.current) {
-      console.log('Initializing JSCAD worker...');
       jscadWorkerRef.current = createJscadWorker();
       if (jscadWorkerRef.current) {
         jscadWorkerRef.current.onmessage = handleJscadWorkerMessage;
-        console.log('JSCAD worker initialized.');
       } else {
         console.warn('Failed to initialize JSCAD worker.');
       }
@@ -413,12 +393,10 @@ const ConfigContextProvider = ({
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.terminate();
         ergogenWorkerRef.current = null;
-        console.log('Ergogen worker terminated.');
       }
       if (jscadWorkerRef.current) {
         jscadWorkerRef.current.terminate();
         jscadWorkerRef.current = null;
-        console.log('JSCAD worker terminated.');
       }
     };
   }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
@@ -567,7 +545,6 @@ const ConfigContextProvider = ({
       try {
         // Run the Ergogen process
         if (ergogenWorkerRef.current) {
-          console.log('>>> Sending Ergogen process requestt...');
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
             inputConfig,
