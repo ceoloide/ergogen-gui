@@ -499,25 +499,21 @@ const ConfigContextProvider = ({
 
       // Check for deprecated KiCad 5 footprints in the config and warn the user
       if (parsedConfig && parsedConfig.pcbs) {
-        const pcbs = Object.values(parsedConfig.pcbs) as Record<
-          string,
-          unknown
-        >[];
         let warningFound = false;
-        for (const pcb of pcbs) {
-          if (!pcb.template || pcb.template === 'kicad5') {
-            if (pcb.footprints) {
-              const footprints = Object.values(
-                pcb.footprints as Record<string, unknown>
-              ) as Record<string, unknown>[];
-              for (const footprint of footprints) {
+        for (const pcbKey in parsedConfig.pcbs) {
+          const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
+          if (!pcb.template || pcb.template === "kicad5") {
+            const footprints = pcb.footprints;
+            if (footprints) {
+              for (const fpKey in footprints) {
+                const footprint = footprints[fpKey];
                 if (
                   footprint &&
-                  typeof footprint.what === 'string' &&
-                  footprint.what.startsWith('ceoloide')
+                  typeof footprint.what === "string" &&
+                  footprint.what.startsWith("ceoloide")
                 ) {
                   setDeprecationWarning(
-                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
+                    "KiCad 5 is deprecated. Please add \"template: kicad8\" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer."
                   );
                   warningFound = true;
                   break;
@@ -530,7 +526,6 @@ const ConfigContextProvider = ({
           }
         }
       }
-
       // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
       // a simplified preview.
       // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
