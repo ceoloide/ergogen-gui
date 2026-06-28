@@ -245,53 +245,54 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
       };
 
       const parseAsciiStl = (stlString: string) => {
-        // Count facets for pre-allocation
-        let numFacets = 0;
-        let pos = stlString.indexOf('facet');
-        while (pos !== -1) {
-          numFacets++;
-          pos = stlString.indexOf('facet', pos + 5);
+        const vertices: number[] = [];
+        const normals: number[] = [];
+
+        const patternVertex =
+          /vertex\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)/g;
+        const patternNormal =
+          /facet normal\s+([\d.eD+-]+)\s+([\d.eD+-]+)\s+([\d.eD+-]+)/g;
+
+        let normalMatch;
+        let vertexMatch;
+
+        // Parse normals
+        const normalMatches: number[][] = [];
+        while ((normalMatch = patternNormal.exec(stlString)) !== null) {
+          normalMatches.push([
+            parseFloat(normalMatch[1]),
+            parseFloat(normalMatch[2]),
+            parseFloat(normalMatch[3]),
+          ]);
         }
 
-        const vertices = new Float32Array(numFacets * 9);
-        const normals = new Float32Array(numFacets * 9);
+        // Parse vertices
+        let normalIndex = 0;
+        while ((vertexMatch = patternVertex.exec(stlString)) !== null) {
+          vertices.push(
+            parseFloat(vertexMatch[1]),
+            parseFloat(vertexMatch[2]),
+            parseFloat(vertexMatch[3])
+          );
 
-        const pattern =
-          /(?:facet normal|vertex)\s+([\d.eED+-]+)\s+([\d.eED+-]+)\s+([\d.eED+-]+)/g;
+          // Assign normal to each vertex (3 vertices per facet)
+          if (normalMatches[normalIndex]) {
+            normals.push(
+              normalMatches[normalIndex][0],
+              normalMatches[normalIndex][1],
+              normalMatches[normalIndex][2]
+            );
+          }
 
-        let match;
-        let vOffset = 0;
-        let nx = 0,
-          ny = 0,
-          nz = 0;
-
-        while ((match = pattern.exec(stlString)) !== null) {
-          const x = parseFloat(match[1]);
-          const y = parseFloat(match[2]);
-          const z = parseFloat(match[3]);
-
-          if (match[0].startsWith('f')) {
-            nx = x;
-            ny = y;
-            nz = z;
-          } else if (vOffset < vertices.length) {
-            vertices[vOffset] = x;
-            vertices[vOffset + 1] = y;
-            vertices[vOffset + 2] = z;
-
-            normals[vOffset] = nx;
-            normals[vOffset + 1] = ny;
-            normals[vOffset + 2] = nz;
-
-            vOffset += 3;
+          // Move to next normal after 3 vertices
+          if ((vertices.length / 3) % 3 === 0) {
+            normalIndex++;
           }
         }
 
         return {
-          vertices:
-            vOffset === vertices.length ? vertices : vertices.subarray(0, vOffset),
-          normals:
-            vOffset === normals.length ? normals : normals.subarray(0, vOffset),
+          vertices: new Float32Array(vertices),
+          normals: new Float32Array(normals),
         };
       };
 
