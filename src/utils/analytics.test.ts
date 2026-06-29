@@ -48,7 +48,6 @@ describe('trackEvent', () => {
   });
 
   it('should not throw or call anything when window.gtag is undefined', () => {
-
     (window as any).gtag = undefined;
 
     expect(() => trackEvent('test_event')).not.toThrow();

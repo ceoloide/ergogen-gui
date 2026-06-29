@@ -140,7 +140,7 @@ export const checkForConflict = (
   return checkForInjectionConflict(
     'footprint',
     name,
-    existingInjections,
+    existingNamesSet ? undefined : existingInjections,
     existingNamesSet
   );
 };
