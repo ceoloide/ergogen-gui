@@ -48,7 +48,6 @@ describe('trackEvent', () => {
   });
 
   it('should not throw or call anything when window.gtag is undefined', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).gtag = undefined;
 
     expect(() => trackEvent('test_event')).not.toThrow();

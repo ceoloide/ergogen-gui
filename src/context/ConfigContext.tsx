@@ -255,7 +255,6 @@ const ConfigContextProvider = ({
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
 
-
   /**
    * Effect to set error from hash fragment decoding if present.
    * This handles errors from initial page load with invalid shared configurations.
@@ -286,7 +285,6 @@ const ConfigContextProvider = ({
       }
 
       if (response.type === 'success') {
-
         // Handle warnings
         if (response.warnings && response.warnings.length > 0) {
           setDeprecationWarning(
@@ -357,7 +355,6 @@ const ConfigContextProvider = ({
         setIsJscadConverting(false);
         setIsGenerating(false);
       } else if (response.type === 'success' && response.results) {
-
         setResults(response.results as Results);
         setResultsVersion((v) => v + 1);
         setIsJscadConverting(false);
@@ -502,18 +499,18 @@ const ConfigContextProvider = ({
         let warningFound = false;
         for (const pcbKey in parsedConfig.pcbs) {
           const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
-          if (!pcb.template || pcb.template === "kicad5") {
+          if (!pcb.template || pcb.template === 'kicad5') {
             const footprints = pcb.footprints;
             if (footprints) {
               for (const fpKey in footprints) {
                 const footprint = footprints[fpKey];
                 if (
                   footprint &&
-                  typeof footprint.what === "string" &&
-                  footprint.what.startsWith("ceoloide")
+                  typeof footprint.what === 'string' &&
+                  footprint.what.startsWith('ceoloide')
                 ) {
                   setDeprecationWarning(
-                    "KiCad 5 is deprecated. Please add \"template: kicad8\" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer."
+                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
                   );
                   warningFound = true;
                   break;

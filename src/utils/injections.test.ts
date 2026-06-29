@@ -4,6 +4,7 @@ import {
   mergeInjections,
   mergeInjectionArrays,
   getInjectionConflicts,
+  mergeInjectionArraysWithResolution,
 } from './injections';
 
 describe('injections utilities', () => {
@@ -416,6 +417,43 @@ describe('injections utilities', () => {
         'new_content',
       ]);
       expect(result[1].conflict.hasConflict).toBe(true);
+    });
+  });
+
+  describe('performance regression', () => {
+    it('handles large batch of injections efficiently with "keep-both"', () => {
+      // Arrange
+      const numExisting = 1000;
+      const numNew = 100;
+      const existingInjections: string[][] = [];
+      for (let i = 0; i < numExisting; i++) {
+        existingInjections.push(['footprint', `footprint_${i}`, 'content']);
+      }
+
+      const newInjections: string[][] = [];
+      for (let i = 0; i < numNew; i++) {
+        // All of these conflict with existing ones
+        newInjections.push(['footprint', `footprint_${i}`, 'new_content']);
+      }
+
+      // Act
+      const startTime = performance.now();
+      const result = mergeInjectionArraysWithResolution(
+        newInjections,
+        existingInjections,
+        'keep-both'
+      );
+      const endTime = performance.now();
+
+      // Assert
+      expect(result).toHaveLength(numExisting + numNew);
+      // The test should be very fast (well under 100ms even in CI)
+      expect(endTime - startTime).toBeLessThan(100);
+
+      // Verify some unique names were generated correctly
+      const generatedNames = result.slice(numExisting).map((inj) => inj[1]);
+      expect(generatedNames).toContain('footprint_0_1');
+      expect(generatedNames).toContain(`footprint_${numNew - 1}_1`);
     });
   });
 });
