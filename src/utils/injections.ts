@@ -133,16 +133,14 @@ export const generateUniqueInjectionName = (
     return baseName;
   }
 
-  const existingNames = new Set(
-    existingInjections
-      .filter((inj) => isValidInjection(inj) && inj[0] === type)
-      .map((inj) => inj[1])
-  );
+  const existingNames = existingInjections
+    .filter((inj) => isValidInjection(inj) && inj[0] === type)
+    .map((inj) => inj[1]);
 
   let counter = 1;
   let newName = `${baseName}_${counter}`;
 
-  while (existingNames.has(newName)) {
+  while (existingNames.includes(newName)) {
     counter++;
     newName = `${baseName}_${counter}`;
   }
