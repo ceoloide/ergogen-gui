@@ -450,28 +450,27 @@ const ConfigContextProvider = ({
   /**
    * Parses a string as either JSON or YAML.
    * @param {string} inputString - The string to parse.
-   * @returns {[string, object | null]} A tuple containing the detected type ('json', 'yaml', or 'UNKNOWN') and the parsed object, or null if parsing fails.
+   * @returns {[string, { [key: string]: unknown[] } | null]} A tuple containing the detected type ("json", "yaml", or "UNKNOWN") and the parsed { [key: string]: unknown[] }, or null if parsing fails.
    */
   const parseConfig = useCallback(
     (inputString: string): [string, { [key: string]: unknown[] } | null] => {
-      let type = 'UNKNOWN';
-      let parsedConfig = null;
-
       try {
-        parsedConfig = JSON.parse(inputString);
-        type = 'json';
+        const parsedConfig = JSON.parse(inputString);
+        return ["json", parsedConfig];
       } catch (_e: unknown) {
-        // Input is not valid JSON
+        // Input is not valid JSON, try YAML
       }
 
       try {
-        parsedConfig = yaml.load(inputString);
-        type = 'yaml';
+        const parsedConfig = yaml.load(inputString) as {
+          [key: string]: unknown[];
+        } | null;
+        return ["yaml", parsedConfig];
       } catch (_e: unknown) {
         // Input is not valid YAML
       }
 
-      return [type, parsedConfig];
+      return ["UNKNOWN", null];
     },
     []
   );
@@ -498,34 +497,30 @@ const ConfigContextProvider = ({
       currentConfigVersion.current += 1; // Increment version at the start of generation
 
       // Check for deprecated KiCad 5 footprints in the config and warn the user
-      if (parsedConfig && parsedConfig.pcbs) {
-        let warningFound = false;
-        for (const pcbKey in parsedConfig.pcbs) {
-          const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
+      if (parsedConfig?.pcbs) {
+        const pcbs = parsedConfig.pcbs as Record<string, unknown>;
+        checkWarning: for (const pcbKey in pcbs) {
+          const pcb = pcbs[pcbKey] as Record<string, unknown>;
           if (!pcb.template || pcb.template === "kicad5") {
-            const footprints = pcb.footprints;
+            const footprints = pcb.footprints as Record<string, unknown>;
             if (footprints) {
               for (const fpKey in footprints) {
-                const footprint = footprints[fpKey];
+                const footprint = footprints[fpKey] as Record<string, unknown>;
                 if (
-                  footprint &&
-                  typeof footprint.what === "string" &&
+                  typeof footprint?.what === "string" &&
                   footprint.what.startsWith("ceoloide")
                 ) {
                   setDeprecationWarning(
                     "KiCad 5 is deprecated. Please add \"template: kicad8\" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer."
                   );
-                  warningFound = true;
-                  break;
+                  break checkWarning;
                 }
               }
             }
           }
-          if (warningFound) {
-            break;
-          }
         }
       }
+
       // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
       // a simplified preview.
       // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
