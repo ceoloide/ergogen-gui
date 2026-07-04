@@ -273,7 +273,7 @@ const Header = (): JSX.Element => {
             <VersionText
               href={versionInfo.url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               aria-label={`View Ergogen ${versionInfo.label} on GitHub`}
               data-testid="version-link"
             >
