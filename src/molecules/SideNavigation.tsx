@@ -182,7 +182,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             <VersionText
               href={versionInfo.url}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               onClick={onClose}
               aria-label={`View Ergogen ${versionInfo.label} on GitHub`}
               data-testid="side-nav-version-link"

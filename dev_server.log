@@ -1,0 +1,94 @@
+yarn run v1.22.22
+$ yarn run build-ergogen && yarn run generate-previews
+$ ./patch/patch_ergogen.sh && cd node_modules/ergogen && npm install --legacy-peer-deps && npm run build && cp dist/ergogen.js ../../public/dependencies/ergogen.js
+Installing Ergogen version 0.4.0...
+npm error code E404
+npm error 404 Not Found - GET https://registry.yarnpkg.com/0.4.0 - Not found
+npm error 404
+npm error 404  '0.4.0@*' is not in this registry.
+npm error 404
+npm error 404 Note that you can also install from a
+npm error 404 tarball, folder, http url, or git url.
+npm error A complete log of this run can be found in: /home/jules/.npm/_logs/2026-07-04T18_57_27_599Z-debug-0.log
+Patching Ergogen...
+Removing existing @ceoloide's footprint library
+Cloning into 'node_modules/ergogen/src/footprints/ceoloide'...
+Removing existing @infused-kim's footprint library
+Cloning into 'node_modules/ergogen/src/footprints/infused-kim'...
+Patching footprints/index.js...
+
+added 1 package, and audited 292 packages in 1s
+
+51 packages are looking for funding
+  run `npm fund` for details
+
+7 vulnerabilities (1 low, 5 moderate, 1 high)
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> ergogen@4.2.1 build
+> rollup -c
+
+[36m
+[1msrc/ergogen.js[22m → [1mdist/ergogen.js[22m...[39m
+[32mcreated [1mdist/ergogen.js[22m in [1m1.1s[22m[39m
+$ ts-node --project scripts/tsconfig.json scripts/generate-previews.js
+Generating preview for Absolem...
+  -> Saved to /app/public/images/previews/absolem.svg
+Generating preview for Atreus...
+  -> Saved to /app/public/images/previews/atreus.svg
+Generating preview for A. Dux...
+  -> Saved to /app/public/images/previews/a._dux.svg
+Generating preview for Corney Island...
+  -> Saved to /app/public/images/previews/corney_island.svg
+Generating preview for Sweep-like...
+  -> Saved to /app/public/images/previews/sweep-like.svg
+Generating preview for Reviung41...
+  -> Saved to /app/public/images/previews/reviung41.svg
+Generating preview for Tiny20...
+  -> Saved to /app/public/images/previews/tiny20.svg
+Generating preview for Wubbo...
+  -> Saved to /app/public/images/previews/wubbo.svg
+Generating preview for Alpha...
+  -> Saved to /app/public/images/previews/alpha.svg
+Generating preview for Plank...
+  -> Saved to /app/public/images/previews/plank.svg
+Generated previews:
+a._dux.svg
+absolem.svg
+alpha.svg
+atreus.svg
+corney_island.svg
+plank.svg
+reviung41.svg
+sweep-like.svg
+tiny20.svg
+wubbo.svg
+$ REACT_APP_ERGOGEN_VERSION=$ERGOGEN_VERSION react-scripts --openssl-legacy-provider start
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+(node:122328) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:122328) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+Starting the development server...
+
+Compiled with warnings.
+
+Failed to parse source map from '/app/node_modules/@mediapipe/tasks-vision/vision_bundle_mjs.js.map' file: Error: ENOENT: no such file or directory, open '/app/node_modules/@mediapipe/tasks-vision/vision_bundle_mjs.js.map'
+
+Search for the keywords to learn more about each warning.
+To ignore, add // eslint-disable-next-line to the line before.
+
+WARNING in ./node_modules/@mediapipe/tasks-vision/vision_bundle.mjs
+Module Warning (from ./node_modules/source-map-loader/dist/cjs.js):
+Failed to parse source map from '/app/node_modules/@mediapipe/tasks-vision/vision_bundle_mjs.js.map' file: Error: ENOENT: no such file or directory, open '/app/node_modules/@mediapipe/tasks-vision/vision_bundle_mjs.js.map'
+
+webpack compiled with 1 warning
+No issues found.
+error Command failed with signal "SIGTERM".
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
