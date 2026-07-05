@@ -155,7 +155,7 @@ const InjectionRow = ({
         </StyledLinkButton>
         <StyledLinkButton
           target={'_blank'}
-          rel={'noreferrer'}
+          rel={'noopener noreferrer'}
           download={`${injection.name.split('/').reverse()[0]}.js`}
           href={window.URL.createObjectURL(
             new Blob([injection.content], { type: 'octet/stream' })
