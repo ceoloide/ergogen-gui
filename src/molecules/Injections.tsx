@@ -1,16 +1,20 @@
 import InjectionRow from '../atoms/InjectionRow';
 import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
+import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
-import { Dispatch, SetStateAction, useRef } from 'react';
+import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import GrowButton from '../atoms/GrowButton';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
+import Title from '../atoms/Title';
 
 const ActionsContainer = styled.div`
   display: flex;
+  margin-left: 0.5rem;
+  margin-left: 0.5rem;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 0.5rem;
 `;
 
 const IconButton = styled(GrowButton)`
@@ -24,12 +28,38 @@ const IconButton = styled(GrowButton)`
  */
 const InjectionsContainer = styled.div`
   display: flex;
+  margin-left: 0.5rem;
   flex-direction: column;
   flex-grow: 1;
+  gap: 0.5rem;
+`;
+const TabsContainer = styled.div`
+  display: flex;
+  margin-left: 0.5rem;
+  border-bottom: 1px solid ${theme.colors.border};
+  margin-left: 0.5rem;
+  gap: 16px;
+`;
+
+const TabButton = styled.button<{ $active: boolean }>`
+  background: none;
+  border: none;
+  color: ${(props) =>
+    props.$active ? theme.colors.text : theme.colors.textDark};
+  padding: 0.75rem 0;
+  cursor: pointer;
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
+  border-bottom: 2px solid
+    ${(props) => (props.$active ? theme.colors.accent : 'transparent')};
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    color: ${theme.colors.text};
+  }
 `;
 
 // Use the shared Title component from atoms
-import Title from '../atoms/Title';
 
 /**
  * Props for the Injections component.
@@ -67,10 +97,17 @@ const Injections = ({
   'data-testid': dataTestId,
 }: Props) => {
   const footprints: InjectionArr = [];
+  const outlines: InjectionArr = [];
   const templates: InjectionArr = [];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
+  const [activeUploadType, setActiveUploadType] = useState<
+    'footprint' | 'outline' | 'template'
+  >('footprint');
+  const [activeTab, setActiveTab] = useState<
+    'footprints' | 'outlines' | 'templates'
+  >('footprints');
 
   // Use the injection conflict resolution hook
   const {
@@ -100,8 +137,14 @@ const Injections = ({
     for (let i = 0; i < injectionInput.length; i++) {
       const injection = injectionInput[i];
       if (injection.length === 3) {
-        const collection =
-          injection[0] === 'footprint' ? footprints : templates;
+        let collection = templates;
+        if (injection[0] === 'footprint') {
+          collection = footprints;
+        } else if (injection[0] === 'outline') {
+          collection = outlines;
+        } else if (injection[0] === 'template') {
+          collection = templates;
+        }
         collection.push({
           key: i,
           type: injection[0],
@@ -133,6 +176,38 @@ const Injections = ({
     }
   };
 
+  const handleNewOutline = () => {
+    const nextKey = configContext?.injectionInput?.length || 0;
+    const newInjection = {
+      key: nextKey,
+      type: 'outline',
+      name: `custom_outline_${nextKey + 1}`,
+      content:
+        'const u = require(\'../utils\');\n\nmodule.exports = (config, name, points, outlines, units) => {\n    const paths = [\n        ""  // Add your SVG path(s) here\n    ];\n    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);\n};',
+    };
+    setInjectionToEdit(newInjection);
+    // Show editor on mobile when new injection is created
+    if (onInjectionSelect) {
+      onInjectionSelect();
+    }
+  };
+
+  const handleNewTemplate = () => {
+    const nextKey = configContext?.injectionInput?.length || 0;
+    const newInjection = {
+      key: nextKey,
+      type: 'template',
+      name: `custom_template_${nextKey + 1}`,
+      content:
+        "const m = require('makerjs')\nconst version = require('../../package.json').version\n\nmodule.exports = {\n    convert_outline: (model, layer) => {\n        return ``;  // Return your converted outlines\n    },\n    body: params => {\n        return ``;  // Add your template text here\n    }\n}",
+    };
+    setInjectionToEdit(newInjection);
+    // Show editor on mobile when new injection is created
+    if (onInjectionSelect) {
+      onInjectionSelect();
+    }
+  };
+
   const handleLoadFiles = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -145,7 +220,7 @@ const Injections = ({
       if (file.name.endsWith('.js')) {
         const content = await file.text();
         const name = file.name.replace(/\.js$/, '');
-        newInjections.push(['footprint', name, content]);
+        newInjections.push([activeUploadType, name, content]);
       }
     }
 
@@ -175,7 +250,7 @@ const Injections = ({
         const pathParts = file.webkitRelativePath.split('/');
         pathParts.shift(); // Remove the top-level folder
         const name = pathParts.join('/').replace(/\.js$/, '');
-        newInjections.push(['footprint', name, content]);
+        newInjections.push([activeUploadType, name, content]);
       }
     }
 
@@ -200,59 +275,213 @@ const Injections = ({
           data-testid="conflict-resolution-dialog"
         />
       )}
-      <Title>Custom Footprints</Title>
-      {footprints.map((footprint) => {
-        return (
-          <InjectionRow
-            key={footprint.key}
-            injection={footprint}
-            setInjectionToEdit={(injection) => {
-              setInjectionToEdit(injection);
-              // Show editor on mobile when injection is selected
-              if (onInjectionSelect) {
-                onInjectionSelect();
-              }
-            }}
-            deleteInjection={deleteInjection}
-            previewKey={injectionToEdit.name}
-            data-testid={dataTestId && `${dataTestId}-${footprint.name}`}
-          />
-        );
-      })}
-      {/* <h3>Custom Templates</h3>
-      {
-        templates.map(
-          (template, i) => {
-            return <InjectionRow key={i} {...template} setInjection={setInjection} />;
-          }
-        )
-      } */}
+      <Title>Custom Libraries</Title>
+      <TabsContainer>
+        <TabButton
+          $active={activeTab === 'footprints'}
+          onClick={() => {
+            setActiveTab('footprints');
+            setActiveUploadType('footprint');
+          }}
+          data-testid="tab-footprints"
+        >
+          Footprints
+        </TabButton>
+        <TabButton
+          $active={activeTab === 'outlines'}
+          onClick={() => {
+            setActiveTab('outlines');
+            setActiveUploadType('outline');
+          }}
+          data-testid="tab-outlines"
+        >
+          Outlines
+        </TabButton>
+        <TabButton
+          $active={activeTab === 'templates'}
+          onClick={() => {
+            setActiveTab('templates');
+            setActiveUploadType('template');
+          }}
+          data-testid="tab-templates"
+        >
+          Templates
+        </TabButton>
+      </TabsContainer>
 
-      <ActionsContainer>
-        <GrowButton
-          onClick={handleNewFootprint}
-          data-testid="add-footprint"
-          aria-label="Add new custom footprint"
-        >
-          <span className="material-symbols-outlined">add</span>
-        </GrowButton>
-        <IconButton
-          onClick={() => fileInputRef.current?.click()}
-          data-testid="load-footprint-files"
-          aria-label="Load custom footprint files"
-          title="Load footprint files"
-        >
-          <span className="material-symbols-outlined">upload_file</span>
-        </IconButton>
-        <IconButton
-          onClick={() => folderInputRef.current?.click()}
-          data-testid="load-footprint-folder"
-          aria-label="Load custom footprint folder"
-          title="Load footprint folder"
-        >
-          <span className="material-symbols-outlined">drive_folder_upload</span>
-        </IconButton>
-      </ActionsContainer>
+      {activeTab === 'footprints' && (
+        <>
+          {footprints.map((footprint) => {
+            return (
+              <InjectionRow
+                key={footprint.key}
+                injection={footprint}
+                setInjectionToEdit={(injection) => {
+                  setInjectionToEdit(injection);
+                  // Show editor on mobile when injection is selected
+                  if (onInjectionSelect) {
+                    onInjectionSelect();
+                  }
+                }}
+                deleteInjection={deleteInjection}
+                previewKey={injectionToEdit.name}
+                data-testid={dataTestId && `${dataTestId}-${footprint.name}`}
+              />
+            );
+          })}
+
+          <ActionsContainer>
+            <GrowButton
+              onClick={handleNewFootprint}
+              data-testid="add-footprint"
+              aria-label="Add new custom footprint"
+              title="Add footprint"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </GrowButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('footprint');
+                setTimeout(() => fileInputRef.current?.click(), 0);
+              }}
+              data-testid="load-footprint-files"
+              aria-label="Load custom footprint files"
+              title="Load footprint files"
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+            </IconButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('footprint');
+                setTimeout(() => folderInputRef.current?.click(), 0);
+              }}
+              data-testid="load-footprint-folder"
+              aria-label="Load custom footprint folder"
+              title="Load footprint folder"
+            >
+              <span className="material-symbols-outlined">
+                drive_folder_upload
+              </span>
+            </IconButton>
+          </ActionsContainer>
+        </>
+      )}
+
+      {activeTab === 'outlines' && (
+        <>
+          {outlines.map((outline) => {
+            return (
+              <InjectionRow
+                key={outline.key}
+                injection={outline}
+                setInjectionToEdit={(injection) => {
+                  setInjectionToEdit(injection);
+                  // Show editor on mobile when injection is selected
+                  if (onInjectionSelect) {
+                    onInjectionSelect();
+                  }
+                }}
+                deleteInjection={deleteInjection}
+                previewKey={injectionToEdit.name}
+                data-testid={dataTestId && `${dataTestId}-${outline.name}`}
+              />
+            );
+          })}
+
+          <ActionsContainer>
+            <GrowButton
+              onClick={handleNewOutline}
+              data-testid="add-outline"
+              aria-label="Add new custom outline"
+              title="Add outline"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </GrowButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('outline');
+                setTimeout(() => fileInputRef.current?.click(), 0);
+              }}
+              data-testid="load-outline-files"
+              aria-label="Load custom outline files"
+              title="Load outline files"
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+            </IconButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('outline');
+                setTimeout(() => folderInputRef.current?.click(), 0);
+              }}
+              data-testid="load-outline-folder"
+              aria-label="Load custom outline folder"
+              title="Load outline folder"
+            >
+              <span className="material-symbols-outlined">
+                drive_folder_upload
+              </span>
+            </IconButton>
+          </ActionsContainer>
+        </>
+      )}
+
+      {activeTab === 'templates' && (
+        <>
+          {templates.map((template) => {
+            return (
+              <InjectionRow
+                key={template.key}
+                injection={template}
+                setInjectionToEdit={(injection) => {
+                  setInjectionToEdit(injection);
+                  // Show editor on mobile when injection is selected
+                  if (onInjectionSelect) {
+                    onInjectionSelect();
+                  }
+                }}
+                deleteInjection={deleteInjection}
+                previewKey={injectionToEdit.name}
+                data-testid={dataTestId && `${dataTestId}-${template.name}`}
+              />
+            );
+          })}
+
+          <ActionsContainer>
+            <GrowButton
+              onClick={handleNewTemplate}
+              data-testid="add-template"
+              aria-label="Add new custom template"
+              title="Add template"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </GrowButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('template');
+                setTimeout(() => fileInputRef.current?.click(), 0);
+              }}
+              data-testid="load-template-files"
+              aria-label="Load custom template files"
+              title="Load template files"
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+            </IconButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('template');
+                setTimeout(() => folderInputRef.current?.click(), 0);
+              }}
+              data-testid="load-template-folder"
+              aria-label="Load custom template folder"
+              title="Load template folder"
+            >
+              <span className="material-symbols-outlined">
+                drive_folder_upload
+              </span>
+            </IconButton>
+          </ActionsContainer>
+        </>
+      )}
       <input
         type="file"
         ref={fileInputRef}

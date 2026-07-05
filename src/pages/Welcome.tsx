@@ -284,8 +284,10 @@ const Welcome = () => {
    * Processes footprints (or any injections) with conflict resolution.
    * Converts GitHubFootprint[] to string[][] and uses the conflict resolution hook.
    */
-  const processFootprints = async (
+  const processInjections = async (
     footprints: GitHubFootprint[],
+    outlines: GitHubFootprint[],
+    templates: GitHubFootprint[],
     config: string,
     resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]
@@ -294,12 +296,12 @@ const Welcome = () => {
       throw new Error('Configuration context not available');
     }
 
-    // Convert footprints to injection array format
-    const injections: string[][] = footprints.map((fp) => [
-      'footprint',
-      fp.name,
-      fp.content,
-    ]);
+    // Convert footprints, outlines, and templates to injection array format
+    const injections: string[][] = [
+      ...footprints.map((fp) => ['footprint', fp.name, fp.content]),
+      ...outlines.map((ot) => ['outline', ot.name, ot.content]),
+      ...templates.map((tmpl) => ['template', tmpl.name, tmpl.content]),
+    ];
 
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
@@ -356,7 +358,12 @@ const Welcome = () => {
 
           try {
             // Process footprints with conflict resolution
-            await processFootprints(result.footprints, result.config);
+            await processInjections(
+              result.footprints,
+              result.outlines,
+              result.templates || [],
+              result.config
+            );
           } catch (error) {
             // If footprint processing fails, don't load the config
             throw new Error(
@@ -406,7 +413,12 @@ const Welcome = () => {
       const result = await loadLocalFile(file);
 
       // Process footprints with conflict resolution
-      await processFootprints(result.footprints, result.config);
+      await processInjections(
+        result.footprints,
+        result.outlines,
+        result.templates || [],
+        result.config
+      );
     } catch (error) {
       setError(
         `Failed to load local file: ${error instanceof Error ? error.message : 'Unknown error'}`

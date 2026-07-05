@@ -99,6 +99,8 @@ export type GitHubFootprint = {
 type GitHubLoadResult = {
   config: string;
   footprints: GitHubFootprint[];
+  outlines: GitHubFootprint[];
+  templates: GitHubFootprint[];
   configPath: string;
   rateLimitWarning?: string;
 };
@@ -111,7 +113,6 @@ type GitHubLoadResult = {
 const parseGitmodules = (
   content: string
 ): Array<{ path: string; url: string }> => {
-  console.log('[GitHub] Parsing .gitmodules file');
   const submodules: Array<{ path: string; url: string }> = [];
   const lines = content.split('\n');
   let currentSubmodule: { path?: string; url?: string } = {};
@@ -142,7 +143,6 @@ const parseGitmodules = (
     });
   }
 
-  console.log(`[GitHub] Found ${submodules.length} submodules:`, submodules);
   return submodules;
 };
 
@@ -219,10 +219,10 @@ const fetchFootprintsFromRepo = async (
             if (contentResponse.ok) {
               const content = await contentResponse.text();
               // Construct the footprint name from path and filename without extension
-              const fileName = item.name.replace(/\.js$/, '');
-              const name = basePath ? `${basePath}/${fileName}` : fileName;
-              console.log(`[GitHub] Loaded footprint: ${name}`);
-              footprints.push({ name, content });
+              const name = item.name.replace(/\.js$/, '');
+              const fullName = basePath ? `${basePath}/${name}` : name;
+              console.log(`[GitHub] Loaded footprint: ${fullName}`);
+              footprints.push({ name: fullName, content });
             }
           } else if (item.type === 'dir') {
             // Recursively fetch from subdirectory
@@ -240,7 +240,7 @@ const fetchFootprintsFromRepo = async (
       )
     );
   } catch (error) {
-    console.warn('[GitHub] Failed to fetch footprints from repo:', error);
+    console.warn(`[GitHub] Error fetching from repo ${owner}/${repo}:`, error);
   }
 
   console.log(
@@ -250,9 +250,10 @@ const fetchFootprintsFromRepo = async (
 };
 
 /**
- * Recursively fetches all .js files from a GitHub directory and its subdirectories.
- * @param {string} apiUrl - The GitHub API URL for the directory.
+ * Recursively fetches all .js files from a GitHub directory API URL.
+ * @param {string} apiUrl - The GitHub API URL for the directory contents.
  * @param {string} basePath - The base path for constructing footprint names.
+ * @param {{warning: string | null}} rateLimitTracker - Mutable object to track rate limit warnings.
  * @returns {Promise<GitHubFootprint[]>} A promise that resolves with the list of footprints.
  */
 const fetchFootprintsFromDirectory = async (
@@ -445,6 +446,8 @@ export const fetchConfigFromUrl = async (
       return {
         config,
         footprints: [],
+        outlines: [],
+        templates: [],
         configPath: '',
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -466,6 +469,8 @@ export const fetchConfigFromUrl = async (
       return {
         config,
         footprints: [],
+        outlines: [],
+        templates: [],
         configPath: '',
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -474,11 +479,29 @@ export const fetchConfigFromUrl = async (
     const [, owner, repo, branch, filePath] = urlMatch;
     const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
     const footprintsPath = dirPath ? `${dirPath}/footprints` : 'footprints';
-    console.log(`[GitHub] Looking for footprints in: ${footprintsPath}`);
+    const outlinesPath = dirPath ? `${dirPath}/outlines` : 'outlines';
+    const templatesPath = dirPath ? `${dirPath}/templates` : 'templates';
 
+    console.log(`[GitHub] Looking for footprints in: ${footprintsPath}`);
     const footprintsApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`;
     const footprints = await fetchFootprintsFromDirectory(
       footprintsApiUrl,
+      '',
+      rateLimitTracker
+    );
+
+    console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
+    const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
+    const outlines = await fetchFootprintsFromDirectory(
+      outlinesApiUrl,
+      '',
+      rateLimitTracker
+    );
+
+    console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
+    const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
+    const templates = await fetchFootprintsFromDirectory(
+      templatesApiUrl,
       '',
       rateLimitTracker
     );
@@ -511,7 +534,24 @@ export const fetchConfigFromUrl = async (
         const submodules = parseGitmodules(gitmodulesContent);
 
         for (const submodule of submodules) {
-          if (submodule.path.startsWith(footprintsPath)) {
+          if (
+            submodule.path.startsWith(footprintsPath) ||
+            submodule.path.startsWith(outlinesPath) ||
+            submodule.path.startsWith(templatesPath)
+          ) {
+            const isOutline = submodule.path.startsWith(outlinesPath);
+            const isTemplate = submodule.path.startsWith(templatesPath);
+            const currentPath = isOutline
+              ? outlinesPath
+              : isTemplate
+                ? templatesPath
+                : footprintsPath;
+            const currentCollection = isOutline
+              ? outlines
+              : isTemplate
+                ? templates
+                : footprints;
+
             console.log(
               `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
             );
@@ -521,7 +561,7 @@ export const fetchConfigFromUrl = async (
             if (submoduleMatch) {
               const [, subOwner, subRepo] = submoduleMatch;
               const relativePath = submodule.path.substring(
-                footprintsPath.length + 1
+                currentPath.length + 1
               );
               console.log(`[GitHub] Submodule relative path: ${relativePath}`);
 
@@ -557,11 +597,11 @@ export const fetchConfigFromUrl = async (
               console.log(
                 `[GitHub] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
               );
-              footprints.push(...prefixedFootprints);
+              currentCollection.push(...prefixedFootprints);
             }
           } else {
             console.log(
-              `[GitHub] Skipping submodule (not in footprints): ${submodule.path}`
+              `[GitHub] Skipping submodule (not in footprints, outlines or templates): ${submodule.path}`
             );
           }
         }
@@ -575,9 +615,15 @@ export const fetchConfigFromUrl = async (
     console.log(
       `[GitHub] Loaded ${footprints.length} footprints from direct link`
     );
+    console.log(`[GitHub] Loaded ${outlines.length} outlines from direct link`);
+    console.log(
+      `[GitHub] Loaded ${templates.length} templates from direct link`
+    );
     return {
       config,
       footprints,
+      outlines,
+      templates,
       configPath: dirPath,
       rateLimitWarning: rateLimitTracker.warning || undefined,
     };
@@ -614,22 +660,18 @@ export const fetchConfigFromUrl = async (
       try {
         const response = await fetch(apiUrl);
 
-        // Check rate limit
-        const bfsRateLimitCheck = checkRateLimit(response, apiUrl);
-        if (bfsRateLimitCheck.error && !rateLimitTracker.warning) {
-          rateLimitTracker.warning = bfsRateLimitCheck.error;
+        // Check rate limit for BFS directory fetch
+        const rateLimitCheck = checkRateLimit(response, apiUrl);
+        if (rateLimitCheck.error && !rateLimitTracker.warning) {
+          rateLimitTracker.warning = rateLimitCheck.error;
         }
-        if (bfsRateLimitCheck.isLimitExceeded) {
-          throw new Error(bfsRateLimitCheck.error || 'Rate limit exceeded');
+        if (rateLimitCheck.isLimitExceeded) {
+          throw new Error(rateLimitCheck.error || 'Rate limit exceeded');
         }
 
-        if (!response.ok) {
-          continue;
-        }
+        if (!response.ok) continue;
 
         const items = await response.json();
-        if (!Array.isArray(items)) continue;
-
         await Promise.all(
           items.map(
             async (item: {
@@ -637,7 +679,6 @@ export const fetchConfigFromUrl = async (
               name: string;
               download_url: string;
               path: string;
-              url: string;
             }) => {
               if (item.type === 'file' && item.name.endsWith('.yaml')) {
                 const fileResponse = await fetch(item.download_url);
@@ -789,6 +830,8 @@ export const fetchConfigFromUrl = async (
       return {
         config,
         footprints: [],
+        outlines: [],
+        templates: [],
         configPath,
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -806,34 +849,71 @@ export const fetchConfigFromUrl = async (
       rateLimitTracker
     );
 
+    // Now fetch outlines from the outlines folder
+    const outlinesPath = configPath ? `${configPath}/outlines` : 'outlines';
+    console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
+    const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
+    const outlines = await fetchFootprintsFromDirectory(
+      outlinesApiUrl,
+      '',
+      rateLimitTracker
+    );
+
+    // Now fetch templates from the templates folder
+    const templatesPath = configPath ? `${configPath}/templates` : 'templates';
+    console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
+    const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
+    const templates = await fetchFootprintsFromDirectory(
+      templatesApiUrl,
+      '',
+      rateLimitTracker
+    );
+
     // Check for .gitmodules to handle submodules
     console.log('[GitHub] Checking for .gitmodules file');
     try {
       const gitmodulesUrl = getRawUrl(`${baseUrl}/blob/${branch}/.gitmodules`);
       const gitmodulesResponse = await fetch(gitmodulesUrl);
-
-      // Check rate limit for .gitmodules fetch
-      const gitmodulesRateLimitCheck = checkRateLimit(
-        gitmodulesResponse,
-        gitmodulesUrl
-      );
-      if (gitmodulesRateLimitCheck.error && !rateLimitTracker.warning) {
-        rateLimitTracker.warning = gitmodulesRateLimitCheck.error;
-      }
-      if (gitmodulesRateLimitCheck.isLimitExceeded) {
-        throw new Error(
-          gitmodulesRateLimitCheck.error || 'Rate limit exceeded'
-        );
-      }
-
-      if (gitmodulesResponse.ok) {
+      if (gitmodulesResponse && gitmodulesResponse.ok) {
         console.log('[GitHub] .gitmodules found, parsing submodules');
+
+        // Check rate limit for .gitmodules fetch
+        const gitmodulesRateLimitCheck = checkRateLimit(
+          gitmodulesResponse,
+          gitmodulesUrl
+        );
+        if (gitmodulesRateLimitCheck.error && !rateLimitTracker.warning) {
+          rateLimitTracker.warning = gitmodulesRateLimitCheck.error;
+        }
+        if (gitmodulesRateLimitCheck.isLimitExceeded) {
+          throw new Error(
+            gitmodulesRateLimitCheck.error || 'Rate limit exceeded'
+          );
+        }
+
         const gitmodulesContent = await gitmodulesResponse.text();
         const submodules = parseGitmodules(gitmodulesContent);
 
-        // Filter submodules that are within the footprints folder
+        // Filter submodules that are within the footprints, outlines, or templates folder
         for (const submodule of submodules) {
-          if (submodule.path.startsWith(footprintsPath)) {
+          if (
+            submodule.path.startsWith(footprintsPath) ||
+            submodule.path.startsWith(outlinesPath) ||
+            submodule.path.startsWith(templatesPath)
+          ) {
+            const isOutline = submodule.path.startsWith(outlinesPath);
+            const isTemplate = submodule.path.startsWith(templatesPath);
+            const currentPath = isOutline
+              ? outlinesPath
+              : isTemplate
+                ? templatesPath
+                : footprintsPath;
+            const currentCollection = isOutline
+              ? outlines
+              : isTemplate
+                ? templates
+                : footprints;
+
             console.log(
               `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
             );
@@ -845,7 +925,7 @@ export const fetchConfigFromUrl = async (
               const [, subOwner, subRepo] = submoduleMatch;
               // Calculate the relative path for naming
               const relativePath = submodule.path.substring(
-                footprintsPath.length + 1
+                currentPath.length + 1
               );
               console.log(`[GitHub] Submodule relative path: ${relativePath}`);
               // Try both main and master branches for the submodule
@@ -881,11 +961,11 @@ export const fetchConfigFromUrl = async (
               console.log(
                 `[GitHub] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
               );
-              footprints.push(...prefixedFootprints);
+              currentCollection.push(...prefixedFootprints);
             }
           } else {
             console.log(
-              `[GitHub] Skipping submodule (not in footprints): ${submodule.path}`
+              `[GitHub] Skipping submodule (not in footprints, outlines or templates): ${submodule.path}`
             );
           }
         }
@@ -898,9 +978,13 @@ export const fetchConfigFromUrl = async (
     }
 
     console.log(`[GitHub] Total footprints loaded: ${footprints.length}`);
+    console.log(`[GitHub] Total outlines loaded: ${outlines.length}`);
+    console.log(`[GitHub] Total templates loaded: ${templates.length}`);
     return {
       config,
       footprints,
+      outlines,
+      templates,
       configPath,
       rateLimitWarning: rateLimitTracker.warning || undefined,
     };

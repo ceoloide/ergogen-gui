@@ -7,7 +7,7 @@
 	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('makerjs'), require('mathjs'), require('js-yaml'), require('jszip'), require('kle-serial'), require('hull')) :
 	typeof define === 'function' && define.amd ? define(['makerjs', 'mathjs', 'js-yaml', 'jszip', 'kle-serial', 'hull'], factory) :
 	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.ergogen = factory(global.makerjs, global.math, global.jsyaml, global.jszip, global.kle, global.hull));
-})(this, (function (require$$0, require$$3, require$$2, require$$1$1, require$$1, require$$9) { 'use strict';
+})(this, (function (require$$0, require$$1, require$$2, require$$1$2, require$$1$1, require$$9) { 'use strict';
 
 	function getDefaultExportFromCjs (x) {
 		return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -17,109 +17,12 @@
 
 	var assert = {};
 
-	var point;
-	var hasRequiredPoint;
-
-	function requirePoint () {
-		if (hasRequiredPoint) return point;
-		hasRequiredPoint = 1;
-		const m = require$$0;
-		const u = requireUtils();
-
-		point = class Point {
-		    constructor(x=0, y=0, r=0, meta={}) {
-		        if (Array.isArray(x)) {
-		            this.x = x[0];
-		            this.y = x[1];
-		            this.r = 0;
-		            this.meta = {};
-		        } else {
-		            this.x = x;
-		            this.y = y;
-		            this.r = r;
-		            this.meta = meta;
-		        }
-		    }
-
-		    get p() {
-		        return [this.x, this.y]
-		    }
-
-		    set p(val) {
-		        [this.x, this.y] = val;
-		    }
-
-		    shift(s, relative=true, resist=false) {
-		        s[0] *= (!resist && this.meta.mirrored) ? -1 : 1;
-		        if (relative) {
-		            s = m.point.rotate(s, this.r);
-		        }
-		        this.x += s[0];
-		        this.y += s[1];
-		        return this
-		    }
-
-		    rotate(angle, origin=[0, 0], resist=false) {
-		        angle *= (!resist && this.meta.mirrored) ? -1 : 1;
-		        if (origin) {
-		            this.p = m.point.rotate(this.p, angle, origin);
-		        }
-		        this.r += angle;
-		        return this
-		    }
-
-		    mirror(x) {
-		        this.x = 2 * x - this.x;
-		        this.r = -this.r;
-		        return this
-		    }
-
-		    clone() {
-		        return new Point(
-		            this.x,
-		            this.y,
-		            this.r,
-		            u.deepcopy(this.meta)
-		        )
-		    }
-
-		    position(model) {
-		        return m.model.moveRelative(m.model.rotate(model, this.r), this.p)
-		    }
-
-		    unposition(model) {
-		        return m.model.rotate(m.model.moveRelative(model, [-this.x, -this.y]), -this.r)
-		    }
-
-		    rect(size=14) {
-		        let rect = u.rect(size, size, [-size/2, -size/2]);
-		        return this.position(rect)
-		    }
-
-		    angle(other) {
-		        const dx = other.x - this.x;
-		        const dy = other.y - this.y;
-		        return -Math.atan2(dx, dy) * (180 / Math.PI)
-		    }
-
-		    equals(other) {
-		        return this.x === other.x
-		            && this.y === other.y
-		            && this.r === other.r
-		            && JSON.stringify(this.meta) === JSON.stringify(other.meta)
-		    }
-		};
-		return point;
-	}
-
 	var hasRequiredAssert;
 
 	function requireAssert () {
 		if (hasRequiredAssert) return assert;
 		hasRequiredAssert = 1;
-		requireUtils();
-		requirePoint();
-		const mathjs = require$$3;
+		const mathjs = require$$1;
 
 		const mathnum = assert.mathnum = raw => units => {
 		    return mathjs.evaluate(`${raw}`, units || {})
@@ -412,7 +315,7 @@
 		if (hasRequiredKle) return kle;
 		hasRequiredKle = 1;
 		const u = requireUtils();
-		const kle$1 = require$$1;
+		const kle$1 = require$$1$1;
 		const yaml = require$$2;
 
 		kle.convert = (config, logger) => {
@@ -1002,6 +905,101 @@
 	var points = {};
 
 	var anchor = {};
+
+	var point;
+	var hasRequiredPoint;
+
+	function requirePoint () {
+		if (hasRequiredPoint) return point;
+		hasRequiredPoint = 1;
+		const m = require$$0;
+		const u = requireUtils();
+
+		point = class Point {
+		    constructor(x=0, y=0, r=0, meta={}) {
+		        if (Array.isArray(x)) {
+		            this.x = x[0];
+		            this.y = x[1];
+		            this.r = 0;
+		            this.meta = {};
+		        } else {
+		            this.x = x;
+		            this.y = y;
+		            this.r = r;
+		            this.meta = meta;
+		        }
+		    }
+
+		    get p() {
+		        return [this.x, this.y]
+		    }
+
+		    set p(val) {
+		        [this.x, this.y] = val;
+		    }
+
+		    shift(s, relative=true, resist=false) {
+		        s[0] *= (!resist && this.meta.mirrored) ? -1 : 1;
+		        if (relative) {
+		            s = m.point.rotate(s, this.r);
+		        }
+		        this.x += s[0];
+		        this.y += s[1];
+		        return this
+		    }
+
+		    rotate(angle, origin=[0, 0], resist=false) {
+		        angle *= (!resist && this.meta.mirrored) ? -1 : 1;
+		        if (origin) {
+		            this.p = m.point.rotate(this.p, angle, origin);
+		        }
+		        this.r += angle;
+		        return this
+		    }
+
+		    mirror(x) {
+		        this.x = 2 * x - this.x;
+		        this.r = -this.r;
+		        return this
+		    }
+
+		    clone() {
+		        return new Point(
+		            this.x,
+		            this.y,
+		            this.r,
+		            u.deepcopy(this.meta)
+		        )
+		    }
+
+		    position(model) {
+		        return m.model.moveRelative(m.model.rotate(model, this.r), this.p)
+		    }
+
+		    unposition(model) {
+		        return m.model.rotate(m.model.moveRelative(model, [-this.x, -this.y]), -this.r)
+		    }
+
+		    rect(size=14) {
+		        let rect = u.rect(size, size, [-size/2, -size/2]);
+		        return this.position(rect)
+		    }
+
+		    angle(other) {
+		        const dx = other.x - this.x;
+		        const dy = other.y - this.y;
+		        return -Math.atan2(dx, dy) * (180 / Math.PI)
+		    }
+
+		    equals(other) {
+		        return this.x === other.x
+		            && this.y === other.y
+		            && this.r === other.r
+		            && JSON.stringify(this.meta) === JSON.stringify(other.meta)
+		    }
+		};
+		return point;
+	}
 
 	var hasRequiredAnchor;
 
@@ -1806,6 +1804,23 @@
 		return filter;
 	}
 
+	var choc_hotswap_socket;
+	var hasRequiredChoc_hotswap_socket;
+
+	function requireChoc_hotswap_socket () {
+		if (hasRequiredChoc_hotswap_socket) return choc_hotswap_socket;
+		hasRequiredChoc_hotswap_socket = 1;
+		const u = requireUtils();
+
+		choc_hotswap_socket = (config, name, points, outlines, units) => {
+		    const paths = [
+		        "M 7.1 0.7 A 1.5 1.5 0 0 0 8.6 2.2 L 11.6 2.2 L 11.6 3.15 L 14.2 3.15 L 14.2 5.75 L 11.6 5.75 L 11.6 6.7 L 7.6 6.7 L 7.6 5.2 A 0.5 0.5 0 0 0 7.1 4.7 L 2.6 4.7 L 2.6 3.5 L 0 3.5 L 0 0.95 L 2.6 0.95 L 2.6 0 L 7.1 0 L 7.1 0.7 Z"
+		    ];
+		    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);
+		};
+		return choc_hotswap_socket;
+	}
+
 	var outlines;
 	var hasRequiredOutlines$1;
 
@@ -1813,6 +1828,7 @@
 		if (hasRequiredOutlines$1) return outlines;
 		hasRequiredOutlines$1 = 1;
 		outlines = {
+		    choc_hotswap_socket: requireChoc_hotswap_socket(),
 		};
 		return outlines;
 	}
