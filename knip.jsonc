@@ -20,6 +20,7 @@
     "@types/styled-components",
     "@typescript-eslint/parser",
     "eslint-plugin-prettier",
+    "makerjs",
     "markdownlint"
   ]
 }

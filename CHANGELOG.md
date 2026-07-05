@@ -1,5 +1,20 @@
 # Changelog
 
+## Support module require() in custom injections
+
+July 05, 2026
+
+![A placeholder image for the custom injection module support.](./public/images/changelog/placeholder.png)
+
+Writing custom outline or template injections with advanced geometries often requires importing libraries like `makerjs` or utilizing Ergogen's internal geometry utilities. Previously, adding a `require()` statement (such as `require('makerjs')` or `require('../utils')`) inside custom injections caused a frustrating `require is not a function` error, preventing you from using advanced shapes.
+
+Now you can write and run custom injections that require external packages and internal Ergogen helper files without encountering errors. The application resolves these references dynamically at runtime inside the web worker, enabling you to build highly customized keyboard shapes and advanced layout templates with ease.
+
+**What changed:**
+
+- **Runtime module resolution**: Supported standard `require()` calls inside custom outline and template injections
+- **Common library bindings**: Automatically mapped and resolved imports for `makerjs` and internal Ergogen helper files (`utils`, `assert`, `prepare`, etc.)
+
 ## Share A Link To Your Keyboard Configuration
 
 November 3, 2025
