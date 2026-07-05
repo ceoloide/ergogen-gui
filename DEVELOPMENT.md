@@ -312,6 +312,22 @@ Several potential improvements could enhance the sharing feature:
 9. **Share Link Expiration**: Add optional expiration dates or time-to-live (TTL) for share links, useful for temporary sharing scenarios.
 10. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
 
+## Ergogen Version Override Lifecycle
+
+To allow developers and CI to override the default Ergogen version using the `ERGOGEN_VERSION` environment variable without permanently modifying `package.json` or breaking `yarn install --frozen-lockfile` in CI, the project implements a temporary package.json patching workflow:
+
+1. **Pre-install (`scripts/preinstall.js`)**:
+   - Executes before dependencies are resolved and installed.
+   - If `ERGOGEN_VERSION` is set and differs from the current `"ergogen"` dependency version in `package.json`, it backs up `package.json` to `packages.json.bak` and temporarily patches the `"ergogen"` dependency to the custom version.
+   - If the version matches or is not set, it does nothing (and cleans up any stale `packages.json.bak` backups).
+
+2. **Installation**:
+   - `yarn install --frozen-lockfile` runs with the temporarily patched `package.json`. Because the lockfile (which was generated and committed locally using the same version) matches `package.json`, the frozen lockfile verification succeeds.
+
+3. **Post-install (`scripts/postinstall.js`)**:
+   - Executes after dependencies are successfully installed.
+   - If `packages.json.bak` exists, it restores the original `package.json` and deletes the backup file, ensuring that the workspace remains clean and no modified `package.json` is committed.
+
 ## Future Tasks
 
 When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:

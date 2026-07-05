@@ -28,9 +28,10 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
+    "preinstall": "node scripts/preinstall.js",
     "build-ergogen": "./patch/patch_ergogen.sh",
     "generate-previews": "ts-node --project scripts/tsconfig.json scripts/generate-previews.js",
-    "postinstall": "yarn run build-ergogen",
+    "postinstall": "node scripts/postinstall.js && yarn run build-ergogen",
     "prestart": "yarn run build-ergogen && yarn run generate-previews",
     "start": "REACT_APP_ERGOGEN_VERSION=$ERGOGEN_VERSION react-scripts --openssl-legacy-provider start",
     "prebuild": "yarn run build-ergogen && yarn run generate-previews",
