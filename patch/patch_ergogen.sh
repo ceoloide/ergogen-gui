@@ -1,6 +1,25 @@
 #!/bin/sh
 # Pull @ceoloide and @infused-kim footprint libraries
 
+# Backup original Git configuration for GitHub insteadOf
+original_instead_of=$(git config --global --get-all url."https://github.com/".insteadOf 2>/dev/null)
+
+# Cleanup function to restore original configuration
+cleanup() {
+  echo "Restoring original Git configuration..."
+  git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
+  if [ -n "$original_instead_of" ]; then
+    printf "%s\n" "$original_instead_of" | while read -r val; do
+      if [ -n "$val" ]; then
+        git config --global --add url."https://github.com/".insteadOf "$val"
+      fi
+    done
+  fi
+}
+
+# Ensure original configuration is restored on exit (success or failure)
+trap cleanup EXIT INT TERM
+
 # Configure Git to use HTTPS for GitHub
 git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
 git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
@@ -27,9 +46,19 @@ if [ -d node_modules/ergogen ]; then
     rm -rf node_modules/ergogen/src/footprints/infused-kim
   fi
   git clone https://github.com/infused-kim/kb_ergogen_fp.git node_modules/ergogen/src/footprints/infused-kim
+  
   # Add the footprints to the index
   echo "Patching footprints/index.js..."
   cp -f patch/footprints_index.js node_modules/ergogen/src/footprints/index.js
+
+  # Build and copy built ergogen
+  echo "Building Ergogen..."
+  (
+    cd node_modules/ergogen
+    npm install --legacy-peer-deps
+    npm run build
+    cp dist/ergogen.js ../../public/dependencies/ergogen.js
+  )
 else
   echo "Directory node_modules/ergogen not found."
 fi
