@@ -3,6 +3,7 @@
 
 import * as ergogen from 'ergogen';
 import { WorkerRequest } from './ergogen.worker.types';
+import { createInjectionModule } from '../utils/injectionEvaluator';
 
 console.log('<-> Ergogen worker module starting...');
 
@@ -48,13 +49,8 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       for (const injection of injectionInput) {
         if (Array.isArray(injection) && injection.length === 3) {
           const [inj_type, inj_name, inj_text] = injection;
-          const module_prefix = 'const module = {};\n\n';
-          const module_suffix = '\n\nreturn module.exports;';
           try {
-            const inj_value = new Function(
-              'require',
-              module_prefix + inj_text + module_suffix
-            )();
+            const inj_value = createInjectionModule(inj_text);
             ergogen.inject(inj_type, inj_name, inj_value);
           } catch (injectionError: unknown) {
             self.postMessage({

@@ -1,4 +1,4 @@
-export interface VersionInfo {
+interface VersionInfo {
   label: string;
   url: string;
 }
