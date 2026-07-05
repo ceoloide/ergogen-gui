@@ -8,6 +8,7 @@ type LocalFileLoadResult = {
   config: string;
   footprints: GitHubFootprint[];
   outlines: GitHubFootprint[];
+  templates: GitHubFootprint[];
 };
 
 /**
@@ -58,6 +59,14 @@ const extractFootprintName = (path: string): string => {
   return name;
 };
 
+const extractTemplateName = (path: string): string => {
+  // Remove 'templates/' prefix
+  let name = path.replace(/^templates\//, '');
+  // Remove '.js' extension
+  name = name.replace(/\.js$/, '');
+  return name;
+};
+
 /**
  * Loads a zip or ekb archive and extracts config.yaml and footprints.
  * @param file - The zip/ekb file to load.
@@ -82,9 +91,10 @@ const loadZipArchive = async (file: File): Promise<LocalFileLoadResult> => {
 
   const config = await configFile.async('string');
 
-  // Extract footprints and outlines
+  // Extract footprints, outlines and templates
   const footprints: GitHubFootprint[] = [];
   const outlines: GitHubFootprint[] = [];
+  const templates: GitHubFootprint[] = [];
   const promises: Promise<void>[] = [];
 
   zip.forEach((relativePath, file) => {
@@ -102,13 +112,19 @@ const loadZipArchive = async (file: File): Promise<LocalFileLoadResult> => {
         outlines.push({ name, content });
       });
       promises.push(promise);
+    } else if (relativePath.startsWith('templates/')) {
+      const promise = file.async('string').then((content) => {
+        const name = extractTemplateName(relativePath);
+        templates.push({ name, content });
+      });
+      promises.push(promise);
     }
   });
 
   // Wait for all files to be read
   await Promise.all(promises);
 
-  return { config, footprints, outlines };
+  return { config, footprints, outlines, templates };
 };
 
 /**
@@ -126,7 +142,7 @@ export const loadLocalFile = async (
   if (extension === 'yaml' || extension === 'yml' || extension === 'json') {
     // Load as text file
     const config = await loadTextFile(file);
-    return { config, footprints: [], outlines: [] };
+    return { config, footprints: [], outlines: [], templates: [] };
   } else if (extension === 'zip' || extension === 'ekb') {
     // Load as zip archive
     return await loadZipArchive(file);

@@ -100,6 +100,7 @@ type GitHubLoadResult = {
   config: string;
   footprints: GitHubFootprint[];
   outlines: GitHubFootprint[];
+  templates: GitHubFootprint[];
   configPath: string;
   rateLimitWarning?: string;
 };
@@ -446,6 +447,7 @@ export const fetchConfigFromUrl = async (
         config,
         footprints: [],
         outlines: [],
+        templates: [],
         configPath: '',
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -468,6 +470,7 @@ export const fetchConfigFromUrl = async (
         config,
         footprints: [],
         outlines: [],
+        templates: [],
         configPath: '',
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -477,6 +480,7 @@ export const fetchConfigFromUrl = async (
     const dirPath = filePath.substring(0, filePath.lastIndexOf('/'));
     const footprintsPath = dirPath ? `${dirPath}/footprints` : 'footprints';
     const outlinesPath = dirPath ? `${dirPath}/outlines` : 'outlines';
+    const templatesPath = dirPath ? `${dirPath}/templates` : 'templates';
 
     console.log(`[GitHub] Looking for footprints in: ${footprintsPath}`);
     const footprintsApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${footprintsPath}?ref=${branch}`;
@@ -490,6 +494,14 @@ export const fetchConfigFromUrl = async (
     const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
     const outlines = await fetchFootprintsFromDirectory(
       outlinesApiUrl,
+      '',
+      rateLimitTracker
+    );
+
+    console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
+    const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
+    const templates = await fetchFootprintsFromDirectory(
+      templatesApiUrl,
       '',
       rateLimitTracker
     );
@@ -524,11 +536,21 @@ export const fetchConfigFromUrl = async (
         for (const submodule of submodules) {
           if (
             submodule.path.startsWith(footprintsPath) ||
-            submodule.path.startsWith(outlinesPath)
+            submodule.path.startsWith(outlinesPath) ||
+            submodule.path.startsWith(templatesPath)
           ) {
             const isOutline = submodule.path.startsWith(outlinesPath);
-            const currentPath = isOutline ? outlinesPath : footprintsPath;
-            const currentCollection = isOutline ? outlines : footprints;
+            const isTemplate = submodule.path.startsWith(templatesPath);
+            const currentPath = isOutline
+              ? outlinesPath
+              : isTemplate
+                ? templatesPath
+                : footprintsPath;
+            const currentCollection = isOutline
+              ? outlines
+              : isTemplate
+                ? templates
+                : footprints;
 
             console.log(
               `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
@@ -579,7 +601,7 @@ export const fetchConfigFromUrl = async (
             }
           } else {
             console.log(
-              `[GitHub] Skipping submodule (not in footprints or outlines): ${submodule.path}`
+              `[GitHub] Skipping submodule (not in footprints, outlines or templates): ${submodule.path}`
             );
           }
         }
@@ -594,10 +616,14 @@ export const fetchConfigFromUrl = async (
       `[GitHub] Loaded ${footprints.length} footprints from direct link`
     );
     console.log(`[GitHub] Loaded ${outlines.length} outlines from direct link`);
+    console.log(
+      `[GitHub] Loaded ${templates.length} templates from direct link`
+    );
     return {
       config,
       footprints,
       outlines,
+      templates,
       configPath: dirPath,
       rateLimitWarning: rateLimitTracker.warning || undefined,
     };
@@ -805,6 +831,7 @@ export const fetchConfigFromUrl = async (
         config,
         footprints: [],
         outlines: [],
+        templates: [],
         configPath,
         rateLimitWarning: rateLimitTracker.warning || undefined,
       };
@@ -828,6 +855,16 @@ export const fetchConfigFromUrl = async (
     const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
     const outlines = await fetchFootprintsFromDirectory(
       outlinesApiUrl,
+      '',
+      rateLimitTracker
+    );
+
+    // Now fetch templates from the templates folder
+    const templatesPath = configPath ? `${configPath}/templates` : 'templates';
+    console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
+    const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
+    const templates = await fetchFootprintsFromDirectory(
+      templatesApiUrl,
       '',
       rateLimitTracker
     );
@@ -857,15 +894,25 @@ export const fetchConfigFromUrl = async (
         const gitmodulesContent = await gitmodulesResponse.text();
         const submodules = parseGitmodules(gitmodulesContent);
 
-        // Filter submodules that are within the footprints or outlines folder
+        // Filter submodules that are within the footprints, outlines, or templates folder
         for (const submodule of submodules) {
           if (
             submodule.path.startsWith(footprintsPath) ||
-            submodule.path.startsWith(outlinesPath)
+            submodule.path.startsWith(outlinesPath) ||
+            submodule.path.startsWith(templatesPath)
           ) {
             const isOutline = submodule.path.startsWith(outlinesPath);
-            const currentPath = isOutline ? outlinesPath : footprintsPath;
-            const currentCollection = isOutline ? outlines : footprints;
+            const isTemplate = submodule.path.startsWith(templatesPath);
+            const currentPath = isOutline
+              ? outlinesPath
+              : isTemplate
+                ? templatesPath
+                : footprintsPath;
+            const currentCollection = isOutline
+              ? outlines
+              : isTemplate
+                ? templates
+                : footprints;
 
             console.log(
               `[GitHub] Processing submodule: ${submodule.path} -> ${submodule.url}`
@@ -918,7 +965,7 @@ export const fetchConfigFromUrl = async (
             }
           } else {
             console.log(
-              `[GitHub] Skipping submodule (not in footprints or outlines): ${submodule.path}`
+              `[GitHub] Skipping submodule (not in footprints, outlines or templates): ${submodule.path}`
             );
           }
         }
@@ -932,10 +979,12 @@ export const fetchConfigFromUrl = async (
 
     console.log(`[GitHub] Total footprints loaded: ${footprints.length}`);
     console.log(`[GitHub] Total outlines loaded: ${outlines.length}`);
+    console.log(`[GitHub] Total templates loaded: ${templates.length}`);
     return {
       config,
       footprints,
       outlines,
+      templates,
       configPath,
       rateLimitWarning: rateLimitTracker.warning || undefined,
     };

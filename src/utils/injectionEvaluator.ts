@@ -85,10 +85,7 @@ export const createInjectionModule = (injText: string): unknown => {
   const module_prefix = 'const module = {};\n\n';
   const module_suffix = '\n\nreturn module.exports;';
 
-  const fn = new Function(
-    'require',
-    module_prefix + injText + module_suffix
-  );
+  const fn = new Function('require', module_prefix + injText + module_suffix);
 
   return fn(customRequire);
 };

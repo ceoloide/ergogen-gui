@@ -1,5 +1,22 @@
 # Changelog
 
+## Custom Templates Support in GUI
+
+July 05, 2026
+
+![A placeholder image for custom templates support.](./public/images/changelog/placeholder.png)
+
+Creating and editing custom layout templates previously required manually writing them in the configuration or outside the tool. You had no way to create, view, or manage your custom Ergogen templates inside the web interface, limiting your ability to customize case geometries and outline configurations.
+
+Now you can manage custom templates directly from the settings panel, complete with template name editing, code editing, and conflict resolution. A new 'Templates' tab in the custom libraries sidebar allows you to add templates, load templates from local JS files or folders, and fetch them directly from a `templates/` directory in your GitHub repositories. When exporting, your custom templates are saved in a clean `templates/` folder in the generated ZIP.
+
+**What changed:**
+
+- **GUI for custom templates**: Created a new tab in custom libraries to add, edit, and delete templates in your design
+- **GitHub & local ZIP template extraction**: Automatically extract templates from `templates/` folder when loading from GitHub or local archives
+- **Clean template exports**: Save footprints, outlines, and templates to their respective directories when downloading the configuration ZIP
+- **Default boilerplate structures**: Added helper boilerplates for newly created custom templates and custom outlines
+
 ## Support module require() in custom injections
 
 July 05, 2026

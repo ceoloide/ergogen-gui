@@ -160,13 +160,17 @@ describe('localFiles utilities', () => {
     });
 
     describe('zip archives', () => {
-      it('loads a zip file with config.yaml and footprints', async () => {
+      it('loads a zip file with config.yaml, footprints, outlines, and templates', async () => {
         // Arrange
         const configContent = 'points:\n  - [0, 0]';
         const footprintContent = 'module.exports = {};';
+        const outlineContent = 'module.exports = {};';
+        const templateContent = 'module.exports = {};';
         const zipFile = await createMockZipFile('test.zip', {
           'config.yaml': configContent,
           'footprints/logo_mr_useful.js': footprintContent,
+          'outlines/my_outline.js': outlineContent,
+          'templates/my_template.js': templateContent,
         });
 
         // Act
@@ -177,6 +181,12 @@ describe('localFiles utilities', () => {
         expect(result.footprints).toHaveLength(1);
         expect(result.footprints[0].name).toBe('logo_mr_useful');
         expect(result.footprints[0].content).toBe(footprintContent);
+        expect(result.outlines).toHaveLength(1);
+        expect(result.outlines[0].name).toBe('my_outline');
+        expect(result.outlines[0].content).toBe(outlineContent);
+        expect(result.templates).toHaveLength(1);
+        expect(result.templates[0].name).toBe('my_template');
+        expect(result.templates[0].content).toBe(templateContent);
       });
 
       it('loads an ekb file (which is a zip)', async () => {

@@ -63,7 +63,7 @@ The application supports loading Ergogen configurations from local files on the 
 ### Supported File Types
 
 - **YAML/JSON files** (`.yaml`, `.yml`, `.json`): Direct configuration files that are loaded as text
-- **ZIP archives** (`.zip`): Archives containing `config.yaml` in the root and optionally a `footprints` folder
+- **ZIP archives** (`.zip`): Archives containing `config.yaml` in the root and optionally `footprints`, `outlines`, or `templates` folders
 - **EKB archives** (`.ekb`): Ergogen keyboard archives (essentially ZIP files with a different extension)
 
 ### Archive Structure
@@ -71,10 +71,12 @@ The application supports loading Ergogen configurations from local files on the 
 When loading ZIP or EKB archives, the application expects:
 
 - **`config.yaml`** (required): Must be present in the root directory of the archive
-- **`footprints/` folder** (optional): Contains `.js` files organized in subfolders
-  - Footprint names are derived from the relative path under `footprints`, excluding the `.js` extension
-  - Example: `footprints/ceoloide/utility_text.js` becomes `ceoloide/utility_text`
-  - Example: `footprints/logo_mr_useful.js` becomes `logo_mr_useful`
+- **`footprints/` folder** (optional): Contains custom footprints as `.js` files organized in subfolders
+  - Names are derived from the relative path under `footprints`, excluding the `.js` extension
+- **`outlines/` folder** (optional): Contains custom outlines as `.js` files organized in subfolders
+  - Names are derived from the relative path under `outlines`, excluding the `.js` extension
+- **`templates/` folder** (optional): Contains custom templates as `.js` files organized in subfolders
+  - Names are derived from the relative path under `templates`, excluding the `.js` extension
 
 ### Drag and Drop
 
@@ -87,19 +89,19 @@ Users can drag and drop files anywhere on the welcome page to load them. Visual 
 
 ### Local File Conflict Resolution
 
-When loading footprints from local archives, the same unified conflict resolution system applies. Users can choose to skip, overwrite, or keep both versions of conflicting footprints. The system works for all injection types (footprints, templates, etc.) and shows type-specific dialogs (e.g., "Footprint Conflict").
+When loading footprints, outlines, or templates from local archives, the same unified conflict resolution system applies. Users can choose to skip, overwrite, or keep both versions of conflicting injections. The system works for all injection types and shows type-specific dialogs (e.g., "Footprint Conflict", "Outline Conflict", "Template Conflict").
 
 ### Local File Implementation
 
 - **`src/utils/localFiles.ts`**: Contains `loadLocalFile` function that handles all file types:
   - `loadTextFile`: Reads YAML/JSON files using FileReader
-  - `loadZipArchive`: Extracts config.yaml and footprints from ZIP/EKB archives using JSZip
-  - `extractFootprintName`: Generates footprint names from file paths
+  - `loadZipArchive`: Extracts config.yaml, footprints, outlines, and templates from ZIP/EKB archives using JSZip
+  - `extractFootprintName` / `extractOutlineName` / `extractTemplateName`: Generates names from relative file paths
 - **`src/pages/Welcome.tsx`**: Integrates local file loading with drag-and-drop handlers and conflict resolution
 
 ## GitHub Integration
 
-The application supports loading Ergogen configurations directly from GitHub repositories. This feature has been extended to include automatic footprint loading.
+The application supports loading Ergogen configurations directly from GitHub repositories. This feature includes automatic footprint, outline, and template loading.
 
 ### Loading from GitHub
 
@@ -115,34 +117,33 @@ When a user provides a GitHub repository URL (e.g., `user/repo` or `https://gith
    - Ergogen subdirectory: `/ergogen/config.yaml`
    - Tries both `main` and `master` branches
 
-2. **Fetches footprints**: Recursively scans for a `footprints` folder alongside the config file:
-   - Searches for `.js` files at any depth within the `footprints` folder
-   - Constructs footprint names from the folder path and filename (e.g., `folder1/folder2/file_name`)
+2. **Fetches custom injections**: Recursively scans for `footprints/`, `outlines/`, and `templates/` folders alongside the config file:
+   - Searches for `.js` files at any depth within these folders
+   - Constructs injection names from the folder path and filename (e.g., `folder1/folder2/file_name`)
    - Uses the GitHub API to traverse directories
 
 3. **Handles Git Submodules**: Checks for `.gitmodules` file in the repository root:
-   - Parses the `.gitmodules` file to find submodules within the footprints folder
+   - Parses the `.gitmodules` file to find submodules within footprints, outlines, or templates folders
    - For each matching submodule, fetches the submodule repository recursively
    - Loads all `.js` files from the submodule and prefixes names with the relative path
-   - Example: A submodule at `footprints/external` with `switch.js` becomes `external/switch`
 
 ### GitHub Conflict Resolution
 
-The application provides a unified conflict resolution system for all injection types (footprints, templates, and future types) across multiple loading scenarios:
+The application provides a unified conflict resolution system for all injection types (footprints, templates, and outlines) across multiple loading scenarios:
 
 #### When Conflicts Occur
 
 Conflict resolution is triggered when loading injections from:
 
 1. **GitHub repository URLs** (via the Welcome page input or `?github=` URL parameter)
-2. **Local files** (ZIP/EKB archives with footprints)
+2. **Local files** (ZIP/EKB archives with injections)
 3. **Shared configuration links** (hash fragments with injections)
 
 #### Conflict Resolution Dialog
 
 When a conflict is detected, a `ConflictResolutionDialog` is displayed to the user with:
 
-1. **Type-specific messaging**: The dialog shows the specific injection type (e.g., "Footprint Conflict", "Template Conflict") rather than generic "injection" terminology, making it clearer for users.
+1. **Type-specific messaging**: The dialog shows the specific injection type (e.g., "Footprint Conflict", "Outline Conflict", "Template Conflict") rather than generic "injection" terminology, making it clearer for users.
 
 2. **Three resolution options**:
    - **Skip**: The new injection is not loaded
@@ -158,11 +159,11 @@ The conflict resolution infrastructure is generic and works with any injection t
 - Uses `checkForInjectionConflict(type, name, existingInjections)` for type-aware conflict detection
 - Uses `mergeInjectionArraysWithResolution(newInjections, existingInjections, resolution)` for merging with conflict resolution
 - The dialog accepts an `injectionType` prop to display type-specific messages
-- Currently used for footprints, but ready for templates and future injection types
+- Supports footprints, outlines, and templates
 
 ### GitHub Implementation
 
-- **`src/utils/github.ts`**: Contains `fetchConfigFromUrl` function that returns both config and footprints, plus helper functions:
+- **`src/utils/github.ts`**: Contains `fetchConfigFromUrl` function that returns config, footprints, outlines, and templates, plus helper functions:
   - `fetchFootprintsFromDirectory`: Recursive directory traversal for a single directory
   - `fetchFootprintsFromRepo`: Recursive traversal of an entire repository (for submodules)
   - `parseGitmodules`: Parses `.gitmodules` file to extract submodule paths and URLs

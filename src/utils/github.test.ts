@@ -39,6 +39,12 @@ describe('github utilities', () => {
           new Response('[]', { status: 404 }) as unknown as Response
         )
       );
+      // Mock templates directory (empty)
+      mockFetch.mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response('[]', { status: 404 }) as unknown as Response
+        )
+      );
 
       // Mock .gitmodules fetch
       mockFetch.mockImplementationOnce(() =>
@@ -106,6 +112,12 @@ describe('github utilities', () => {
         )
       );
       // Mock outlines directory (empty)
+      mockFetch.mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response('[]', { status: 404 }) as unknown as Response
+        )
+      );
+      // Mock templates directory (empty)
       mockFetch.mockImplementationOnce(() =>
         Promise.resolve(
           new Response('[]', { status: 404 }) as unknown as Response
@@ -197,6 +209,12 @@ describe('github utilities', () => {
           new Response('[]', { status: 404 }) as unknown as Response
         )
       );
+      // Mock templates directory (empty)
+      mockFetch.mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response('[]', { status: 404 }) as unknown as Response
+        )
+      );
 
       // Mock .gitmodules fetch with non-footprint submodule
       mockFetch.mockImplementationOnce(() =>
@@ -235,6 +253,12 @@ describe('github utilities', () => {
         )
       );
       // Mock outlines directory (empty)
+      mockFetch.mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response('[]', { status: 404 }) as unknown as Response
+        )
+      );
+      // Mock templates directory (empty)
       mockFetch.mockImplementationOnce(() =>
         Promise.resolve(
           new Response('[]', { status: 404 }) as unknown as Response

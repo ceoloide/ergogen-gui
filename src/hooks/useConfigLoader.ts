@@ -45,7 +45,7 @@ export const useConfigLoader = ({
             setError(result.rateLimitWarning);
           }
 
-          // Convert footprints and outlines to injection array format
+          // Convert footprints, outlines, and templates to injection array format
           const footprintInjections: string[][] = result.footprints.map(
             (fp) => ['footprint', fp.name, fp.content]
           );
@@ -56,7 +56,17 @@ export const useConfigLoader = ({
             fp.content,
           ]);
 
-          const newInjections = [...footprintInjections, ...outlineInjections];
+          const templateInjections: string[][] = result.templates.map((fp) => [
+            'template',
+            fp.name,
+            fp.content,
+          ]);
+
+          const newInjections = [
+            ...footprintInjections,
+            ...outlineInjections,
+            ...templateInjections,
+          ];
 
           // Process injections with conflict resolution
           await processInjectionsWithConflictResolution(

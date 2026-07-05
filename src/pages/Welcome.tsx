@@ -287,6 +287,7 @@ const Welcome = () => {
   const processInjections = async (
     footprints: GitHubFootprint[],
     outlines: GitHubFootprint[],
+    templates: GitHubFootprint[],
     config: string,
     resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]
@@ -295,10 +296,11 @@ const Welcome = () => {
       throw new Error('Configuration context not available');
     }
 
-    // Convert footprints and outlines to injection array format
+    // Convert footprints, outlines, and templates to injection array format
     const injections: string[][] = [
       ...footprints.map((fp) => ['footprint', fp.name, fp.content]),
       ...outlines.map((ot) => ['outline', ot.name, ot.content]),
+      ...templates.map((tmpl) => ['template', tmpl.name, tmpl.content]),
     ];
 
     // Use the hook's process function
@@ -359,6 +361,7 @@ const Welcome = () => {
             await processInjections(
               result.footprints,
               result.outlines,
+              result.templates || [],
               result.config
             );
           } catch (error) {
@@ -413,6 +416,7 @@ const Welcome = () => {
       await processInjections(
         result.footprints,
         result.outlines,
+        result.templates || [],
         result.config
       );
     } catch (error) {

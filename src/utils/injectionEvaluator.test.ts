@@ -27,7 +27,7 @@ describe('injectionEvaluator', () => {
     `;
 
     // Act
-    const fn = createInjectionModule(injectionCode) as () => any;  
+    const fn = createInjectionModule(injectionCode) as () => any;
 
     // Assert
     expect(typeof fn).toBe('function');

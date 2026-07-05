@@ -103,11 +103,11 @@ const Injections = ({
   const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
   const [activeUploadType, setActiveUploadType] = useState<
-    'footprint' | 'outline'
+    'footprint' | 'outline' | 'template'
   >('footprint');
-  const [activeTab, setActiveTab] = useState<'footprints' | 'outlines'>(
-    'footprints'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'footprints' | 'outlines' | 'templates'
+  >('footprints');
 
   // Use the injection conflict resolution hook
   const {
@@ -142,6 +142,8 @@ const Injections = ({
           collection = footprints;
         } else if (injection[0] === 'outline') {
           collection = outlines;
+        } else if (injection[0] === 'template') {
+          collection = templates;
         }
         collection.push({
           key: i,
@@ -181,7 +183,23 @@ const Injections = ({
       type: 'outline',
       name: `custom_outline_${nextKey + 1}`,
       content:
-        "module.exports = {\n  params: {\n    designator: '',\n  },\n  body: p => ``\n}",
+        'const u = require(\'../utils\');\n\nmodule.exports = (config, name, points, outlines, units) => {\n    const paths = [\n        ""  // Add your SVG path(s) here\n    ];\n    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);\n};',
+    };
+    setInjectionToEdit(newInjection);
+    // Show editor on mobile when new injection is created
+    if (onInjectionSelect) {
+      onInjectionSelect();
+    }
+  };
+
+  const handleNewTemplate = () => {
+    const nextKey = configContext?.injectionInput?.length || 0;
+    const newInjection = {
+      key: nextKey,
+      type: 'template',
+      name: `custom_template_${nextKey + 1}`,
+      content:
+        "const m = require('makerjs')\nconst version = require('../../package.json').version\n\nmodule.exports = {\n    convert_outline: (model, layer) => {\n        return ``;  // Return your converted outlines\n    },\n    body: params => {\n        return ``;  // Add your template text here\n    }\n}",
     };
     setInjectionToEdit(newInjection);
     // Show editor on mobile when new injection is created
@@ -278,6 +296,16 @@ const Injections = ({
           data-testid="tab-outlines"
         >
           Outlines
+        </TabButton>
+        <TabButton
+          $active={activeTab === 'templates'}
+          onClick={() => {
+            setActiveTab('templates');
+            setActiveUploadType('template');
+          }}
+          data-testid="tab-templates"
+        >
+          Templates
         </TabButton>
       </TabsContainer>
 
@@ -388,6 +416,64 @@ const Injections = ({
               data-testid="load-outline-folder"
               aria-label="Load custom outline folder"
               title="Load outline folder"
+            >
+              <span className="material-symbols-outlined">
+                drive_folder_upload
+              </span>
+            </IconButton>
+          </ActionsContainer>
+        </>
+      )}
+
+      {activeTab === 'templates' && (
+        <>
+          {templates.map((template) => {
+            return (
+              <InjectionRow
+                key={template.key}
+                injection={template}
+                setInjectionToEdit={(injection) => {
+                  setInjectionToEdit(injection);
+                  // Show editor on mobile when injection is selected
+                  if (onInjectionSelect) {
+                    onInjectionSelect();
+                  }
+                }}
+                deleteInjection={deleteInjection}
+                previewKey={injectionToEdit.name}
+                data-testid={dataTestId && `${dataTestId}-${template.name}`}
+              />
+            );
+          })}
+
+          <ActionsContainer>
+            <GrowButton
+              onClick={handleNewTemplate}
+              data-testid="add-template"
+              aria-label="Add new custom template"
+              title="Add template"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </GrowButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('template');
+                setTimeout(() => fileInputRef.current?.click(), 0);
+              }}
+              data-testid="load-template-files"
+              aria-label="Load custom template files"
+              title="Load template files"
+            >
+              <span className="material-symbols-outlined">upload_file</span>
+            </IconButton>
+            <IconButton
+              onClick={() => {
+                setActiveUploadType('template');
+                setTimeout(() => folderInputRef.current?.click(), 0);
+              }}
+              data-testid="load-template-folder"
+              aria-label="Load custom template folder"
+              title="Load template folder"
             >
               <span className="material-symbols-outlined">
                 drive_folder_upload

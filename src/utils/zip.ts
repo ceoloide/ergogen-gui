@@ -99,15 +99,24 @@ export const createZip = async (
     }
   }
 
-  // Footprints folder
+  // Save injections into their respective folders based on type
   if (injections && injections.length > 0) {
-    const footprintsFolder = zip.folder('footprints');
-    if (footprintsFolder) {
-      for (const injection of injections) {
-        const [, name, content] = injection;
+    for (const injection of injections) {
+      const [type, name, content] = injection;
+
+      // Select folder based on type
+      let folderName = 'footprints';
+      if (type === 'outline') {
+        folderName = 'outlines';
+      } else if (type === 'template') {
+        folderName = 'templates';
+      }
+
+      const targetFolder = zip.folder(folderName);
+      if (targetFolder) {
         const pathParts = name.split('/');
         const fileName = pathParts.pop();
-        let currentFolder = footprintsFolder;
+        let currentFolder = targetFolder;
         for (const part of pathParts) {
           currentFolder = currentFolder.folder(part) || currentFolder;
         }

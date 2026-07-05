@@ -1804,6 +1804,23 @@
 		return filter;
 	}
 
+	var choc_hotswap_socket;
+	var hasRequiredChoc_hotswap_socket;
+
+	function requireChoc_hotswap_socket () {
+		if (hasRequiredChoc_hotswap_socket) return choc_hotswap_socket;
+		hasRequiredChoc_hotswap_socket = 1;
+		const u = requireUtils();
+
+		choc_hotswap_socket = (config, name, points, outlines, units) => {
+		    const paths = [
+		        "M 7.1 0.7 A 1.5 1.5 0 0 0 8.6 2.2 L 11.6 2.2 L 11.6 3.15 L 14.2 3.15 L 14.2 5.75 L 11.6 5.75 L 11.6 6.7 L 7.6 6.7 L 7.6 5.2 A 0.5 0.5 0 0 0 7.1 4.7 L 2.6 4.7 L 2.6 3.5 L 0 3.5 L 0 0.95 L 2.6 0.95 L 2.6 0 L 7.1 0 L 7.1 0.7 Z"
+		    ];
+		    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);
+		};
+		return choc_hotswap_socket;
+	}
+
 	var outlines;
 	var hasRequiredOutlines$1;
 
@@ -1811,6 +1828,7 @@
 		if (hasRequiredOutlines$1) return outlines;
 		hasRequiredOutlines$1 = 1;
 		outlines = {
+		    choc_hotswap_socket: requireChoc_hotswap_socket(),
 		};
 		return outlines;
 	}
