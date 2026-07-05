@@ -4,163 +4,16 @@
  */
 
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('makerjs'), require('js-yaml'), require('jszip'), require('mathjs'), require('kle-serial'), require('hull')) :
-	typeof define === 'function' && define.amd ? define(['makerjs', 'js-yaml', 'jszip', 'mathjs', 'kle-serial', 'hull'], factory) :
-	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.ergogen = factory(global.makerjs, global.jsyaml, global.jszip, global.math, global.kle, global.hull));
-})(this, (function (require$$0, require$$2, require$$1$1, require$$3, require$$1, require$$8$1) { 'use strict';
+	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('makerjs'), require('mathjs'), require('js-yaml'), require('jszip'), require('kle-serial'), require('hull')) :
+	typeof define === 'function' && define.amd ? define(['makerjs', 'mathjs', 'js-yaml', 'jszip', 'kle-serial', 'hull'], factory) :
+	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.ergogen = factory(global.makerjs, global.math, global.jsyaml, global.jszip, global.kle, global.hull));
+})(this, (function (require$$0, require$$3, require$$2, require$$1$1, require$$1, require$$9) { 'use strict';
 
 	function getDefaultExportFromCjs (x) {
 		return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 	}
 
 	var utils = {};
-
-	var hasRequiredUtils;
-
-	function requireUtils () {
-		if (hasRequiredUtils) return utils;
-		hasRequiredUtils = 1;
-		const m = require$$0;
-
-
-		utils.deepcopy = value => {
-		    if (value === undefined) return undefined
-		    return JSON.parse(JSON.stringify(value))
-		};
-
-		const deep = utils.deep = (obj, key, val) => {
-		    const levels = key.split('.');
-		    const last = levels.pop();
-		    let step = obj;
-		    for (const level of levels) {
-		        step[level] = step[level] || {};
-		        step = step[level];
-		    }
-		    if (val === undefined) return step[last]
-		    step[last] = val;
-		    return obj
-		};
-
-		utils.template = (str, vals={}) => {
-		    const regex = /\{\{([^}]*)\}\}/g;
-		    let res = str;
-		    let shift = 0;
-		    for (const match of str.matchAll(regex)) {
-		        const replacement = (deep(vals, match[1]) || '') + '';
-		        res = res.substring(0, match.index + shift)
-		            + replacement
-		            + res.substring(match.index + shift + match[0].length);
-		        shift += replacement.length - match[0].length;
-		    }
-		    return res
-		};
-
-		const eq = utils.eq = (a=[], b=[]) => {
-		    return a[0] === b[0] && a[1] === b[1]
-		};
-
-		const line = utils.line = (a, b) => {
-		    return new m.paths.Line(a, b)
-		};
-
-		utils.circle = (p, r) => {
-		    return {paths: {circle: new m.paths.Circle(p, r)}}
-		};
-
-		utils.rect = (w, h, o=[0, 0]) => {
-		    const res = {
-		        top:    line([0, h], [w, h]),
-		        right:  line([w, h], [w, 0]),
-		        bottom: line([w, 0], [0, 0]),
-		        left:   line([0, 0], [0, h])
-		    };
-		    return m.model.move({paths: res}, o)
-		};
-
-		utils.poly = (arr) => {
-		    let counter = 0;
-		    let prev = arr[arr.length - 1];
-		    const res = {
-		        paths: {}
-		    };
-		    for (const p of arr) {
-		        if (eq(prev, p)) continue
-		        res.paths['p' + (++counter)] = line(prev, p);
-		        prev = p;
-		    }
-		    return res
-		};
-
-		utils.bbox = (arr) => {
-		    let minx = Infinity;
-		    let miny = Infinity;
-		    let maxx = -Infinity;
-		    let maxy = -Infinity;
-		    for (const p of arr) {
-		        minx = Math.min(minx, p[0]);
-		        miny = Math.min(miny, p[1]);
-		        maxx = Math.max(maxx, p[0]);
-		        maxy = Math.max(maxy, p[1]);
-		    }
-		    return {low: [minx, miny], high: [maxx, maxy]}
-		};
-
-		const farPoint = utils.farPoint = [1234.1234, 2143.56789];
-
-		utils.union = utils.add = (a, b) => {
-		    return m.model.combine(a, b, false, true, false, true, {
-		        farPoint
-		    })
-		};
-
-		utils.subtract = (a, b) => {
-		    return m.model.combine(a, b, false, true, true, false, {
-		        farPoint
-		    })
-		};
-
-		utils.intersect = (a, b) => {
-		    return m.model.combine(a, b, true, false, true, false, {
-		        farPoint
-		    })
-		};
-
-		utils.stack = (a, b) => {
-		    return {
-		        models: {
-		            a, b
-		        }
-		    }
-		};
-
-		const semver = utils.semver = (str, name='') => {
-		    let main = str.split('-')[0];
-		    if (main.startsWith('v')) {
-		        main = main.substring(1);
-		    }
-		    while (main.split('.').length < 3) {
-		        main += '.0';
-		    }
-		    if (/^\d+\.\d+\.\d+$/.test(main)) {
-		        const parts = main.split('.').map(part => parseInt(part, 10));
-		        return {major: parts[0], minor: parts[1], patch: parts[2]}
-		    } else throw new Error(`Invalid semver "${str}" at ${name}!`)
-		};
-
-		utils.satisfies = (current, expected) => {
-		    if (current.major === undefined) current = semver(current);
-		    if (expected.major === undefined) expected = semver(expected);
-		    return current.major === expected.major && (
-		        current.minor > expected.minor || (
-		            current.minor === expected.minor && 
-		            current.patch >= expected.patch
-		        )
-		    )
-		};
-		return utils;
-	}
-
-	var io = {};
 
 	var assert = {};
 
@@ -346,6 +199,211 @@
 		return assert;
 	}
 
+	var hasRequiredUtils;
+
+	function requireUtils () {
+		if (hasRequiredUtils) return utils;
+		hasRequiredUtils = 1;
+		(function (exports) {
+			const m = require$$0;
+
+
+			exports.deepcopy = value => {
+			    if (value === undefined) return undefined
+			    return JSON.parse(JSON.stringify(value))
+			};
+
+			const deep = exports.deep = (obj, key, val) => {
+			    const levels = key.split('.');
+			    const last = levels.pop();
+			    let step = obj;
+			    for (const level of levels) {
+			        step[level] = step[level] || {};
+			        step = step[level];
+			    }
+			    if (val === undefined) return step[last]
+			    step[last] = val;
+			    return obj
+			};
+
+			exports.template = (str, vals={}) => {
+			    const regex = /\{\{([^}]*)\}\}/g;
+			    let res = str;
+			    let shift = 0;
+			    for (const match of str.matchAll(regex)) {
+			        const replacement = (deep(vals, match[1]) || '') + '';
+			        res = res.substring(0, match.index + shift)
+			            + replacement
+			            + res.substring(match.index + shift + match[0].length);
+			        shift += replacement.length - match[0].length;
+			    }
+			    return res
+			};
+
+			const eq = exports.eq = (a=[], b=[]) => {
+			    return a[0] === b[0] && a[1] === b[1]
+			};
+
+			const line = exports.line = (a, b) => {
+			    return new m.paths.Line(a, b)
+			};
+
+			exports.circle = (p, r) => {
+			    return {paths: {circle: new m.paths.Circle(p, r)}}
+			};
+
+			exports.rect = (w, h, o=[0, 0]) => {
+			    const res = {
+			        top:    line([0, h], [w, h]),
+			        right:  line([w, h], [w, 0]),
+			        bottom: line([w, 0], [0, 0]),
+			        left:   line([0, 0], [0, h])
+			    };
+			    return m.model.move({paths: res}, o)
+			};
+
+			exports.poly = (arr) => {
+			    let counter = 0;
+			    let prev = arr[arr.length - 1];
+			    const res = {
+			        paths: {}
+			    };
+			    for (const p of arr) {
+			        if (eq(prev, p)) continue
+			        res.paths['p' + (++counter)] = line(prev, p);
+			        prev = p;
+			    }
+			    return res
+			};
+
+			exports.bbox = (arr) => {
+			    let minx = Infinity;
+			    let miny = Infinity;
+			    let maxx = -Infinity;
+			    let maxy = -Infinity;
+			    for (const p of arr) {
+			        minx = Math.min(minx, p[0]);
+			        miny = Math.min(miny, p[1]);
+			        maxx = Math.max(maxx, p[0]);
+			        maxy = Math.max(maxy, p[1]);
+			    }
+			    return {low: [minx, miny], high: [maxx, maxy]}
+			};
+
+			const farPoint = exports.farPoint = [1234.1234, 2143.56789];
+
+			exports.union = exports.add = (a, b) => {
+			    return m.model.combine(a, b, false, true, false, true, {
+			        farPoint
+			    })
+			};
+
+			exports.subtract = (a, b) => {
+			    return m.model.combine(a, b, false, true, true, false, {
+			        farPoint
+			    })
+			};
+
+			exports.intersect = (a, b) => {
+			    return m.model.combine(a, b, true, false, true, false, {
+			        farPoint
+			    })
+			};
+
+			exports.stack = (a, b) => {
+			    return {
+			        models: {
+			            a, b
+			        }
+			    }
+			};
+
+			const semver = exports.semver = (str, name='') => {
+			    let main = str.split('-')[0];
+			    if (main.startsWith('v')) {
+			        main = main.substring(1);
+			    }
+			    while (main.split('.').length < 3) {
+			        main += '.0';
+			    }
+			    if (/^\d+\.\d+\.\d+$/.test(main)) {
+			        const parts = main.split('.').map(part => parseInt(part, 10));
+			        return {major: parts[0], minor: parts[1], patch: parts[2]}
+			    } else throw new Error(`Invalid semver "${str}" at ${name}!`)
+			};
+
+			exports.satisfies = (current, expected) => {
+			    if (current.major === undefined) current = semver(current);
+			    if (expected.major === undefined) expected = semver(expected);
+			    return current.major === expected.major && (
+			        current.minor > expected.minor || (
+			            current.minor === expected.minor && 
+			            current.patch >= expected.patch
+			        )
+			    )
+			};
+
+			exports.svg_paths_to_outline = (paths_raw, config, name, points, outlines, units, accuracy = 0.0001) => {
+			    const a = requireAssert();
+			    a.unexpected(config, name, ['paths', 'accuracy', 'flip_horizontally', 'flip_vertically', 'origin']);
+			    const actual_accuracy = a.sane(config.accuracy || accuracy, `${name}.accuracy`, 'number')(units);
+			    a.assert(actual_accuracy !== 0, `Accuracy for SVG outline "${name}" cannot be 0!`);
+
+			    const flip_horizontally = a.sane(config.flip_horizontally || false, `${name}.flip_horizontally`, 'boolean')(units);
+			    const flip_vertically = a.sane(config.flip_vertically || false, `${name}.flip_vertically`, 'boolean')(units);
+			    const origin = a.xy(config.origin || [0, 0], `${name}.origin`)(units);
+
+			    return [point => {
+			        let paths = [];
+			        if (a.type(paths_raw)() == 'string') {
+			            paths = [paths_raw];
+			        } else if (a.type(paths_raw)() == 'array') {
+			            paths = paths_raw;
+			        } else {
+			            a.assert(false, `Field "paths" for SVG outline "${name}" must be a string or an array!`);
+			        }
+
+			        let combined = undefined;
+			        for (const [i, p] of paths.entries()) {
+			            a.assert(a.type(p)() == 'string', `Path ${i} for SVG outline "${name}" must be a string!`);
+			            const imported = m.importer.fromSVGPathData(p, actual_accuracy);
+			            if (combined === undefined) {
+			                combined = imported;
+			            } else {
+			                combined = exports.union(combined, imported);
+			                m.model.simplify(combined);
+			            }
+			        }
+			        let shape = combined;
+			        shape = m.model.mirror(shape, false, true);
+
+			        if (origin[0] !== 0 || origin[1] !== 0) {
+			            shape = m.model.moveRelative(shape, [-origin[0], -origin[1]]);
+			        }
+
+			        if (flip_horizontally || flip_vertically) {
+			            shape = m.model.mirror(shape, flip_horizontally, flip_vertically);
+			        }
+
+			        const chains = m.model.findChains(shape);
+			        a.assert(chains.length > 0, `SVG outline "${name}" does not contain any valid paths!`);
+			        for (const chain of chains) {
+			            a.assert(chain.endless, `SVG paths need to be closed shapes (check failed for "${name}")`);
+			        }
+
+			        if (point.meta.mirrored) {
+			            shape = m.model.mirror(shape, true, false);
+			        }
+			        const bbox = m.measure.modelExtents(shape);
+			        return [shape, {low: bbox.low, high: bbox.high}]
+			    }, units]
+			}; 
+		} (utils));
+		return utils;
+	}
+
+	var io = {};
+
 	var kle = {};
 
 	var hasRequiredKle;
@@ -448,24 +506,24 @@
 	var dependencies = {
 		"fs-extra": "^11.3.2",
 		hull: "github:andriiheonia/hull",
-		"js-yaml": "^3.14.1",
+		"js-yaml": "^4.1.1",
 		jszip: "^3.10.1",
 		"kle-serial": "github:ergogen/kle-serial#ergogen",
-		makerjs: "^0.18.1",
-		mathjs: "^15.0.0",
-		yargs: "^17.7.2"
+		makerjs: "^0.19.2",
+		mathjs: "^15.2.0",
+		yargs: "^18.0.0"
 	};
 	var devDependencies = {
-		"@rollup/plugin-commonjs": "^28.0.7",
+		"@rollup/plugin-commonjs": "^29.0.3",
 		"@rollup/plugin-json": "^6.1.0",
 		chai: "^4.5.0",
 		"chai-as-promised": "^7.1.2",
 		"dir-compare": "^5.0.0",
-		glob: "^11.0.3",
+		glob: "^13.0.6",
 		mocha: "^11.7.4",
-		nyc: "^17.1.0",
-		rollup: "^4.52.4",
-		sinon: "^21.0.0"
+		nyc: "^18.0.0",
+		rollup: "^4.62.2",
+		sinon: "^22.0.0"
 	};
 	var nyc = {
 		all: true,
@@ -545,6 +603,31 @@
 		        const parsed = new Function('require', module_prefix + text + module_suffix)(fake_require(name));
 		        // TODO: some sort of template validation?
 		        injections.push(['template', name, parsed]);
+		    }
+
+		    // bundled outlines
+		    const ots = zip.folder('outlines');
+		    for (const ot of ots.file(/.*\.(svg|js)$/)) {
+		        const name = ot.name.slice('outlines/'.length).replace(/\.(svg|js)$/, '');
+		        const text = await ot.async('string');
+		        if (ot.name.endsWith('.js')) {
+		            const parsed = new Function('require', module_prefix + text + module_suffix)(fake_require(name));
+		            injections.push(['outline', name, parsed]);
+		        } else {
+		            // Simple SVG path extraction
+		            const paths = [];
+		            const pathRegex = /<path[\s\S]*?\sd=["']([\s\S]*?)["']/gi;
+		            let match;
+		            while ((match = pathRegex.exec(text)) !== null) {
+		                paths.push(match[1]);
+		            }
+
+		            const svg_injected = (config, name, points, outlines, units) => {
+		                return u.svg_paths_to_outline(paths, config, name, points, outlines, units)
+		            };
+
+		            injections.push(['outline', name, svg_injected]);
+		        }
 		    }
 
 		    return [config_text, injections]
@@ -686,26 +769,68 @@
 		    u.deep(target, key, val);
 		});
 
-		prepare.inherit = config => traverse(config, config, [], (target, key, val, root, breadcrumbs) => {
-		    if (val && val.$extends !== undefined) {
-		        let candidates = u.deepcopy(val.$extends);
-		        if (a.type(candidates)() !== 'array') candidates = [candidates];
-		        const list = [val];
-		        while (candidates.length) {
-		            const path = candidates.shift();
-		            const other = u.deep(root, path);
-		            a.assert(other, `"${path}" (reached from "${breadcrumbs.join('.')}.$extends") does not name a valid inheritance target!`);
-		            let parents = other.$extends || [];
-		            if (a.type(parents)() !== 'array') parents = [parents];
-		            candidates = candidates.concat(parents);
-		            a.assert(!list.includes(other), `"${path}" (reached from "${breadcrumbs.join('.')}.$extends") leads to a circular dependency!`);
-		            list.unshift(other);
+		prepare.inherit = config => {
+		    const cache = new Map();
+		    const stack = [];
+
+		    const resolve = (val, breadcrumbs) => {
+		        const type = a.type(val)();
+		        if (type !== 'object' && type !== 'array') return val
+		        if (cache.has(val)) return cache.get(val)
+
+		        a.assert(!stack.includes(val), `"${breadcrumbs.join('.')}" leads to a circular dependency!`);
+
+		        stack.push(val);
+		        let res;
+		        if (type === 'object') {
+		            let current = val;
+		            if (val.$extends !== undefined) {
+		                let candidates = val.$extends;
+		                if (a.type(candidates)() !== 'array') candidates = [candidates];
+		                const list = [];
+		                for (const path of candidates) {
+		                    const other = u.deep(config, path);
+		                    a.assert(other, `"${path}" (reached from "${breadcrumbs.join('.')}.$extends") does not name a valid inheritance target!`);
+		                    list.push(resolve(other, path.split('.')));
+		                }
+		                const own = u.deepcopy(val);
+		                delete own.$extends;
+
+		                if (list.length === 1 && Object.keys(own).length === 0) {
+		                    current = list[0];
+		                } else {
+		                    list.push(own);
+		                    current = extend.apply(null, list);
+		                }
+		            }
+
+		            const current_type = a.type(current)();
+		            if (current_type === 'object') {
+		                res = {};
+		                for (const [k, v] of Object.entries(current)) {
+		                    res[k] = resolve(v, [...breadcrumbs, k]);
+		                }
+		            } else if (current_type === 'array') {
+		                res = [];
+		                for (let i = 0; i < current.length; i++) {
+		                    res[i] = resolve(current[i], [...breadcrumbs, `[${i}]`]);
+		                }
+		            } else {
+		                res = current;
+		            }
+		        } else { // array
+		            res = [];
+		            for (let i = 0; i < val.length; i++) {
+		                res[i] = resolve(val[i], [...breadcrumbs, `[${i}]`]);
+		            }
 		        }
-		        val = extend.apply(null, list);
-		        delete val.$extends;
-		    }
-		    target[key] = val;
-		});
+		        stack.pop();
+		        cache.set(val, res);
+		        return res
+		    };
+
+		    return resolve(config, [])
+		};
 
 		prepare.parameterize = config => traverse(config, config, [], (target, key, val, root, breadcrumbs) => {
 
@@ -754,6 +879,83 @@
 		    delete val.$params;
 		    delete val.$args;
 		    target[key] = val;
+		});
+
+		const parseArgs = (inner) => {
+		    const args = [];
+		    let current = '';
+		    let depth = 0;
+		    let inQuote = false;
+		    let quoteChar = '';
+		    for (let i = 0; i < inner.length; i++) {
+		        const char = inner[i];
+		        if ((char === '"' || char === "'") && (i === 0 || inner[i-1] !== '\\')) {
+		            if (!inQuote) {
+		                inQuote = true;
+		                quoteChar = char;
+		                current += char;
+		            } else if (char === quoteChar) {
+		                inQuote = false;
+		                current += char;
+		            } else {
+		                current += char;
+		            }
+		        } else if (!inQuote && char === '(') {
+		            depth++;
+		            current += char;
+		        } else if (!inQuote && char === ')') {
+		            depth--;
+		            current += char;
+		        } else if (!inQuote && char === ',' && depth === 0) {
+		            args.push(current.trim());
+		            current = '';
+		        } else {
+		            current += char;
+		        }
+		    }
+		    if (current.trim().length > 0 || inner.length === 0) {
+		        args.push(current.trim());
+		    }
+		    return args
+		};
+
+		const resolve = (val, root, breadcrumbs, seen = new Set()) => {
+		    if (a.type(val)() !== 'string') return val
+		    if (!val.startsWith('$concat(') || !val.endsWith(')')) return val
+
+		    if (seen.has(val)) {
+		        throw new Error(`Circular dependency detected in $concat at "${breadcrumbs.join('.')}": ${val}`)
+		    }
+		    seen.add(val);
+
+		    const inner = val.substring(8, val.length - 1);
+		    const args = parseArgs(inner);
+
+		    const res = args
+		        .filter(arg => arg.length > 0)
+		        .map(arg => {
+		            // String literal
+		            if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+		                return arg.substring(1, arg.length - 1).replace(/\\(.)/g, '$1')
+		            }
+		            // $concat call
+		            if (arg.startsWith('$concat(')) {
+		                return resolve(arg, root, breadcrumbs, seen)
+		            }
+		            // Reference
+		            const ref = u.deep(root, arg);
+		            if (ref === undefined) {
+		                throw new Error(`Could not resolve reference "${arg}" in $concat at "${breadcrumbs.join('.')}"`)
+		            }
+		            return resolve(ref, root, breadcrumbs, seen)
+		        }).join('');
+
+		    seen.delete(val);
+		    return res
+		};
+
+		prepare.concat = config => traverse(config, config, [], (target, key, val, root, breadcrumbs) => {
+		    target[key] = resolve(val, root, breadcrumbs);
 		});
 		return prepare;
 	}
@@ -1401,7 +1603,7 @@
 		return points;
 	}
 
-	var outlines = {};
+	var outlines$1 = {};
 
 	var operation = {};
 
@@ -1453,8 +1655,8 @@
 
 		const _true = () => true;
 		const _false = () => false;
-		const _and = arr => p => arr.map(e => e(p)).reduce((a, b) => a && b);
-		const _or = arr => p => arr.map(e => e(p)).reduce((a, b) => a || b);
+		const _and = arr => p => arr.every(e => e(p));
+		const _or = arr => p => arr.some(e => e(p));
 
 		const similar = (keys, reference, name, units) => {
 		    let neg = false;
@@ -1590,11 +1792,11 @@
 		        if (['clone', 'both'].includes(asym)) {
 		            // this is permissive: we only include mirrored versions if they exist, and don't fuss if they don't
 		            // also, we check for duplicates as clones can potentially refer back to their sources, too
-		            const pool = result.map(p => p.meta.name);
+		            const pool = new Set(result.map(p => p.meta.name));
 		            result = result.concat(
 		                source.map(p => points[anchor_lib.mirror(p.meta.name)])
 		                .filter(p => !!p)
-		                .filter(p => !pool.includes(p.meta.name))
+		                .filter(p => !pool.has(p.meta.name))
 		            );
 		        }
 		    }
@@ -1604,10 +1806,21 @@
 		return filter;
 	}
 
+	var outlines;
+	var hasRequiredOutlines$1;
+
+	function requireOutlines$1 () {
+		if (hasRequiredOutlines$1) return outlines;
+		hasRequiredOutlines$1 = 1;
+		outlines = {
+		};
+		return outlines;
+	}
+
 	var hasRequiredOutlines;
 
 	function requireOutlines () {
-		if (hasRequiredOutlines) return outlines;
+		if (hasRequiredOutlines) return outlines$1;
 		hasRequiredOutlines = 1;
 		const m = require$$0;
 		const u = requireUtils();
@@ -1617,7 +1830,8 @@
 		const prep = requirePrepare();
 		const anchor = requireAnchor().parse;
 		const filter = requireFilter().parse;
-		const hulljs = require$$8$1;
+		const injected_outlines = requireOutlines$1();
+		const hulljs = require$$9;
 
 		const binding = (base, bbox, point, units) => {
 
@@ -1915,12 +2129,17 @@
 		    }, units]
 		};
 
+		const svg = (config, name, points, outlines, units) => {
+		    return u.svg_paths_to_outline(config.paths, config, name, points, outlines, units)
+		};
+
 		const whats = {
 		    rectangle,
 		    circle,
 		    polygon,
 		    outline,
 		    path,
+		    svg,
 		    hull
 		};
 
@@ -1942,7 +2161,7 @@
 		    }
 		};
 
-		outlines.parse = (config, points, units) => {
+		outlines$1.parse = (config, points, units) => {
 
 		    // output outlines will be collected here
 		    const outlines = {};
@@ -1972,7 +2191,7 @@
 
 		            // process keys that are common to all part declarations
 		            const operation = u[a.in(part.operation || 'add', `${name}.operation`, ['add', 'subtract', 'intersect', 'stack'])];
-		            const what = a.in(part.what || 'outline', `${name}.what`, ['rectangle', 'circle', 'polygon', 'outline', 'path', 'hull']);
+		            const what = a.in(part.what || 'outline', `${name}.what`, ['rectangle', 'circle', 'polygon', 'outline', 'path', 'hull', 'svg', ...Object.keys(injected_outlines)]);
 		            const bound = !!part.bound;
 		            const asym = a.asym(part.asym || 'source', `${name}.asym`);
 
@@ -2001,7 +2220,7 @@
 		            delete part.scale;
 
 		            // a prototype "shape" maker (and its units) are computed
-		            const [shape_maker, shape_units] = whats[what](part, name, points, outlines, units);
+		            const [shape_maker, shape_units] = (whats[what] || injected_outlines[what])(part, name, points, outlines, units);
 		            const adjust = start => anchor(original_adjust || {}, `${name}.adjust`, points, start)(shape_units);
 
 		            // and then the shape is repeated for all where positions
@@ -2040,7 +2259,11 @@
 
 		    return outlines
 		};
-		return outlines;
+
+		outlines$1.inject_outline = (name, outline) => {
+		    injected_outlines[name] = outline;
+		};
+		return outlines$1;
 	}
 
 	var cases = {};
@@ -14554,6 +14777,7 @@
 		    config = prepare.unnest(config);
 		    config = prepare.inherit(config);
 		    config = prepare.parameterize(config);
+		    config = prepare.concat(config);
 		    const results = {};
 		    if (debug) {
 		        results.raw = raw;
@@ -14632,6 +14856,8 @@
 		            return pcbs_lib.inject_footprint(name, value)
 		        case 'template':
 		            return pcbs_lib.inject_template(name, value)
+		        case 'outline':
+		            return outlines_lib.inject_outline(name, value)
 		        default:
 		            throw new Error(`Unknown injection type "${type}" with name "${name}" and value "${value}"!`)
 		    }
