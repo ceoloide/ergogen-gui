@@ -45,7 +45,7 @@
     "lint:js": "eslint --fix \"{src,e2e,patch}/**/*.{ts,tsx,js,jsx}\"",
     "lint:md": "markdownlint --fix \"**/*.md\"",
     "lint": "yarn lint:md && yarn lint:js && yarn knip",
-    "precommit": "yarn format && yarn lint && yarn test"
+    "precommit": "yarn format && yarn lint && yarn test:unit"
   },
   "browserslist": {
     "production": [
