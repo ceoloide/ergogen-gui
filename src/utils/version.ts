@@ -23,12 +23,14 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
       label: version,
       url: version.startsWith('ergogen@')
         ? `${defaultUrl}/releases/tag/v${version.split('@')[1]}`
-        : `https://www.npmjs.com/package/${version.split('@')[0]}`
+        : `https://www.npmjs.com/package/${version.split('@')[0]}`,
     };
   }
 
   // Remove "github:" prefix if present for uniform processing
-  const cleanVersion = version.startsWith('github:') ? version.slice(7) : version;
+  const cleanVersion = version.startsWith('github:')
+    ? version.slice(7)
+    : version;
 
   // Split into repo and branch
   const [repo, branch] = cleanVersion.split('#');
@@ -46,6 +48,6 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
   // For custom repos, show the full clean version string (e.g., user/repo or user/repo#branch)
   return {
     label: cleanVersion,
-    url: branch ? `${baseUrl}/tree/${branch}` : baseUrl
+    url: branch ? `${baseUrl}/tree/${branch}` : baseUrl,
   };
 };

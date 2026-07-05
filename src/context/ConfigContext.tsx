@@ -675,16 +675,67 @@ const ConfigContextProvider = ({
     // eslint-disable-next-line
   }, [isConfigLoading]);
 
+  // Track previous showSettings value
+  const prevShowSettingsRef = useRef<boolean>(showSettings);
+
+  /**
+   * Effect to handle transition of showSettings from true to false (settings closed).
+   * When settings are closed, we terminate the old worker and spin up a fresh one to clear
+   * any stale custom injections, then run generation.
+   */
+  useEffect(() => {
+    if (prevShowSettingsRef.current && !showSettings) {
+      console.log(
+        'Settings panel closed. Restarting Ergogen worker to clear stale custom libraries...'
+      );
+
+      if (ergogenWorkerRef.current) {
+        ergogenWorkerRef.current.terminate();
+        ergogenWorkerRef.current = null;
+        console.log('Ergogen worker terminated.');
+      }
+
+      console.log('Initializing fresh Ergogen worker...');
+      ergogenWorkerRef.current = createErgogenWorker();
+      if (ergogenWorkerRef.current) {
+        ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
+        console.log('Ergogen worker initialized.');
+      } else {
+        console.warn('Failed to initialize Ergogen worker.');
+      }
+
+      if (configInput) {
+        generateNow(configInput, injectionInput, { pointsonly: !autoGen3D });
+      }
+    }
+    prevShowSettingsRef.current = showSettings;
+  }, [
+    showSettings,
+    configInput,
+    injectionInput,
+    autoGen3D,
+    generateNow,
+    handleErgogenWorkerMessage,
+  ]);
+
   /**
    * Effect to process the input configuration whenever it or the auto-generation settings change.
    * Also persists the injection input to local storage.
+   * Only triggers generation if the settings panel is NOT open, to prevent performance lag while editing settings/options.
    */
   useEffect(() => {
     localStorage.setItem('ergogen:injection', JSON.stringify(injectionInput));
-    if (autoGen) {
+    if (autoGen && !showSettings) {
       processInput(configInput, injectionInput, { pointsonly: !autoGen3D });
     }
-  }, [configInput, injectionInput, autoGen, autoGen3D, processInput]);
+  }, [
+    configInput,
+    injectionInput,
+    autoGen,
+    autoGen3D,
+    showSettings,
+    processInput,
+  ]);
 
   const experiment = useMemo(() => {
     const urlParams = new URLSearchParams(window.location.search);

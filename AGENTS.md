@@ -181,6 +181,8 @@ The `ResizablePanel` component is used throughout the application for:
 The application offloads long-running, computationally intensive tasks to Web Workers to prevent the main UI thread from freezing. This ensures the user interface remains responsive while processing complex keyboard layouts or generating 3D models.
 
 - **`ergogen.worker.ts`**: This worker is responsible for running the core Ergogen logic. It takes the user's YAML configuration as input and generates the raw output data, including outlines, PCB information, and case designs.
+  - **Lifecycle Management**: To prevent custom injections (footprints, outlines, templates) from lingering in Ergogen's persistent module-level registry inside the worker thread when renamed or deleted, the worker is terminated and recreated fresh every time the settings panel (`showSettings`) transitions from open (`true`) to closed (`false`).
+  - **Auto-Generation Suspension**: Auto-generation runs are suspended while the settings panel is open to ensure maximum performance and responsiveness when editing custom footprint code or modifying settings. Once the settings panel is closed, the worker is restarted and a generation run is triggered immediately to compile all edits.
 
 - **`jscad.worker.ts`**: This worker handles 3D geometry processing. It receives the output from the Ergogen worker and uses JSCAD to generate 3D models for previewing. It is also responsible for converting these models into the STL format for downloading.
 

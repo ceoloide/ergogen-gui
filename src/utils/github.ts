@@ -180,57 +180,71 @@ const fetchFootprintsFromRepo = async (
     }
 
     if (!response.ok) {
-      console.log(`[GitHub] Failed to fetch from ${apiUrl}: ${response.status}`);
+      console.log(
+        `[GitHub] Failed to fetch from ${apiUrl}: ${response.status}`
+      );
       return footprints;
     }
 
     const items = await response.json();
 
     await Promise.all(
-      items.map(async (item: { type: string; name: string; download_url: string; path: string; url: string }) => {
-        if (item.type === 'file' && item.name.endsWith('.js')) {
-          // Fetch the content of the .js file
-          const contentResponse = await fetch(item.download_url);
+      items.map(
+        async (item: {
+          type: string;
+          name: string;
+          download_url: string;
+          path: string;
+          url: string;
+        }) => {
+          if (item.type === 'file' && item.name.endsWith('.js')) {
+            // Fetch the content of the .js file
+            const contentResponse = await fetch(item.download_url);
 
-          // Check rate limit for file download
-          const fileRateLimitCheck = checkRateLimit(
-            contentResponse,
-            item.download_url
-          );
-          if (fileRateLimitCheck.error && !rateLimitTracker.warning) {
-            rateLimitTracker.warning = fileRateLimitCheck.error;
-          }
-          if (fileRateLimitCheck.isLimitExceeded) {
-            throw new Error(fileRateLimitCheck.error || 'Rate limit exceeded');
-          }
+            // Check rate limit for file download
+            const fileRateLimitCheck = checkRateLimit(
+              contentResponse,
+              item.download_url
+            );
+            if (fileRateLimitCheck.error && !rateLimitTracker.warning) {
+              rateLimitTracker.warning = fileRateLimitCheck.error;
+            }
+            if (fileRateLimitCheck.isLimitExceeded) {
+              throw new Error(
+                fileRateLimitCheck.error || 'Rate limit exceeded'
+              );
+            }
 
-          if (contentResponse.ok) {
-            const content = await contentResponse.text();
-            // Construct the footprint name from path and filename without extension
-            const name = item.name.replace(/\.js$/, '');
-            const fullName = basePath ? `${basePath}/${name}` : name;
-            console.log(`[GitHub] Loaded footprint: ${fullName}`);
-            footprints.push({ name: fullName, content });
+            if (contentResponse.ok) {
+              const content = await contentResponse.text();
+              // Construct the footprint name from path and filename without extension
+              const name = item.name.replace(/\.js$/, '');
+              const fullName = basePath ? `${basePath}/${name}` : name;
+              console.log(`[GitHub] Loaded footprint: ${fullName}`);
+              footprints.push({ name: fullName, content });
+            }
+          } else if (item.type === 'dir') {
+            // Recursively fetch from subdirectory
+            const subPath = basePath ? `${basePath}/${item.name}` : item.name;
+            const subFootprints = await fetchFootprintsFromRepo(
+              owner,
+              repo,
+              branch,
+              subPath,
+              rateLimitTracker
+            );
+            footprints.push(...subFootprints);
           }
-        } else if (item.type === 'dir') {
-          // Recursively fetch from subdirectory
-          const subPath = basePath ? `${basePath}/${item.name}` : item.name;
-          const subFootprints = await fetchFootprintsFromRepo(
-            owner,
-            repo,
-            branch,
-            subPath,
-            rateLimitTracker
-          );
-          footprints.push(...subFootprints);
         }
-      })
+      )
     );
   } catch (error) {
     console.warn(`[GitHub] Error fetching from repo ${owner}/${repo}:`, error);
   }
 
-  console.log(`[GitHub] Loaded ${footprints.length} footprints from ${owner}/${repo}`);
+  console.log(
+    `[GitHub] Loaded ${footprints.length} footprints from ${owner}/${repo}`
+  );
   return footprints;
 };
 
@@ -270,42 +284,52 @@ const fetchFootprintsFromDirectory = async (
     const items = await response.json();
 
     await Promise.all(
-      items.map(async (item: { type: string; name: string; download_url: string; path: string; url: string }) => {
-        if (item.type === 'file' && item.name.endsWith('.js')) {
-          // Fetch the content of the .js file
-          const contentResponse = await fetch(item.download_url);
+      items.map(
+        async (item: {
+          type: string;
+          name: string;
+          download_url: string;
+          path: string;
+          url: string;
+        }) => {
+          if (item.type === 'file' && item.name.endsWith('.js')) {
+            // Fetch the content of the .js file
+            const contentResponse = await fetch(item.download_url);
 
-          // Check rate limit for file download
-          const fileRateLimitCheck = checkRateLimit(
-            contentResponse,
-            item.download_url
-          );
-          if (fileRateLimitCheck.error && !rateLimitTracker.warning) {
-            rateLimitTracker.warning = fileRateLimitCheck.error;
-          }
-          if (fileRateLimitCheck.isLimitExceeded) {
-            throw new Error(fileRateLimitCheck.error || 'Rate limit exceeded');
-          }
+            // Check rate limit for file download
+            const fileRateLimitCheck = checkRateLimit(
+              contentResponse,
+              item.download_url
+            );
+            if (fileRateLimitCheck.error && !rateLimitTracker.warning) {
+              rateLimitTracker.warning = fileRateLimitCheck.error;
+            }
+            if (fileRateLimitCheck.isLimitExceeded) {
+              throw new Error(
+                fileRateLimitCheck.error || 'Rate limit exceeded'
+              );
+            }
 
-          if (contentResponse.ok) {
-            const content = await contentResponse.text();
-            // Construct the footprint name from path and filename without extension
-            const fileName = item.name.replace(/\.js$/, '');
-            const name = basePath ? `${basePath}/${fileName}` : fileName;
-            console.log(`[GitHub] Loaded footprint: ${name}`);
-            footprints.push({ name, content });
+            if (contentResponse.ok) {
+              const content = await contentResponse.text();
+              // Construct the footprint name from path and filename without extension
+              const fileName = item.name.replace(/\.js$/, '');
+              const name = basePath ? `${basePath}/${fileName}` : fileName;
+              console.log(`[GitHub] Loaded footprint: ${name}`);
+              footprints.push({ name, content });
+            }
+          } else if (item.type === 'dir') {
+            // Recursively fetch from subdirectory
+            const subPath = basePath ? `${basePath}/${item.name}` : item.name;
+            const subFootprints = await fetchFootprintsFromDirectory(
+              item.url,
+              subPath,
+              rateLimitTracker
+            );
+            footprints.push(...subFootprints);
           }
-        } else if (item.type === 'dir') {
-          // Recursively fetch from subdirectory
-          const subPath = basePath ? `${basePath}/${item.name}` : item.name;
-          const subFootprints = await fetchFootprintsFromDirectory(
-            item.url,
-            subPath,
-            rateLimitTracker
-          );
-          footprints.push(...subFootprints);
         }
-      })
+      )
     );
   } catch (error) {
     // Silently fail if directory doesn't exist or can't be accessed
@@ -498,7 +522,10 @@ export const fetchConfigFromUrl = async (
         const submodules = parseGitmodules(gitmodulesContent);
 
         for (const submodule of submodules) {
-          if (submodule.path.startsWith(footprintsPath) || submodule.path.startsWith(outlinesPath)) {
+          if (
+            submodule.path.startsWith(footprintsPath) ||
+            submodule.path.startsWith(outlinesPath)
+          ) {
             const isOutline = submodule.path.startsWith(outlinesPath);
             const currentPath = isOutline ? outlinesPath : footprintsPath;
             const currentCollection = isOutline ? outlines : footprints;
@@ -566,9 +593,7 @@ export const fetchConfigFromUrl = async (
     console.log(
       `[GitHub] Loaded ${footprints.length} footprints from direct link`
     );
-    console.log(
-      `[GitHub] Loaded ${outlines.length} outlines from direct link`
-    );
+    console.log(`[GitHub] Loaded ${outlines.length} outlines from direct link`);
     return {
       config,
       footprints,
@@ -622,38 +647,45 @@ export const fetchConfigFromUrl = async (
 
         const items = await response.json();
         await Promise.all(
-          items.map(async (item: { type: string; name: string; download_url: string; path: string }) => {
-            if (item.type === 'file' && item.name.endsWith('.yaml')) {
-              const fileResponse = await fetch(item.download_url);
+          items.map(
+            async (item: {
+              type: string;
+              name: string;
+              download_url: string;
+              path: string;
+            }) => {
+              if (item.type === 'file' && item.name.endsWith('.yaml')) {
+                const fileResponse = await fetch(item.download_url);
 
-              // Check rate limit for YAML file download
-              const yamlRateLimitCheck = checkRateLimit(
-                fileResponse,
-                item.download_url
-              );
-              if (yamlRateLimitCheck.error && !rateLimitTracker.warning) {
-                rateLimitTracker.warning = yamlRateLimitCheck.error;
-              }
-              if (yamlRateLimitCheck.isLimitExceeded) {
-                throw new Error(
-                  yamlRateLimitCheck.error || 'Rate limit exceeded'
+                // Check rate limit for YAML file download
+                const yamlRateLimitCheck = checkRateLimit(
+                  fileResponse,
+                  item.download_url
                 );
-              }
-
-              if (fileResponse.ok) {
-                const content = await fileResponse.text();
-                const filePath = item.path;
-
-                if (item.name === 'config.yaml') {
-                  configYamls.push({ path: filePath, content });
-                } else {
-                  anyYamls.push({ path: filePath, content });
+                if (yamlRateLimitCheck.error && !rateLimitTracker.warning) {
+                  rateLimitTracker.warning = yamlRateLimitCheck.error;
                 }
+                if (yamlRateLimitCheck.isLimitExceeded) {
+                  throw new Error(
+                    yamlRateLimitCheck.error || 'Rate limit exceeded'
+                  );
+                }
+
+                if (fileResponse.ok) {
+                  const content = await fileResponse.text();
+                  const filePath = item.path;
+
+                  if (item.name === 'config.yaml') {
+                    configYamls.push({ path: filePath, content });
+                  } else {
+                    anyYamls.push({ path: filePath, content });
+                  }
+                }
+              } else if (item.type === 'dir') {
+                queue.push(item.path);
               }
-            } else if (item.type === 'dir') {
-              queue.push(item.path);
             }
-          })
+          )
         );
       } catch (_error) {
         // Continue searching other directories
@@ -791,9 +823,7 @@ export const fetchConfigFromUrl = async (
     );
 
     // Now fetch outlines from the outlines folder
-    const outlinesPath = configPath
-      ? `${configPath}/outlines`
-      : 'outlines';
+    const outlinesPath = configPath ? `${configPath}/outlines` : 'outlines';
     console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
     const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
     const outlines = await fetchFootprintsFromDirectory(
@@ -829,7 +859,10 @@ export const fetchConfigFromUrl = async (
 
         // Filter submodules that are within the footprints or outlines folder
         for (const submodule of submodules) {
-          if (submodule.path.startsWith(footprintsPath) || submodule.path.startsWith(outlinesPath)) {
+          if (
+            submodule.path.startsWith(footprintsPath) ||
+            submodule.path.startsWith(outlinesPath)
+          ) {
             const isOutline = submodule.path.startsWith(outlinesPath);
             const currentPath = isOutline ? outlinesPath : footprintsPath;
             const currentCollection = isOutline ? outlines : footprints;

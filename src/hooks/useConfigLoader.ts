@@ -46,11 +46,9 @@ export const useConfigLoader = ({
           }
 
           // Convert footprints and outlines to injection array format
-          const footprintInjections: string[][] = result.footprints.map((fp) => [
-            'footprint',
-            fp.name,
-            fp.content,
-          ]);
+          const footprintInjections: string[][] = result.footprints.map(
+            (fp) => ['footprint', fp.name, fp.content]
+          );
 
           const outlineInjections: string[][] = result.outlines.map((fp) => [
             'outline',

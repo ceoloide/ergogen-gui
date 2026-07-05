@@ -7,10 +7,11 @@ import { Dispatch, SetStateAction, useRef, useState } from 'react';
 import GrowButton from '../atoms/GrowButton';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
-import Title from "../atoms/Title";
+import Title from '../atoms/Title';
 
 const ActionsContainer = styled.div`
-  display: flex; margin-left: 0.5rem;
+  display: flex;
+  margin-left: 0.5rem;
   margin-left: 0.5rem;
   gap: 8px;
   margin-top: 0.5rem;
@@ -43,7 +44,8 @@ const TabsContainer = styled.div`
 const TabButton = styled.button<{ $active: boolean }>`
   background: none;
   border: none;
-  color: ${(props) => (props.$active ? theme.colors.text : theme.colors.textDark)};
+  color: ${(props) =>
+    props.$active ? theme.colors.text : theme.colors.textDark};
   padding: 0.75rem 0;
   cursor: pointer;
   font-size: ${theme.fontSizes.bodySmall};
@@ -56,7 +58,6 @@ const TabButton = styled.button<{ $active: boolean }>`
     color: ${theme.colors.text};
   }
 `;
-
 
 // Use the shared Title component from atoms
 
@@ -101,8 +102,12 @@ const Injections = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const configContext = useConfigContext();
-  const [activeUploadType, setActiveUploadType] = useState<'footprint' | 'outline'>('footprint');
-  const [activeTab, setActiveTab] = useState<'footprints' | 'outlines'>('footprints');
+  const [activeUploadType, setActiveUploadType] = useState<
+    'footprint' | 'outline'
+  >('footprint');
+  const [activeTab, setActiveTab] = useState<'footprints' | 'outlines'>(
+    'footprints'
+  );
 
   // Use the injection conflict resolution hook
   const {
@@ -120,8 +125,6 @@ const Injections = ({
     getCurrentInjections: () => configContext?.injectionInput || [],
     setError: (error) => configContext?.setError(error),
   });
-
-
 
   if (!configContext) return null;
 
@@ -187,7 +190,6 @@ const Injections = ({
     }
   };
 
-
   const handleLoadFiles = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -245,7 +247,7 @@ const Injections = ({
   };
 
   return (
-        <InjectionsContainer data-testid={dataTestId}>
+    <InjectionsContainer data-testid={dataTestId}>
       {currentConflict && (
         <ConflictResolutionDialog
           injectionName={currentConflict.name}
@@ -329,7 +331,9 @@ const Injections = ({
               aria-label="Load custom footprint folder"
               title="Load footprint folder"
             >
-              <span className="material-symbols-outlined">drive_folder_upload</span>
+              <span className="material-symbols-outlined">
+                drive_folder_upload
+              </span>
             </IconButton>
           </ActionsContainer>
         </>
@@ -385,7 +389,9 @@ const Injections = ({
               aria-label="Load custom outline folder"
               title="Load outline folder"
             >
-              <span className="material-symbols-outlined">drive_folder_upload</span>
+              <span className="material-symbols-outlined">
+                drive_folder_upload
+              </span>
             </IconButton>
           </ActionsContainer>
         </>

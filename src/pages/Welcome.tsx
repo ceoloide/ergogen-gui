@@ -356,7 +356,11 @@ const Welcome = () => {
 
           try {
             // Process footprints with conflict resolution
-            await processInjections(result.footprints, result.outlines, result.config);
+            await processInjections(
+              result.footprints,
+              result.outlines,
+              result.config
+            );
           } catch (error) {
             // If footprint processing fails, don't load the config
             throw new Error(
@@ -406,7 +410,11 @@ const Welcome = () => {
       const result = await loadLocalFile(file);
 
       // Process footprints with conflict resolution
-      await processInjections(result.footprints, result.outlines, result.config);
+      await processInjections(
+        result.footprints,
+        result.outlines,
+        result.config
+      );
     } catch (error) {
       setError(
         `Failed to load local file: ${error instanceof Error ? error.message : 'Unknown error'}`

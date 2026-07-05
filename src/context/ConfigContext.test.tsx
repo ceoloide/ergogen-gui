@@ -430,4 +430,105 @@ describe('ConfigContextProvider', () => {
       });
     });
   });
+
+  describe('Settings Panel Interaction', () => {
+    beforeEach(() => {
+      mockErgogenWorker.postMessage.mockClear();
+      mockErgogenWorker.terminate.mockClear();
+      mockJscadWorker.postMessage.mockClear();
+      localStorage.clear();
+    });
+
+    it('should inhibit auto-generation when showSettings is true', async () => {
+      const TestSettingsComponent = () => {
+        const ctx = useConfigContext();
+        return (
+          <>
+            <button
+              data-testid="toggle-settings"
+              onClick={() => ctx?.setShowSettings((prev) => !prev)}
+            >
+              Toggle Settings
+            </button>
+            <button
+              data-testid="change-injections"
+              onClick={() =>
+                ctx?.setInjectionInput([['footprint', 'fp1', 'code']])
+              }
+            >
+              Change Injections
+            </button>
+          </>
+        );
+      };
+
+      const { getByTestId } = render(
+        <ConfigContextProvider
+          configInput="points: {}"
+          setConfigInput={jest.fn()}
+        >
+          <TestSettingsComponent />
+        </ConfigContextProvider>
+      );
+
+      // Verify initial mount triggers generation
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalled();
+
+      // Open settings
+      act(() => {
+        getByTestId('toggle-settings').click();
+      });
+
+      // Change injections while settings are open
+      mockErgogenWorker.postMessage.mockClear();
+      act(() => {
+        getByTestId('change-injections').click();
+      });
+
+      // Auto-generation should be inhibited (postMessage should NOT be called)
+      expect(mockErgogenWorker.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('should terminate the old worker, create a new one, and trigger generation when showSettings transitions from true to false', async () => {
+      const TestSettingsComponent = () => {
+        const ctx = useConfigContext();
+        return (
+          <button
+            data-testid="toggle-settings"
+            onClick={() => ctx?.setShowSettings((prev) => !prev)}
+          >
+            Toggle Settings
+          </button>
+        );
+      };
+
+      const { getByTestId } = render(
+        <ConfigContextProvider
+          configInput="points: {}"
+          setConfigInput={jest.fn()}
+        >
+          <TestSettingsComponent />
+        </ConfigContextProvider>
+      );
+
+      // Open settings panel
+      act(() => {
+        getByTestId('toggle-settings').click();
+      });
+
+      mockErgogenWorker.postMessage.mockClear();
+      mockErgogenWorker.terminate.mockClear();
+
+      // Close settings panel
+      act(() => {
+        getByTestId('toggle-settings').click();
+      });
+
+      // Old worker should be terminated
+      expect(mockErgogenWorker.terminate).toHaveBeenCalledTimes(1);
+
+      // Fresh generation should be kicked off
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalledTimes(1);
+    });
+  });
 });
