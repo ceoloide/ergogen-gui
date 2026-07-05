@@ -1,6 +1,6 @@
 import ergogenPkg from 'ergogen/package.json';
 
-export interface VersionInfo {
+interface VersionInfo {
   label: string;
   url: string;
 }
