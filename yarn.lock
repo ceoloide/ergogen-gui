@@ -4887,7 +4887,7 @@ entities@^4.4.0:
 
 "ergogen@github:ceoloide/ergogen#v4.3.0":
   version "4.2.1"
-  resolved "git+ssh://git@github.com/ceoloide/ergogen.git#348d182dc20c7b385edcd5676583b24246556c37"
+  resolved "git+ssh://git@github.com/ceoloide/ergogen.git#419e188353afff59943ed1072eb9273d48ec4f5b"
   dependencies:
     fs-extra "^11.3.2"
     hull "github:andriiheonia/hull"
@@ -6361,7 +6361,7 @@ https-proxy-agent@^5.0.0:
 
 "hull@github:andriiheonia/hull":
   version "1.0.13"
-  resolved "git+https://github.com/andriiheonia/hull.git#ffcf93dbd4df5a8c59f0541af5a9926d01528c5d"
+  resolved "git+ssh://git@github.com/andriiheonia/hull.git#ffcf93dbd4df5a8c59f0541af5a9926d01528c5d"
   dependencies:
     monotone-convex-hull-2d "1.0.1"
     robust-segment-intersect "1.0.1"
@@ -7627,7 +7627,7 @@ kind-of@^6.0.2:
 
 "kle-serial@github:ergogen/kle-serial#ergogen":
   version "0.15.1"
-  resolved "git+https://github.com/ergogen/kle-serial.git#61f29f317d87bbfed0b0b7e646e1b91d4384ac02"
+  resolved "git+ssh://git@github.com/ergogen/kle-serial.git#61f29f317d87bbfed0b0b7e646e1b91d4384ac02"
   dependencies:
     json5 "^2.1.0"
 
@@ -10812,7 +10812,16 @@ string-width@^5.0.1, string-width@^5.1.2:
     emoji-regex "^9.2.2"
     strip-ansi "^7.0.1"
 
-string-width@^7.0.0, string-width@^7.2.0:
+string-width@^7.0.0:
+  version "7.2.0"
+  resolved "https://registry.npmjs.org/string-width/-/string-width-7.2.0.tgz"
+  integrity sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ==
+  dependencies:
+    emoji-regex "^10.3.0"
+    get-east-asian-width "^1.0.0"
+    strip-ansi "^7.1.0"
+
+string-width@^7.2.0:
   version "7.2.0"
   resolved "https://registry.npmjs.org/string-width/-/string-width-7.2.0.tgz"
   integrity sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ==
