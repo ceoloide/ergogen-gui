@@ -183,7 +183,6 @@ const CameraController: React.FC<{
       perspectiveCamera.lookAt(boxCenter);
       perspectiveCamera.updateProjectionMatrix();
 
-      console.log('Camera positioned at distance:', distance);
     }
   }, [geometry, camera, size]);
 
@@ -215,7 +214,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
 
   React.useEffect(() => {
     try {
-      console.log('Parsing STL, length:', stl.length);
 
       // Parse STL data
       const parseStl = (stlString: string) => {
@@ -228,18 +226,10 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
           startsWithSolid &&
           (stlString.includes('facet') || stlString.includes('FACET'));
 
-        console.log('STL format detection:', {
-          startsWithSolid,
-          hasRequiredKeywords,
-          length: stlString.length,
-          preview: stlString.substring(0, 100),
-        });
 
         if (hasRequiredKeywords) {
-          console.log('Parsing as ASCII STL');
           return parseAsciiStl(stlString);
         } else {
-          console.log('Parsing as Binary STL');
           return parseBinaryStl(stlString);
         }
       };
@@ -313,9 +303,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         // Calculate expected file size
         const expectedSize = 84 + numTriangles * 50; // header + count + (50 bytes per triangle)
 
-        console.log(
-          `Binary STL: ${numTriangles} triangles, buffer size: ${buffer.byteLength}, expected: ${expectedSize}`
-        );
 
         if (buffer.byteLength < expectedSize) {
           throw new Error(
@@ -323,10 +310,11 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
           );
         }
 
-        const vertices: number[] = [];
-        const normals: number[] = [];
+        const vertices = new Float32Array(numTriangles * 9);
+        const normals = new Float32Array(numTriangles * 9);
 
         let offset = 84;
+        let vOffset = 0;
         for (let i = 0; i < numTriangles; i++) {
           // Normal vector
           const nx = view.getFloat32(offset, true);
@@ -336,12 +324,15 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
 
           // Three vertices
           for (let j = 0; j < 3; j++) {
-            vertices.push(
-              view.getFloat32(offset, true),
-              view.getFloat32(offset + 4, true),
-              view.getFloat32(offset + 8, true)
-            );
-            normals.push(nx, ny, nz);
+            vertices[vOffset] = view.getFloat32(offset, true);
+            vertices[vOffset + 1] = view.getFloat32(offset + 4, true);
+            vertices[vOffset + 2] = view.getFloat32(offset + 8, true);
+
+            normals[vOffset] = nx;
+            normals[vOffset + 1] = ny;
+            normals[vOffset + 2] = nz;
+
+            vOffset += 3;
             offset += 12;
           }
 
@@ -350,8 +341,8 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         }
 
         return {
-          vertices: new Float32Array(vertices),
-          normals: new Float32Array(normals),
+          vertices,
+          normals,
         };
       };
 
@@ -363,7 +354,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         return;
       }
 
-      console.log('Parsed vertices:', vertices.length / 3, 'triangles');
 
       // Create Three.js BufferGeometry
       const newGeometry = new THREE.BufferGeometry();
@@ -381,10 +371,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         const center = new THREE.Vector3();
         newGeometry.boundingBox.getCenter(center);
         newGeometry.translate(-center.x, -center.y, -center.z);
-        console.log(
-          'Geometry centered, bounding sphere radius:',
-          newGeometry.boundingSphere?.radius
-        );
       }
 
       setGeometry(newGeometry);

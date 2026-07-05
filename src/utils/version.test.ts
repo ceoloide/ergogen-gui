@@ -1,7 +1,8 @@
 import { getErgogenVersionInfo } from './version';
+import ergogenPkg from 'ergogen/package.json';
 
 describe('getErgogenVersionInfo', () => {
-  const defaultVersion = 'v4.2.1';
+  const defaultVersion = `v${ergogenPkg.version}`;
   const defaultUrl = 'https://github.com/ergogen/ergogen';
 
   it('returns default version when no version is provided', () => {

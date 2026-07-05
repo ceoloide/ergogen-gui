@@ -18,7 +18,7 @@ const getRawUrl = (url: string) => {
  * @param {string} url - The URL being fetched (to determine if it's API or raw content).
  * @returns {{isLimitExceeded: boolean, error: string | null}} Rate limit status.
  */
-const checkRateLimit = (
+export const checkRateLimit = (
   response: Response,
   url: string
 ): { isLimitExceeded: boolean; error: string | null } => {

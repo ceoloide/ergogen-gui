@@ -10,8 +10,20 @@ interface VersionInfo {
  * @returns An object containing the formatted label and the corresponding URL.
  */
 export const getErgogenVersionInfo = (version?: string): VersionInfo => {
-  const defaultVersion = 'v4.2.1';
-  const defaultUrl = 'https://github.com/ergogen/ergogen';
+  const defaultVersion = `v${ergogenPkg.version}`;
+
+  const repoStr =
+    typeof ergogenPkg.repository === 'string'
+      ? ergogenPkg.repository
+      : typeof ergogenPkg.repository === 'object' &&
+          ergogenPkg.repository !== null &&
+          'url' in ergogenPkg.repository
+        ? (ergogenPkg.repository as { url: string }).url
+        : 'https://github.com/ergogen/ergogen';
+
+  const defaultUrl = repoStr.startsWith('github:')
+    ? repoStr.replace('github:', 'https://github.com/')
+    : repoStr.replace(/^git\+/, '').replace(/\.git$/, '');
 
   if (!version) {
     return { label: defaultVersion, url: defaultUrl };

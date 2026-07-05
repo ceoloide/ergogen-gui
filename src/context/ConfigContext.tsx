@@ -255,12 +255,6 @@ const ConfigContextProvider = ({
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
 
-  useEffect(() => {
-    console.log('--- ConfigContextProvider mounted ---');
-    return () => {
-      console.log('--- ConfigContextProvider unmounted ---');
-    };
-  }, []);
 
   /**
    * Effect to set error from hash fragment decoding if present.
@@ -282,7 +276,6 @@ const ConfigContextProvider = ({
   const handleErgogenWorkerMessage = useCallback(
     (event: MessageEvent<ErgogenWorkerResponse>) => {
       const response = event.data;
-      console.log('<<< Received message from Ergogen worker:', response.type);
 
       if (response.type === 'error') {
         console.error('--- Ergogen worker error:', response.error);
@@ -293,7 +286,6 @@ const ConfigContextProvider = ({
       }
 
       if (response.type === 'success') {
-        console.log('--- Ergogen worker success, processing results...');
 
         // Handle warnings
         if (response.warnings && response.warnings.length > 0) {
@@ -323,9 +315,6 @@ const ConfigContextProvider = ({
             if (jscadWorkerRef.current) {
               willConvertStl = true;
               setIsJscadConverting(true);
-              console.log(
-                '>>> Sending full results to JSCAD worker for STL conversion'
-              );
               const request: JscadWorkerRequest = {
                 type: 'batch_jscad_to_stl',
                 results: newResults as ResultsLike,
@@ -358,12 +347,8 @@ const ConfigContextProvider = ({
   const handleJscadWorkerMessage = useCallback(
     (event: MessageEvent<JscadWorkerResponse>) => {
       const response = event.data;
-      console.log('<<< Received message from JSCAD worker:', response.type);
 
       if (response.configVersion !== currentConfigVersion.current) {
-        console.log(
-          `Discarding stale STL result for version ${response.configVersion} (current: ${currentConfigVersion.current})`
-        );
         return;
       }
 
@@ -372,7 +357,6 @@ const ConfigContextProvider = ({
         setIsJscadConverting(false);
         setIsGenerating(false);
       } else if (response.type === 'success' && response.results) {
-        console.log('--- JSCAD worker success, applying updated results');
 
         setResults(response.results as Results);
         setResultsVersion((v) => v + 1);
@@ -388,22 +372,18 @@ const ConfigContextProvider = ({
    */
   useEffect(() => {
     if (!ergogenWorkerRef.current) {
-      console.log('Initializing Ergogen worker...');
       ergogenWorkerRef.current = createErgogenWorker();
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
-        console.log('Ergogen worker initialized.');
       } else {
         console.warn('Failed to initialize Ergogen worker.');
       }
     }
 
     if (!jscadWorkerRef.current) {
-      console.log('Initializing JSCAD worker...');
       jscadWorkerRef.current = createJscadWorker();
       if (jscadWorkerRef.current) {
         jscadWorkerRef.current.onmessage = handleJscadWorkerMessage;
-        console.log('JSCAD worker initialized.');
       } else {
         console.warn('Failed to initialize JSCAD worker.');
       }
@@ -413,12 +393,10 @@ const ConfigContextProvider = ({
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.terminate();
         ergogenWorkerRef.current = null;
-        console.log('Ergogen worker terminated.');
       }
       if (jscadWorkerRef.current) {
         jscadWorkerRef.current.terminate();
         jscadWorkerRef.current = null;
-        console.log('JSCAD worker terminated.');
       }
     };
   }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
@@ -521,25 +499,21 @@ const ConfigContextProvider = ({
 
       // Check for deprecated KiCad 5 footprints in the config and warn the user
       if (parsedConfig && parsedConfig.pcbs) {
-        const pcbs = Object.values(parsedConfig.pcbs) as Record<
-          string,
-          unknown
-        >[];
         let warningFound = false;
-        for (const pcb of pcbs) {
-          if (!pcb.template || pcb.template === 'kicad5') {
-            if (pcb.footprints) {
-              const footprints = Object.values(
-                pcb.footprints as Record<string, unknown>
-              ) as Record<string, unknown>[];
-              for (const footprint of footprints) {
+        for (const pcbKey in parsedConfig.pcbs) {
+          const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
+          if (!pcb.template || pcb.template === "kicad5") {
+            const footprints = pcb.footprints;
+            if (footprints) {
+              for (const fpKey in footprints) {
+                const footprint = footprints[fpKey];
                 if (
                   footprint &&
-                  typeof footprint.what === 'string' &&
-                  footprint.what.startsWith('ceoloide')
+                  typeof footprint.what === "string" &&
+                  footprint.what.startsWith("ceoloide")
                 ) {
                   setDeprecationWarning(
-                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
+                    "KiCad 5 is deprecated. Please add \"template: kicad8\" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer."
                   );
                   warningFound = true;
                   break;
@@ -552,7 +526,6 @@ const ConfigContextProvider = ({
           }
         }
       }
-
       // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
       // a simplified preview.
       // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
@@ -567,7 +540,6 @@ const ConfigContextProvider = ({
       try {
         // Run the Ergogen process
         if (ergogenWorkerRef.current) {
-          console.log('>>> Sending Ergogen process requestt...');
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
             inputConfig,

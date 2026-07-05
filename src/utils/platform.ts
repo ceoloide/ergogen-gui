@@ -20,7 +20,7 @@ export function isMacOS() {
   return false;
 }
 
-function isWindows() {
+export function isWindows() {
   if (typeof navigator !== 'undefined') {
     if ('userAgentData' in navigator && navigator.userAgentData) {
       const uaData = navigator.userAgentData as { platform?: string };
@@ -33,7 +33,7 @@ function isWindows() {
   return false;
 }
 
-function isLinux() {
+export function isLinux() {
   if (typeof navigator !== 'undefined') {
     if ('userAgentData' in navigator && navigator.userAgentData) {
       const uaData = navigator.userAgentData as { platform?: string };
@@ -46,18 +46,18 @@ function isLinux() {
   return false;
 }
 
-function _getPlatform() {
+export function getPlatform() {
   if (isMacOS()) return 'mac';
   if (isWindows()) return 'windows';
   if (isLinux()) return 'linux';
   return 'other';
 }
 
-function _getModifierKey() {
+export function getModifierKey() {
   return isMacOS() ? '⌘' : 'Ctrl';
 }
 
-function _isMobile() {
+export function isMobile() {
   if (typeof navigator !== 'undefined') {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent
