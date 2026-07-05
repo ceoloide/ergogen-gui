@@ -4887,7 +4887,7 @@ entities@^4.4.0:
 
 "ergogen@github:ceoloide/ergogen#v4.3.0":
   version "4.2.1"
-  resolved "git+ssh://git@github.com/ceoloide/ergogen.git#419e188353afff59943ed1072eb9273d48ec4f5b"
+  resolved "git+ssh://git@github.com/ceoloide/ergogen.git#2cfbb2d7679947b0301ba25288d483b0b389edd2"
   dependencies:
     fs-extra "^11.3.2"
     hull "github:andriiheonia/hull"
