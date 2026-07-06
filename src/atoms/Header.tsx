@@ -506,6 +506,8 @@ const ActiveConfigNameSection = styled.div<{ $isEditing?: boolean }>`
     ${(props) => (props.$isEditing ? theme.colors.accent : 'transparent')};
   background-color: ${(props) =>
     props.$isEditing ? theme.colors.backgroundLight : 'transparent'};
+  width: 220px;
+  box-sizing: border-box;
 
   &:hover {
     background-color: ${(props) =>
@@ -515,6 +517,10 @@ const ActiveConfigNameSection = styled.div<{ $isEditing?: boolean }>`
     .header-actions-hover {
       opacity: 1;
     }
+  }
+
+  @media (max-width: 767px) {
+    width: 160px;
   }
 `;
 
@@ -568,12 +574,8 @@ const ConfigNameText = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 150px;
+  flex: 1;
   user-select: none;
-
-  @media (max-width: 480px) {
-    max-width: 80px;
-  }
 `;
 
 const ConfigNameInput = styled.input`
@@ -583,13 +585,10 @@ const ConfigNameInput = styled.input`
   font-size: ${theme.fontSizes.bodySmall};
   font-weight: ${theme.fontWeights.semiBold};
   padding: 0;
-  width: 150px;
+  flex: 1;
   outline: none;
   height: 100%;
-
-  @media (max-width: 480px) {
-    width: 90px;
-  }
+  min-width: 0;
 `;
 
 const SharedBadge = styled.span`
