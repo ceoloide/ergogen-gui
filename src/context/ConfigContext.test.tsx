@@ -716,7 +716,7 @@ describe('ConfigContextProvider', () => {
       // Verify it is converted
       expect(contextValue.isPreview).toBe(false);
       expect(contextValue.configs.length).toBe(1);
-      expect(contextValue.configs[0].name).toBe('Shared 1');
+      expect(contextValue.configs[0].name).toBe('Shared Config 1');
       expect(contextValue.configs[0].config).toBe('points: {A: {}}');
       expect(contextValue.activeConfigId).toBe(contextValue.configs[0].id);
     });

@@ -777,9 +777,9 @@ const ConfigContextProvider = ({
         if (newVal !== previewConfigRef.current) {
           const nextSharedNum = getNextIndexForPattern(
             configsRef.current,
-            /^Shared\s+(\d+)$/
+            /^Shared\s+Config\s+(\d+)$/
           );
-          const name = `Shared ${nextSharedNum}`;
+          const name = `Shared Config ${nextSharedNum}`;
           const newId = generateUUID();
           const now = new Date().toISOString();
           const newConfig: SavedConfig = {
@@ -981,9 +981,9 @@ const ConfigContextProvider = ({
     if (!isPreviewRef.current) return;
     const nextSharedNum = getNextIndexForPattern(
       configsRef.current,
-      /^Shared\s+(\d+)$/
+      /^Shared\s+Config\s+(\d+)$/
     );
-    const name = `Shared ${nextSharedNum}`;
+    const name = `Shared Config ${nextSharedNum}`;
     const newId = generateUUID();
     const now = new Date().toISOString();
     const newConfig: SavedConfig = {
@@ -1019,7 +1019,7 @@ const ConfigContextProvider = ({
 
   const activeConfigName = useMemo(() => {
     if (isPreview) {
-      return 'Shared Preview';
+      return 'Shared Config';
     }
     if (activeConfigId) {
       const active = configs.find((c) => c.id === activeConfigId);

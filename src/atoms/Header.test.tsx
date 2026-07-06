@@ -64,7 +64,7 @@ describe('Header', () => {
   it('renders Shared icon when configuration is in preview mode', () => {
     (useConfigContext as jest.Mock).mockReturnValue({
       ...mockContextValue,
-      activeConfigName: 'Shared Preview',
+      activeConfigName: 'Shared Config',
       isPreview: true,
     });
     renderComponent();
@@ -147,7 +147,7 @@ describe('Header', () => {
   it('triggers savePreviewConfig when clicking the save button in preview mode', () => {
     (useConfigContext as jest.Mock).mockReturnValue({
       ...mockContextValue,
-      activeConfigName: 'Shared Preview',
+      activeConfigName: 'Shared Config',
       isPreview: true,
     });
     renderComponent();
