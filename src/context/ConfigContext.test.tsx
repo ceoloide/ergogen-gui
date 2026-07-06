@@ -531,4 +531,74 @@ describe('ConfigContextProvider', () => {
       expect(mockErgogenWorker.postMessage).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('multi-configuration management actions', () => {
+    it('should switch between configurations and update values correctly without cross-contamination', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Initially, there should be 0 configs on clean storage
+      expect(contextValue.configs.length).toBe(0);
+
+      // Create Config B
+      let idB: string = '';
+      act(() => {
+        idB = contextValue.createNewConfig('points: {B: {}}', 'Config B');
+      });
+
+      // Create Config C
+      let idC: string = '';
+      act(() => {
+        idC = contextValue.createNewConfig('points: {C: {}}', 'Config C');
+      });
+
+      // Verify they are added
+      expect(contextValue.configs.find((c: any) => c.id === idB)?.config).toBe(
+        'points: {B: {}}'
+      );
+      expect(contextValue.configs.find((c: any) => c.id === idC)?.config).toBe(
+        'points: {C: {}}'
+      );
+
+      // Switch to B
+      act(() => {
+        contextValue.selectConfig(idB);
+      });
+      expect(contextValue.activeConfigId).toBe(idB);
+      expect(contextValue.configInput).toBe('points: {B: {}}');
+
+      // Update B's config
+      act(() => {
+        contextValue.setConfigInput('points: {B: {updated: true}}');
+      });
+      expect(contextValue.configs.find((c: any) => c.id === idB)?.config).toBe(
+        'points: {B: {updated: true}}'
+      );
+
+      // Switch to C
+      act(() => {
+        contextValue.selectConfig(idC);
+      });
+      expect(contextValue.activeConfigId).toBe(idC);
+      expect(contextValue.configInput).toBe('points: {C: {}}');
+
+      // Verify B's config remains updated and was not overwritten by C's config
+      expect(contextValue.configs.find((c: any) => c.id === idB)?.config).toBe(
+        'points: {B: {updated: true}}'
+      );
+      expect(contextValue.configs.find((c: any) => c.id === idC)?.config).toBe(
+        'points: {C: {}}'
+      );
+    });
+  });
 });

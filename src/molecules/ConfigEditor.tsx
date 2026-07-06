@@ -1,5 +1,5 @@
 import { Editor, OnMount } from '@monaco-editor/react';
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { useConfigContext } from '../context/ConfigContext';
 
 /**
@@ -73,10 +73,6 @@ const ConfigEditor = ({
     },
     [setConfigInput]
   );
-
-  useEffect(() => {
-    handleChange(configInput);
-  }, [configInput, handleChange]);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editor.addAction({
