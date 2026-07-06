@@ -196,13 +196,9 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
             </ProgressWrapper>
 
             <ButtonGroup>
-              <SecondaryButton
-                onClick={handleAbort}
-                size="medium"
-                style={{ width: '100%' }}
-              >
+              <AbortButton onClick={handleAbort} size="medium">
                 Abort
-              </SecondaryButton>
+              </AbortButton>
             </ButtonGroup>
           </>
         )}
@@ -429,6 +425,10 @@ const SecondaryButton = styled(Button)`
   &:hover {
     background-color: ${theme.colors.buttonHover};
   }
+`;
+
+const AbortButton = styled(SecondaryButton)`
+  width: 100%;
 `;
 
 export default BulkDownloadDialog;
