@@ -37,6 +37,7 @@ describe('Header', () => {
     showSideNav: false,
     setShowSettings: jest.fn(),
     setShowSideNav: jest.fn(),
+    renameConfig: jest.fn(),
   };
 
   beforeEach(() => {
@@ -70,5 +71,20 @@ describe('Header', () => {
     const toggleBtn = screen.getByTestId('side-nav-toggle-button');
     fireEvent.click(toggleBtn);
     expect(mockContextValue.setShowSideNav).toHaveBeenCalledWith(true);
+  });
+
+  it('triggers inline renaming in the header', () => {
+    renderComponent();
+    const textNode = screen.getByText('My Awesome Board');
+    fireEvent.click(textNode);
+
+    const inputNode = screen.getByTestId('header-config-name-input');
+    fireEvent.change(inputNode, { target: { value: 'New Header Name' } });
+    fireEvent.keyDown(inputNode, { key: 'Enter', code: 'Enter' });
+
+    expect(mockContextValue.renameConfig).toHaveBeenCalledWith(
+      '1',
+      'New Header Name'
+    );
   });
 });

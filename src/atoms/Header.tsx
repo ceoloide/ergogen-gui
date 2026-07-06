@@ -78,7 +78,7 @@ const VersionText = styled.a`
   color: ${theme.colors.accent};
   text-decoration: none;
   align-items: center;
-  @media (max-width: 350px) {
+  @media (max-width: 767px) {
     display: none;
   }
 `;
@@ -171,6 +171,37 @@ const Header = (): JSX.Element => {
   const location = useLocation();
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const handleStartEdit = () => {
+    if (configContext?.activeConfigName && configContext?.activeConfigId) {
+      setEditValue(configContext.activeConfigName);
+      setIsEditing(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (
+      configContext?.renameConfig &&
+      configContext?.activeConfigId &&
+      editValue.trim()
+    ) {
+      configContext.renameConfig(
+        configContext.activeConfigId,
+        editValue.trim()
+      );
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+    }
+  };
 
   /**
    * Toggles the visibility of the settings panel.
@@ -283,9 +314,27 @@ const Header = (): JSX.Element => {
           {configContext?.activeConfigName && (
             <ActiveConfigNameSection data-testid="header-active-config-name">
               <ConfigDivider>/</ConfigDivider>
-              <ConfigNameText title={configContext.activeConfigName}>
-                {configContext.activeConfigName}
-              </ConfigNameText>
+              {isEditing ? (
+                <ConfigNameInput
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={handleSaveEdit}
+                  onKeyDown={handleKeyDown}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  autoFocus
+                  data-testid="header-config-name-input"
+                  aria-label="Edit configuration name"
+                />
+              ) : (
+                <ConfigNameText
+                  onClick={handleStartEdit}
+                  title="Click to rename"
+                  data-testid="header-config-name-text"
+                >
+                  {configContext.activeConfigName}
+                </ConfigNameText>
+              )}
               {configContext.isPreview && (
                 <SharedBadge data-testid="header-shared-badge">
                   Shared
@@ -369,9 +418,36 @@ const ConfigNameText = styled.span`
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 150px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition:
+    background-color 0.15s ease-in-out,
+    color 0.15s ease-in-out;
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+    color: ${theme.colors.white};
+  }
 
   @media (max-width: 480px) {
     max-width: 80px;
+  }
+`;
+
+const ConfigNameInput = styled.input`
+  background: ${theme.colors.backgroundLight};
+  border: 1px solid ${theme.colors.accent};
+  border-radius: 4px;
+  color: ${theme.colors.white};
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
+  padding: 2px 6px;
+  width: 150px;
+  outline: none;
+
+  @media (max-width: 480px) {
+    width: 90px;
   }
 `;
 
