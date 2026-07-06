@@ -625,5 +625,60 @@ describe('ConfigContextProvider', () => {
       );
       expect(configAfterRename.updatedAt).toBe(originalUpdatedAt);
     });
+
+    it('should not allow renaming a configuration to an existing name and should set error', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      let id1: string = '';
+      let id2: string = '';
+      act(() => {
+        id1 = contextValue.createNewConfig('points: {}', 'Keyboard Alpha');
+        id2 = contextValue.createNewConfig('points: {}', 'Keyboard Beta');
+      });
+
+      expect(contextValue.error).toBeNull();
+
+      // Try renaming Beta to Alpha (should fail and set error)
+      let renameResult = false;
+      act(() => {
+        renameResult = contextValue.renameConfig(id2, 'Keyboard Alpha');
+      });
+
+      expect(renameResult).toBe(false);
+      expect(contextValue.error).toBe(
+        'A configuration named "Keyboard Alpha" already exists.'
+      );
+      expect(contextValue.configs.find((c: any) => c.id === id2)?.name).toBe(
+        'Keyboard Beta'
+      );
+
+      // Clear error
+      act(() => {
+        contextValue.setError(null);
+      });
+      expect(contextValue.error).toBeNull();
+
+      // Try renaming Beta to Gamma (should succeed)
+      act(() => {
+        renameResult = contextValue.renameConfig(id2, 'Keyboard Gamma');
+      });
+
+      expect(renameResult).toBe(true);
+      expect(contextValue.error).toBeNull();
+      expect(contextValue.configs.find((c: any) => c.id === id2)?.name).toBe(
+        'Keyboard Gamma'
+      );
+    });
   });
 });

@@ -37,13 +37,14 @@ describe('Header', () => {
     showSideNav: false,
     setShowSettings: jest.fn(),
     setShowSideNav: jest.fn(),
-    renameConfig: jest.fn(),
+    renameConfig: jest.fn().mockReturnValue(true),
     duplicateConfig: jest.fn(),
     deleteConfig: jest.fn(),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockContextValue.renameConfig.mockReturnValue(true);
     (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
     window.confirm = jest.fn().mockReturnValue(true);
   });

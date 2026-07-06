@@ -196,7 +196,10 @@ const Header = (): JSX.Element => {
       e.stopPropagation();
     }
     if (renameConfig && activeConfigId && editValue.trim()) {
-      renameConfig(activeConfigId, editValue.trim());
+      const success = renameConfig(activeConfigId, editValue.trim());
+      if (!success) {
+        return;
+      }
     }
     setIsEditing(false);
   };

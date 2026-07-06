@@ -110,7 +110,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 
   const handleRenameSubmit = (id: string) => {
     if (renameConfig && renameValue.trim()) {
-      renameConfig(id, renameValue.trim());
+      const success = renameConfig(id, renameValue.trim());
+      if (!success) {
+        return;
+      }
     }
     setRenamingId(null);
   };

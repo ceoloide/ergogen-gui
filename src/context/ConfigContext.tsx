@@ -112,7 +112,7 @@ type ContextProps = {
   isPreview: boolean;
   selectConfig: (id: string | null) => void;
   createNewConfig: (content: string, name?: string) => string;
-  renameConfig: (id: string, newName: string) => void;
+  renameConfig: (id: string, newName: string) => boolean;
   duplicateConfig: (id: string) => void;
   deleteConfig: (id: string) => void;
   exportAllConfigs: () => Promise<void>;
@@ -889,19 +889,38 @@ const ConfigContextProvider = ({
     return newId;
   }, []);
 
-  const renameConfig = useCallback((id: string, newName: string) => {
-    const existing = configsRef.current.find((c) => c.id === id);
-    if (!existing || existing.name === newName) return;
+  const renameConfig = useCallback(
+    (id: string, newName: string) => {
+      const trimmed = newName.trim();
+      if (!trimmed) {
+        setError('Configuration name cannot be empty');
+        return false;
+      }
+      const existing = configsRef.current.find((c) => c.id === id);
+      if (!existing) return false;
+      if (existing.name === trimmed) return true;
 
-    const updatedConfigs = configsRef.current.map((c) =>
-      c.id === id
-        ? { ...c, name: newName, updatedAt: new Date().toISOString() }
-        : c
-    );
-    setConfigs(updatedConfigs);
-    configsRef.current = updatedConfigs;
-    saveMultiConfigToStorage(updatedConfigs, activeConfigIdRef.current);
-  }, []);
+      const isDuplicate = configsRef.current.some(
+        (c) =>
+          c.id !== id && c.name.trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (isDuplicate) {
+        setError(`A configuration named "${trimmed}" already exists.`);
+        return false;
+      }
+
+      const updatedConfigs = configsRef.current.map((c) =>
+        c.id === id
+          ? { ...c, name: trimmed, updatedAt: new Date().toISOString() }
+          : c
+      );
+      setConfigs(updatedConfigs);
+      configsRef.current = updatedConfigs;
+      saveMultiConfigToStorage(updatedConfigs, activeConfigIdRef.current);
+      return true;
+    },
+    [setError]
+  );
 
   const duplicateConfig = useCallback((id: string) => {
     const found = configsRef.current.find((c) => c.id === id);

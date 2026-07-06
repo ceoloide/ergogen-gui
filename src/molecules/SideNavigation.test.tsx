@@ -41,7 +41,7 @@ describe('SideNavigation', () => {
     activeConfigId: '1',
     selectConfig: jest.fn(),
     createNewConfig: jest.fn().mockReturnValue('3'),
-    renameConfig: jest.fn(),
+    renameConfig: jest.fn().mockReturnValue(true),
     duplicateConfig: jest.fn(),
     deleteConfig: jest.fn(),
     setIsBulkDownloadOpen: jest.fn(),
@@ -53,6 +53,7 @@ describe('SideNavigation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockContextValue.createNewConfig.mockReturnValue('3');
+    mockContextValue.renameConfig.mockReturnValue(true);
     (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
     window.confirm = jest.fn().mockReturnValue(true);
   });
