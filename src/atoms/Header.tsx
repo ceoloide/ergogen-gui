@@ -280,6 +280,19 @@ const Header = (): JSX.Element => {
               {versionInfo.label}
             </VersionText>
           </ErgogenLogo>
+          {configContext?.activeConfigName && (
+            <ActiveConfigNameSection data-testid="header-active-config-name">
+              <ConfigDivider>/</ConfigDivider>
+              <ConfigNameText title={configContext.activeConfigName}>
+                {configContext.activeConfigName}
+              </ConfigNameText>
+              {configContext.isPreview && (
+                <SharedBadge data-testid="header-shared-badge">
+                  Shared
+                </SharedBadge>
+              )}
+            </ActiveConfigNameSection>
+          )}
         </LeftContainer>
         <RightContainer>
           {location.pathname === '/' && (
@@ -333,5 +346,46 @@ const Header = (): JSX.Element => {
     </>
   );
 };
+
+const ActiveConfigNameSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+`;
+
+const ConfigDivider = styled.span`
+  color: ${theme.colors.border};
+  font-size: ${theme.fontSizes.sm};
+  user-select: none;
+`;
+
+const ConfigNameText = styled.span`
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.medium};
+  color: ${theme.colors.text};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+
+  @media (max-width: 480px) {
+    max-width: 80px;
+  }
+`;
+
+const SharedBadge = styled.span`
+  background-color: ${theme.colors.accent};
+  color: ${theme.colors.white};
+  font-size: 10px;
+  font-weight: ${theme.fontWeights.semiBold};
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+  flex-shrink: 0;
+`;
 
 export default Header;
