@@ -108,17 +108,6 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
 
         {!isGenerating ? (
           <>
-            <Description>Select which configurations to download.</Description>
-
-            <SelectionActions>
-              <ActionButton onClick={() => handleToggleSelectAll(true)}>
-                Select All
-              </ActionButton>
-              <ActionButton onClick={() => handleToggleSelectAll(false)}>
-                Deselect All
-              </ActionButton>
-            </SelectionActions>
-
             <ConfigListContainer>
               {configs.map((cfg) => {
                 const isChecked = selectedIds.has(cfg.id);
@@ -139,6 +128,15 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
                 );
               })}
             </ConfigListContainer>
+
+            <SelectionActions>
+              <ActionButton onClick={() => handleToggleSelectAll(true)}>
+                Select All
+              </ActionButton>
+              <ActionButton onClick={() => handleToggleSelectAll(false)}>
+                Deselect All
+              </ActionButton>
+            </SelectionActions>
 
             <SwitchWrapper>
               <SwitchLabel>Only download configs</SwitchLabel>
@@ -240,17 +238,11 @@ const Title = styled.h2`
   color: ${theme.colors.text};
 `;
 
-const Description = styled.p`
-  margin: 0 0 1rem 0;
-  font-size: ${theme.fontSizes.base};
-  color: ${theme.colors.textDark};
-`;
-
 const SelectionActions = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
 `;
 
 const ActionButton = styled.button`
@@ -280,7 +272,7 @@ const ConfigListContainer = styled.div`
   padding: 0.5rem;
   max-height: 200px;
   overflow-y: auto;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 6px;
