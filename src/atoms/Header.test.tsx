@@ -91,6 +91,40 @@ describe('Header', () => {
     );
   });
 
+  it('submits inline rename using the confirm check button', () => {
+    renderComponent();
+    const textNode = screen.getByText('My Awesome Board');
+    fireEvent.click(textNode);
+
+    const inputNode = screen.getByTestId('header-config-name-input');
+    fireEvent.change(inputNode, { target: { value: 'Checked Rename' } });
+
+    const confirmBtn = screen.getByTestId('header-confirm-rename-btn');
+    fireEvent.click(confirmBtn);
+
+    expect(mockContextValue.renameConfig).toHaveBeenCalledWith(
+      '1',
+      'Checked Rename'
+    );
+    expect(
+      screen.queryByTestId('header-config-name-input')
+    ).not.toBeInTheDocument();
+  });
+
+  it('cancels inline rename using the cancel close button', () => {
+    renderComponent();
+    const textNode = screen.getByText('My Awesome Board');
+    fireEvent.click(textNode);
+
+    const cancelBtn = screen.getByTestId('header-cancel-rename-btn');
+    fireEvent.click(cancelBtn);
+
+    expect(mockContextValue.renameConfig).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId('header-config-name-input')
+    ).not.toBeInTheDocument();
+  });
+
   it('triggers duplicate config from the header', () => {
     renderComponent();
     const dupBtn = screen.getByTestId('header-duplicate-btn');

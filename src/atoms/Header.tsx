@@ -191,9 +191,19 @@ const Header = (): JSX.Element => {
     }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = (e?: React.MouseEvent | React.FocusEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     if (renameConfig && activeConfigId && editValue.trim()) {
       renameConfig(activeConfigId, editValue.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
     }
     setIsEditing(false);
   };
@@ -345,17 +355,41 @@ const Header = (): JSX.Element => {
                 onClick={!isEditing ? handleStartEdit : undefined}
               >
                 {isEditing ? (
-                  <ConfigNameInput
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={handleSaveEdit}
-                    onKeyDown={handleKeyDown}
-                    // eslint-disable-next-line
-                    autoFocus
-                    data-testid="header-config-name-input"
-                    aria-label="Edit configuration name"
-                  />
+                  <>
+                    <ConfigNameInput
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleSaveEdit}
+                      onKeyDown={handleKeyDown}
+                      // eslint-disable-next-line
+                      autoFocus
+                      data-testid="header-config-name-input"
+                      aria-label="Edit configuration name"
+                    />
+                    <HeaderItemActions className="header-actions-always-visible">
+                      <HeaderActionIconBtn
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                        }}
+                        onClick={handleSaveEdit}
+                        aria-label="Confirm rename"
+                        data-testid="header-confirm-rename-btn"
+                      >
+                        <span className="material-symbols-outlined">check</span>
+                      </HeaderActionIconBtn>
+                      <HeaderActionIconBtn
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                        }}
+                        onClick={handleCancelEdit}
+                        aria-label="Cancel rename"
+                        data-testid="header-cancel-rename-btn"
+                      >
+                        <span className="material-symbols-outlined">close</span>
+                      </HeaderActionIconBtn>
+                    </HeaderItemActions>
+                  </>
                 ) : (
                   <>
                     <ConfigNameText
@@ -490,6 +524,10 @@ const HeaderItemActions = styled.div`
   opacity: 0;
   transition: opacity 0.15s ease-in-out;
   margin-left: 4px;
+
+  &.header-actions-always-visible {
+    opacity: 1;
+  }
 
   @media (max-width: 1023px) {
     opacity: 1;
