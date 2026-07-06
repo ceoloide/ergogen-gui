@@ -334,6 +334,7 @@ const Ergogen = () => {
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
     () => {
       if (configContext) {
+        trackEvent('shortcut_used', { action: 'generate' });
         configContext.generateNow(
           configContext.configInput,
           configContext.injectionInput,
@@ -453,6 +454,7 @@ const Ergogen = () => {
    */
   const handleDeleteInjection = (injectionToDelete: Injection) => {
     if (!Array.isArray(configContext?.injectionInput)) return;
+    trackEvent('injection_deleted', { injection_type: injectionToDelete.type });
     const injections = [...configContext.injectionInput].filter((e, i) => {
       return i !== injectionToDelete.key;
     });

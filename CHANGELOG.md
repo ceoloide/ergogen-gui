@@ -1,5 +1,24 @@
 # Changelog
 
+## Advanced Interaction Analytics & Cleanup
+
+July 06, 2026
+
+![The analytics evaluation plan highlighting user interaction tracking.](./public/images/changelog/placeholder.png)
+
+Understanding how users interact with the generator and identifying where they encounter compile errors or library naming conflicts was difficult because the application lacked comprehensive event instrumentation.
+
+To solve this, we implemented deep event tracking with Google Analytics (GA4) across the entire application workspace. We now track React Router SPA page navigation, compiler generation successes and failure durations, keyboard shortcut usage, and footprint/template conflict resolution outcomes. We also instrumented page feature usage like single/bulk downloads, custom library uploads, and sidebar searches. Finally, we removed the legacy `exp` URL parameter and associated context fields, as those preview modes are now fully integrated standard features.
+
+**What changed:**
+
+- **Page View Instrumenting**: Track SPA routing transitions and the quantity of configurations kept in the local workspace
+- **Success & Fail Duration Tracking**: Measure generation performance duration (ms) and log syntax/compiler error messages to analyze user blockages
+- **Conflict Strategy Logging**: Track when users encounter library conflicts and how they resolve them (skip, overwrite, keep-both)
+- **Feature & CRUD Analytics**: Monitor sidebar searches, file/folder uploads, bulk exports, zip archiving, and config creation or deletion
+- **Shortcut Metrics**: Measure how often power users invoke the compiler using the keyboard shortcuts
+- **Legacy Code Cleanup**: Removed unused URL `exp` parameter and experiment context fields to streamline the configuration state
+
 ## Smooth Monaco Editor Experience
 
 July 06, 2026

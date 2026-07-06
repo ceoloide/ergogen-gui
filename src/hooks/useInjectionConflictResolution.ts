@@ -6,6 +6,7 @@ import {
   isValidInjection,
   generateUniqueInjectionName,
 } from '../utils/injections';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * Callbacks for context operations that the hook needs to perform.
@@ -138,6 +139,10 @@ export const useInjectionConflictResolution = (
           conflict: c.conflict as { conflictingName: string },
         }));
 
+        trackEvent('conflict_encountered', {
+          conflict_count: conflicts.length,
+        });
+
         setConflictQueue(formattedConflicts);
         setPendingInjections(validInjections);
         setPendingConfig(config);
@@ -178,6 +183,11 @@ export const useInjectionConflictResolution = (
         return;
 
       if (applyToAllConflicts) {
+        trackEvent('conflict_resolved', {
+          strategy: action,
+          apply_to_all: true,
+          remaining_count: conflictQueue.length,
+        });
         // Apply action to ALL remaining conflicts
         // We can do this by calling processInjectionsWithConflictResolution with the chosen strategy
         // But we need to be careful: we want to apply this strategy to the *remaining* conflicts
@@ -206,6 +216,11 @@ export const useInjectionConflictResolution = (
         setPendingConfig(null);
         setPendingInjectionsAtConflict(null);
       } else {
+        trackEvent('conflict_resolved', {
+          strategy: action,
+          apply_to_all: false,
+          remaining_count: conflictQueue.length,
+        });
         // Apply action to ONLY the current conflict
         const currentConflictItem = conflictQueue[0];
         const [type, name] = currentConflictItem.injection;
@@ -301,12 +316,13 @@ export const useInjectionConflictResolution = (
    * Handles cancellation of conflict resolution.
    */
   const handleConflictCancel = useCallback(() => {
+    trackEvent('conflict_cancelled', { remaining_count: conflictQueue.length });
     setConflictQueue([]);
     setPendingInjections(null);
     setPendingConfig(null);
     setPendingInjectionsAtConflict(null);
     callbacks.setError?.('Loading cancelled by user');
-  }, [callbacks]);
+  }, [callbacks, conflictQueue.length]);
 
   return {
     currentConflict: currentConflict

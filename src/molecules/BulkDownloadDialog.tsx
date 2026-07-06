@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import Button from '../atoms/Button';
 import { exportConfigsProgressively } from '../utils/zip';
+import { trackEvent } from '../utils/analytics';
 
 type BulkDownloadDialogProps = {
   isOpen: boolean;
@@ -69,6 +70,11 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
     abortRef.current = false;
 
     const selectedConfigs = configs.filter((c) => selectedIds.has(c.id));
+
+    trackEvent('bulk_download_started', {
+      selected_configs_count: selectedIds.size,
+      only_configs: onlyConfigs,
+    });
 
     try {
       await exportConfigsProgressively(

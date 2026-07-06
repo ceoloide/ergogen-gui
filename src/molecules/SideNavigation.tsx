@@ -6,6 +6,7 @@ import { getErgogenVersionInfo } from '../utils/version';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
 import { useConfigContext } from '../context/ConfigContext';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * Props for the SideNavigation component.
@@ -89,6 +90,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   };
 
   const handleDownloadAll = () => {
+    trackEvent('bulk_download_dialog_opened', {
+      stored_configs_count: configs?.length || 0,
+    });
     if (setIsBulkDownloadOpen) {
       setIsBulkDownloadOpen(true);
     }
@@ -153,6 +157,17 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen]);
+
+  // Track search queries
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    const timer = setTimeout(() => {
+      trackEvent('search_performed', {
+        query_length: searchQuery.trim().length,
+      });
+    }, 1000); // 1-second debounce to avoid firing on every keystroke
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Handle resize
   useEffect(() => {

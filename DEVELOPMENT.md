@@ -486,3 +486,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 **Context:** The "Export All" functionality compiles configurations sequentially using the background Ergogen worker. While this works perfectly and keeps the UI responsive, compiling many configurations sequentially can be slow for users with large collections.
 
 **Task:** Refactor the bulk export compiler in `src/utils/zip.ts` to support concurrent compilation pools. Instead of awaiting compilations one-by-one, spawn up to `navigator.hardwareConcurrency || 4` workers to compile configurations concurrently. Ensure the UI export progress bar dynamically calculates overall completion status and handles worker failures gracefully.
+
+### [TASK-014] Dynamic Google Tag Script Loading in JS
+
+**Context:** The Google Tag (`gtag.js`) script tag is currently hardcoded in `public/index.html`. In environments where `REACT_APP_GTAG_ID` is not defined (such as local development or forks), the browser still attempts to download the library from Google with the literal string `%REACT_APP_GTAG_ID%`, causing a console network error.
+
+**Task:** Refactor Google Tag initialization. Remove the script tags from `public/index.html` and implement dynamic script injection inside `src/utils/analytics.ts`. The script should only inject standard DOM script elements if the `REACT_APP_GTAG_ID` is present, valid, and not the CRA replacement placeholder.

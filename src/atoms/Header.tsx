@@ -264,6 +264,11 @@ const Header = (): JSX.Element => {
     ) {
       return;
     }
+    trackEvent('archive_single_downloaded', {
+      has_injections: !!configContext.injectionInput?.length,
+      injections_count: configContext.injectionInput?.length || 0,
+      stored_configs_count: configContext.configs?.length || 0,
+    });
     createZip(
       configContext.results,
       configContext.configInput,
