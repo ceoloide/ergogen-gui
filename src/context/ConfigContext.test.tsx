@@ -570,6 +570,15 @@ describe('ConfigContextProvider', () => {
         'points: {C: {}}'
       );
 
+      // Verify metadata fields exist and match ISO 8601 UTC format
+      const configB = contextValue.configs.find((c: any) => c.id === idB);
+      expect(configB.createdAt).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+      expect(configB.updatedAt).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+
       // Switch to B
       act(() => {
         contextValue.selectConfig(idB);

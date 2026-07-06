@@ -39,6 +39,8 @@ interface SavedConfig {
   id: string;
   name: string;
   config: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface MultiConfigContainer {
@@ -229,7 +231,18 @@ const loadMultiConfigFromStorage = (): MultiConfigContainer => {
     try {
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed.version === 'number') {
-        return parsed as MultiConfigContainer;
+        const now = new Date().toISOString();
+        const migratedConfigs = (parsed.configs || []).map(
+          (cfg: Partial<SavedConfig>) => ({
+            ...cfg,
+            createdAt: cfg.createdAt || now,
+            updatedAt: cfg.updatedAt || now,
+          })
+        );
+        return {
+          ...parsed,
+          configs: migratedConfigs,
+        };
       }
     } catch (e) {
       console.error('Failed to parse multi-config storage:', e);
@@ -287,6 +300,8 @@ const migrateLegacyConfig = (): MultiConfigContainer => {
         id: newId,
         name: 'Legacy Config',
         config: legacyText,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       initialData.configs.push(legacyConfig);
       initialData.activeConfigId = newId;
@@ -761,10 +776,13 @@ const ConfigContextProvider = ({
           );
           const name = `Shared ${nextSharedNum}`;
           const newId = generateUUID();
+          const now = new Date().toISOString();
           const newConfig: SavedConfig = {
             id: newId,
             name,
             config: newVal || '',
+            createdAt: now,
+            updatedAt: now,
           };
 
           const updatedConfigs = [...configsRef.current, newConfig];
@@ -778,7 +796,13 @@ const ConfigContextProvider = ({
         const currentActiveId = activeConfigIdRef.current;
         if (currentActiveId) {
           const updatedConfigs = configsRef.current.map((c) =>
-            c.id === currentActiveId ? { ...c, config: newVal || '' } : c
+            c.id === currentActiveId
+              ? {
+                  ...c,
+                  config: newVal || '',
+                  updatedAt: new Date().toISOString(),
+                }
+              : c
           );
           setConfigs(updatedConfigs);
           saveMultiConfigToStorage(updatedConfigs, currentActiveId);
@@ -789,10 +813,13 @@ const ConfigContextProvider = ({
           );
           const name = `Untitled ${nextUntitledNum}`;
           const newId = generateUUID();
+          const now = new Date().toISOString();
           const newConfig: SavedConfig = {
             id: newId,
             name,
             config: newVal || '',
+            createdAt: now,
+            updatedAt: now,
           };
           const updatedConfigs = [...configsRef.current, newConfig];
           setConfigs(updatedConfigs);
@@ -822,10 +849,13 @@ const ConfigContextProvider = ({
     );
     const configName = name || `Untitled ${nextUntitledNum}`;
     const newId = generateUUID();
+    const now = new Date().toISOString();
     const newConfig: SavedConfig = {
       id: newId,
       name: configName,
       config: content,
+      createdAt: now,
+      updatedAt: now,
     };
     const updatedConfigs = [...configsRef.current, newConfig];
     setConfigs(updatedConfigs);
@@ -839,7 +869,9 @@ const ConfigContextProvider = ({
 
   const renameConfig = useCallback((id: string, newName: string) => {
     const updatedConfigs = configsRef.current.map((c) =>
-      c.id === id ? { ...c, name: newName } : c
+      c.id === id
+        ? { ...c, name: newName, updatedAt: new Date().toISOString() }
+        : c
     );
     setConfigs(updatedConfigs);
     saveMultiConfigToStorage(updatedConfigs, activeConfigIdRef.current);
@@ -849,10 +881,13 @@ const ConfigContextProvider = ({
     const found = configsRef.current.find((c) => c.id === id);
     if (found) {
       const newId = generateUUID();
+      const now = new Date().toISOString();
       const newConfig: SavedConfig = {
         id: newId,
         name: `${found.name} (Copy)`,
         config: found.config,
+        createdAt: now,
+        updatedAt: now,
       };
       const updatedConfigs = [...configsRef.current, newConfig];
       setConfigs(updatedConfigs);
