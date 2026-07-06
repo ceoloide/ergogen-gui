@@ -51,15 +51,20 @@ export const createZip = async (
 
   // Outlines folder
   if (results.outlines) {
-    const outlinesFolder = zip.folder('outlines');
-    if (outlinesFolder) {
-      for (const [name, outline] of Object.entries(results.outlines)) {
-        if (debug || !name.startsWith('_')) {
-          if (outline.dxf) {
-            outlinesFolder.file(`${name}.dxf`, outline.dxf);
+    let outlinesFolder: JSZip | null = null;
+    for (const [name, outline] of Object.entries(results.outlines)) {
+      if (debug || !name.startsWith('_')) {
+        if (outline.dxf || outline.svg) {
+          if (!outlinesFolder) {
+            outlinesFolder = zip.folder('outlines');
           }
-          if (outline.svg) {
-            outlinesFolder.file(`${name}.svg`, outline.svg);
+          if (outlinesFolder) {
+            if (outline.dxf) {
+              outlinesFolder.file(`${name}.dxf`, outline.dxf);
+            }
+            if (outline.svg) {
+              outlinesFolder.file(`${name}.svg`, outline.svg);
+            }
           }
         }
       }
@@ -67,7 +72,7 @@ export const createZip = async (
   }
 
   // PCBs folder
-  if (results.pcbs) {
+  if (results.pcbs && Object.keys(results.pcbs).length > 0) {
     const pcbsFolder = zip.folder('pcbs');
     if (pcbsFolder) {
       for (const [name, pcb] of Object.entries(results.pcbs)) {
@@ -81,14 +86,21 @@ export const createZip = async (
 
   // Cases folder
   if (results.cases) {
-    const casesFolder = zip.folder('cases');
-    if (casesFolder) {
-      for (const [name, caseData] of Object.entries(results.cases)) {
-        if (caseData.jscad) {
-          casesFolder.file(`${name}.jscad`, caseData.jscad);
+    let casesFolder: JSZip | null = null;
+    for (const [name, caseData] of Object.entries(results.cases)) {
+      const hasJscad = !!caseData.jscad;
+      const hasStl = stlPreview && !!caseData.stl;
+      if (hasJscad || hasStl) {
+        if (!casesFolder) {
+          casesFolder = zip.folder('cases');
         }
-        if (stlPreview && caseData.stl) {
-          casesFolder.file(`${name}.stl`, caseData.stl);
+        if (casesFolder) {
+          if (caseData.jscad) {
+            casesFolder.file(`${name}.jscad`, caseData.jscad);
+          }
+          if (stlPreview && caseData.stl) {
+            casesFolder.file(`${name}.stl`, caseData.stl);
+          }
         }
       }
     }
@@ -277,18 +289,25 @@ export const exportAllConfigs = async (
       configFolder.file('config.yaml', configRecord.config);
 
       if (finalResults.outlines) {
-        const outlinesFolder = configFolder.folder('outlines');
-        if (outlinesFolder) {
-          for (const [name, outline] of Object.entries(finalResults.outlines)) {
-            if (debug || !name.startsWith('_')) {
-              if (outline.dxf) outlinesFolder.file(`${name}.dxf`, outline.dxf);
-              if (outline.svg) outlinesFolder.file(`${name}.svg`, outline.svg);
+        let outlinesFolder: JSZip | null = null;
+        for (const [name, outline] of Object.entries(finalResults.outlines)) {
+          if (debug || !name.startsWith('_')) {
+            if (outline.dxf || outline.svg) {
+              if (!outlinesFolder) {
+                outlinesFolder = configFolder.folder('outlines');
+              }
+              if (outlinesFolder) {
+                if (outline.dxf)
+                  outlinesFolder.file(`${name}.dxf`, outline.dxf);
+                if (outline.svg)
+                  outlinesFolder.file(`${name}.svg`, outline.svg);
+              }
             }
           }
         }
       }
 
-      if (finalResults.pcbs) {
+      if (finalResults.pcbs && Object.keys(finalResults.pcbs).length > 0) {
         const pcbsFolder = configFolder.folder('pcbs');
         if (pcbsFolder) {
           for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
@@ -301,13 +320,20 @@ export const exportAllConfigs = async (
       }
 
       if (finalResults.cases) {
-        const casesFolder = configFolder.folder('cases');
-        if (casesFolder) {
-          for (const [name, caseData] of Object.entries(finalResults.cases)) {
-            if (caseData.jscad)
-              casesFolder.file(`${name}.jscad`, caseData.jscad);
-            if (stlPreview && caseData.stl)
-              casesFolder.file(`${name}.stl`, caseData.stl);
+        let casesFolder: JSZip | null = null;
+        for (const [name, caseData] of Object.entries(finalResults.cases)) {
+          const hasJscad = !!caseData.jscad;
+          const hasStl = stlPreview && !!caseData.stl;
+          if (hasJscad || hasStl) {
+            if (!casesFolder) {
+              casesFolder = configFolder.folder('cases');
+            }
+            if (casesFolder) {
+              if (caseData.jscad)
+                casesFolder.file(`${name}.jscad`, caseData.jscad);
+              if (stlPreview && caseData.stl)
+                casesFolder.file(`${name}.stl`, caseData.stl);
+            }
           }
         }
       }
@@ -668,22 +694,27 @@ export const exportConfigsProgressively = async (
           configFolder.file('config.yaml', configRecord.config);
 
           if (finalResults.outlines) {
-            const outlinesFolder = configFolder.folder('outlines');
-            if (outlinesFolder) {
-              for (const [name, outline] of Object.entries(
-                finalResults.outlines
-              )) {
-                if (debug || !name.startsWith('_')) {
-                  if (outline.dxf)
-                    outlinesFolder.file(`${name}.dxf`, outline.dxf);
-                  if (outline.svg)
-                    outlinesFolder.file(`${name}.svg`, outline.svg);
+            let outlinesFolder: JSZip | null = null;
+            for (const [name, outline] of Object.entries(
+              finalResults.outlines
+            )) {
+              if (debug || !name.startsWith('_')) {
+                if (outline.dxf || outline.svg) {
+                  if (!outlinesFolder) {
+                    outlinesFolder = configFolder.folder('outlines');
+                  }
+                  if (outlinesFolder) {
+                    if (outline.dxf)
+                      outlinesFolder.file(`${name}.dxf`, outline.dxf);
+                    if (outline.svg)
+                      outlinesFolder.file(`${name}.svg`, outline.svg);
+                  }
                 }
               }
             }
           }
 
-          if (finalResults.pcbs) {
+          if (finalResults.pcbs && Object.keys(finalResults.pcbs).length > 0) {
             const pcbsFolder = configFolder.folder('pcbs');
             if (pcbsFolder) {
               for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
@@ -696,14 +727,20 @@ export const exportConfigsProgressively = async (
           }
 
           if (finalResults.cases) {
-            const casesFolder = configFolder.folder('cases');
-            if (casesFolder) {
-              for (const [name, caseData] of Object.entries(
-                finalResults.cases
-              )) {
-                if (caseData.jscad)
-                  casesFolder.file(`${name}.jscad`, caseData.jscad);
-                if (caseData.stl) casesFolder.file(`${name}.stl`, caseData.stl);
+            let casesFolder: JSZip | null = null;
+            for (const [name, caseData] of Object.entries(finalResults.cases)) {
+              const hasJscad = !!caseData.jscad;
+              const hasStl = !!caseData.stl;
+              if (hasJscad || hasStl) {
+                if (!casesFolder) {
+                  casesFolder = configFolder.folder('cases');
+                }
+                if (casesFolder) {
+                  if (caseData.jscad)
+                    casesFolder.file(`${name}.jscad`, caseData.jscad);
+                  if (caseData.stl)
+                    casesFolder.file(`${name}.stl`, caseData.stl);
+                }
               }
             }
           }
