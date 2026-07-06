@@ -868,6 +868,9 @@ const ConfigContextProvider = ({
   }, []);
 
   const renameConfig = useCallback((id: string, newName: string) => {
+    const existing = configsRef.current.find((c) => c.id === id);
+    if (!existing || existing.name === newName) return;
+
     const updatedConfigs = configsRef.current.map((c) =>
       c.id === id
         ? { ...c, name: newName, updatedAt: new Date().toISOString() }

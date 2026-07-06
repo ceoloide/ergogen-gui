@@ -608,6 +608,22 @@ describe('ConfigContextProvider', () => {
       expect(contextValue.configs.find((c: any) => c.id === idC)?.config).toBe(
         'points: {C: {}}'
       );
+
+      // Verify that renaming to the same name does not update updatedAt timestamp
+      const configBeforeRename = contextValue.configs.find(
+        (c: any) => c.id === idB
+      );
+      const originalUpdatedAt = configBeforeRename.updatedAt;
+
+      // Wait a moment so Date milliseconds would have advanced
+      act(() => {
+        contextValue.renameConfig(idB, 'Config B');
+      });
+
+      const configAfterRename = contextValue.configs.find(
+        (c: any) => c.id === idB
+      );
+      expect(configAfterRename.updatedAt).toBe(originalUpdatedAt);
     });
   });
 });
