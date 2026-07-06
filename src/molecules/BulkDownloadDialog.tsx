@@ -351,15 +351,15 @@ const SwitchThumb = styled.span<{ $checked: boolean }>`
 `;
 
 const WarningBox = styled.div`
-  background-color: rgba(255, 109, 109, 0.1);
-  border: 1px solid ${theme.colors.error};
+  background-color: ${theme.colors.warning};
+  border: 1px solid ${theme.colors.warningDark};
   border-radius: 6px;
   padding: 10px 12px;
   margin-bottom: 1.5rem;
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: ${theme.colors.error};
+  color: ${theme.colors.warningDark};
   font-size: 13px;
   line-height: 1.4;
 
@@ -367,6 +367,7 @@ const WarningBox = styled.div`
     font-size: 18px;
     flex-shrink: 0;
     margin-top: 1px;
+    color: ${theme.colors.warningDark};
   }
 `;
 

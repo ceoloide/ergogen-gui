@@ -92,6 +92,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     if (setIsBulkDownloadOpen) {
       setIsBulkDownloadOpen(true);
     }
+    onClose();
   };
 
   const handleSelectConfig = (id: string) => {
