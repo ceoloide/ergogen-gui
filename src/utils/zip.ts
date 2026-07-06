@@ -71,7 +71,10 @@ export const createZip = async (
     const pcbsFolder = zip.folder('pcbs');
     if (pcbsFolder) {
       for (const [name, pcb] of Object.entries(results.pcbs)) {
-        pcbsFolder.file(name, pcb);
+        const fileName = name.endsWith('.kicad_pcb')
+          ? name
+          : `${name}.kicad_pcb`;
+        pcbsFolder.file(fileName, pcb);
       }
     }
   }
@@ -289,7 +292,10 @@ export const exportAllConfigs = async (
         const pcbsFolder = configFolder.folder('pcbs');
         if (pcbsFolder) {
           for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
-            pcbsFolder.file(name, pcb);
+            const fileName = name.endsWith('.kicad_pcb')
+              ? name
+              : `${name}.kicad_pcb`;
+            pcbsFolder.file(fileName, pcb);
           }
         }
       }
@@ -681,7 +687,10 @@ export const exportConfigsProgressively = async (
             const pcbsFolder = configFolder.folder('pcbs');
             if (pcbsFolder) {
               for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
-                pcbsFolder.file(name, pcb);
+                const fileName = name.endsWith('.kicad_pcb')
+                  ? name
+                  : `${name}.kicad_pcb`;
+                pcbsFolder.file(fileName, pcb);
               }
             }
           }

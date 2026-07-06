@@ -113,10 +113,11 @@ describe('createZip', () => {
     );
   });
 
-  it('should include PCBs', async () => {
+  it('should include PCBs and ensure they have the .kicad_pcb extension', async () => {
     const results = {
       pcbs: {
         'main.kicad_pcb': 'pcb-content',
+        board: 'board-pcb-content',
       },
     };
 
@@ -127,6 +128,10 @@ describe('createZip', () => {
     expect(pcbsFolder.file).toHaveBeenCalledWith(
       'main.kicad_pcb',
       'pcb-content'
+    );
+    expect(pcbsFolder.file).toHaveBeenCalledWith(
+      'board.kicad_pcb',
+      'board-pcb-content'
     );
   });
 
