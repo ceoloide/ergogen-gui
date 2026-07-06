@@ -38,11 +38,14 @@ describe('Header', () => {
     setShowSettings: jest.fn(),
     setShowSideNav: jest.fn(),
     renameConfig: jest.fn(),
+    duplicateConfig: jest.fn(),
+    deleteConfig: jest.fn(),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
+    window.confirm = jest.fn().mockReturnValue(true);
   });
 
   const renderComponent = () => {
@@ -86,5 +89,22 @@ describe('Header', () => {
       '1',
       'New Header Name'
     );
+  });
+
+  it('triggers duplicate config from the header', () => {
+    renderComponent();
+    const dupBtn = screen.getByTestId('header-duplicate-btn');
+    fireEvent.click(dupBtn);
+    expect(mockContextValue.duplicateConfig).toHaveBeenCalledWith('1');
+  });
+
+  it('triggers delete config from the header with confirmation', () => {
+    renderComponent();
+    const deleteBtn = screen.getByTestId('header-delete-btn');
+    fireEvent.click(deleteBtn);
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('My Awesome Board')
+    );
+    expect(mockContextValue.deleteConfig).toHaveBeenCalledWith('1');
   });
 });

@@ -169,28 +169,31 @@ const Header = (): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const {
+    activeConfigId,
+    activeConfigName,
+    configs,
+    isPreview,
+    renameConfig,
+    duplicateConfig,
+    deleteConfig,
+  } = configContext || {};
+
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
   const handleStartEdit = () => {
-    if (configContext?.activeConfigName && configContext?.activeConfigId) {
-      setEditValue(configContext.activeConfigName);
+    if (activeConfigName && activeConfigId) {
+      setEditValue(activeConfigName);
       setIsEditing(true);
     }
   };
 
   const handleSaveEdit = () => {
-    if (
-      configContext?.renameConfig &&
-      configContext?.activeConfigId &&
-      editValue.trim()
-    ) {
-      configContext.renameConfig(
-        configContext.activeConfigId,
-        editValue.trim()
-      );
+    if (renameConfig && activeConfigId && editValue.trim()) {
+      renameConfig(activeConfigId, editValue.trim());
     }
     setIsEditing(false);
   };
@@ -200,6 +203,26 @@ const Header = (): JSX.Element => {
       handleSaveEdit();
     } else if (e.key === 'Escape') {
       setIsEditing(false);
+    }
+  };
+
+  const handleDuplicate = () => {
+    if (duplicateConfig && activeConfigId) {
+      duplicateConfig(activeConfigId);
+    }
+  };
+
+  const handleDelete = () => {
+    if (activeConfigId && activeConfigName && deleteConfig) {
+      if (
+        window.confirm(`Are you sure you want to delete "${activeConfigName}"?`)
+      ) {
+        deleteConfig(activeConfigId);
+        const isLastConfig = configs && configs.length <= 1;
+        if (isLastConfig || activeConfigId) {
+          navigate('/new');
+        }
+      }
     }
   };
 
@@ -311,7 +334,7 @@ const Header = (): JSX.Element => {
               {versionInfo.label}
             </VersionText>
           </ErgogenLogo>
-          {configContext?.activeConfigName && (
+          {activeConfigName && (
             <ActiveConfigNameSection data-testid="header-active-config-name">
               <ConfigDivider>/</ConfigDivider>
               {isEditing ? (
@@ -327,15 +350,42 @@ const Header = (): JSX.Element => {
                   aria-label="Edit configuration name"
                 />
               ) : (
-                <ConfigNameText
-                  onClick={handleStartEdit}
-                  title="Click to rename"
-                  data-testid="header-config-name-text"
-                >
-                  {configContext.activeConfigName}
-                </ConfigNameText>
+                <>
+                  <ConfigNameText
+                    onClick={handleStartEdit}
+                    title="Click to rename"
+                    data-testid="header-config-name-text"
+                  >
+                    {activeConfigName}
+                  </ConfigNameText>
+                  <HeaderItemActions className="header-actions-hover">
+                    <HeaderActionIconBtn
+                      onClick={handleStartEdit}
+                      aria-label="Rename configuration"
+                      data-testid="header-rename-btn"
+                    >
+                      <span className="material-symbols-outlined">edit</span>
+                    </HeaderActionIconBtn>
+                    <HeaderActionIconBtn
+                      onClick={handleDuplicate}
+                      aria-label="Duplicate configuration"
+                      data-testid="header-duplicate-btn"
+                    >
+                      <span className="material-symbols-outlined">
+                        content_copy
+                      </span>
+                    </HeaderActionIconBtn>
+                    <HeaderActionIconBtn
+                      onClick={handleDelete}
+                      aria-label="Delete configuration"
+                      data-testid="header-delete-btn"
+                    >
+                      <span className="material-symbols-outlined">delete</span>
+                    </HeaderActionIconBtn>
+                  </HeaderItemActions>
+                </>
               )}
-              {configContext.isPreview && (
+              {isPreview && (
                 <SharedBadge data-testid="header-shared-badge">
                   Shared
                 </SharedBadge>
@@ -402,6 +452,45 @@ const ActiveConfigNameSection = styled.div`
   gap: 8px;
   min-width: 0;
   overflow: hidden;
+
+  &:hover {
+    .header-actions-hover {
+      opacity: 1;
+    }
+  }
+`;
+
+const HeaderItemActions = styled.div`
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  margin-left: 4px;
+
+  @media (max-width: 1023px) {
+    opacity: 1;
+  }
+`;
+
+const HeaderActionIconBtn = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .material-symbols-outlined {
+    font-size: 16px !important;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+    color: ${theme.colors.white};
+  }
 `;
 
 const ConfigDivider = styled.span`
