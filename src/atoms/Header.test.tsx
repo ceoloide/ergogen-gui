@@ -40,6 +40,7 @@ describe('Header', () => {
     renameConfig: jest.fn().mockReturnValue(true),
     duplicateConfig: jest.fn(),
     deleteConfig: jest.fn(),
+    savePreviewConfig: jest.fn(),
   };
 
   beforeEach(() => {
@@ -57,17 +58,17 @@ describe('Header', () => {
     renderComponent();
     expect(screen.getByTestId('header-active-config-name')).toBeInTheDocument();
     expect(screen.getByText('My Awesome Board')).toBeInTheDocument();
-    expect(screen.queryByText('Shared')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('header-shared-icon')).not.toBeInTheDocument();
   });
 
-  it('renders Shared badge when configuration is in preview mode', () => {
+  it('renders Shared icon when configuration is in preview mode', () => {
     (useConfigContext as jest.Mock).mockReturnValue({
       ...mockContextValue,
       activeConfigName: 'Shared Preview',
       isPreview: true,
     });
     renderComponent();
-    expect(screen.getByText('Shared')).toBeInTheDocument();
+    expect(screen.getByTestId('header-shared-icon')).toBeInTheDocument();
   });
 
   it('triggers side nav toggle', () => {
@@ -141,5 +142,19 @@ describe('Header', () => {
       expect.stringContaining('My Awesome Board')
     );
     expect(mockContextValue.deleteConfig).toHaveBeenCalledWith('1');
+  });
+
+  it('triggers savePreviewConfig when clicking the save button in preview mode', () => {
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...mockContextValue,
+      activeConfigName: 'Shared Preview',
+      isPreview: true,
+    });
+    renderComponent();
+
+    const saveBtn = screen.getByTestId('header-save-preview-btn');
+    fireEvent.click(saveBtn);
+
+    expect(mockContextValue.savePreviewConfig).toHaveBeenCalled();
   });
 });

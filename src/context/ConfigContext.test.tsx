@@ -680,5 +680,45 @@ describe('ConfigContextProvider', () => {
         'Keyboard Gamma'
       );
     });
+
+    it('should convert a preview configuration into a saved configuration when savePreviewConfig is called', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Verify initially empty
+      expect(contextValue.configs.length).toBe(0);
+      expect(contextValue.isPreview).toBe(false);
+
+      // Load preview config
+      act(() => {
+        contextValue.loadPreview('points: {A: {}}');
+      });
+
+      expect(contextValue.isPreview).toBe(true);
+      expect(contextValue.configInput).toBe('points: {A: {}}');
+      expect(contextValue.configs.length).toBe(0);
+
+      // Trigger savePreviewConfig
+      act(() => {
+        contextValue.savePreviewConfig();
+      });
+
+      // Verify it is converted
+      expect(contextValue.isPreview).toBe(false);
+      expect(contextValue.configs.length).toBe(1);
+      expect(contextValue.configs[0].name).toBe('Shared 1');
+      expect(contextValue.configs[0].config).toBe('points: {A: {}}');
+      expect(contextValue.activeConfigId).toBe(contextValue.configs[0].id);
+    });
   });
 });

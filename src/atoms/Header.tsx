@@ -177,6 +177,7 @@ const Header = (): JSX.Element => {
     renameConfig,
     duplicateConfig,
     deleteConfig,
+    savePreviewConfig,
   } = configContext || {};
 
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -356,8 +357,13 @@ const Header = (): JSX.Element => {
               <ActiveConfigNameSection
                 data-testid="header-active-config-name"
                 $isEditing={isEditing}
-                onClick={!isEditing ? handleStartEdit : undefined}
+                onClick={!isEditing && !isPreview ? handleStartEdit : undefined}
               >
+                {isPreview && (
+                  <SharedLinkIcon data-testid="header-shared-icon">
+                    <span className="material-symbols-outlined">link</span>
+                  </SharedLinkIcon>
+                )}
                 {isEditing ? (
                   <>
                     <ConfigNameInput
@@ -391,6 +397,24 @@ const Header = (): JSX.Element => {
                         data-testid="header-cancel-rename-btn"
                       >
                         <span className="material-symbols-outlined">close</span>
+                      </HeaderActionIconBtn>
+                    </HeaderItemActions>
+                  </>
+                ) : isPreview ? (
+                  <>
+                    <ConfigNameText data-testid="header-config-name-text">
+                      {activeConfigName}
+                    </ConfigNameText>
+                    <HeaderItemActions className="header-actions-always-visible">
+                      <HeaderActionIconBtn
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          savePreviewConfig?.();
+                        }}
+                        aria-label="Save preview configuration"
+                        data-testid="header-save-preview-btn"
+                      >
+                        <span className="material-symbols-outlined">save</span>
                       </HeaderActionIconBtn>
                     </HeaderItemActions>
                   </>
@@ -430,11 +454,6 @@ const Header = (): JSX.Element => {
                       </HeaderActionIconBtn>
                     </HeaderItemActions>
                   </>
-                )}
-                {isPreview && (
-                  <SharedBadge data-testid="header-shared-badge">
-                    Shared
-                  </SharedBadge>
                 )}
               </ActiveConfigNameSection>
             </>
@@ -595,17 +614,20 @@ const ConfigNameInput = styled.input`
   min-width: 0;
 `;
 
-const SharedBadge = styled.span`
+const SharedLinkIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: ${theme.colors.accent};
   color: ${theme.colors.white};
-  font-size: 10px;
-  font-weight: ${theme.fontWeights.semiBold};
-  padding: 2px 6px;
+  padding: 4px;
   border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  user-select: none;
   flex-shrink: 0;
+  user-select: none;
+
+  .material-symbols-outlined {
+    font-size: 16px !important;
+  }
 `;
 
 export default Header;

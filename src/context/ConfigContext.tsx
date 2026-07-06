@@ -118,6 +118,7 @@ type ContextProps = {
   exportAllConfigs: () => Promise<void>;
   downloadAllConfigs: () => Promise<void>;
   loadPreview: (config: string) => void;
+  savePreviewConfig: () => void;
   injectionInput: string[][] | undefined;
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>;
   processInput: DebouncedFunc<
@@ -976,6 +977,33 @@ const ConfigContextProvider = ({
     setConfigInputState(config);
   }, []);
 
+  const savePreviewConfig = useCallback(() => {
+    if (!isPreviewRef.current) return;
+    const nextSharedNum = getNextIndexForPattern(
+      configsRef.current,
+      /^Shared\s+(\d+)$/
+    );
+    const name = `Shared ${nextSharedNum}`;
+    const newId = generateUUID();
+    const now = new Date().toISOString();
+    const newConfig: SavedConfig = {
+      id: newId,
+      name,
+      config: configInputRef.current || '',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const updatedConfigs = [...configsRef.current, newConfig];
+    setConfigs(updatedConfigs);
+    configsRef.current = updatedConfigs;
+    setActiveConfigId(newId);
+    activeConfigIdRef.current = newId;
+    setIsPreview(false);
+    setPreviewConfig(null);
+    saveMultiConfigToStorage(updatedConfigs, newId);
+  }, []);
+
   const handleExportAllConfigs = useCallback(async () => {
     await exportAllConfigs(
       configsRef.current,
@@ -1130,6 +1158,7 @@ const ConfigContextProvider = ({
       exportAllConfigs: handleExportAllConfigs,
       downloadAllConfigs: handleDownloadAllConfigs,
       loadPreview,
+      savePreviewConfig,
       injectionInput,
       setInjectionInput,
       processInput,
@@ -1183,6 +1212,7 @@ const ConfigContextProvider = ({
       handleDownloadAllConfigs,
       isBulkDownloadOpen,
       loadPreview,
+      savePreviewConfig,
       injectionInput,
       setInjectionInput,
       processInput,
