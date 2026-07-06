@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 
 import Ergogen from './Ergogen';
@@ -16,6 +16,7 @@ import { getConfigFromHash } from './utils/share';
 import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
 import BulkDownloadDialog from './molecules/BulkDownloadDialog';
+import { trackEvent } from './utils/analytics';
 
 // Module-level variable to persist hash result across React StrictMode remounts
 // React StrictMode in dev mode intentionally remounts components, which resets refs
@@ -115,6 +116,18 @@ const AppContent = ({
   const configContext = useConfigContext();
   // Get configInput from context to ensure we have the latest value
   const configInput = configContext?.configInput;
+  const location = useLocation();
+
+  // Store configs count in a ref to safely read it in useEffect without lint dependencies
+  const configsCountRef = useRef(0);
+  configsCountRef.current = configContext?.configs?.length || 0;
+
+  useEffect(() => {
+    trackEvent('page_view', {
+      page_path: location.pathname + location.search,
+      stored_configs_count: configsCountRef.current,
+    });
+  }, [location.pathname, location.search]);
 
   // Track if we've already processed the initial pending shared config
   const hasProcessedInitialSharedConfig = useRef(false);

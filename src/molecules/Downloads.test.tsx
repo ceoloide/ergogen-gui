@@ -97,7 +97,6 @@ describe('Downloads', () => {
     setKicanvasPreview: jest.fn(),
     stlPreview,
     setStlPreview: jest.fn(),
-    experiment: null,
     isGenerating: false,
   });
 

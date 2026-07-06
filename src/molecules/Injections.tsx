@@ -8,6 +8,7 @@ import GrowButton from '../atoms/GrowButton';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
 import Title from '../atoms/Title';
+import { trackEvent } from '../utils/analytics';
 
 const ActionsContainer = styled.div`
   display: flex;
@@ -169,6 +170,7 @@ const Injections = ({
       content:
         "module.exports = {\n  params: {\n    designator: '',\n  },\n  body: p => ``\n}",
     };
+    trackEvent('injection_created', { injection_type: 'footprint' });
     setInjectionToEdit(newInjection);
     // Show editor on mobile when new injection is created
     if (onInjectionSelect) {
@@ -185,6 +187,7 @@ const Injections = ({
       content:
         'const u = require(\'../utils\');\n\nmodule.exports = (config, name, points, outlines, units) => {\n    const paths = [\n        ""  // Add your SVG path(s) here\n    ];\n    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);\n};',
     };
+    trackEvent('injection_created', { injection_type: 'outline' });
     setInjectionToEdit(newInjection);
     // Show editor on mobile when new injection is created
     if (onInjectionSelect) {
@@ -201,6 +204,7 @@ const Injections = ({
       content:
         "const m = require('makerjs')\nconst version = require('../../package.json').version\n\nmodule.exports = {\n    convert_outline: (model, layer) => {\n        return ``;  // Return your converted outlines\n    },\n    body: params => {\n        return ``;  // Add your template text here\n    }\n}",
     };
+    trackEvent('injection_created', { injection_type: 'template' });
     setInjectionToEdit(newInjection);
     // Show editor on mobile when new injection is created
     if (onInjectionSelect) {
@@ -225,6 +229,11 @@ const Injections = ({
     }
 
     if (newInjections.length > 0) {
+      trackEvent('injection_uploaded', {
+        injection_type: activeUploadType,
+        source: 'file',
+        file_count: newInjections.length,
+      });
       await processInjectionsWithConflictResolution(
         newInjections,
         configContext.configInput || ''
@@ -255,6 +264,11 @@ const Injections = ({
     }
 
     if (newInjections.length > 0) {
+      trackEvent('injection_uploaded', {
+        injection_type: activeUploadType,
+        source: 'folder',
+        file_count: newInjections.length,
+      });
       await processInjectionsWithConflictResolution(
         newInjections,
         configContext.configInput || ''
@@ -317,6 +331,9 @@ const Injections = ({
                 key={footprint.key}
                 injection={footprint}
                 setInjectionToEdit={(injection) => {
+                  trackEvent('injection_editor_opened', {
+                    injection_type: injection.type,
+                  });
                   setInjectionToEdit(injection);
                   // Show editor on mobile when injection is selected
                   if (onInjectionSelect) {
@@ -375,6 +392,9 @@ const Injections = ({
                 key={outline.key}
                 injection={outline}
                 setInjectionToEdit={(injection) => {
+                  trackEvent('injection_editor_opened', {
+                    injection_type: injection.type,
+                  });
                   setInjectionToEdit(injection);
                   // Show editor on mobile when injection is selected
                   if (onInjectionSelect) {
@@ -433,6 +453,9 @@ const Injections = ({
                 key={template.key}
                 injection={template}
                 setInjectionToEdit={(injection) => {
+                  trackEvent('injection_editor_opened', {
+                    injection_type: injection.type,
+                  });
                   setInjectionToEdit(injection);
                   // Show editor on mobile when injection is selected
                   if (onInjectionSelect) {

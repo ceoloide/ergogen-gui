@@ -165,7 +165,6 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>;
   stlPreview: boolean;
   setStlPreview: Dispatch<SetStateAction<boolean>>;
-  experiment: string | null;
   isGenerating: boolean;
   setIsGenerating: Dispatch<SetStateAction<boolean>>;
   isJscadConverting: boolean;
@@ -569,6 +568,7 @@ const ConfigContextProvider = ({
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
+  const generationStartTimeRef = useRef<number | null>(null);
 
   // Effect to prune deleted configs on load
   useEffect(() => {
@@ -632,6 +632,10 @@ const ConfigContextProvider = ({
         setError(response.error);
         setIsGenerating(false);
         setIsJscadConverting(false);
+        trackEvent('generation_failed', {
+          error_message: response.error || 'Unknown worker error',
+          stored_configs_count: configsRef.current.length,
+        });
         return;
       }
 
@@ -646,6 +650,24 @@ const ConfigContextProvider = ({
         // Set results and trigger STL conversion if needed
         if (response.results) {
           const newResults = response.results as Results;
+
+          const duration = generationStartTimeRef.current
+            ? performance.now() - generationStartTimeRef.current
+            : 0;
+          trackEvent('generation_completed', {
+            duration_ms: Math.round(duration),
+            points_count: newResults.points
+              ? Object.keys(newResults.points).length
+              : 0,
+            pcbs_count: newResults.pcbs
+              ? Object.keys(newResults.pcbs).length
+              : 0,
+            cases_count: newResults.cases
+              ? Object.keys(newResults.cases).length
+              : 0,
+            has_outlines: !!newResults.outlines,
+            stored_configs_count: configsRef.current.length,
+          });
 
           // Store preview or demo SVG in the active configuration
           const svgContent =
@@ -862,6 +884,7 @@ const ConfigContextProvider = ({
       setError(null);
       setDeprecationWarning(null);
       setIsGenerating(true);
+      generationStartTimeRef.current = performance.now();
       currentConfigVersion.current += 1;
 
       if (parsedConfig && parsedConfig.pcbs) {
@@ -919,14 +942,12 @@ const ConfigContextProvider = ({
         }
       } catch (e: unknown) {
         setIsGenerating(false);
-        if (!e) return;
-
-        if (typeof e === 'string') {
-          setError(e);
-        }
-        if (typeof e === 'object' && e !== null) {
-          setError(e.toString());
-        }
+        const errMsg = typeof e === 'string' ? e : String(e);
+        setError(errMsg);
+        trackEvent('generation_failed', {
+          error_message: errMsg,
+          stored_configs_count: configsRef.current.length,
+        });
         return;
       }
     },
@@ -1055,6 +1076,9 @@ const ConfigContextProvider = ({
         setConfigInputState(found.config);
         configInputRef.current = found.config;
         saveMultiConfigToStorage(configsRef.current, id);
+        trackEvent('config_selected', {
+          stored_configs_count: configsRef.current.length,
+        });
       }
     }
   }, []);
@@ -1080,6 +1104,10 @@ const ConfigContextProvider = ({
     setIsPreview(false);
     setPreviewConfig(null);
     setConfigInputState(content);
+
+    trackEvent('config_created', {
+      stored_configs_count: updatedConfigs.length,
+    });
 
     // Synchronously update the refs to avoid race conditions with consecutive calls
     configsRef.current = updatedConfigs;
@@ -1118,6 +1146,9 @@ const ConfigContextProvider = ({
       setConfigs(updatedConfigs);
       configsRef.current = updatedConfigs;
       saveMultiConfigToStorage(updatedConfigs, activeConfigIdRef.current);
+      trackEvent('config_renamed', {
+        stored_configs_count: updatedConfigs.length,
+      });
       return true;
     },
     [setError]
@@ -1148,6 +1179,9 @@ const ConfigContextProvider = ({
       configInputRef.current = found.config;
 
       saveMultiConfigToStorage(updatedConfigs, newId);
+      trackEvent('config_duplicated', {
+        stored_configs_count: updatedConfigs.length,
+      });
     }
   }, []);
 
@@ -1175,6 +1209,10 @@ const ConfigContextProvider = ({
     if (deletedConfigObj) {
       saveToDeletedStorage(deletedConfigObj);
     }
+
+    trackEvent('config_deleted', {
+      stored_configs_count: remainingConfigs.length,
+    });
   }, []);
 
   const loadPreview = useCallback((config: string) => {
@@ -1385,11 +1423,6 @@ const ConfigContextProvider = ({
     }
   }, [workerReady, loadedVersion, hadLegacyConfig]);
 
-  const experiment = useMemo(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('exp');
-  }, []);
-
   const contextValue = useMemo(
     () => ({
       configInput: configInputState,
@@ -1442,7 +1475,6 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
-      experiment,
       isGenerating,
       setIsGenerating,
       isJscadConverting,
@@ -1497,7 +1529,6 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
-      experiment,
       isGenerating,
       setIsGenerating,
       isJscadConverting,
