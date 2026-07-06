@@ -376,7 +376,7 @@ export const downloadAllConfigs = async (
   // Add YAML configs to the root
   for (const configRecord of configs) {
     const baseName =
-      configRecord.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Untitled';
+      configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
     let finalName = baseName;
     let counter = 1;
     while (usedNames.has(finalName)) {

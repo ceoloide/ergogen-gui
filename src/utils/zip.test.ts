@@ -292,7 +292,7 @@ describe('downloadAllConfigs', () => {
 
     // Assert files in root
     expect(mockZip.file).toHaveBeenCalledWith(
-      'Ergonomic_Board.yaml',
+      'Ergonomic Board.yaml',
       'points: {}'
     );
     expect(mockZip.file).toHaveBeenCalledWith(
