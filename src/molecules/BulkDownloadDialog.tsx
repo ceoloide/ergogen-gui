@@ -197,7 +197,7 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
 
             <ButtonGroup>
               <AbortButton onClick={handleAbort} size="medium">
-                Abort
+                Cancel
               </AbortButton>
             </ButtonGroup>
           </>
