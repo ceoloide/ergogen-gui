@@ -840,5 +840,163 @@ describe('ConfigContextProvider', () => {
       // The newest remaining should be `Config 104`
       expect(backupAfterPruningData2.configs[99].name).toBe('Config 104');
     });
+
+    it('should upgrade version 1 to version 2 on load and trigger background generation for configurations missing preview SVG', async () => {
+      // Setup version 1 container in localStorage with a configuration that lacks previewSvg
+      const initialConfigs = [
+        {
+          id: 'cfg-v1-1',
+          name: 'V1 Config',
+          config: 'points: {A: {}}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+      const containerV1 = {
+        version: 1,
+        activeConfigId: 'cfg-v1-1',
+        configs: initialConfigs,
+      };
+      localStorage.setItem('ergogen:multi-config', JSON.stringify(containerV1));
+
+      const TestComponent = () => {
+        useConfigContext();
+        return null;
+      };
+
+      mockErgogenWorker.postMessage.mockClear();
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Verify it updates key in local storage to version 2
+      const storedRaw = localStorage.getItem('ergogen:multi-config');
+      expect(storedRaw).not.toBeNull();
+      const parsed = JSON.parse(storedRaw!);
+      expect(parsed.version).toBe(2);
+
+      // Verify that background-preview generation was triggered
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'generate',
+          inputConfig: 'points: {A: {}}',
+          requestId: 'background-preview-cfg-v1-1',
+        })
+      );
+    });
+
+    it('should process background generation worker success message and update previewSvg in local storage without triggering STL conversion', () => {
+      const TestComponent = () => {
+        useConfigContext();
+        return null;
+      };
+
+      // Pre-populate multi-config
+      const initialConfigs = [
+        {
+          id: 'cfg-bg-1',
+          name: 'BG Config',
+          config: 'points: {A: {}}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+      const containerV2 = {
+        version: 2,
+        activeConfigId: 'cfg-bg-1',
+        configs: initialConfigs,
+      };
+      localStorage.setItem('ergogen:multi-config', JSON.stringify(containerV2));
+
+      mockJscadWorker.postMessage.mockClear();
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Simulate worker success callback for background preview
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: 'background-preview-cfg-bg-1',
+            results: {
+              demo: {
+                svg: '<svg><path stroke="#000" /></svg>',
+              },
+            },
+            warnings: [],
+          },
+        } as MessageEvent);
+      });
+
+      // Verify that previewSvg was formatted and stored
+      const stored = JSON.parse(localStorage.getItem('ergogen:multi-config')!);
+      expect(stored.configs[0].previewSvg).toContain(
+        'style="background-color: rgb(51,51,51);"'
+      );
+      expect(stored.configs[0].previewSvg).toContain('stroke="#AAA"');
+
+      // Verify that JSCAD/STL converter was NOT called
+      expect(mockJscadWorker.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('should save formatted previewSvg to the active configuration when user-initiated generation completes successfully', () => {
+      const TestComponent = () => {
+        useConfigContext();
+        return null;
+      };
+
+      // Pre-populate multi-config with active config
+      const initialConfigs = [
+        {
+          id: 'cfg-user-1',
+          name: 'User Config',
+          config: 'points: {A: {}}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ];
+      const containerV2 = {
+        version: 2,
+        activeConfigId: 'cfg-user-1',
+        configs: initialConfigs,
+      };
+      localStorage.setItem('ergogen:multi-config', JSON.stringify(containerV2));
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Simulate worker success callback for normal generation
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: 'ergogen-generate-12345',
+            results: {
+              demo: {
+                svg: '<svg><path stroke="#000" /></svg>',
+              },
+            },
+            warnings: [],
+          },
+        } as MessageEvent);
+      });
+
+      // Verify that previewSvg was formatted and stored for user config
+      const stored = JSON.parse(localStorage.getItem('ergogen:multi-config')!);
+      expect(stored.configs[0].previewSvg).toContain(
+        'style="background-color: rgb(51,51,51);"'
+      );
+      expect(stored.configs[0].previewSvg).toContain('stroke="#AAA"');
+    });
   });
 });

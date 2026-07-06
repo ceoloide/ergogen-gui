@@ -341,6 +341,8 @@ The application features a built-in Multi-Configuration Management system allowi
 2. **Persistence (`constants.ts`)**:
    - Key name: `ergogen:multi-config` maps to a JSON container following the `MultiConfigContainer` scheme.
    - Automatically migrates legacy configurations (saved on `LOCAL_STORAGE_CONFIG` or `ergogen:config` key) on startup.
+   - **Version 2**: Upgraded to store formatted inline SVG previews (`previewSvg`) in `SavedConfig` metadata inside `ergogen:multi-config`.
+   - **Background Compilation**: Triggers a silent compile on mount for all configurations that lack a preview SVG (e.g. legacy/v1 designs) to generate their SVGs, skipping the heavy STL generation phase.
 3. **ZIP Exporter Utilities (`zip.ts`)**:
    - Offers background worker compilation sequences that compiles all configurations concurrently or sequentially and zips them up into a single file with custom folder structures.
 

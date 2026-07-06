@@ -41,6 +41,7 @@ interface SavedConfig {
   config: string;
   createdAt: string;
   updatedAt: string;
+  previewSvg?: string;
 }
 
 interface MultiConfigContainer {
@@ -299,9 +300,33 @@ const pruneDeletedConfigs = () => {
   }
 };
 
+const formatPreviewSvg = (svgContent: unknown): string | undefined => {
+  if (!svgContent) return undefined;
+  
+  let content: string = '';
+  if (typeof svgContent === 'string') {
+    content = svgContent;
+  } else if (Array.isArray(svgContent)) {
+    content = svgContent.join('');
+  } else {
+    return undefined;
+  }
+
+  content = content
+    .replace(/width="[^"]+"/, 'width="284px"')
+    .replace(/height="[^"]+"/, 'height="134px"');
+  content = content.replace(
+    /<svg/,
+    '<svg style="background-color: rgb(51,51,51);"'
+  );
+  content = content.replaceAll(/stroke="#000"/g, 'stroke="#AAA"');
+  content = content.replaceAll(/stroke:#000/g, 'stroke:#AAA');
+  return content;
+};
+
 const loadMultiConfigFromStorage = (): MultiConfigContainer => {
   if (typeof window === 'undefined') {
-    return { version: 1, activeConfigId: null, configs: [] };
+    return { version: 2, activeConfigId: null, configs: [] };
   }
   const stored = localStorage.getItem(MULTI_CONFIG_STORAGE_KEY);
   if (stored) {
@@ -326,7 +351,7 @@ const loadMultiConfigFromStorage = (): MultiConfigContainer => {
     }
   }
   return {
-    version: 1,
+    version: 2,
     activeConfigId: null,
     configs: [],
   };
@@ -334,11 +359,12 @@ const loadMultiConfigFromStorage = (): MultiConfigContainer => {
 
 const saveMultiConfigToStorage = (
   configs: SavedConfig[],
-  activeConfigId: string | null
+  activeConfigId: string | null,
+  version: number = 2
 ) => {
   if (typeof window === 'undefined') return;
   const container: MultiConfigContainer = {
-    version: 1,
+    version,
     activeConfigId,
     configs,
   };
@@ -382,7 +408,7 @@ const migrateLegacyConfig = (): MultiConfigContainer => {
       };
       initialData.configs.push(legacyConfig);
       initialData.activeConfigId = newId;
-      saveMultiConfigToStorage(initialData.configs, newId);
+      saveMultiConfigToStorage(initialData.configs, newId, 2);
     }
     localStorage.removeItem(LEGACY_STORAGE_CONFIG_KEY);
     localStorage.removeItem(CONFIG_LOCAL_STORAGE_KEY);
@@ -406,6 +432,29 @@ const ConfigContextProvider = ({
   hashError,
   children,
 }: Props) => {
+  const [hadLegacyConfig] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const legacy1 = localStorage.getItem(LEGACY_STORAGE_CONFIG_KEY);
+    const legacy2 = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
+    return !!(legacy1 || legacy2);
+  });
+
+  const [loadedVersion] = useState<number>(() => {
+    if (typeof window === 'undefined') return 2;
+    const stored = localStorage.getItem(MULTI_CONFIG_STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed && typeof parsed.version === 'number') {
+          return parsed.version;
+        }
+      } catch (err) {
+        console.warn('Failed to parse loaded version:', err);
+      }
+    }
+    return 1;
+  });
+
   const [multiConfig] = useState<MultiConfigContainer>(() => {
     return migrateLegacyConfig();
   });
@@ -494,6 +543,7 @@ const ConfigContextProvider = ({
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [workerReady, setWorkerReady] = useState<boolean>(false);
 
   // Worker refs
   const ergogenWorkerRef = useRef<Worker | null>(null);
@@ -530,6 +580,37 @@ const ConfigContextProvider = ({
     (event: MessageEvent<ErgogenWorkerResponse>) => {
       const response = event.data;
 
+      // Handle background preview generation requests
+      if (
+        response.requestId &&
+        response.requestId.startsWith('background-preview-')
+      ) {
+        const configId = response.requestId.substring(
+          'background-preview-'.length
+        );
+        if (response.type === 'success' && response.results) {
+          const resultsObj = response.results as Results;
+          const svgContent =
+            resultsObj.outlines?.preview?.svg || resultsObj.demo?.svg;
+          const formattedSvg = formatPreviewSvg(svgContent);
+          if (formattedSvg) {
+            setConfigs((prevConfigs) => {
+              const updated = prevConfigs.map((c) =>
+                c.id === configId ? { ...c, previewSvg: formattedSvg } : c
+              );
+              saveMultiConfigToStorage(updated, activeConfigIdRef.current, 2);
+              return updated;
+            });
+          }
+        } else if (response.type === 'error') {
+          console.warn(
+            `Background generation failed for config ${configId}:`,
+            response.error
+          );
+        }
+        return;
+      }
+
       if (response.type === 'error') {
         console.error('--- Ergogen worker error:', response.error);
         setError(response.error);
@@ -549,6 +630,24 @@ const ConfigContextProvider = ({
         // Set results and trigger STL conversion if needed
         if (response.results) {
           const newResults = response.results as Results;
+
+          // Store preview or demo SVG in the active configuration
+          const svgContent =
+            newResults.outlines?.preview?.svg || newResults.demo?.svg;
+          const formattedSvg = formatPreviewSvg(svgContent);
+          const currentActiveId = activeConfigIdRef.current;
+          if (formattedSvg && currentActiveId) {
+            setConfigs((prevConfigs) => {
+              const updated = prevConfigs.map((c) =>
+                c.id === currentActiveId
+                  ? { ...c, previewSvg: formattedSvg }
+                  : c
+              );
+              saveMultiConfigToStorage(updated, currentActiveId, 2);
+              return updated;
+            });
+          }
+
           let willConvertStl = false;
 
           if (
@@ -626,6 +725,7 @@ const ConfigContextProvider = ({
       ergogenWorkerRef.current = createErgogenWorker();
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
+        setWorkerReady(true);
       } else {
         console.warn('Failed to initialize Ergogen worker.');
       }
@@ -644,6 +744,7 @@ const ConfigContextProvider = ({
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.terminate();
         ergogenWorkerRef.current = null;
+        setWorkerReady(false);
       }
       if (jscadWorkerRef.current) {
         jscadWorkerRef.current.terminate();
@@ -1178,6 +1279,7 @@ const ConfigContextProvider = ({
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.terminate();
         ergogenWorkerRef.current = null;
+        setWorkerReady(false);
         console.log('Ergogen worker terminated.');
       }
 
@@ -1185,6 +1287,7 @@ const ConfigContextProvider = ({
       ergogenWorkerRef.current = createErgogenWorker();
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
+        setWorkerReady(true);
         console.log('Ergogen worker initialized.');
       } else {
         console.warn('Failed to initialize Ergogen worker.');
@@ -1224,6 +1327,42 @@ const ConfigContextProvider = ({
     showSettings,
     processInput,
   ]);
+
+  // Trigger background preview generation on mount if loadedVersion is 1 or hadLegacyConfig is true
+  useEffect(() => {
+    if (!workerReady) return;
+
+    if (loadedVersion === 1 || hadLegacyConfig) {
+      console.log(
+        'Version 1 or legacy configuration detected on load. Triggering background preview generation for all configs missing a preview SVG...'
+      );
+
+      // Save directly as version 2 to prevent triggering this again next time
+      saveMultiConfigToStorage(
+        configsRef.current,
+        activeConfigIdRef.current,
+        2
+      );
+
+      // Loop through all configurations that don't have a previewSvg and generate them
+      configsRef.current.forEach((cfg) => {
+        if (!cfg.previewSvg) {
+          console.log(
+            `Triggering background preview generation for: ${cfg.name}`
+          );
+          ergogenWorkerRef.current?.postMessage({
+            type: 'generate',
+            inputConfig: cfg.config,
+            requestId: `background-preview-${cfg.id}`,
+            options: {
+              debug: true,
+              svg: true,
+            },
+          });
+        }
+      });
+    }
+  }, [workerReady, loadedVersion, hadLegacyConfig]);
 
   const experiment = useMemo(() => {
     const urlParams = new URLSearchParams(window.location.search);
