@@ -45,6 +45,7 @@ describe('SideNavigation', () => {
     duplicateConfig: jest.fn(),
     deleteConfig: jest.fn(),
     exportAllConfigs: jest.fn(),
+    downloadAllConfigs: jest.fn(),
     injectionInput: [],
     setInjectionInput: jest.fn(),
     setError: jest.fn(),
@@ -96,6 +97,14 @@ describe('SideNavigation', () => {
     fireEvent.click(newBtn);
 
     expect(mockNavigate).toHaveBeenCalledWith('/new');
+  });
+
+  it('triggers bulk download when clicking Download All', () => {
+    renderComponent();
+    const downloadBtn = screen.getByRole('button', { name: /download all/i });
+    fireEvent.click(downloadBtn);
+
+    expect(mockContextValue.downloadAllConfigs).toHaveBeenCalled();
   });
 
   it('triggers bulk export when clicking Export All', () => {

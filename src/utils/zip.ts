@@ -362,6 +362,67 @@ export const exportAllConfigs = async (
     .toISOString()
     .replace(/[:.]/g, '-')
     .split('T')[0];
-  const filename = `ergogen-all-${timestamp}.zip`;
+  const filename = `ergogen-export-all-${timestamp}.zip`;
+  saveAs(blob, filename);
+};
+
+export const downloadAllConfigs = async (
+  configs: { name: string; config: string }[],
+  injections: string[][] | undefined
+) => {
+  const zip = new JSZip();
+  const usedNames = new Set<string>();
+
+  // Add YAML configs to the root
+  for (const configRecord of configs) {
+    const baseName =
+      configRecord.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Untitled';
+    let finalName = baseName;
+    let counter = 1;
+    while (usedNames.has(finalName)) {
+      finalName = `${baseName}_${counter}`;
+      counter++;
+    }
+    usedNames.add(finalName);
+    zip.file(`${finalName}.yaml`, configRecord.config);
+  }
+
+  // Add injections folders in the zip root
+  if (injections && injections.length > 0) {
+    for (const injection of injections) {
+      const [type, name, content] = injection;
+      let innerFolderName = 'footprints';
+      if (type === 'outline') {
+        innerFolderName = 'outlines';
+      } else if (type === 'template') {
+        innerFolderName = 'templates';
+      }
+
+      const targetFolder = zip.folder(innerFolderName);
+      if (targetFolder) {
+        const pathParts = name.split('/');
+        const fileName = pathParts.pop();
+        let currentFolder = targetFolder;
+        for (const part of pathParts) {
+          currentFolder = currentFolder.folder(part) || currentFolder;
+        }
+        if (fileName) {
+          currentFolder.file(`${fileName}.js`, content);
+        }
+      }
+    }
+  }
+
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 },
+  });
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, '-')
+    .split('T')[0];
+  const filename = `ergogen-config-all-${timestamp}.zip`;
   saveAs(blob, filename);
 };

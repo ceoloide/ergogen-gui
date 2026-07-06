@@ -33,7 +33,7 @@ import {
   MULTI_CONFIG_STORAGE_KEY,
   LEGACY_STORAGE_CONFIG_KEY,
 } from './constants';
-import { exportAllConfigs } from '../utils/zip';
+import { exportAllConfigs, downloadAllConfigs } from '../utils/zip';
 
 interface SavedConfig {
   id: string;
@@ -116,6 +116,7 @@ type ContextProps = {
   duplicateConfig: (id: string) => void;
   deleteConfig: (id: string) => void;
   exportAllConfigs: () => Promise<void>;
+  downloadAllConfigs: () => Promise<void>;
   loadPreview: (config: string) => void;
   injectionInput: string[][] | undefined;
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>;
@@ -934,6 +935,10 @@ const ConfigContextProvider = ({
     );
   }, [injectionInput, debug, stlPreview]);
 
+  const handleDownloadAllConfigs = useCallback(async () => {
+    await downloadAllConfigs(configsRef.current, injectionInput);
+  }, [injectionInput]);
+
   const activeConfigName = useMemo(() => {
     if (isPreview) {
       return 'Shared Preview';
@@ -1073,6 +1078,7 @@ const ConfigContextProvider = ({
       duplicateConfig,
       deleteConfig,
       exportAllConfigs: handleExportAllConfigs,
+      downloadAllConfigs: handleDownloadAllConfigs,
       loadPreview,
       injectionInput,
       setInjectionInput,

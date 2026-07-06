@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { createZip } from './zip';
+import { createZip, downloadAllConfigs } from './zip';
 
 jest.mock('jszip');
 jest.mock('file-saver');
@@ -235,6 +235,95 @@ describe('createZip', () => {
     expect(saveAs).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringMatching(/^ergogen-\d{4}-\d{2}-\d{2}\.zip$/)
+    );
+  });
+});
+
+describe('downloadAllConfigs', () => {
+  let mockZip: any;
+  let mockFolders: Record<string, any>;
+
+  const createMockFolder = () => {
+    const folder: any = {
+      file: jest.fn().mockReturnThis(),
+      folder: jest.fn(),
+    };
+    folder.folder.mockImplementation((name: string) => {
+      if (!mockFolders[name]) {
+        mockFolders[name] = createMockFolder();
+      }
+      return mockFolders[name];
+    });
+    return folder;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFolders = {};
+
+    mockZip = {
+      file: jest.fn().mockReturnThis(),
+      folder: jest.fn().mockImplementation((name: string) => {
+        if (!mockFolders[name]) {
+          mockFolders[name] = createMockFolder();
+        }
+        return mockFolders[name];
+      }),
+      generateAsync: jest
+        .fn()
+        .mockResolvedValue(new Blob(['mock config zip content'])),
+    };
+
+    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+  });
+
+  it('should include configs in root and package injections', async () => {
+    const configs = [
+      { name: 'Ergonomic Board', config: 'points: {}' },
+      { name: 'Keyboard/Alpha', config: 'points: { alpha: true }' },
+    ];
+    const injections = [
+      ['footprint', 'deep/foot', 'foot-content'],
+      ['outline', 'out-1', 'outline-content'],
+      ['template', 'temp-1', 'template-content'],
+    ];
+
+    await downloadAllConfigs(configs, injections);
+
+    // Assert files in root
+    expect(mockZip.file).toHaveBeenCalledWith(
+      'Ergonomic_Board.yaml',
+      'points: {}'
+    );
+    expect(mockZip.file).toHaveBeenCalledWith(
+      'Keyboard_Alpha.yaml',
+      'points: { alpha: true }'
+    );
+
+    // Assert injections folders structure
+    expect(mockZip.folder).toHaveBeenCalledWith('footprints');
+    const footprintsFolder = mockFolders['footprints'];
+    const deepFolder = mockFolders['deep'];
+    expect(footprintsFolder.folder).toHaveBeenCalledWith('deep');
+    expect(deepFolder.file).toHaveBeenCalledWith('foot.js', 'foot-content');
+
+    expect(mockZip.folder).toHaveBeenCalledWith('outlines');
+    const outlinesFolder = mockFolders['outlines'];
+    expect(outlinesFolder.file).toHaveBeenCalledWith(
+      'out-1.js',
+      'outline-content'
+    );
+
+    expect(mockZip.folder).toHaveBeenCalledWith('templates');
+    const templatesFolder = mockFolders['templates'];
+    expect(templatesFolder.file).toHaveBeenCalledWith(
+      'temp-1.js',
+      'template-content'
+    );
+
+    expect(saveAs).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringMatching(/^ergogen-config-all-\d{4}-\d{2}-\d{2}\.zip$/)
     );
   });
 });
