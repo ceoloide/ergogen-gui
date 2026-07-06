@@ -142,6 +142,8 @@ type ContextProps = {
   setResultsVersion: Dispatch<SetStateAction<number>>;
   showSettings: boolean;
   setShowSettings: Dispatch<SetStateAction<boolean>>;
+  isBulkDownloadOpen: boolean;
+  setIsBulkDownloadOpen: Dispatch<SetStateAction<boolean>>;
   showSideNav: boolean;
   setShowSideNav: Dispatch<SetStateAction<boolean>>;
   showConfig: boolean;
@@ -413,6 +415,7 @@ const ConfigContextProvider = ({
     localStorageOrDefault('ergogen:config:stlPreview', true)
   );
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [isBulkDownloadOpen, setIsBulkDownloadOpen] = useState<boolean>(false);
   const [showSideNav, setShowSideNav] = useState<boolean>(false);
   const [showConfig, setShowConfig] = useState<boolean>(true);
   const [showDownloads, setShowDownloads] = useState<boolean>(true);
@@ -1094,6 +1097,8 @@ const ConfigContextProvider = ({
       setResultsVersion,
       showSettings,
       setShowSettings,
+      isBulkDownloadOpen,
+      setIsBulkDownloadOpen,
       showSideNav,
       setShowSideNav,
       showConfig,
@@ -1128,6 +1133,8 @@ const ConfigContextProvider = ({
       duplicateConfig,
       deleteConfig,
       handleExportAllConfigs,
+      handleDownloadAllConfigs,
+      isBulkDownloadOpen,
       loadPreview,
       injectionInput,
       setInjectionInput,

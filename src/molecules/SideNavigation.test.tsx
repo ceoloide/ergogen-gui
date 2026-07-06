@@ -44,8 +44,7 @@ describe('SideNavigation', () => {
     renameConfig: jest.fn(),
     duplicateConfig: jest.fn(),
     deleteConfig: jest.fn(),
-    exportAllConfigs: jest.fn(),
-    downloadAllConfigs: jest.fn(),
+    setIsBulkDownloadOpen: jest.fn(),
     injectionInput: [],
     setInjectionInput: jest.fn(),
     setError: jest.fn(),
@@ -99,20 +98,12 @@ describe('SideNavigation', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/new');
   });
 
-  it('triggers bulk download when clicking Download All', () => {
+  it('opens bulk download modal when clicking Download All', () => {
     renderComponent();
     const downloadBtn = screen.getByRole('button', { name: /download all/i });
     fireEvent.click(downloadBtn);
 
-    expect(mockContextValue.downloadAllConfigs).toHaveBeenCalled();
-  });
-
-  it('triggers bulk export when clicking Export All', () => {
-    renderComponent();
-    const exportBtn = screen.getByRole('button', { name: /export all/i });
-    fireEvent.click(exportBtn);
-
-    expect(mockContextValue.exportAllConfigs).toHaveBeenCalled();
+    expect(mockContextValue.setIsBulkDownloadOpen).toHaveBeenCalledWith(true);
   });
 
   it('selects configuration when clicking on its name', () => {

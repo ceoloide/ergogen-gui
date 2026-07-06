@@ -15,6 +15,7 @@ import {
 import { getConfigFromHash } from './utils/share';
 import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
+import BulkDownloadDialog from './molecules/BulkDownloadDialog';
 
 // Module-level variable to persist hash result across React StrictMode remounts
 // React StrictMode in dev mode intentionally remounts components, which resets refs
@@ -301,6 +302,17 @@ const AppContent = ({
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
           data-testid="conflict-resolution-dialog"
+        />
+      )}
+      {configContext?.isBulkDownloadOpen && (
+        <BulkDownloadDialog
+          isOpen={configContext.isBulkDownloadOpen}
+          configs={configContext.configs}
+          injections={configContext.injectionInput}
+          debug={configContext.debug}
+          stlPreview={configContext.stlPreview}
+          onClose={() => configContext.setIsBulkDownloadOpen(false)}
+          data-testid="bulk-download-dialog"
         />
       )}
       <Header />

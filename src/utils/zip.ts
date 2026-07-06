@@ -426,3 +426,342 @@ export const downloadAllConfigs = async (
   const filename = `ergogen-config-all-${timestamp}.zip`;
   saveAs(blob, filename);
 };
+
+export const exportConfigsProgressively = async (
+  configs: { name: string; config: string }[],
+  injections: string[][] | undefined,
+  debug: boolean,
+  stlPreview: boolean,
+  onlyConfigs: boolean,
+  onProgress: (current: number, total: number, name: string) => void,
+  isAborted: () => boolean
+) => {
+  const zip = new JSZip();
+  const usedNames = new Set<string>();
+
+  if (onlyConfigs) {
+    // 1. Configs only mode
+    for (let i = 0; i < configs.length; i++) {
+      if (isAborted()) return;
+      const configRecord = configs[i];
+      onProgress(i, configs.length, configRecord.name);
+
+      const baseName =
+        configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
+      let finalName = baseName;
+      let counter = 1;
+      while (usedNames.has(finalName)) {
+        finalName = `${baseName}_${counter}`;
+        counter++;
+      }
+      usedNames.add(finalName);
+      zip.file(`${finalName}.yaml`, configRecord.config);
+    }
+
+    // Add injections folders in the zip root
+    if (injections && injections.length > 0) {
+      if (isAborted()) return;
+      for (const injection of injections) {
+        const [type, name, content] = injection;
+        let innerFolderName = 'footprints';
+        if (type === 'outline') {
+          innerFolderName = 'outlines';
+        } else if (type === 'template') {
+          innerFolderName = 'templates';
+        }
+
+        const targetFolder = zip.folder(innerFolderName);
+        if (targetFolder) {
+          const pathParts = name.split('/');
+          const fileName = pathParts.pop();
+          let currentFolder = targetFolder;
+          for (const part of pathParts) {
+            currentFolder = currentFolder.folder(part) || currentFolder;
+          }
+          if (fileName) {
+            currentFolder.file(`${fileName}.js`, content);
+          }
+        }
+      }
+    }
+
+    if (isAborted()) return;
+    onProgress(configs.length, configs.length, 'Creating ZIP...');
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 9 },
+    });
+
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .split('T')[0];
+    const filename = `ergogen-config-all-${timestamp}.zip`;
+    saveAs(blob, filename);
+  } else {
+    // 2. Full compilation mode (like export all but progressive and abortable)
+    let activeWorker: Worker | null = null;
+
+    const compileConfigAbortable = (
+      config: string,
+      injections: string[][] | undefined
+    ): Promise<Results> => {
+      return new Promise((resolve, reject) => {
+        if (isAborted()) {
+          reject(new Error('Aborted'));
+          return;
+        }
+        const worker = createErgogenWorker();
+        if (!worker) {
+          reject(new Error('Failed to create Ergogen worker'));
+          return;
+        }
+        activeWorker = worker;
+
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          if (activeWorker === worker) activeWorker = null;
+          reject(new Error('Compilation timed out'));
+        }, 30000);
+
+        worker.onmessage = (event) => {
+          const response = event.data;
+          if (response.type === 'error') {
+            clearTimeout(timeout);
+            worker.terminate();
+            if (activeWorker === worker) activeWorker = null;
+            reject(new Error(response.error));
+          } else if (response.type === 'success') {
+            clearTimeout(timeout);
+            worker.terminate();
+            if (activeWorker === worker) activeWorker = null;
+            resolve(response.results as Results);
+          }
+        };
+
+        worker.onerror = (error) => {
+          clearTimeout(timeout);
+          worker.terminate();
+          if (activeWorker === worker) activeWorker = null;
+          reject(error);
+        };
+
+        let parsedConfig;
+        try {
+          parsedConfig = JSON.parse(config);
+        } catch {
+          try {
+            parsedConfig = yaml.load(config);
+          } catch {
+            parsedConfig = config;
+          }
+        }
+
+        worker.postMessage({
+          type: 'generate',
+          inputConfig: parsedConfig,
+          injectionInput: injections,
+          requestId: `export-compile-${Date.now()}`,
+        });
+      });
+    };
+
+    const compileJscadToStlAbortable = (results: Results): Promise<Results> => {
+      return new Promise((resolve) => {
+        if (
+          isAborted() ||
+          !results.cases ||
+          Object.keys(results.cases).length === 0
+        ) {
+          resolve(results);
+          return;
+        }
+        const jscadWorker = createJscadWorker();
+        if (!jscadWorker) {
+          resolve(results);
+          return;
+        }
+        activeWorker = jscadWorker;
+
+        const timeout = setTimeout(() => {
+          jscadWorker.terminate();
+          if (activeWorker === jscadWorker) activeWorker = null;
+          resolve(results);
+        }, 30000);
+
+        jscadWorker.onmessage = (event) => {
+          const response = event.data;
+          if (response.type === 'batch_jscad_to_stl_success') {
+            clearTimeout(timeout);
+            jscadWorker.terminate();
+            if (activeWorker === jscadWorker) activeWorker = null;
+            resolve(response.results as Results);
+          }
+        };
+        jscadWorker.onerror = () => {
+          clearTimeout(timeout);
+          jscadWorker.terminate();
+          if (activeWorker === jscadWorker) activeWorker = null;
+          resolve(results);
+        };
+        jscadWorker.postMessage({
+          type: 'batch_jscad_to_stl',
+          results: results,
+          configVersion: 0,
+        });
+      });
+    };
+
+    try {
+      for (let i = 0; i < configs.length; i++) {
+        if (isAborted()) {
+          if (activeWorker) activeWorker.terminate();
+          return;
+        }
+        const configRecord = configs[i];
+        onProgress(i, configs.length, configRecord.name);
+
+        const folderName =
+          configRecord.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Untitled';
+        const configFolder = zip.folder(folderName);
+        if (!configFolder) continue;
+
+        try {
+          const results = await compileConfigAbortable(
+            configRecord.config,
+            injections
+          );
+          let finalResults = results;
+          if (
+            stlPreview &&
+            results.cases &&
+            Object.keys(results.cases).length > 0
+          ) {
+            finalResults = await compileJscadToStlAbortable(results);
+          }
+
+          if (isAborted()) {
+            if (activeWorker) activeWorker.terminate();
+            return;
+          }
+
+          if (finalResults.demo?.svg) {
+            configFolder.file('demo.svg', finalResults.demo.svg);
+          }
+          configFolder.file('config.yaml', configRecord.config);
+
+          if (finalResults.outlines) {
+            const outlinesFolder = configFolder.folder('outlines');
+            if (outlinesFolder) {
+              for (const [name, outline] of Object.entries(
+                finalResults.outlines
+              )) {
+                if (debug || !name.startsWith('_')) {
+                  if (outline.dxf)
+                    outlinesFolder.file(`${name}.dxf`, outline.dxf);
+                  if (outline.svg)
+                    outlinesFolder.file(`${name}.svg`, outline.svg);
+                }
+              }
+            }
+          }
+
+          if (finalResults.pcbs) {
+            const pcbsFolder = configFolder.folder('pcbs');
+            if (pcbsFolder) {
+              for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
+                pcbsFolder.file(name, pcb);
+              }
+            }
+          }
+
+          if (finalResults.cases) {
+            const casesFolder = configFolder.folder('cases');
+            if (casesFolder) {
+              for (const [name, caseData] of Object.entries(
+                finalResults.cases
+              )) {
+                if (caseData.jscad)
+                  casesFolder.file(`${name}.jscad`, caseData.jscad);
+                if (stlPreview && caseData.stl)
+                  casesFolder.file(`${name}.stl`, caseData.stl);
+              }
+            }
+          }
+
+          if (debug) {
+            const debugFolder = configFolder.folder('debug');
+            if (debugFolder) {
+              debugFolder.file('raw.txt', configRecord.config);
+              for (const [key, value] of Object.entries(finalResults)) {
+                if (['canonical', 'points', 'units'].includes(key)) {
+                  debugFolder.file(
+                    `${key}.yaml`,
+                    JSON.stringify(value, null, 2)
+                  );
+                }
+              }
+            }
+          }
+
+          if (injections && injections.length > 0) {
+            for (const injection of injections) {
+              const [type, name, content] = injection;
+              let innerFolderName = 'footprints';
+              if (type === 'outline') {
+                innerFolderName = 'outlines';
+              } else if (type === 'template') {
+                innerFolderName = 'templates';
+              }
+
+              const targetFolder = configFolder.folder(innerFolderName);
+              if (targetFolder) {
+                const pathParts = name.split('/');
+                const fileName = pathParts.pop();
+                let currentFolder = targetFolder;
+                for (const part of pathParts) {
+                  currentFolder = currentFolder.folder(part) || currentFolder;
+                }
+                if (fileName) {
+                  currentFolder.file(`${fileName}.js`, content);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Failed to compile config ${configRecord.name}:`, e);
+          configFolder.file('config.yaml', configRecord.config);
+          configFolder.file(
+            'error.txt',
+            `Compilation failed: ${e instanceof Error ? e.message : String(e)}`
+          );
+        }
+      }
+
+      if (isAborted()) {
+        if (activeWorker) activeWorker.terminate();
+        return;
+      }
+      onProgress(configs.length, configs.length, 'Creating ZIP...');
+
+      const blob = await zip.generateAsync({
+        type: 'blob',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 9 },
+      });
+
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, '-')
+        .split('T')[0];
+      const filename = `ergogen-export-all-${timestamp}.zip`;
+      saveAs(blob, filename);
+    } finally {
+      if (activeWorker) {
+        activeWorker.terminate();
+      }
+    }
+  }
+};

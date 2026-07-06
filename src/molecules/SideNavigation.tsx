@@ -42,8 +42,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     renameConfig,
     duplicateConfig,
     deleteConfig,
-    exportAllConfigs,
-    downloadAllConfigs,
+    setIsBulkDownloadOpen,
   } = configContext || {};
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,15 +85,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     onClose();
   };
 
-  const handleExportAll = async () => {
-    if (exportAllConfigs) {
-      await exportAllConfigs();
-    }
-  };
-
-  const handleDownloadAll = async () => {
-    if (downloadAllConfigs) {
-      await downloadAllConfigs();
+  const handleDownloadAll = () => {
+    if (setIsBulkDownloadOpen) {
+      setIsBulkDownloadOpen(true);
     }
   };
 
@@ -319,24 +312,14 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               <span>New</span>
             </NewConfigButton>
             {configs && configs.length > 0 && (
-              <>
-                <DownloadAllButton
-                  onClick={handleDownloadAll}
-                  aria-label="Download All"
-                  data-testid="side-nav-download-all-button"
-                >
-                  <span className="material-symbols-outlined">download</span>
-                  <span>Download All</span>
-                </DownloadAllButton>
-                <ExportAllButton
-                  onClick={handleExportAll}
-                  aria-label="Export All"
-                  data-testid="side-nav-export-all-button"
-                >
-                  <span className="material-symbols-outlined">archive</span>
-                  <span>Export All</span>
-                </ExportAllButton>
-              </>
+              <DownloadAllButton
+                onClick={handleDownloadAll}
+                aria-label="Download All"
+                data-testid="side-nav-download-all-button"
+              >
+                <span className="material-symbols-outlined">download</span>
+                <span>Download All</span>
+              </DownloadAllButton>
             )}
           </ActionBar>
 
@@ -652,32 +635,6 @@ const NewConfigButton = styled.button`
 `;
 
 const DownloadAllButton = styled.button`
-  flex: 1;
-  background-color: transparent;
-  color: ${theme.colors.white};
-  border: 1px solid ${theme.colors.border};
-  border-radius: 6px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: ${theme.fontSizes.bodySmall};
-  font-weight: ${theme.fontWeights.regular};
-  cursor: pointer;
-  transition: background-color 0.15s ease-in-out;
-  padding: 0 6px;
-
-  .material-symbols-outlined {
-    font-size: 20px;
-  }
-
-  &:hover {
-    background-color: ${theme.colors.buttonHover};
-  }
-`;
-
-const ExportAllButton = styled.button`
   flex: 1;
   background-color: transparent;
   color: ${theme.colors.white};
