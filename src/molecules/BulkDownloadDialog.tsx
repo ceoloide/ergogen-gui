@@ -114,28 +114,30 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
               <ActionButton onClick={() => handleToggleSelectAll(true)}>
                 Select All
               </ActionButton>
-              <ActionDivider>|</ActionDivider>
               <ActionButton onClick={() => handleToggleSelectAll(false)}>
                 Deselect All
               </ActionButton>
             </SelectionActions>
 
             <ConfigListContainer>
-              {configs.map((cfg) => (
-                <ConfigItemRow key={cfg.id}>
-                  <input
-                    type="checkbox"
-                    id={`bulk-check-${cfg.id}`}
-                    checked={selectedIds.has(cfg.id)}
-                    onChange={(e) =>
-                      handleCheckboxChange(cfg.id, e.target.checked)
-                    }
-                  />
-                  <ConfigItemLabel htmlFor={`bulk-check-${cfg.id}`}>
-                    {cfg.name}
-                  </ConfigItemLabel>
-                </ConfigItemRow>
-              ))}
+              {configs.map((cfg) => {
+                const isChecked = selectedIds.has(cfg.id);
+                return (
+                  <ConfigItemRow key={cfg.id}>
+                    <CustomCheckboxWrapper htmlFor={`bulk-check-${cfg.id}`}>
+                      <HiddenCheckbox
+                        id={`bulk-check-${cfg.id}`}
+                        checked={isChecked}
+                        onChange={(e) =>
+                          handleCheckboxChange(cfg.id, e.target.checked)
+                        }
+                      />
+                      <StyledCheckbox $checked={isChecked} />
+                      <ConfigItemLabelText>{cfg.name}</ConfigItemLabelText>
+                    </CustomCheckboxWrapper>
+                  </ConfigItemRow>
+                );
+              })}
             </ConfigListContainer>
 
             <SwitchWrapper>
@@ -247,27 +249,27 @@ const Description = styled.p`
 const SelectionActions = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 0.5rem;
-`;
-
-const ActionDivider = styled.span`
-  color: ${theme.colors.border};
-  font-size: 12px;
-  user-select: none;
 `;
 
 const ActionButton = styled.button`
   background: none;
   border: none;
-  color: ${theme.colors.accent};
-  font-size: 12px;
+  color: ${theme.colors.textDark};
+  font-size: 11px;
+  font-weight: ${theme.fontWeights.medium};
   cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
 
   &:hover {
-    color: ${theme.colors.accentDark};
+    background-color: ${theme.colors.border};
+    color: ${theme.colors.white};
   }
 `;
 
@@ -290,11 +292,56 @@ const ConfigItemRow = styled.div`
   gap: 8px;
 `;
 
-const ConfigItemLabel = styled.label`
+const ConfigItemLabelText = styled.span`
   color: ${theme.colors.text};
   font-size: 13px;
-  cursor: pointer;
   user-select: none;
+`;
+
+const CustomCheckboxWrapper = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  width: 100%;
+  padding: 4px 0;
+`;
+
+const HiddenCheckbox = styled.input.attrs({ type: 'checkbox' })`
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+`;
+
+const StyledCheckbox = styled.div<{ $checked: boolean }>`
+  width: 16px;
+  height: 16px;
+  background-color: ${(props) =>
+    props.$checked ? theme.colors.accent : 'transparent'};
+  border: 2px solid
+    ${(props) => (props.$checked ? theme.colors.accent : theme.colors.border)};
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &::after {
+    content: '';
+    display: ${(props) => (props.$checked ? 'block' : 'none')};
+    width: 3px;
+    height: 6px;
+    border: solid ${theme.colors.white};
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-0.5px, -1px);
+  }
+
+  ${CustomCheckboxWrapper}:hover & {
+    border-color: ${theme.colors.accent};
+  }
 `;
 
 const SwitchWrapper = styled.div`
