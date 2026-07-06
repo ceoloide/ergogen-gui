@@ -106,6 +106,8 @@ type Props = {
  */
 type ContextProps = {
   configInput: string | undefined;
+  getRealtimeConfigInput: () => string | undefined;
+  updateRealtimeConfigInput: (val: string | undefined) => void;
   setConfigInput: Dispatch<SetStateAction<string | undefined>>;
   configs: SavedConfig[];
   activeConfigId: string | null;
@@ -512,6 +514,20 @@ const ConfigContextProvider = ({
     configInputRef.current = configInputState;
   }, [configInputState]);
 
+  const realtimeConfigInputRef = useRef<string | undefined>(configInputState);
+
+  useEffect(() => {
+    realtimeConfigInputRef.current = configInputState;
+  }, [configInputState]);
+
+  const updateRealtimeConfigInput = useCallback((val: string | undefined) => {
+    realtimeConfigInputRef.current = val;
+  }, []);
+
+  const getRealtimeConfigInput = useCallback(() => {
+    return realtimeConfigInputRef.current;
+  }, []);
+
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
     'ergogen:injection',
     initialInjectionInput
@@ -831,12 +847,17 @@ const ConfigContextProvider = ({
       injectionInput: string[][] | undefined,
       options: ProcessOptions = { pointsonly: true }
     ) => {
-      if (!textInput) {
+      const targetInput =
+        textInput === undefined || textInput === configInputRef.current
+          ? (realtimeConfigInputRef.current ?? configInputRef.current)
+          : textInput;
+
+      if (!targetInput) {
         return;
       }
-      let inputConfig: string | object = textInput ?? '';
+      let inputConfig: string | object = targetInput;
       const inputInjection: string[][] | undefined = injectionInput;
-      const [, parsedConfig] = parseConfig(textInput ?? '');
+      const [, parsedConfig] = parseConfig(targetInput);
 
       setError(null);
       setDeprecationWarning(null);
@@ -1372,6 +1393,8 @@ const ConfigContextProvider = ({
   const contextValue = useMemo(
     () => ({
       configInput: configInputState,
+      getRealtimeConfigInput,
+      updateRealtimeConfigInput,
       setConfigInput,
       configs,
       activeConfigId,
@@ -1426,6 +1449,8 @@ const ConfigContextProvider = ({
     }),
     [
       configInputState,
+      getRealtimeConfigInput,
+      updateRealtimeConfigInput,
       setConfigInput,
       configs,
       activeConfigId,

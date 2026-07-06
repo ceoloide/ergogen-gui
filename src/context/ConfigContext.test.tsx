@@ -999,4 +999,34 @@ describe('ConfigContextProvider', () => {
       expect(stored.configs[0].previewSvg).toContain('stroke="#AAA"');
     });
   });
+
+  describe('realtime config input functions', () => {
+    it('should retrieve and update the realtime config input value', () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      expect(capturedContext.getRealtimeConfigInput()).toBe('points: {}');
+
+      act(() => {
+        capturedContext.updateRealtimeConfigInput('points: { modified: true }');
+      });
+
+      // It should update the realtime value ref
+      expect(capturedContext.getRealtimeConfigInput()).toBe(
+        'points: { modified: true }'
+      );
+
+      // But configInput state should remain the old value (no re-render update to state yet)
+      expect(capturedContext.configInput).toBe('points: {}');
+    });
+  });
 });

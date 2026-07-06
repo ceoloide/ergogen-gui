@@ -1,5 +1,6 @@
 import { Editor, OnMount } from '@monaco-editor/react';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
+import debounce from 'lodash.debounce';
 import { useConfigContext } from '../context/ConfigContext';
 
 /**
@@ -40,6 +41,7 @@ const ConfigEditor = ({
   'aria-label': ariaLabel,
 }: Props) => {
   const configContext = useConfigContext();
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
   // Provide safe defaults when context is null to avoid conditional hooks
   const defaults = {
@@ -49,6 +51,7 @@ const ConfigEditor = ({
     ) => {}) as unknown as React.Dispatch<
       React.SetStateAction<string | undefined>
     >,
+    updateRealtimeConfigInput: (_val: string | undefined) => {},
     injectionInput: undefined as string[][] | undefined,
     generateNow: (async () => {}) as (
       textInput: string | undefined,
@@ -57,8 +60,37 @@ const ConfigEditor = ({
     ) => Promise<void>,
   };
 
-  const { configInput, setConfigInput, injectionInput, generateNow } =
-    configContext ?? defaults;
+  const {
+    configInput,
+    updateRealtimeConfigInput,
+    setConfigInput,
+    injectionInput,
+    generateNow,
+  } = configContext ?? defaults;
+
+  // Create a debounced setConfigInput to avoid updating context on every keystroke
+  const debouncedSetConfigInput = useRef(
+    debounce((val: string) => {
+      setConfigInput(val);
+    }, 500)
+  ).current;
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSetConfigInput.cancel();
+    };
+  }, [debouncedSetConfigInput]);
+
+  // Sync editor value with context configInput (only when changed from outside)
+  useEffect(() => {
+    if (editorRef.current) {
+      const currentVal = editorRef.current.getValue();
+      if (configInput !== undefined && configInput !== currentVal) {
+        editorRef.current.setValue(configInput);
+      }
+    }
+  }, [configInput]);
 
   /**
    * Handles changes in the editor's content.
@@ -66,22 +98,35 @@ const ConfigEditor = ({
    * @param {string | undefined} textInput - The new text content from the editor.
    */
   const handleChange = useCallback(
-    async (textInput: string | undefined) => {
-      if (!textInput) return null;
+    (textInput: string | undefined) => {
+      if (textInput === undefined) return;
 
-      setConfigInput(textInput);
+      // Sync the realtime value ref immediately (without triggering re-renders)
+      updateRealtimeConfigInput(textInput);
+
+      // Debounce the state/localStorage update
+      debouncedSetConfigInput(textInput);
     },
-    [setConfigInput]
+    [debouncedSetConfigInput, updateRealtimeConfigInput]
   );
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+
+    // Flush/save changes immediately on blur to ensure download/generate buttons have the latest value
+    editor.onDidBlurEditorText(() => {
+      debouncedSetConfigInput.flush();
+    });
+
     editor.addAction({
       id: 'generate-config',
       label: 'Generate',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => {
         const currentConfig = editor.getValue();
-        // Also update the context state so the UI is in sync
+        // Cancel pending debounces and apply immediately
+        debouncedSetConfigInput.cancel();
+        updateRealtimeConfigInput(currentConfig);
         setConfigInput(currentConfig);
         generateNow(currentConfig, injectionInput, { pointsonly: false });
       },
@@ -98,9 +143,8 @@ const ConfigEditor = ({
         language="yaml"
         onChange={handleChange}
         onMount={handleEditorDidMount}
-        value={configInput}
-        theme={'ergogen-theme'}
         defaultValue={configInput}
+        theme={'ergogen-theme'}
         options={options || undefined}
       />
     </div>
