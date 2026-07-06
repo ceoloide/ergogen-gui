@@ -344,7 +344,7 @@ const Header = (): JSX.Element => {
                   onChange={(e) => setEditValue(e.target.value)}
                   onBlur={handleSaveEdit}
                   onKeyDown={handleKeyDown}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
+                  // eslint-disable-next-line
                   autoFocus
                   data-testid="header-config-name-input"
                   aria-label="Edit configuration name"
