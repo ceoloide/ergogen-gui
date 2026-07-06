@@ -1,5 +1,23 @@
 # Changelog
 
+## Multi-Configuration Management System
+
+July 06, 2026
+
+![A placeholder image for multi-configuration support.](./public/images/changelog/placeholder.png)
+
+Managing multiple keyboard design variations previously required manually copying and pasting configurations, importing files over and over, or managing multiple browser tabs. There was no native way to save, organize, or quickly switch between different board setups inside the GUI, making iteration on layout alternatives slow and error-prone.
+
+Now you can create, save, rename, duplicate, and switch between multiple configurations directly inside the workspace. A new sidebar navigation lists all your saved configurations with search support, inline renaming, and quick duplication or deletion. You can also export all your designs as a bulk compilation, bundling all your keyboard variants into a single ZIP archive.
+
+**What changed:**
+
+- **Native Multi-Configuration Workspace**: Created a side navigation panel to manage, switch, search, and organize multiple configurations
+- **Inline Actions**: Perform inline renaming, deletion, and layout duplication for any saved design
+- **Bulk compilation export**: Added an "Export All" option that compiles and packages all saved configurations in a single ZIP folder structure
+- **Preview mode**: Enabled temporary shared URL preview loading alongside your permanent saved layouts
+- **Data Migration**: Automatically migrates legacy configuration storage formats into the new system without data loss
+
 ## Custom Templates Support in GUI
 
 July 05, 2026
