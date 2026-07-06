@@ -1,23 +1,5 @@
 # Changelog
 
-## Recent Configurations Preview (Pick up where you left)
-
-July 06, 2026
-
-![The welcome page showing the new Recent Configurations section displaying visual layouts of your recently edited keyboards.](./public/images/changelog/placeholder.png)
-
-When launching the Ergogen Web UI, returning to your active projects meant manually browsing the side panel search or opening layouts one by one to check their visual shapes. There was no visual "dashboard" to quickly identify and resume working on your most recently edited designs from the entry page.
-
-Now, a new "Pick up where you left" section greets you directly on the welcome page, showcasing up to 4 of your most recently edited configurations. Each layout is rendered as a visual preview card showing the compiled board shape alongside its name. Under the hood, multi-config storage has been upgraded to version 2 to embed clean, dark-themed SVG previews, which are compiled in the background for your legacy layouts to ensure your dashboard is immediately complete and responsive.
-
-**What changed:**
-
-- **Dashboard Recent Section**: Added a "Pick up where you left" section to the welcome page displaying cards for the 4 most recently modified keyboards
-- **Visual Previews**: Show the compiled keyboard shape inline on each card with a dark style matching the examples
-- **Fallback Glyph**: Center a `keyboard_off` icon on the card if a configuration is empty or fails to compile
-- **Background Compiler**: Automatically generate preview SVGs in the background for all legacy and version 1 configurations without blocking the UI or running heavy STL conversions
-- **Storage Version 2**: Upgraded the multi-configuration schema to version 2 to store formatted preview SVGs in local storage
-
 ## Multi-Configuration Management System
 
 July 06, 2026
