@@ -35,13 +35,13 @@ import {
 } from './constants';
 import { exportAllConfigs } from '../utils/zip';
 
-export interface SavedConfig {
+interface SavedConfig {
   id: string;
   name: string;
   config: string;
 }
 
-export interface MultiConfigContainer {
+interface MultiConfigContainer {
   version: number;
   activeConfigId: string | null;
   configs: SavedConfig[];
@@ -647,7 +647,7 @@ const ConfigContextProvider = ({
       if (parsedConfig && parsedConfig.pcbs) {
         let warningFound = false;
         for (const pcbKey in parsedConfig.pcbs) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line
           const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
           if (!pcb.template || pcb.template === 'kicad5') {
             const footprints = pcb.footprints;
@@ -741,7 +741,9 @@ const ConfigContextProvider = ({
       const prevVal = configInputRef.current;
       const newVal =
         typeof valueOrFunc === 'function'
-          ? (valueOrFunc as (prev: string | undefined) => string | undefined)(prevVal)
+          ? (valueOrFunc as (prev: string | undefined) => string | undefined)(
+              prevVal
+            )
           : valueOrFunc;
 
       if (newVal === prevVal) return;

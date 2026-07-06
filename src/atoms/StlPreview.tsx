@@ -182,7 +182,6 @@ const CameraController: React.FC<{
       perspectiveCamera.position.copy(cameraPosition);
       perspectiveCamera.lookAt(boxCenter);
       perspectiveCamera.updateProjectionMatrix();
-
     }
   }, [geometry, camera, size]);
 
@@ -214,7 +213,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
 
   React.useEffect(() => {
     try {
-
       // Parse STL data
       const parseStl = (stlString: string) => {
         // Check if string starts with "solid" (ASCII STL)
@@ -225,7 +223,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         const hasRequiredKeywords =
           startsWithSolid &&
           (stlString.includes('facet') || stlString.includes('FACET'));
-
 
         if (hasRequiredKeywords) {
           return parseAsciiStl(stlString);
@@ -303,7 +300,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         // Calculate expected file size
         const expectedSize = 84 + numTriangles * 50; // header + count + (50 bytes per triangle)
 
-
         if (buffer.byteLength < expectedSize) {
           throw new Error(
             `Binary STL size mismatch: got ${buffer.byteLength} bytes, expected ${expectedSize}`
@@ -353,7 +349,6 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         console.error('No vertices found in STL data');
         return;
       }
-
 
       // Create Three.js BufferGeometry
       const newGeometry = new THREE.BufferGeometry();

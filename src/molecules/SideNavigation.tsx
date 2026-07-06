@@ -306,7 +306,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
           </ActionBar>
 
           <SearchWrapper>
-            <span className="material-symbols-outlined search-icon">search</span>
+            <span className="material-symbols-outlined search-icon">
+              search
+            </span>
             <SearchInput
               type="text"
               placeholder="Search configurations..."
@@ -332,21 +334,34 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               const isRenaming = renamingId === cfg.id;
 
               return (
-                <ConfigItem key={cfg.id} $isActive={isActive} data-testid={`config-item-${cfg.id}`}>
+                <ConfigItem
+                  key={cfg.id}
+                  $isActive={isActive}
+                  data-testid={`config-item-${cfg.id}`}
+                >
                   {isRenaming ? (
-                    <RenameForm onSubmit={(e) => { e.preventDefault(); handleRenameSubmit(cfg.id); }}>
+                    <RenameForm
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleRenameSubmit(cfg.id);
+                      }}
+                    >
                       <RenameInput
                         type="text"
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
-                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                        // eslint-disable-next-line
                         autoFocus
                         aria-label="Rename input"
                       />
                       <RenameActionBtn type="submit" aria-label="Save name">
                         <span className="material-symbols-outlined">check</span>
                       </RenameActionBtn>
-                      <RenameActionBtn type="button" onClick={() => setRenamingId(null)} aria-label="Cancel rename">
+                      <RenameActionBtn
+                        type="button"
+                        onClick={() => setRenamingId(null)}
+                        aria-label="Cancel rename"
+                      >
                         <span className="material-symbols-outlined">close</span>
                       </RenameActionBtn>
                     </RenameForm>
@@ -357,7 +372,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                         $isActive={isActive}
                         title={cfg.name}
                       >
-                        <span className="material-symbols-outlined">description</span>
+                        <span className="material-symbols-outlined">
+                          description
+                        </span>
                         <span className="config-title-text">{cfg.name}</span>
                       </ConfigNameButton>
                       <ItemActions>
@@ -365,19 +382,25 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                           onClick={() => handleStartRename(cfg.id, cfg.name)}
                           aria-label={`Rename configuration ${cfg.name}`}
                         >
-                          <span className="material-symbols-outlined">edit</span>
+                          <span className="material-symbols-outlined">
+                            edit
+                          </span>
                         </ActionIconBtn>
                         <ActionIconBtn
                           onClick={() => handleDuplicateConfig(cfg.id)}
                           aria-label={`Duplicate configuration ${cfg.name}`}
                         >
-                          <span className="material-symbols-outlined">content_copy</span>
+                          <span className="material-symbols-outlined">
+                            content_copy
+                          </span>
                         </ActionIconBtn>
                         <ActionIconBtn
                           onClick={() => handleDeleteConfig(cfg.id, cfg.name)}
                           aria-label={`Delete configuration ${cfg.name}`}
                         >
-                          <span className="material-symbols-outlined">delete</span>
+                          <span className="material-symbols-outlined">
+                            delete
+                          </span>
                         </ActionIconBtn>
                       </ItemActions>
                     </>
@@ -579,7 +602,7 @@ const NewConfigButton = styled.button`
   justify-content: center;
   gap: 6px;
   font-size: ${theme.fontSizes.bodySmall};
-  font-weight: ${theme.fontWeights.medium};
+  font-weight: ${theme.fontWeights.semiBold};
   cursor: pointer;
   transition: background-color 0.15s ease-in-out;
 
@@ -588,7 +611,7 @@ const NewConfigButton = styled.button`
   }
 
   &:hover {
-    background-color: ${theme.colors.accentHover || '#ff6f00'};
+    background-color: ${theme.colors.accentDark};
   }
 `;
 
@@ -604,7 +627,7 @@ const ExportAllButton = styled.button`
   justify-content: center;
   gap: 6px;
   font-size: ${theme.fontSizes.bodySmall};
-  font-weight: ${theme.fontWeights.medium};
+  font-weight: ${theme.fontWeights.semiBold};
   cursor: pointer;
   transition: background-color 0.15s ease-in-out;
 
@@ -635,7 +658,7 @@ const SearchWrapper = styled.div`
 
 const SearchInput = styled.input`
   width: 100%;
-  background-color: ${theme.colors.inputBg || '#1e1e1e'};
+  background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
   height: 36px;
@@ -677,7 +700,7 @@ const ConfigListHeader = styled.div`
   margin-bottom: 0.5rem;
   font-size: ${theme.fontSizes.bodySmall};
   color: ${theme.colors.textDark};
-  font-weight: ${theme.fontWeights.medium};
+  font-weight: ${theme.fontWeights.semiBold};
   text-transform: uppercase;
   letter-spacing: 0.5px;
   flex-shrink: 0;
@@ -707,8 +730,8 @@ const ConfigItem = styled.div<{ $isActive: boolean }>`
   border-radius: 6px;
   background-color: ${(props) =>
     props.$isActive ? 'rgba(255, 110, 0, 0.08)' : 'transparent'};
-  border: 1px solid ${(props) =>
-    props.$isActive ? theme.colors.accent : 'transparent'};
+  border: 1px solid
+    ${(props) => (props.$isActive ? theme.colors.accent : 'transparent')};
   padding: 2px 6px;
   height: 38px;
   min-width: 0;
@@ -732,9 +755,10 @@ const ConfigNameButton = styled.button<{ $isActive: boolean }>`
   display: flex;
   align-items: center;
   gap: 8px;
-  color: ${(props) => (props.$isActive ? theme.colors.white : theme.colors.textDark)};
+  color: ${(props) =>
+    props.$isActive ? theme.colors.white : theme.colors.textDark};
   font-weight: ${(props) =>
-    props.$isActive ? theme.fontWeights.medium : theme.fontWeights.regular};
+    props.$isActive ? theme.fontWeights.semiBold : theme.fontWeights.regular};
   font-size: ${theme.fontSizes.bodySmall};
   text-align: left;
   cursor: pointer;
@@ -744,7 +768,8 @@ const ConfigNameButton = styled.button<{ $isActive: boolean }>`
 
   .material-symbols-outlined {
     font-size: 18px;
-    color: ${(props) => (props.$isActive ? theme.colors.accent : theme.colors.textDark)};
+    color: ${(props) =>
+      props.$isActive ? theme.colors.accent : theme.colors.textDark};
   }
 
   .config-title-text {
@@ -800,7 +825,7 @@ const RenameForm = styled.form`
 
 const RenameInput = styled.input`
   flex: 1;
-  background-color: ${theme.colors.inputBg || '#1e1e1e'};
+  background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.accent};
   border-radius: 4px;
   height: 28px;

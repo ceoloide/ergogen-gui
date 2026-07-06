@@ -20,10 +20,18 @@ if (typeof global.TextEncoder === 'undefined') {
 // Global mock for react-router-dom
 jest.mock('react-router-dom', () => ({
   Link: ({ children, to, onClick, ...props }) => (
-    <a href={to} onClick={onClick} {...props}>{children}</a>
+    <a href={to} onClick={onClick} {...props}>
+      {children}
+    </a>
   ),
   useNavigate: () => jest.fn(),
   Navigate: () => null,
   Routes: ({ children }) => children,
   Route: () => null,
+}));
+
+// Global mock for workers to avoid import.meta syntax issues in Jest
+jest.mock('./workers/workerFactory', () => ({
+  createErgogenWorker: () => null,
+  createJscadWorker: () => null,
 }));

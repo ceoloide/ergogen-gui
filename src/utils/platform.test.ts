@@ -1,4 +1,11 @@
-import { isMacOS, isWindows, isLinux, getPlatform, getModifierKey, isMobile } from './platform';
+import {
+  isMacOS,
+  isWindows,
+  isLinux,
+  getPlatform,
+  getModifierKey,
+  isMobile,
+} from './platform';
 
 describe('platform utilities', () => {
   const originalNavigator = { ...global.navigator };

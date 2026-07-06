@@ -363,7 +363,7 @@ const ConfigDivider = styled.span`
 
 const ConfigNameText = styled.span`
   font-size: ${theme.fontSizes.bodySmall};
-  font-weight: ${theme.fontWeights.medium};
+  font-weight: ${theme.fontWeights.semiBold};
   color: ${theme.colors.text};
   overflow: hidden;
   text-overflow: ellipsis;

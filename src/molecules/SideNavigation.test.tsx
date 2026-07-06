@@ -11,7 +11,9 @@ jest.mock('../context/ConfigContext', () => ({
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   Link: ({ children, to, onClick, ...props }: any) => (
-    <a href={to} onClick={onClick} {...props}>{children}</a>
+    <a href={to} onClick={onClick} {...props}>
+      {children}
+    </a>
   ),
   useNavigate: () => mockNavigate,
 }));
@@ -44,14 +46,14 @@ describe('SideNavigation', () => {
   });
 
   const renderComponent = () => {
-    return render(
-      <SideNavigation isOpen={true} onClose={jest.fn()} />
-    );
+    return render(<SideNavigation isOpen={true} onClose={jest.fn()} />);
   };
 
   it('renders list of configurations and search input', () => {
     renderComponent();
-    expect(screen.getByPlaceholderText(/search configurations/i)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/search configurations/i)
+    ).toBeInTheDocument();
     expect(screen.getByText('Keyboard Alpha')).toBeInTheDocument();
     expect(screen.getByText('Ergonomic Board')).toBeInTheDocument();
   });
@@ -109,11 +111,14 @@ describe('SideNavigation', () => {
 
     const input = screen.getByDisplayValue('Keyboard Alpha');
     fireEvent.change(input, { target: { value: 'Updated Name' } });
-    
+
     const saveBtn = screen.getByLabelText(/save name/i);
     fireEvent.click(saveBtn);
 
-    expect(mockContextValue.renameConfig).toHaveBeenCalledWith('1', 'Updated Name');
+    expect(mockContextValue.renameConfig).toHaveBeenCalledWith(
+      '1',
+      'Updated Name'
+    );
   });
 
   it('duplicates a configuration when clicking duplicate button', () => {
@@ -129,7 +134,9 @@ describe('SideNavigation', () => {
     const deleteBtn = screen.getAllByLabelText(/delete configuration/i)[0];
     fireEvent.click(deleteBtn);
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Keyboard Alpha'));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Keyboard Alpha')
+    );
     expect(mockContextValue.deleteConfig).toHaveBeenCalledWith('1');
   });
 });
