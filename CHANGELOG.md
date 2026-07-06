@@ -4,7 +4,7 @@
 
 July 05, 2026
 
-![A placeholder image for custom templates support.](./public/images/changelog/placeholder.png)
+![The settings panel showing the custom library tabs and a custom outline.](./public/images/changelog/2026-06-05.png)
 
 Creating and editing custom outlines or templates previously required running the tool offline. You had no way to create, view, or manage your custom Ergogen outlines or templates inside the web interface.
 
