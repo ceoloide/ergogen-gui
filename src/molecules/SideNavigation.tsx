@@ -743,8 +743,7 @@ const ConfigItem = styled.div<{ $isActive: boolean }>`
   align-items: center;
   justify-content: space-between;
   border-radius: 6px;
-  background-color: ${(props) =>
-    props.$isActive ? 'rgba(255, 110, 0, 0.08)' : 'transparent'};
+  background-color: transparent;
   border: 1px solid
     ${(props) => (props.$isActive ? theme.colors.accent : 'transparent')};
   padding: 2px 6px;
@@ -753,8 +752,7 @@ const ConfigItem = styled.div<{ $isActive: boolean }>`
   flex-shrink: 0;
 
   &:hover {
-    background-color: ${(props) =>
-      props.$isActive ? 'rgba(255, 110, 0, 0.08)' : theme.colors.buttonHover};
+    background-color: ${theme.colors.buttonHover};
 
     /* Show action buttons on hover */
     .item-actions-hover {
