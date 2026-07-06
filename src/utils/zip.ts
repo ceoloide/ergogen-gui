@@ -1,5 +1,10 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import yaml from 'js-yaml';
+import {
+  createErgogenWorker,
+  createJscadWorker,
+} from '../workers/workerFactory';
 
 type DemoOutput = {
   dxf?: string;
@@ -140,5 +145,223 @@ export const createZip = async (
     .replace(/[:.]/g, '-')
     .split('T')[0];
   const filename = `ergogen-${timestamp}.zip`;
+  saveAs(blob, filename);
+};
+
+const compileConfig = (
+  config: string,
+  injections: string[][] | undefined
+): Promise<Results> => {
+  return new Promise((resolve, reject) => {
+    const worker = createErgogenWorker();
+    if (!worker) {
+      reject(new Error('Failed to create Ergogen worker'));
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('Compilation timed out'));
+    }, 15000);
+
+    worker.onmessage = (event) => {
+      const response = event.data;
+      if (response.type === 'error') {
+        clearTimeout(timeout);
+        reject(new Error(response.error));
+        worker.terminate();
+      } else if (response.type === 'success') {
+        clearTimeout(timeout);
+        resolve(response.results as Results);
+        worker.terminate();
+      }
+    };
+    worker.onerror = (error) => {
+      clearTimeout(timeout);
+      reject(error);
+      worker.terminate();
+    };
+
+    let parsedConfig;
+    try {
+      parsedConfig = JSON.parse(config);
+    } catch {
+      try {
+        parsedConfig = yaml.load(config);
+      } catch {
+        parsedConfig = config;
+      }
+    }
+
+    worker.postMessage({
+      type: 'generate',
+      inputConfig: parsedConfig,
+      injectionInput: injections,
+      requestId: `export-compile-${Date.now()}`,
+      options: {
+        debug: true,
+        svg: true,
+      },
+    });
+  });
+};
+
+const compileJscadToStl = (results: Results): Promise<Results> => {
+  return new Promise<Results>((resolve) => {
+    const jscadWorker = createJscadWorker();
+    if (!jscadWorker) {
+      resolve(results);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      jscadWorker.terminate();
+      resolve(results);
+    }, 15000);
+
+    jscadWorker.onmessage = (event) => {
+      const response = event.data;
+      if (response.type === 'success' && response.results) {
+        clearTimeout(timeout);
+        resolve(response.results as Results);
+      } else {
+        clearTimeout(timeout);
+        resolve(results);
+      }
+      jscadWorker.terminate();
+    };
+    jscadWorker.onerror = () => {
+      clearTimeout(timeout);
+      resolve(results);
+      jscadWorker.terminate();
+    };
+    jscadWorker.postMessage({
+      type: 'batch_jscad_to_stl',
+      results: results,
+      configVersion: 0,
+    });
+  });
+};
+
+export const exportAllConfigs = async (
+  configs: { name: string; config: string }[],
+  injections: string[][] | undefined,
+  debug: boolean,
+  stlPreview: boolean
+) => {
+  const zip = new JSZip();
+
+  for (const configRecord of configs) {
+    const folderName =
+      configRecord.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Untitled';
+    const configFolder = zip.folder(folderName);
+    if (!configFolder) continue;
+
+    try {
+      const results = await compileConfig(configRecord.config, injections);
+      let finalResults = results;
+      if (
+        stlPreview &&
+        results.cases &&
+        Object.keys(results.cases).length > 0
+      ) {
+        finalResults = await compileJscadToStl(results);
+      }
+
+      if (finalResults.demo?.svg) {
+        configFolder.file('demo.svg', finalResults.demo.svg);
+      }
+      configFolder.file('config.yaml', configRecord.config);
+
+      if (finalResults.outlines) {
+        const outlinesFolder = configFolder.folder('outlines');
+        if (outlinesFolder) {
+          for (const [name, outline] of Object.entries(finalResults.outlines)) {
+            if (debug || !name.startsWith('_')) {
+              if (outline.dxf) outlinesFolder.file(`${name}.dxf`, outline.dxf);
+              if (outline.svg) outlinesFolder.file(`${name}.svg`, outline.svg);
+            }
+          }
+        }
+      }
+
+      if (finalResults.pcbs) {
+        const pcbsFolder = configFolder.folder('pcbs');
+        if (pcbsFolder) {
+          for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
+            pcbsFolder.file(name, pcb);
+          }
+        }
+      }
+
+      if (finalResults.cases) {
+        const casesFolder = configFolder.folder('cases');
+        if (casesFolder) {
+          for (const [name, caseData] of Object.entries(finalResults.cases)) {
+            if (caseData.jscad)
+              casesFolder.file(`${name}.jscad`, caseData.jscad);
+            if (stlPreview && caseData.stl)
+              casesFolder.file(`${name}.stl`, caseData.stl);
+          }
+        }
+      }
+
+      if (debug) {
+        const debugFolder = configFolder.folder('debug');
+        if (debugFolder) {
+          debugFolder.file('raw.txt', configRecord.config);
+          for (const [key, value] of Object.entries(finalResults)) {
+            if (['canonical', 'points', 'units'].includes(key)) {
+              debugFolder.file(`${key}.yaml`, JSON.stringify(value, null, 2));
+            }
+          }
+        }
+      }
+
+      if (injections && injections.length > 0) {
+        for (const injection of injections) {
+          const [type, name, content] = injection;
+          let innerFolderName = 'footprints';
+          if (type === 'outline') {
+            innerFolderName = 'outlines';
+          } else if (type === 'template') {
+            innerFolderName = 'templates';
+          }
+
+          const targetFolder = configFolder.folder(innerFolderName);
+          if (targetFolder) {
+            const pathParts = name.split('/');
+            const fileName = pathParts.pop();
+            let currentFolder = targetFolder;
+            for (const part of pathParts) {
+              currentFolder = currentFolder.folder(part) || currentFolder;
+            }
+            if (fileName) {
+              currentFolder.file(`${fileName}.js`, content);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to compile config ${configRecord.name}:`, e);
+      configFolder.file('config.yaml', configRecord.config);
+      configFolder.file(
+        'error.txt',
+        `Compilation failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
+  }
+
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 },
+  });
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, '-')
+    .split('T')[0];
+  const filename = `ergogen-all-${timestamp}.zip`;
   saveAs(blob, filename);
 };

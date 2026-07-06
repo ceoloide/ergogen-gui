@@ -28,6 +28,25 @@ import type {
   ResultsLike,
 } from '../workers/jscad.worker.types';
 
+import {
+  CONFIG_LOCAL_STORAGE_KEY,
+  MULTI_CONFIG_STORAGE_KEY,
+  LEGACY_STORAGE_CONFIG_KEY,
+} from './constants';
+import { exportAllConfigs } from '../utils/zip';
+
+export interface SavedConfig {
+  id: string;
+  name: string;
+  config: string;
+}
+
+export interface MultiConfigContainer {
+  version: number;
+  activeConfigId: string | null;
+  configs: SavedConfig[];
+}
+
 // Strongly-typed shape for Ergogen results used in the UI
 type DemoOutput = {
   dxf?: string;
@@ -70,16 +89,10 @@ declare global {
 
 /**
  * Props for the ConfigContextProvider component.
- * @typedef {object} Props
- * @property {string | undefined} configInput - The current YAML/JSON configuration string.
- * @property {Dispatch<SetStateAction<string | undefined>>} setConfigInput - Function to update the config input.
- * @property {string[][]} [initialInjectionInput] - The initial array of code injections.
- * @property {string | null} [hashError] - Error message from hash fragment decoding, if any.
- * @property {React.ReactNode[] | React.ReactNode} children - The child components to be wrapped by the provider.
  */
 type Props = {
-  configInput: string | undefined;
-  setConfigInput: Dispatch<SetStateAction<string | undefined>>;
+  configInput?: string | undefined;
+  setConfigInput?: Dispatch<SetStateAction<string | undefined>>;
   initialInjectionInput?: string[][];
   hashError?: string | null;
   children: React.ReactNode[] | React.ReactNode;
@@ -87,44 +100,21 @@ type Props = {
 
 /**
  * Defines the shape of the data and functions provided by the ConfigContext.
- * @typedef {object} ContextProps
- * @property {string | undefined} configInput - The current YAML/JSON configuration string.
- * @property {Dispatch<SetStateAction<string | undefined>>} setConfigInput - Function to update the config input.
- * @property {string[][] | undefined} injectionInput - The current array of code injections.
- * @property {Dispatch<SetStateAction<string[][] | undefined>>} setInjectionInput - Function to update the injections.
- * @property {DebouncedFunc<...>} processInput - Debounced function to process the configuration.
- * @property {(textInput: string | undefined, injectionInput: string[][] | undefined, options?: ProcessOptions) => Promise<void>} generateNow - Immediate function to process the configuration.
- * @property {string | null} error - Any error message from the Ergogen process.
- * @property {Dispatch<SetStateAction<string | null>>} setError - Function to set an error message.
- * @property {() => void} clearError - Function to clear the current error message.
- * @property {string | null} deprecationWarning - Any deprecation warnings from the process.
- * @property {() => void} clearWarning - Function to clear the current deprecation warning.
- * @property {Results | null} results - The results from the Ergogen process.
- * @property {number} resultsVersion - A version number that increments with each new result.
- * @property {Dispatch<SetStateAction<number>>} setResultsVersion - Function to update the results version.
- * @property {boolean} showSettings - Flag to control the visibility of the settings panel.
- * @property {Dispatch<SetStateAction<boolean>>} setShowSettings - Function to toggle the settings panel.
- * @property {boolean} showSideNav - Flag to control the visibility of the side navigation panel.
- * @property {Dispatch<SetStateAction<boolean>>} setShowSideNav - Function to toggle the side navigation panel.
- * @property {boolean} showConfig - Flag to control the visibility of the configuration editor.
- * @property {Dispatch<SetStateAction<boolean>>} setShowConfig - Function to toggle the config editor.
- * @property {boolean} showDownloads - Flag to control the visibility of the downloads panel.
- * @property {Dispatch<SetStateAction<boolean>>} setShowDownloads - Function to toggle the downloads panel.
- * @property {boolean} debug - Flag to enable debug mode.
- * @property {Dispatch<SetStateAction<boolean>>} setDebug - Function to set debug mode.
- * @property {boolean} autoGen - Flag to enable automatic regeneration of previews.
- * @property {Dispatch<SetStateAction<boolean>>} setAutoGen - Function to toggle auto-generation.
- * @property {boolean} autoGen3D - Flag to enable automatic regeneration of 3D previews.
- * @property {Dispatch<SetStateAction<boolean>>} setAutoGen3D - Function to toggle 3D auto-generation.
- * @property {boolean} kicanvasPreview - Flag to enable the KiCanvas preview for PCBs.
- * @property {Dispatch<SetStateAction<boolean>>} setKicanvasPreview - Function to toggle the KiCanvas preview.
- * @property {boolean} stlPreview - Flag to enable the STL 3D preview and conversion.
- * @property {Dispatch<SetStateAction<boolean>>} setStlPreview - Function to toggle the STL preview.
- * @property {string | null} experiment - The value of any 'exp' query parameter.
  */
 type ContextProps = {
   configInput: string | undefined;
   setConfigInput: Dispatch<SetStateAction<string | undefined>>;
+  configs: SavedConfig[];
+  activeConfigId: string | null;
+  activeConfigName: string;
+  isPreview: boolean;
+  selectConfig: (id: string) => void;
+  createNewConfig: (content: string, name?: string) => string;
+  renameConfig: (id: string, newName: string) => void;
+  duplicateConfig: (id: string) => void;
+  deleteConfig: (id: string) => void;
+  exportAllConfigs: () => Promise<void>;
+  loadPreview: (config: string) => void;
   injectionInput: string[][] | undefined;
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>;
   processInput: DebouncedFunc<
@@ -173,8 +163,6 @@ type ContextProps = {
 
 /**
  * Options for the `processInput` function.
- * @typedef {object} ProcessOptions
- * @property {boolean} pointsonly - If true, only the points will be processed, skipping PCBs and cases.
  */
 type ProcessOptions = {
   pointsonly: boolean;
@@ -200,6 +188,117 @@ const localStorageOrDefault = (key: string, defaultValue: unknown) => {
   }
 };
 
+const generateUUID = () => {
+  if (
+    typeof window !== 'undefined' &&
+    window.crypto &&
+    window.crypto.randomUUID
+  ) {
+    return window.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+const getNextIndexForPattern = (
+  configsList: SavedConfig[],
+  pattern: RegExp
+) => {
+  let maxVal = 0;
+  for (const c of configsList) {
+    const match = c.name.match(pattern);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (!isNaN(val) && val > maxVal) {
+        maxVal = val;
+      }
+    }
+  }
+  return maxVal + 1;
+};
+
+const loadMultiConfigFromStorage = (): MultiConfigContainer => {
+  if (typeof window === 'undefined') {
+    return { version: 1, activeConfigId: null, configs: [] };
+  }
+  const stored = localStorage.getItem(MULTI_CONFIG_STORAGE_KEY);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed.version === 'number') {
+        return parsed as MultiConfigContainer;
+      }
+    } catch (e) {
+      console.error('Failed to parse multi-config storage:', e);
+    }
+  }
+  return {
+    version: 1,
+    activeConfigId: null,
+    configs: [],
+  };
+};
+
+const saveMultiConfigToStorage = (
+  configs: SavedConfig[],
+  activeConfigId: string | null
+) => {
+  if (typeof window === 'undefined') return;
+  const container: MultiConfigContainer = {
+    version: 1,
+    activeConfigId,
+    configs,
+  };
+  localStorage.setItem(MULTI_CONFIG_STORAGE_KEY, JSON.stringify(container));
+};
+
+const migrateLegacyConfig = (): MultiConfigContainer => {
+  const initialData = loadMultiConfigFromStorage();
+  if (typeof window === 'undefined') return initialData;
+
+  const legacyConfigValue1 = localStorage.getItem(LEGACY_STORAGE_CONFIG_KEY);
+  const legacyConfigValue2 = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
+
+  let legacyText = '';
+  if (legacyConfigValue1) {
+    try {
+      legacyText = JSON.parse(legacyConfigValue1);
+    } catch {
+      legacyText = legacyConfigValue1;
+    }
+  } else if (legacyConfigValue2) {
+    try {
+      legacyText = JSON.parse(legacyConfigValue2);
+    } catch {
+      legacyText = legacyConfigValue2;
+    }
+  }
+
+  if (legacyText && legacyText.trim() !== '') {
+    const hasLegacyConfig = initialData.configs.some(
+      (c) => c.name === 'Legacy Config'
+    );
+    if (!hasLegacyConfig) {
+      const newId = generateUUID();
+      const legacyConfig: SavedConfig = {
+        id: newId,
+        name: 'Legacy Config',
+        config: legacyText,
+      };
+      initialData.configs.push(legacyConfig);
+      initialData.activeConfigId = newId;
+      saveMultiConfigToStorage(initialData.configs, newId);
+    }
+    localStorage.removeItem(LEGACY_STORAGE_CONFIG_KEY);
+    localStorage.removeItem(CONFIG_LOCAL_STORAGE_KEY);
+  }
+
+  return initialData;
+};
+
 /**
  * The provider component for the ConfigContext.
  * It manages all state related to configuration, injections, settings, and results.
@@ -210,11 +309,68 @@ const localStorageOrDefault = (key: string, defaultValue: unknown) => {
  */
 const ConfigContextProvider = ({
   configInput,
-  setConfigInput,
+  setConfigInput: setConfigInputProp,
   initialInjectionInput,
   hashError,
   children,
 }: Props) => {
+  const [multiConfig] = useState<MultiConfigContainer>(() => {
+    return migrateLegacyConfig();
+  });
+
+  const [configs, setConfigs] = useState<SavedConfig[]>(
+    () => multiConfig.configs
+  );
+  const [activeConfigId, setActiveConfigId] = useState<string | null>(
+    () => multiConfig.activeConfigId
+  );
+  const [isPreview, setIsPreview] = useState<boolean>(false);
+  const [previewConfig, setPreviewConfig] = useState<string | null>(null);
+
+  const [configInputState, setConfigInputState] = useState<string | undefined>(
+    () => {
+      if (configInput !== undefined) {
+        return configInput;
+      }
+      if (multiConfig.activeConfigId) {
+        const active = multiConfig.configs.find(
+          (c) => c.id === multiConfig.activeConfigId
+        );
+        return active ? active.config : '';
+      }
+      return '';
+    }
+  );
+
+  // Sync configInput prop if it changes from outside
+  useEffect(() => {
+    if (configInput !== undefined) {
+      setConfigInputState(configInput);
+    }
+  }, [configInput]);
+
+  const configsRef = useRef<SavedConfig[]>(configs);
+  const activeConfigIdRef = useRef<string | null>(activeConfigId);
+  const isPreviewRef = useRef<boolean>(isPreview);
+  const previewConfigRef = useRef<string | null>(previewConfig);
+  const configInputRef = useRef<string | undefined>(configInputState);
+
+  useEffect(() => {
+    configsRef.current = configs;
+  }, [configs]);
+  useEffect(() => {
+    activeConfigIdRef.current = activeConfigId;
+  }, [activeConfigId]);
+  useEffect(() => {
+    isPreviewRef.current = isPreview;
+  }, [isPreview]);
+  useEffect(() => {
+    previewConfigRef.current = previewConfig;
+  }, [previewConfig]);
+  useEffect(() => {
+    configInputRef.current = configInputState;
+  }, [configInputState]);
+
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
     'ergogen:injection',
     initialInjectionInput
@@ -255,7 +411,6 @@ const ConfigContextProvider = ({
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
 
-
   /**
    * Effect to set error from hash fragment decoding if present.
    * This handles errors from initial page load with invalid shared configurations.
@@ -286,7 +441,6 @@ const ConfigContextProvider = ({
       }
 
       if (response.type === 'success') {
-
         // Handle warnings
         if (response.warnings && response.warnings.length > 0) {
           setDeprecationWarning(
@@ -357,7 +511,6 @@ const ConfigContextProvider = ({
         setIsJscadConverting(false);
         setIsGenerating(false);
       } else if (response.type === 'success' && response.results) {
-
         setResults(response.results as Results);
         setResultsVersion((v) => v + 1);
         setIsJscadConverting(false);
@@ -420,11 +573,8 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to track settings loaded and changes.
-   * Tracks settings_loaded every time settings are available (including on mount and remounts).
-   * Tracks setting_changed when settings actually change (not on initial mount).
    */
   useEffect(() => {
-    // Track settings_loaded every time settings are available
     trackEvent('settings_loaded', {
       debug,
       autoGen,
@@ -433,7 +583,6 @@ const ConfigContextProvider = ({
       stlPreview,
     });
 
-    // Track setting_changed only when settings actually change (not on initial mount)
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
     } else {
@@ -449,8 +598,6 @@ const ConfigContextProvider = ({
 
   /**
    * Parses a string as either JSON or YAML.
-   * @param {string} inputString - The string to parse.
-   * @returns {[string, object | null]} A tuple containing the detected type ('json', 'yaml', or 'UNKNOWN') and the parsed object, or null if parsing fails.
    */
   const parseConfig = useCallback(
     (inputString: string): [string, { [key: string]: unknown[] } | null] => {
@@ -495,25 +642,25 @@ const ConfigContextProvider = ({
       setError(null);
       setDeprecationWarning(null);
       setIsGenerating(true);
-      currentConfigVersion.current += 1; // Increment version at the start of generation
+      currentConfigVersion.current += 1;
 
-      // Check for deprecated KiCad 5 footprints in the config and warn the user
       if (parsedConfig && parsedConfig.pcbs) {
         let warningFound = false;
         for (const pcbKey in parsedConfig.pcbs) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
-          if (!pcb.template || pcb.template === "kicad5") {
+          if (!pcb.template || pcb.template === 'kicad5') {
             const footprints = pcb.footprints;
             if (footprints) {
               for (const fpKey in footprints) {
                 const footprint = footprints[fpKey];
                 if (
                   footprint &&
-                  typeof footprint.what === "string" &&
-                  footprint.what.startsWith("ceoloide")
+                  typeof footprint.what === 'string' &&
+                  footprint.what.startsWith('ceoloide')
                 ) {
                   setDeprecationWarning(
-                    "KiCad 5 is deprecated. Please add \"template: kicad8\" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer."
+                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
                   );
                   warningFound = true;
                   break;
@@ -526,9 +673,7 @@ const ConfigContextProvider = ({
           }
         }
       }
-      // When running this as part of onChange we remove `pcbs` and `cases` properties to generate
-      // a simplified preview.
-      // If there is no 'points' key we send the input to Ergogen as-is, it could be KLE or invalid.
+
       if (parsedConfig?.points && options?.pointsonly) {
         inputConfig = {
           ...parsedConfig,
@@ -538,7 +683,6 @@ const ConfigContextProvider = ({
       }
 
       try {
-        // Run the Ergogen process
         if (ergogenWorkerRef.current) {
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
@@ -592,6 +736,175 @@ const ConfigContextProvider = ({
     [processInput, runGeneration]
   );
 
+  const setConfigInput = useCallback(
+    (valueOrFunc: SetStateAction<string | undefined>) => {
+      const prevVal = configInputRef.current;
+      const newVal =
+        typeof valueOrFunc === 'function'
+          ? (valueOrFunc as (prev: string | undefined) => string | undefined)(prevVal)
+          : valueOrFunc;
+
+      if (newVal === prevVal) return;
+
+      setConfigInputState(newVal);
+      if (setConfigInputProp) {
+        setConfigInputProp(newVal);
+      }
+
+      if (isPreviewRef.current) {
+        if (newVal !== previewConfigRef.current) {
+          const nextSharedNum = getNextIndexForPattern(
+            configsRef.current,
+            /^Shared\s+(\d+)$/
+          );
+          const name = `Shared ${nextSharedNum}`;
+          const newId = generateUUID();
+          const newConfig: SavedConfig = {
+            id: newId,
+            name,
+            config: newVal || '',
+          };
+
+          const updatedConfigs = [...configsRef.current, newConfig];
+          setConfigs(updatedConfigs);
+          setActiveConfigId(newId);
+          setIsPreview(false);
+          setPreviewConfig(null);
+          saveMultiConfigToStorage(updatedConfigs, newId);
+        }
+      } else {
+        const currentActiveId = activeConfigIdRef.current;
+        if (currentActiveId) {
+          const updatedConfigs = configsRef.current.map((c) =>
+            c.id === currentActiveId ? { ...c, config: newVal || '' } : c
+          );
+          setConfigs(updatedConfigs);
+          saveMultiConfigToStorage(updatedConfigs, currentActiveId);
+        } else {
+          const nextUntitledNum = getNextIndexForPattern(
+            configsRef.current,
+            /^Untitled\s+(\d+)$/
+          );
+          const name = `Untitled ${nextUntitledNum}`;
+          const newId = generateUUID();
+          const newConfig: SavedConfig = {
+            id: newId,
+            name,
+            config: newVal || '',
+          };
+          const updatedConfigs = [...configsRef.current, newConfig];
+          setConfigs(updatedConfigs);
+          setActiveConfigId(newId);
+          saveMultiConfigToStorage(updatedConfigs, newId);
+        }
+      }
+    },
+    [setConfigInputProp]
+  );
+
+  const selectConfig = useCallback((id: string) => {
+    const found = configsRef.current.find((c) => c.id === id);
+    if (found) {
+      setActiveConfigId(id);
+      setIsPreview(false);
+      setPreviewConfig(null);
+      setConfigInputState(found.config);
+      saveMultiConfigToStorage(configsRef.current, id);
+    }
+  }, []);
+
+  const createNewConfig = useCallback((content: string, name?: string) => {
+    const nextUntitledNum = getNextIndexForPattern(
+      configsRef.current,
+      /^Untitled\s+(\d+)$/
+    );
+    const configName = name || `Untitled ${nextUntitledNum}`;
+    const newId = generateUUID();
+    const newConfig: SavedConfig = {
+      id: newId,
+      name: configName,
+      config: content,
+    };
+    const updatedConfigs = [...configsRef.current, newConfig];
+    setConfigs(updatedConfigs);
+    setActiveConfigId(newId);
+    setIsPreview(false);
+    setPreviewConfig(null);
+    setConfigInputState(content);
+    saveMultiConfigToStorage(updatedConfigs, newId);
+    return newId;
+  }, []);
+
+  const renameConfig = useCallback((id: string, newName: string) => {
+    const updatedConfigs = configsRef.current.map((c) =>
+      c.id === id ? { ...c, name: newName } : c
+    );
+    setConfigs(updatedConfigs);
+    saveMultiConfigToStorage(updatedConfigs, activeConfigIdRef.current);
+  }, []);
+
+  const duplicateConfig = useCallback((id: string) => {
+    const found = configsRef.current.find((c) => c.id === id);
+    if (found) {
+      const newId = generateUUID();
+      const newConfig: SavedConfig = {
+        id: newId,
+        name: `${found.name} (Copy)`,
+        config: found.config,
+      };
+      const updatedConfigs = [...configsRef.current, newConfig];
+      setConfigs(updatedConfigs);
+      setActiveConfigId(newId);
+      setIsPreview(false);
+      setPreviewConfig(null);
+      setConfigInputState(found.config);
+      saveMultiConfigToStorage(updatedConfigs, newId);
+    }
+  }, []);
+
+  const deleteConfig = useCallback((id: string) => {
+    const currentActiveId = activeConfigIdRef.current;
+    const remainingConfigs = configsRef.current.filter((c) => c.id !== id);
+    setConfigs(remainingConfigs);
+
+    const isDeletingActive = currentActiveId === id;
+    const isLastConfig = configsRef.current.length <= 1;
+
+    if (isLastConfig || isDeletingActive) {
+      setActiveConfigId(null);
+      setConfigInputState('');
+      saveMultiConfigToStorage(remainingConfigs, null);
+    } else {
+      saveMultiConfigToStorage(remainingConfigs, currentActiveId);
+    }
+  }, []);
+
+  const loadPreview = useCallback((config: string) => {
+    setIsPreview(true);
+    setPreviewConfig(config);
+    setConfigInputState(config);
+  }, []);
+
+  const handleExportAllConfigs = useCallback(async () => {
+    await exportAllConfigs(
+      configsRef.current,
+      injectionInput,
+      debug,
+      stlPreview
+    );
+  }, [injectionInput, debug, stlPreview]);
+
+  const activeConfigName = useMemo(() => {
+    if (isPreview) {
+      return 'Shared Preview';
+    }
+    if (activeConfigId) {
+      const active = configs.find((c) => c.id === activeConfigId);
+      return active ? active.name : '';
+    }
+    return '';
+  }, [isPreview, activeConfigId, configs]);
+
   // Memoize callbacks for the conflict resolution hook to prevent unnecessary re-renders
   const conflictResolutionCallbacks = useMemo(
     () => ({
@@ -620,29 +933,21 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to process the input configuration on the initial load.
-   * Checks for GitHub URL parameter, or processes existing config from localStorage/hash fragment.
-   * Note: Hash fragment loading (including injections) is handled in App.tsx by storing in localStorage.
-   * If there's a hashError, skip initial generation to prevent clearing the error.
    */
   useEffect(() => {
-    // If there's a hash error, don't run initial generation (error will be displayed)
     if (hashError) {
       return;
     }
 
-    // If we are loading from GitHub, wait for that to finish
     if (isConfigLoading) {
       return;
     }
 
-    // If not loading from GitHub, and we have configInput, generate it
-    // This handles the case where we have config from localStorage or hash fragment
-    // but NOT from a GitHub URL (which is handled by useConfigLoader)
     const queryParameters = new URLSearchParams(window.location.search);
     const githubUrl = queryParameters.get('github');
 
-    if (!githubUrl && configInput) {
-      generateNow(configInput, injectionInput, { pointsonly: false });
+    if (!githubUrl && configInputState) {
+      generateNow(configInputState, injectionInput, { pointsonly: false });
     }
     // eslint-disable-next-line
   }, [isConfigLoading]);
@@ -652,8 +957,6 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to handle transition of showSettings from true to false (settings closed).
-   * When settings are closed, we terminate the old worker and spin up a fresh one to clear
-   * any stale custom injections, then run generation.
    */
   useEffect(() => {
     if (prevShowSettingsRef.current && !showSettings) {
@@ -676,14 +979,16 @@ const ConfigContextProvider = ({
         console.warn('Failed to initialize Ergogen worker.');
       }
 
-      if (configInput) {
-        generateNow(configInput, injectionInput, { pointsonly: !autoGen3D });
+      if (configInputState) {
+        generateNow(configInputState, injectionInput, {
+          pointsonly: !autoGen3D,
+        });
       }
     }
     prevShowSettingsRef.current = showSettings;
   }, [
     showSettings,
-    configInput,
+    configInputState,
     injectionInput,
     autoGen3D,
     generateNow,
@@ -692,16 +997,16 @@ const ConfigContextProvider = ({
 
   /**
    * Effect to process the input configuration whenever it or the auto-generation settings change.
-   * Also persists the injection input to local storage.
-   * Only triggers generation if the settings panel is NOT open, to prevent performance lag while editing settings/options.
    */
   useEffect(() => {
     localStorage.setItem('ergogen:injection', JSON.stringify(injectionInput));
     if (autoGen && !showSettings) {
-      processInput(configInput, injectionInput, { pointsonly: !autoGen3D });
+      processInput(configInputState, injectionInput, {
+        pointsonly: !autoGen3D,
+      });
     }
   }, [
-    configInput,
+    configInputState,
     injectionInput,
     autoGen,
     autoGen3D,
@@ -716,8 +1021,19 @@ const ConfigContextProvider = ({
 
   const contextValue = useMemo(
     () => ({
-      configInput,
+      configInput: configInputState,
       setConfigInput,
+      configs,
+      activeConfigId,
+      activeConfigName,
+      isPreview,
+      selectConfig,
+      createNewConfig,
+      renameConfig,
+      duplicateConfig,
+      deleteConfig,
+      exportAllConfigs: handleExportAllConfigs,
+      loadPreview,
       injectionInput,
       setInjectionInput,
       processInput,
@@ -754,8 +1070,19 @@ const ConfigContextProvider = ({
       isJscadConverting,
     }),
     [
-      configInput,
+      configInputState,
       setConfigInput,
+      configs,
+      activeConfigId,
+      activeConfigName,
+      isPreview,
+      selectConfig,
+      createNewConfig,
+      renameConfig,
+      duplicateConfig,
+      deleteConfig,
+      handleExportAllConfigs,
+      loadPreview,
       injectionInput,
       setInjectionInput,
       processInput,
