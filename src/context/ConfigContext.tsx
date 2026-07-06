@@ -119,6 +119,7 @@ type ContextProps = {
   downloadAllConfigs: () => Promise<void>;
   loadPreview: (config: string) => void;
   savePreviewConfig: () => void;
+  pruneDeletedConfigs: () => void;
   injectionInput: string[][] | undefined;
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>;
   processInput: DebouncedFunc<
@@ -224,6 +225,78 @@ const getNextIndexForPattern = (
     }
   }
   return maxVal + 1;
+};
+
+interface DeletedConfig extends SavedConfig {
+  deletedAt: string;
+}
+
+const STORAGE_KEY_DELETED = 'ergogen:deleted-config';
+
+const saveToDeletedStorage = (config: SavedConfig) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED);
+    const data: { version: number; configs: DeletedConfig[] } = {
+      version: 1,
+      configs: [],
+    };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.configs)) {
+        data.configs = parsed.configs;
+        if (parsed.version !== undefined) {
+          data.version = parsed.version;
+        }
+      }
+    }
+    const deletedRecord: DeletedConfig = {
+      ...config,
+      deletedAt: new Date().toISOString(),
+    };
+    data.configs.push(deletedRecord);
+    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to save deleted config to storage:', err);
+  }
+};
+
+const pruneDeletedConfigs = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DELETED);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.configs)) return;
+
+    let configs: DeletedConfig[] = parsed.configs;
+    const now = Date.now();
+    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+
+    // 1. Remove if older than 90 days (by deletedAt date)
+    configs = configs.filter((c) => {
+      const deletedTime = new Date(c.deletedAt).getTime();
+      return now - deletedTime <= ninetyDaysMs;
+    });
+
+    // 2. If more than 100 configs, delete the oldest ones (by last modified date / updatedAt) until 100 remain
+    if (configs.length > 100) {
+      // Sort by updatedAt ascending (oldest first)
+      configs.sort((a, b) => {
+        const timeA = new Date(a.updatedAt).getTime();
+        const timeB = new Date(b.updatedAt).getTime();
+        return timeA - timeB;
+      });
+      // slice the last 100 (which are the newest)
+      configs = configs.slice(configs.length - 100);
+    }
+
+    const data = {
+      version: parsed.version || 1,
+      configs,
+    };
+    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to prune deleted configs:', err);
+  }
 };
 
 const loadMultiConfigFromStorage = (): MultiConfigContainer => {
@@ -430,6 +503,11 @@ const ConfigContextProvider = ({
   const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
+
+  // Effect to prune deleted configs on load
+  useEffect(() => {
+    pruneDeletedConfigs();
+  }, []);
 
   /**
    * Effect to set error from hash fragment decoding if present.
@@ -953,6 +1031,8 @@ const ConfigContextProvider = ({
 
   const deleteConfig = useCallback((id: string) => {
     const currentActiveId = activeConfigIdRef.current;
+    const deletedConfigObj = configsRef.current.find((c) => c.id === id);
+
     const remainingConfigs = configsRef.current.filter((c) => c.id !== id);
     setConfigs(remainingConfigs);
     configsRef.current = remainingConfigs;
@@ -968,6 +1048,10 @@ const ConfigContextProvider = ({
       saveMultiConfigToStorage(remainingConfigs, null);
     } else {
       saveMultiConfigToStorage(remainingConfigs, currentActiveId);
+    }
+
+    if (deletedConfigObj) {
+      saveToDeletedStorage(deletedConfigObj);
     }
   }, []);
 
@@ -1002,6 +1086,10 @@ const ConfigContextProvider = ({
     setIsPreview(false);
     setPreviewConfig(null);
     saveMultiConfigToStorage(updatedConfigs, newId);
+  }, []);
+
+  const handlePruneDeletedConfigs = useCallback(() => {
+    pruneDeletedConfigs();
   }, []);
 
   const handleExportAllConfigs = useCallback(async () => {
@@ -1159,6 +1247,7 @@ const ConfigContextProvider = ({
       downloadAllConfigs: handleDownloadAllConfigs,
       loadPreview,
       savePreviewConfig,
+      pruneDeletedConfigs: handlePruneDeletedConfigs,
       injectionInput,
       setInjectionInput,
       processInput,
@@ -1213,6 +1302,7 @@ const ConfigContextProvider = ({
       isBulkDownloadOpen,
       loadPreview,
       savePreviewConfig,
+      handlePruneDeletedConfigs,
       injectionInput,
       setInjectionInput,
       processInput,

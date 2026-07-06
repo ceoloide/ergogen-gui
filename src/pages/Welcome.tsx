@@ -250,6 +250,11 @@ const Welcome = () => {
     }
   }, [shouldNavigate, configContext?.configInput, navigate]);
 
+  // Prune deleted configs on mount
+  useEffect(() => {
+    configContext?.pruneDeletedConfigs?.();
+  }, [configContext]);
+
   const handleSelectExample = async (configValue: string) => {
     if (configContext) {
       // Determine if this is the empty config
