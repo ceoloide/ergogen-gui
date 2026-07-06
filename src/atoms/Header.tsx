@@ -247,6 +247,7 @@ const Header = (): JSX.Element => {
 
   const handleNewClick = () => {
     configContext?.setShowSettings(false);
+    configContext?.selectConfig(null);
     navigate('/new');
   };
 

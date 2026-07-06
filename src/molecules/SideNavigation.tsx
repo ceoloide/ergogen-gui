@@ -81,6 +81,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   }, [configs, searchQuery]);
 
   const handleNewConfig = () => {
+    if (selectConfig) {
+      selectConfig(null);
+    }
     navigate('/new');
     onClose();
   };

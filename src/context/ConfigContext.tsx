@@ -110,7 +110,7 @@ type ContextProps = {
   activeConfigId: string | null;
   activeConfigName: string;
   isPreview: boolean;
-  selectConfig: (id: string) => void;
+  selectConfig: (id: string | null) => void;
   createNewConfig: (content: string, name?: string) => string;
   renameConfig: (id: string, newName: string) => void;
   duplicateConfig: (id: string) => void;
@@ -835,14 +835,26 @@ const ConfigContextProvider = ({
     [setConfigInputProp]
   );
 
-  const selectConfig = useCallback((id: string) => {
-    const found = configsRef.current.find((c) => c.id === id);
-    if (found) {
-      setActiveConfigId(id);
+  const selectConfig = useCallback((id: string | null) => {
+    if (id === null) {
+      setActiveConfigId(null);
+      activeConfigIdRef.current = null;
       setIsPreview(false);
       setPreviewConfig(null);
-      setConfigInputState(found.config);
-      saveMultiConfigToStorage(configsRef.current, id);
+      setConfigInputState('');
+      configInputRef.current = '';
+      saveMultiConfigToStorage(configsRef.current, null);
+    } else {
+      const found = configsRef.current.find((c) => c.id === id);
+      if (found) {
+        setActiveConfigId(id);
+        activeConfigIdRef.current = id;
+        setIsPreview(false);
+        setPreviewConfig(null);
+        setConfigInputState(found.config);
+        configInputRef.current = found.config;
+        saveMultiConfigToStorage(configsRef.current, id);
+      }
     }
   }, []);
 
@@ -867,6 +879,12 @@ const ConfigContextProvider = ({
     setIsPreview(false);
     setPreviewConfig(null);
     setConfigInputState(content);
+
+    // Synchronously update the refs to avoid race conditions with consecutive calls
+    configsRef.current = updatedConfigs;
+    activeConfigIdRef.current = newId;
+    configInputRef.current = content;
+
     saveMultiConfigToStorage(updatedConfigs, newId);
     return newId;
   }, []);
@@ -881,6 +899,7 @@ const ConfigContextProvider = ({
         : c
     );
     setConfigs(updatedConfigs);
+    configsRef.current = updatedConfigs;
     saveMultiConfigToStorage(updatedConfigs, activeConfigIdRef.current);
   }, []);
 
@@ -902,6 +921,12 @@ const ConfigContextProvider = ({
       setIsPreview(false);
       setPreviewConfig(null);
       setConfigInputState(found.config);
+
+      // Synchronously update the refs to avoid race conditions
+      configsRef.current = updatedConfigs;
+      activeConfigIdRef.current = newId;
+      configInputRef.current = found.config;
+
       saveMultiConfigToStorage(updatedConfigs, newId);
     }
   }, []);
@@ -910,13 +935,16 @@ const ConfigContextProvider = ({
     const currentActiveId = activeConfigIdRef.current;
     const remainingConfigs = configsRef.current.filter((c) => c.id !== id);
     setConfigs(remainingConfigs);
+    configsRef.current = remainingConfigs;
 
     const isDeletingActive = currentActiveId === id;
     const isLastConfig = configsRef.current.length <= 1;
 
     if (isLastConfig || isDeletingActive) {
       setActiveConfigId(null);
+      activeConfigIdRef.current = null;
       setConfigInputState('');
+      configInputRef.current = '';
       saveMultiConfigToStorage(remainingConfigs, null);
     } else {
       saveMultiConfigToStorage(remainingConfigs, currentActiveId);
