@@ -78,14 +78,12 @@ describe('SideNavigation', () => {
     expect(screen.queryByText('Ergonomic Board')).not.toBeInTheDocument();
   });
 
-  it('creates a new configuration and navigates when clicking New Config', () => {
+  it('navigates to /new when clicking New button', () => {
     renderComponent();
-    const newBtn = screen.getByRole('button', { name: /new config/i });
+    const newBtn = screen.getByRole('button', { name: /^new$/i });
     fireEvent.click(newBtn);
 
-    expect(mockContextValue.createNewConfig).toHaveBeenCalled();
-    expect(mockContextValue.selectConfig).toHaveBeenCalledWith('3');
-    expect(mockNavigate).toHaveBeenCalledWith('/');
+    expect(mockNavigate).toHaveBeenCalledWith('/new');
   });
 
   it('triggers bulk export when clicking Export All', () => {

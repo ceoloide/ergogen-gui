@@ -39,7 +39,6 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     configs,
     activeConfigId,
     selectConfig,
-    createNewConfig,
     renameConfig,
     duplicateConfig,
     deleteConfig,
@@ -62,12 +61,8 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   }, [configs, searchQuery]);
 
   const handleNewConfig = () => {
-    if (createNewConfig) {
-      const newId = createNewConfig('points:\n  keycaps:\n    true\n');
-      if (selectConfig) selectConfig(newId);
-      navigate('/');
-      onClose();
-    }
+    navigate('/new');
+    onClose();
   };
 
   const handleExportAll = async () => {
@@ -287,11 +282,11 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
           <ActionBar>
             <NewConfigButton
               onClick={handleNewConfig}
-              aria-label="New Config"
+              aria-label="New"
               data-testid="side-nav-new-config-button"
             >
               <span className="material-symbols-outlined">add</span>
-              <span>New Config</span>
+              <span>New</span>
             </NewConfigButton>
             {configs && configs.length > 0 && (
               <ExportAllButton
@@ -299,7 +294,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                 aria-label="Export All"
                 data-testid="side-nav-export-all-button"
               >
-                <span className="material-symbols-outlined">download_zip</span>
+                <span className="material-symbols-outlined">folder_zip</span>
                 <span>Export All</span>
               </ExportAllButton>
             )}
@@ -377,7 +372,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                         </span>
                         <span className="config-title-text">{cfg.name}</span>
                       </ConfigNameButton>
-                      <ItemActions>
+                      <ItemActions $isActive={isActive}>
                         <ActionIconBtn
                           onClick={() => handleStartRename(cfg.id, cfg.name)}
                           aria-label={`Rename configuration ${cfg.name}`}
@@ -783,10 +778,12 @@ const ConfigNameButton = styled.button<{ $isActive: boolean }>`
   }
 `;
 
-const ItemActions = styled.div.attrs({ className: 'item-actions-hover' })`
+const ItemActions = styled.div.attrs({ className: 'item-actions-hover' })<{
+  $isActive?: boolean;
+}>`
   display: flex;
   gap: 4px;
-  opacity: 0;
+  opacity: ${(props) => (props.$isActive ? 1 : 0)};
   transition: opacity 0.15s ease-in-out;
 
   @media (max-width: 1023px) {
