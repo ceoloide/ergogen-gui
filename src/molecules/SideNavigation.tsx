@@ -141,6 +141,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
       // Closing: was open, now closed
       setIsOpening(false);
     }
+    if (!isOpen) {
+      setRenamingId(null);
+    }
     prevIsOpenRef.current = isOpen;
   }, [isOpen]);
 
@@ -840,13 +843,13 @@ const RenameForm = styled.form`
 
 const RenameInput = styled.input`
   flex: 1;
-  background-color: ${theme.colors.backgroundLighter};
-  border: 1px solid ${theme.colors.accent};
-  border-radius: 4px;
-  height: 28px;
-  padding: 0 6px;
+  background: transparent;
+  border: none;
+  height: 100%;
+  padding: 0;
   color: ${theme.colors.white};
   font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
 
   &:focus {
     outline: none;

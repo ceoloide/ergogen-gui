@@ -190,4 +190,26 @@ describe('SideNavigation', () => {
     expect(configItems[1]).toContain('Config B');
     expect(configItems[2]).toContain('Config C');
   });
+
+  it('cancels active renaming when the side navigation is closed', () => {
+    const { rerender } = render(
+      <SideNavigation isOpen={true} onClose={jest.fn()} />
+    );
+
+    // Start renaming
+    const renameBtn = screen.getAllByLabelText(/rename configuration/i)[0];
+    fireEvent.click(renameBtn);
+
+    expect(screen.getByLabelText('Rename input')).toBeInTheDocument();
+
+    // Close side navigation
+    rerender(<SideNavigation isOpen={false} onClose={jest.fn()} />);
+
+    // Re-open side navigation
+    rerender(<SideNavigation isOpen={true} onClose={jest.fn()} />);
+
+    // Renaming input should be gone, showing original static name
+    expect(screen.queryByLabelText('Rename input')).not.toBeInTheDocument();
+    expect(screen.getByText('Keyboard Alpha')).toBeInTheDocument();
+  });
 });
