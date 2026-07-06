@@ -253,7 +253,7 @@ export const exportAllConfigs = async (
 
   for (const configRecord of configs) {
     const folderName =
-      configRecord.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Untitled';
+      configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
     const configFolder = zip.folder(folderName);
     if (!configFolder) continue;
 
@@ -431,7 +431,7 @@ export const exportConfigsProgressively = async (
   configs: { name: string; config: string }[],
   injections: string[][] | undefined,
   debug: boolean,
-  stlPreview: boolean,
+  _stlPreview: boolean,
   onlyConfigs: boolean,
   onProgress: (current: number, total: number, name: string) => void,
   isAborted: () => boolean
@@ -598,12 +598,18 @@ export const exportConfigsProgressively = async (
 
         jscadWorker.onmessage = (event) => {
           const response = event.data;
-          if (response.type === 'batch_jscad_to_stl_success') {
+          if (response.type === 'success') {
             clearTimeout(timeout);
             jscadWorker.terminate();
             if (activeWorkerRef.current === jscadWorker)
               activeWorkerRef.current = null;
             resolve(response.results as Results);
+          } else if (response.type === 'error') {
+            clearTimeout(timeout);
+            jscadWorker.terminate();
+            if (activeWorkerRef.current === jscadWorker)
+              activeWorkerRef.current = null;
+            resolve(results);
           }
         };
         jscadWorker.onerror = () => {
@@ -631,7 +637,7 @@ export const exportConfigsProgressively = async (
         onProgress(i, configs.length, configRecord.name);
 
         const folderName =
-          configRecord.name.replace(/[/\\?%*:|"<>\s]/g, '_') || 'Untitled';
+          configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
         const configFolder = zip.folder(folderName);
         if (!configFolder) continue;
 
@@ -641,11 +647,7 @@ export const exportConfigsProgressively = async (
             injections
           );
           let finalResults = results;
-          if (
-            stlPreview &&
-            results.cases &&
-            Object.keys(results.cases).length > 0
-          ) {
+          if (results.cases && Object.keys(results.cases).length > 0) {
             finalResults = await compileJscadToStlAbortable(results);
           }
 
@@ -692,8 +694,7 @@ export const exportConfigsProgressively = async (
               )) {
                 if (caseData.jscad)
                   casesFolder.file(`${name}.jscad`, caseData.jscad);
-                if (stlPreview && caseData.stl)
-                  casesFolder.file(`${name}.stl`, caseData.stl);
+                if (caseData.stl) casesFolder.file(`${name}.stl`, caseData.stl);
               }
             }
           }

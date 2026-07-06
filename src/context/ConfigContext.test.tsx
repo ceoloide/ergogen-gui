@@ -640,10 +640,10 @@ describe('ConfigContextProvider', () => {
         </ConfigContextProvider>
       );
 
-      let id1: string = '';
+      let _id1: string = '';
       let id2: string = '';
       act(() => {
-        id1 = contextValue.createNewConfig('points: {}', 'Keyboard Alpha');
+        _id1 = contextValue.createNewConfig('points: {}', 'Keyboard Alpha');
         id2 = contextValue.createNewConfig('points: {}', 'Keyboard Beta');
       });
 
