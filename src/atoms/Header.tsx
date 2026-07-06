@@ -206,13 +206,15 @@ const Header = (): JSX.Element => {
     }
   };
 
-  const handleDuplicate = () => {
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (duplicateConfig && activeConfigId) {
       duplicateConfig(activeConfigId);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (activeConfigId && activeConfigName && deleteConfig) {
       if (
         window.confirm(`Are you sure you want to delete "${activeConfigName}"?`)
@@ -335,62 +337,69 @@ const Header = (): JSX.Element => {
             </VersionText>
           </ErgogenLogo>
           {activeConfigName && (
-            <ActiveConfigNameSection data-testid="header-active-config-name">
+            <>
               <ConfigDivider>/</ConfigDivider>
-              {isEditing ? (
-                <ConfigNameInput
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={handleSaveEdit}
-                  onKeyDown={handleKeyDown}
-                  // eslint-disable-next-line
-                  autoFocus
-                  data-testid="header-config-name-input"
-                  aria-label="Edit configuration name"
-                />
-              ) : (
-                <>
-                  <ConfigNameText
-                    onClick={handleStartEdit}
-                    title="Click to rename"
-                    data-testid="header-config-name-text"
-                  >
-                    {activeConfigName}
-                  </ConfigNameText>
-                  <HeaderItemActions className="header-actions-hover">
-                    <HeaderActionIconBtn
-                      onClick={handleStartEdit}
-                      aria-label="Rename configuration"
-                      data-testid="header-rename-btn"
+              <ActiveConfigNameSection
+                data-testid="header-active-config-name"
+                $isEditing={isEditing}
+                onClick={!isEditing ? handleStartEdit : undefined}
+              >
+                {isEditing ? (
+                  <ConfigNameInput
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={handleSaveEdit}
+                    onKeyDown={handleKeyDown}
+                    // eslint-disable-next-line
+                    autoFocus
+                    data-testid="header-config-name-input"
+                    aria-label="Edit configuration name"
+                  />
+                ) : (
+                  <>
+                    <ConfigNameText
+                      title="Click to rename"
+                      data-testid="header-config-name-text"
                     >
-                      <span className="material-symbols-outlined">edit</span>
-                    </HeaderActionIconBtn>
-                    <HeaderActionIconBtn
-                      onClick={handleDuplicate}
-                      aria-label="Duplicate configuration"
-                      data-testid="header-duplicate-btn"
-                    >
-                      <span className="material-symbols-outlined">
-                        content_copy
-                      </span>
-                    </HeaderActionIconBtn>
-                    <HeaderActionIconBtn
-                      onClick={handleDelete}
-                      aria-label="Delete configuration"
-                      data-testid="header-delete-btn"
-                    >
-                      <span className="material-symbols-outlined">delete</span>
-                    </HeaderActionIconBtn>
-                  </HeaderItemActions>
-                </>
-              )}
-              {isPreview && (
-                <SharedBadge data-testid="header-shared-badge">
-                  Shared
-                </SharedBadge>
-              )}
-            </ActiveConfigNameSection>
+                      {activeConfigName}
+                    </ConfigNameText>
+                    <HeaderItemActions className="header-actions-hover">
+                      <HeaderActionIconBtn
+                        onClick={handleStartEdit}
+                        aria-label="Rename configuration"
+                        data-testid="header-rename-btn"
+                      >
+                        <span className="material-symbols-outlined">edit</span>
+                      </HeaderActionIconBtn>
+                      <HeaderActionIconBtn
+                        onClick={handleDuplicate}
+                        aria-label="Duplicate configuration"
+                        data-testid="header-duplicate-btn"
+                      >
+                        <span className="material-symbols-outlined">
+                          content_copy
+                        </span>
+                      </HeaderActionIconBtn>
+                      <HeaderActionIconBtn
+                        onClick={handleDelete}
+                        aria-label="Delete configuration"
+                        data-testid="header-delete-btn"
+                      >
+                        <span className="material-symbols-outlined">
+                          delete
+                        </span>
+                      </HeaderActionIconBtn>
+                    </HeaderItemActions>
+                  </>
+                )}
+                {isPreview && (
+                  <SharedBadge data-testid="header-shared-badge">
+                    Shared
+                  </SharedBadge>
+                )}
+              </ActiveConfigNameSection>
+            </>
           )}
         </LeftContainer>
         <RightContainer>
@@ -446,14 +455,29 @@ const Header = (): JSX.Element => {
   );
 };
 
-const ActiveConfigNameSection = styled.div`
+const ActiveConfigNameSection = styled.div<{ $isEditing?: boolean }>`
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
   overflow: hidden;
+  height: 34px;
+  border-radius: 6px;
+  padding: 0 8px;
+  transition:
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out;
+  cursor: ${(props) => (props.$isEditing ? 'default' : 'pointer')};
+  border: 1px solid
+    ${(props) => (props.$isEditing ? theme.colors.accent : 'transparent')};
+  background-color: ${(props) =>
+    props.$isEditing ? theme.colors.backgroundLight : 'transparent'};
 
   &:hover {
+    background-color: ${(props) =>
+      props.$isEditing
+        ? theme.colors.backgroundLight
+        : theme.colors.buttonHover};
     .header-actions-hover {
       opacity: 1;
     }
@@ -507,17 +531,7 @@ const ConfigNameText = styled.span`
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 150px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition:
-    background-color 0.15s ease-in-out,
-    color 0.15s ease-in-out;
-
-  &:hover {
-    background-color: ${theme.colors.buttonHover};
-    color: ${theme.colors.white};
-  }
+  user-select: none;
 
   @media (max-width: 480px) {
     max-width: 80px;
@@ -525,15 +539,15 @@ const ConfigNameText = styled.span`
 `;
 
 const ConfigNameInput = styled.input`
-  background: ${theme.colors.backgroundLight};
-  border: 1px solid ${theme.colors.accent};
-  border-radius: 4px;
+  background: transparent;
+  border: none;
   color: ${theme.colors.white};
   font-size: ${theme.fontSizes.bodySmall};
   font-weight: ${theme.fontWeights.semiBold};
-  padding: 2px 6px;
+  padding: 0;
   width: 150px;
   outline: none;
+  height: 100%;
 
   @media (max-width: 480px) {
     width: 90px;
