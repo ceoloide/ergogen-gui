@@ -302,7 +302,7 @@ const pruneDeletedConfigs = () => {
 
 const formatPreviewSvg = (svgContent: unknown): string | undefined => {
   if (!svgContent) return undefined;
-  
+
   let content: string = '';
   if (typeof svgContent === 'string') {
     content = svgContent;
