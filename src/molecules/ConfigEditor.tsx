@@ -58,6 +58,7 @@ const ConfigEditor = ({
       injectionInput: string[][] | undefined,
       options?: { pointsonly: boolean }
     ) => Promise<void>,
+    activeConfigId: null as string | null,
   };
 
   const {
@@ -66,6 +67,7 @@ const ConfigEditor = ({
     setConfigInput,
     injectionInput,
     generateNow,
+    activeConfigId,
   } = configContext ?? defaults;
 
   // Create a debounced setConfigInput to avoid updating context on every keystroke
@@ -85,6 +87,11 @@ const ConfigEditor = ({
   // Sync editor value with context configInput (only when changed from outside)
   useEffect(() => {
     if (editorRef.current) {
+      // If the editor currently has focus, the changes came from user typing.
+      // Do not overwrite the editor as that resets the cursor position.
+      if (editorRef.current.hasTextFocus()) {
+        return;
+      }
       const currentVal = editorRef.current.getValue();
       if (configInput !== undefined && configInput !== currentVal) {
         editorRef.current.setValue(configInput);
@@ -138,6 +145,7 @@ const ConfigEditor = ({
   return (
     <div className={className} data-testid={dataTestId} aria-label={ariaLabel}>
       <Editor
+        key={activeConfigId || 'preview'}
         height="100%"
         defaultLanguage="yaml"
         language="yaml"
