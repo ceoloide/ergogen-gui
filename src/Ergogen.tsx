@@ -474,7 +474,9 @@ const Ergogen = () => {
    * Triggers a browser download of the current configuration as a 'config.yaml' file.
    */
   const handleDownload = () => {
-    if (configContext.configInput === undefined) {
+    const latestConfig =
+      configContext.getRealtimeConfigInput?.() ?? configContext.configInput;
+    if (latestConfig === undefined) {
       return;
     }
     trackEvent('download_button_clicked', {
@@ -482,7 +484,7 @@ const Ergogen = () => {
       file_name: 'config.yaml',
     });
     const element = document.createElement('a');
-    const file = new Blob([configContext.configInput], { type: 'text/yaml' });
+    const file = new Blob([latestConfig], { type: 'text/yaml' });
     element.href = URL.createObjectURL(file);
     element.download = 'config.yaml';
     document.body.appendChild(element);
