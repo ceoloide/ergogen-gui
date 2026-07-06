@@ -346,6 +346,15 @@ The application features a built-in Multi-Configuration Management system allowi
 3. **ZIP Exporter Utilities (`zip.ts`)**:
    - Offers background worker compilation sequences that compiles all configurations concurrently or sequentially and zips them up into a single file with custom folder structures.
 
+## Monaco Editor & Performance Optimization
+
+To prevent editing lag and cursor jumping in the Monaco editor when working with heavy configurations or on slow CPUs:
+
+- **Uncontrolled Editor Component**: The Monaco `Editor` component in `src/molecules/ConfigEditor.tsx` is configured as uncontrolled (using `defaultValue` instead of `value`). This prevents React from forcing value synchronizations on every render.
+- **Debounced Context State Updates**: Keystrokes trigger a debounced context update (500ms delay) using `lodash.debounce`. This avoids triggering heavy React tree re-renders and synchronous `localStorage` disk writes (which stringify all configurations and their SVG previews) during active typing.
+- **Focus Blur Flushing**: Any pending debounced state update is immediately flushed via `debouncedSetConfigInput.flush()` when the editor loses focus (such as when a user clicks the "Download" or "Generate" buttons), ensuring other components have the latest value immediately.
+- **Realtime Context Reference**: The context exposes `getRealtimeConfigInput` and `updateRealtimeConfigInput` to track the synchronous, real-time code buffer value via a React ref. Action handlers (like download and compile generation) prefer this realtime value over the debounced state value to ensure they always operate on the absolute latest changes.
+
 ## Future Tasks
 
 When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:
