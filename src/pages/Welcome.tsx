@@ -206,6 +206,38 @@ const ExampleName = styled.div`
   text-align: center;
 `;
 
+const ExampleSvgWrapper = styled.div`
+  width: 100%;
+  height: 150px;
+  padding: 8px;
+  box-sizing: border-box;
+  background-color: ${theme.colors.backgroundLighter};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+`;
+
+const FallbackIconContainer = styled.div`
+  width: 100%;
+  height: 150px;
+  box-sizing: border-box;
+  background-color: ${theme.colors.backgroundLighter};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${theme.colors.textDarker};
+
+  .material-symbols-outlined {
+    font-size: 4rem;
+  }
+`;
+
 // Flatten examples into a single list, excluding the "Empty" one which has a dedicated button
 const allExamples: ConfigOption[] = exampleOptions
   .flatMap((group) => group.options)
@@ -284,6 +316,33 @@ const Welcome = () => {
       setShouldNavigate(true);
     }
   };
+
+  const handleSelectSavedConfig = async (id: string) => {
+    if (configContext) {
+      const cfg = configContext.configs.find((c) => c.id === id);
+      if (cfg) {
+        configContext.selectConfig(id);
+        trackEvent('saved_config_loaded', {
+          config_name: cfg.name,
+          config_id: cfg.id,
+        });
+        await configContext.generateNow(
+          cfg.config,
+          configContext.injectionInput,
+          { pointsonly: false }
+        );
+        setShouldNavigate(true);
+      }
+    }
+  };
+
+  const savedConfigs = configContext?.configs || [];
+  const latestConfigs = [...savedConfigs]
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    )
+    .slice(0, 4);
 
   /**
    * Processes footprints (or any injections) with conflict resolution.
@@ -603,6 +662,43 @@ const Welcome = () => {
             </GitHubInputContainer>
           </OptionBox>
         </OptionsContainer>
+
+        {latestConfigs.length > 0 && (
+          <>
+            <h2
+              style={{
+                textAlign: 'center',
+                marginBottom: '2rem',
+                fontSize: theme.fontSizes.h2,
+              }}
+            >
+              Pick up where you left
+            </h2>
+            <ExamplesGrid style={{ marginBottom: '3rem' }}>
+              {latestConfigs.map((cfg) => (
+                <ExampleCard
+                  key={cfg.id}
+                  onClick={() => handleSelectSavedConfig(cfg.id)}
+                  aria-label={`Load ${cfg.name} configuration`}
+                  data-testid={`saved-config-${cfg.name.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  {cfg.previewSvg ? (
+                    <ExampleSvgWrapper
+                      dangerouslySetInnerHTML={{ __html: cfg.previewSvg }}
+                    />
+                  ) : (
+                    <FallbackIconContainer>
+                      <span className="material-symbols-outlined">
+                        keyboard_off
+                      </span>
+                    </FallbackIconContainer>
+                  )}
+                  <ExampleName>{cfg.name}</ExampleName>
+                </ExampleCard>
+              ))}
+            </ExamplesGrid>
+          </>
+        )}
 
         <h2
           style={{
