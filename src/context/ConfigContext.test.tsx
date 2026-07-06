@@ -531,4 +531,314 @@ describe('ConfigContextProvider', () => {
       expect(mockErgogenWorker.postMessage).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('multi-configuration management actions', () => {
+    it('should switch between configurations and update values correctly without cross-contamination', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Initially, there should be 0 configs on clean storage
+      expect(contextValue.configs.length).toBe(0);
+
+      // Create Config B
+      let idB: string = '';
+      act(() => {
+        idB = contextValue.createNewConfig('points: {B: {}}', 'Config B');
+      });
+
+      // Create Config C
+      let idC: string = '';
+      act(() => {
+        idC = contextValue.createNewConfig('points: {C: {}}', 'Config C');
+      });
+
+      // Verify they are added
+      expect(contextValue.configs.find((c: any) => c.id === idB)?.config).toBe(
+        'points: {B: {}}'
+      );
+      expect(contextValue.configs.find((c: any) => c.id === idC)?.config).toBe(
+        'points: {C: {}}'
+      );
+
+      // Verify metadata fields exist and match ISO 8601 UTC format
+      const configB = contextValue.configs.find((c: any) => c.id === idB);
+      expect(configB.createdAt).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+      expect(configB.updatedAt).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
+
+      // Switch to B
+      act(() => {
+        contextValue.selectConfig(idB);
+      });
+      expect(contextValue.activeConfigId).toBe(idB);
+      expect(contextValue.configInput).toBe('points: {B: {}}');
+
+      // Update B's config
+      act(() => {
+        contextValue.setConfigInput('points: {B: {updated: true}}');
+      });
+      expect(contextValue.configs.find((c: any) => c.id === idB)?.config).toBe(
+        'points: {B: {updated: true}}'
+      );
+
+      // Switch to C
+      act(() => {
+        contextValue.selectConfig(idC);
+      });
+      expect(contextValue.activeConfigId).toBe(idC);
+      expect(contextValue.configInput).toBe('points: {C: {}}');
+
+      // Verify B's config remains updated and was not overwritten by C's config
+      expect(contextValue.configs.find((c: any) => c.id === idB)?.config).toBe(
+        'points: {B: {updated: true}}'
+      );
+      expect(contextValue.configs.find((c: any) => c.id === idC)?.config).toBe(
+        'points: {C: {}}'
+      );
+
+      // Verify that renaming to the same name does not update updatedAt timestamp
+      const configBeforeRename = contextValue.configs.find(
+        (c: any) => c.id === idB
+      );
+      const originalUpdatedAt = configBeforeRename.updatedAt;
+
+      // Wait a moment so Date milliseconds would have advanced
+      act(() => {
+        contextValue.renameConfig(idB, 'Config B');
+      });
+
+      const configAfterRename = contextValue.configs.find(
+        (c: any) => c.id === idB
+      );
+      expect(configAfterRename.updatedAt).toBe(originalUpdatedAt);
+    });
+
+    it('should not allow renaming a configuration to an existing name and should set error', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      let _id1: string = '';
+      let id2: string = '';
+      act(() => {
+        _id1 = contextValue.createNewConfig('points: {}', 'Keyboard Alpha');
+        id2 = contextValue.createNewConfig('points: {}', 'Keyboard Beta');
+      });
+
+      expect(contextValue.error).toBeNull();
+
+      // Try renaming Beta to Alpha (should fail and set error)
+      let renameResult = false;
+      act(() => {
+        renameResult = contextValue.renameConfig(id2, 'Keyboard Alpha');
+      });
+
+      expect(renameResult).toBe(false);
+      expect(contextValue.error).toBe(
+        'A configuration named "Keyboard Alpha" already exists.'
+      );
+      expect(contextValue.configs.find((c: any) => c.id === id2)?.name).toBe(
+        'Keyboard Beta'
+      );
+
+      // Clear error
+      act(() => {
+        contextValue.setError(null);
+      });
+      expect(contextValue.error).toBeNull();
+
+      // Try renaming Beta to Gamma (should succeed)
+      act(() => {
+        renameResult = contextValue.renameConfig(id2, 'Keyboard Gamma');
+      });
+
+      expect(renameResult).toBe(true);
+      expect(contextValue.error).toBeNull();
+      expect(contextValue.configs.find((c: any) => c.id === id2)?.name).toBe(
+        'Keyboard Gamma'
+      );
+    });
+
+    it('should convert a preview configuration into a saved configuration when savePreviewConfig is called', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Verify initially empty
+      expect(contextValue.configs.length).toBe(0);
+      expect(contextValue.isPreview).toBe(false);
+
+      // Load preview config
+      act(() => {
+        contextValue.loadPreview('points: {A: {}}');
+      });
+
+      expect(contextValue.isPreview).toBe(true);
+      expect(contextValue.configInput).toBe('points: {A: {}}');
+      expect(contextValue.configs.length).toBe(0);
+
+      // Trigger savePreviewConfig
+      act(() => {
+        contextValue.savePreviewConfig();
+      });
+
+      // Verify it is converted
+      expect(contextValue.isPreview).toBe(false);
+      expect(contextValue.configs.length).toBe(1);
+      expect(contextValue.configs[0].name).toBe('Shared Config 1');
+      expect(contextValue.configs[0].config).toBe('points: {A: {}}');
+      expect(contextValue.activeConfigId).toBe(contextValue.configs[0].id);
+    });
+
+    it('should backup deleted configurations in ergogen:deleted-config and prune them correctly', () => {
+      let contextValue: any = null;
+
+      const TestComponent = () => {
+        contextValue = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Create a configuration to delete
+      let idToDelete: string = '';
+      act(() => {
+        idToDelete = contextValue.createNewConfig(
+          'points: {D: {}}',
+          'To Be Deleted'
+        );
+      });
+
+      // Confirm deleted storage is empty first
+      expect(localStorage.getItem('ergogen:deleted-config')).toBeNull();
+
+      // Delete the configuration
+      act(() => {
+        contextValue.deleteConfig(idToDelete);
+      });
+
+      // Verify it is backed up in local storage
+      const backupRaw = localStorage.getItem('ergogen:deleted-config');
+      expect(backupRaw).not.toBeNull();
+      const backupData = JSON.parse(backupRaw!);
+      expect(backupData.version).toBe(1);
+      expect(backupData.configs.length).toBe(1);
+      expect(backupData.configs[0].name).toBe('To Be Deleted');
+      expect(backupData.configs[0].config).toBe('points: {D: {}}');
+      expect(backupData.configs[0].deletedAt).toBeDefined();
+
+      // Test pruning 1: prune configs older than 90 days
+      const ninetyFiveDaysAgo = new Date(
+        Date.now() - 95 * 24 * 60 * 60 * 1000
+      ).toISOString();
+      const oldConfig = {
+        id: 'old-id',
+        name: 'Old Config',
+        config: 'points: {}',
+        createdAt: ninetyFiveDaysAgo,
+        updatedAt: ninetyFiveDaysAgo,
+        deletedAt: ninetyFiveDaysAgo,
+      };
+
+      const freshDeletedData = {
+        version: 1,
+        configs: [
+          backupData.configs[0], // fresh config
+          oldConfig, // 95 days old config
+        ],
+      };
+      localStorage.setItem(
+        'ergogen:deleted-config',
+        JSON.stringify(freshDeletedData)
+      );
+
+      // Trigger pruning
+      act(() => {
+        contextValue.pruneDeletedConfigs();
+      });
+
+      // Verify the old config is pruned, leaving only the fresh one
+      const backupAfterPruningRaw1 = localStorage.getItem(
+        'ergogen:deleted-config'
+      );
+      const backupAfterPruningData1 = JSON.parse(backupAfterPruningRaw1!);
+      expect(backupAfterPruningData1.configs.length).toBe(1);
+      expect(backupAfterPruningData1.configs[0].id).toBe(idToDelete);
+
+      // Test pruning 2: limit to 100 configs, removing the oldest by modified date (updatedAt) first
+      const largeConfigsList: any[] = [];
+      // Let's create 105 configs
+      for (let i = 0; i < 105; i++) {
+        // Increment updatedAt date by i hours to establish a clear chronological order
+        const date = new Date(
+          Date.now() - (105 - i) * 60 * 60 * 1000
+        ).toISOString();
+        largeConfigsList.push({
+          id: `id-${i}`,
+          name: `Config ${i}`,
+          config: 'points: {}',
+          createdAt: date,
+          updatedAt: date,
+          deletedAt: new Date().toISOString(), // deletedAt is fresh so they won't be pruned by the 90 days filter
+        });
+      }
+
+      localStorage.setItem(
+        'ergogen:deleted-config',
+        JSON.stringify({ version: 1, configs: largeConfigsList })
+      );
+
+      // Trigger pruning
+      act(() => {
+        contextValue.pruneDeletedConfigs();
+      });
+
+      // Verify only 100 configs remain, and the 5 oldest ones (indices 0 to 4) were deleted
+      const backupAfterPruningRaw2 = localStorage.getItem(
+        'ergogen:deleted-config'
+      );
+      const backupAfterPruningData2 = JSON.parse(backupAfterPruningRaw2!);
+      expect(backupAfterPruningData2.configs.length).toBe(100);
+
+      // The oldest remaining should be index 5, meaning `Config 5`
+      expect(backupAfterPruningData2.configs[0].name).toBe('Config 5');
+      // The newest remaining should be `Config 104`
+      expect(backupAfterPruningData2.configs[99].name).toBe('Config 104');
+    });
+  });
 });

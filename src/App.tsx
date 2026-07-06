@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useLocalStorage } from 'react-use';
 import styled from 'styled-components';
 
 import Ergogen from './Ergogen';
@@ -13,10 +12,10 @@ import {
   ConfigContextProvider,
   useConfigContext,
 } from './context/ConfigContext';
-import { CONFIG_LOCAL_STORAGE_KEY } from './context/constants';
 import { getConfigFromHash } from './utils/share';
 import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
+import BulkDownloadDialog from './molecules/BulkDownloadDialog';
 
 // Module-level variable to persist hash result across React StrictMode remounts
 // React StrictMode in dev mode intentionally remounts components, which resets refs
@@ -35,7 +34,6 @@ const App = () => {
   }
   const hashResult = cachedHashResult;
 
-  let initialConfig = '';
   const initialInjectionInput: string[][] = [];
   let hashError: string | null = null;
 
@@ -57,22 +55,6 @@ const App = () => {
           config: sharedConfig.config,
           injections: sharedConfig.injections,
         };
-      }
-
-      // Check if we have injections that might conflict
-      const hasInjections =
-        sharedConfig.injections && sharedConfig.injections.length > 0;
-
-      if (!hasInjections) {
-        // No injections, safe to load config immediately
-        initialConfig = sharedConfig.config;
-        localStorage.setItem(
-          CONFIG_LOCAL_STORAGE_KEY,
-          JSON.stringify(initialConfig)
-        );
-      } else {
-        // We have injections. Defer loading the new config until conflicts are resolved.
-        // We will fall through to load the *existing* config from local storage for now.
       }
 
       // Clear the hash fragment after reading it
@@ -98,58 +80,6 @@ const App = () => {
     }
   }
 
-  // Load from local storage if:
-  // 1. No hash result provided
-  // 2. Hash result was successful but had injections (deferred loading)
-  // 3. Hash result failed (we might want to show empty, but let's stick to original behavior of NOT loading local if hash failed?
-  //    Actually, original behavior was: if (hashResult) { ... } else { load local }.
-  //    So if hash failed, it did NOT load local. initialConfig remained ''.
-  const shouldLoadFromLocalStorage =
-    !hashResult ||
-    !hashResult.success ||
-    (hashResult.success &&
-      hashResult.config.injections &&
-      hashResult.config.injections.length > 0);
-
-  if (shouldLoadFromLocalStorage) {
-    // Since we changed the local storage key for the Ergogen config, we need to always check for the legacy key first and migrate it if it exists.
-    // This migration code can be removed in a future release once we are confident most users have migrated.
-    const legacyStoredConfigValue = localStorage.getItem(
-      'LOCAL_STORAGE_CONFIG'
-    );
-    const legacyInitialConfig = legacyStoredConfigValue
-      ? JSON.parse(legacyStoredConfigValue)
-      : '';
-    if (legacyInitialConfig) {
-      // The user has a legacy configuration we need to import once, overriding the current initialConfig and then removing the legacy local storage key and value.
-      localStorage.removeItem('LOCAL_STORAGE_CONFIG');
-      localStorage.setItem(
-        CONFIG_LOCAL_STORAGE_KEY,
-        JSON.stringify(legacyInitialConfig)
-      );
-      if (window.gtag) {
-        window.gtag('event', 'legacy_config_migrated', {
-          event_category: 'config',
-        });
-      }
-    }
-
-    const storedConfigValue = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
-    // Only overwrite initialConfig if we found something (it might be '' if hash failed)
-    // Actually, if shouldLoadFromLocalStorage is true, initialConfig is currently '' (default).
-    if (storedConfigValue) {
-      initialConfig = JSON.parse(storedConfigValue);
-    }
-  }
-
-  // The useLocalStorage hook now manages the config state in the App component.
-  // This ensures that any component that updates the config will trigger a re-render here,
-  // which in turn makes the routing logic reactive.
-  const [configInput, setConfigInput] = useLocalStorage<string>(
-    CONFIG_LOCAL_STORAGE_KEY,
-    initialConfig
-  );
-
   // Convert ref to state so it can be passed as a prop and trigger re-renders
   const [pendingSharedConfig, setPendingSharedConfig] = useState<{
     config: string;
@@ -165,10 +95,7 @@ const App = () => {
   }, []); // Only run once on mount
 
   return (
-    // Pass the state and the setter function down to the context provider.
     <ConfigContextProvider
-      configInput={configInput}
-      setConfigInput={setConfigInput}
       initialInjectionInput={initialInjectionInput}
       hashError={hashError}
     >
@@ -209,7 +136,7 @@ const AppContent = ({
   } = useInjectionConflictResolution({
     setInjectionInput: (injections) =>
       configContext?.setInjectionInput(injections),
-    setConfigInput: (config) => configContext?.setConfigInput(config),
+    setConfigInput: (config) => configContext?.loadPreview(config),
     generateNow: async (config, injections, options) => {
       if (configContext) {
         await configContext.generateNow(config, injections, options);
@@ -219,8 +146,7 @@ const AppContent = ({
     onComplete: async (config, injections) => {
       // Store merged result in localStorage to persist
       localStorage.setItem('ergogen:injection', JSON.stringify(injections));
-      // Store config in localStorage
-      localStorage.setItem(CONFIG_LOCAL_STORAGE_KEY, JSON.stringify(config));
+      configContext?.loadPreview(config);
     },
     setError: (error) => configContext?.setError(error),
   });
@@ -270,10 +196,8 @@ const AppContent = ({
         );
       });
     } else {
-      // No injections to process, just set config and generate
-      // This handles the case where we loaded the config immediately in the parent component
-      // but we still need to ensure the context is updated and generation runs.
-      configContext.setConfigInput(pendingSharedConfig.config);
+      // No injections to process, just set config in preview state and generate
+      configContext.loadPreview(pendingSharedConfig.config);
       configContext.generateNow(
         pendingSharedConfig.config,
         configContext.injectionInput,
@@ -322,13 +246,8 @@ const AppContent = ({
             );
           });
         } else {
-          // No injections, safe to update config immediately
-          configContext.setConfigInput(sharedConfig.config);
-          // Store config in localStorage
-          localStorage.setItem(
-            CONFIG_LOCAL_STORAGE_KEY,
-            JSON.stringify(sharedConfig.config)
-          );
+          // No injections, safe to update config immediately in preview state
+          configContext.loadPreview(sharedConfig.config);
 
           // No injections to process, just generate
           configContext.generateNow(
@@ -383,6 +302,17 @@ const AppContent = ({
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
           data-testid="conflict-resolution-dialog"
+        />
+      )}
+      {configContext?.isBulkDownloadOpen && (
+        <BulkDownloadDialog
+          isOpen={configContext.isBulkDownloadOpen}
+          configs={configContext.configs}
+          injections={configContext.injectionInput}
+          debug={configContext.debug}
+          stlPreview={configContext.stlPreview}
+          onClose={() => configContext.setIsBulkDownloadOpen(false)}
+          data-testid="bulk-download-dialog"
         />
       )}
       <Header />

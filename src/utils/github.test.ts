@@ -17,7 +17,9 @@ describe('github utilities', () => {
       mockFetch.mockResolvedValueOnce(new Response('', { status: 404 }));
 
       // Mock config.yaml fetch from ergogen folder (success)
-      mockFetch.mockResolvedValueOnce(new Response('points: {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
 
       // Mock footprints directory (empty)
       mockFetch.mockImplementationOnce(() =>
@@ -39,28 +41,34 @@ describe('github utilities', () => {
       );
 
       // Mock .gitmodules fetch
-      mockFetch.mockResolvedValueOnce(new Response(
-        '[submodule "ergogen/footprints/ceoloide"]\n' +
-          '\tpath = ergogen/footprints/ceoloide\n' +
-          '\turl = https://github.com/ceoloide/ergogen-footprints.git',
-        { status: 200 }
-      ));
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          '[submodule "ergogen/footprints/ceoloide"]\n' +
+            '\tpath = ergogen/footprints/ceoloide\n' +
+            '\turl = https://github.com/ceoloide/ergogen-footprints.git',
+          { status: 200 }
+        )
+      );
 
       // Mock submodule repo contents (main branch)
-      mockFetch.mockResolvedValueOnce(new Response(
-        JSON.stringify([
-          {
-            type: 'file',
-            name: 'test_footprint.js',
-            download_url:
-              'https://raw.githubusercontent.com/ceoloide/ergogen-footprints/main/test_footprint.js',
-          },
-        ]),
-        { status: 200 }
-      ));
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              type: 'file',
+              name: 'test_footprint.js',
+              download_url:
+                'https://raw.githubusercontent.com/ceoloide/ergogen-footprints/main/test_footprint.js',
+            },
+          ]),
+          { status: 200 }
+        )
+      );
 
       // Mock footprint file content
-      mockFetch.mockResolvedValueOnce(new Response('module.exports = {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('module.exports = {}', { status: 200 })
+      );
 
       // Act
       const result = await fetchConfigFromUrl('ceoloide/test-repo');
@@ -77,7 +85,9 @@ describe('github utilities', () => {
       const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
-      mockFetch.mockResolvedValueOnce(new Response('points: {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
 
       // Mock footprints directory (empty)
       mockFetch.mockImplementationOnce(() =>
@@ -99,40 +109,48 @@ describe('github utilities', () => {
       );
 
       // Mock .gitmodules fetch
-      mockFetch.mockResolvedValueOnce(new Response(
-        '[submodule "footprints/external"]\n' +
-          '\tpath = footprints/external\n' +
-          '\turl = https://github.com/test/footprints.git',
-        { status: 200 }
-      ));
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          '[submodule "footprints/external"]\n' +
+            '\tpath = footprints/external\n' +
+            '\turl = https://github.com/test/footprints.git',
+          { status: 200 }
+        )
+      );
 
       // Mock submodule repo root contents
-      mockFetch.mockResolvedValueOnce(new Response(
-        JSON.stringify([
-          {
-            type: 'dir',
-            name: 'switches',
-            url: 'https://api.github.com/repos/test/footprints/contents/switches',
-          },
-        ]),
-        { status: 200 }
-      ));
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              type: 'dir',
+              name: 'switches',
+              url: 'https://api.github.com/repos/test/footprints/contents/switches',
+            },
+          ]),
+          { status: 200 }
+        )
+      );
 
       // Mock submodule subdirectory contents
-      mockFetch.mockResolvedValueOnce(new Response(
-        JSON.stringify([
-          {
-            type: 'file',
-            name: 'mx.js',
-            download_url:
-              'https://raw.githubusercontent.com/test/footprints/main/switches/mx.js',
-          },
-        ]),
-        { status: 200 }
-      ));
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              type: 'file',
+              name: 'mx.js',
+              download_url:
+                'https://raw.githubusercontent.com/test/footprints/main/switches/mx.js',
+            },
+          ]),
+          { status: 200 }
+        )
+      );
 
       // Mock footprint file content
-      mockFetch.mockResolvedValueOnce(new Response('module.exports = {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('module.exports = {}', { status: 200 })
+      );
 
       // Act
       const result = await fetchConfigFromUrl('test/repo');
@@ -147,7 +165,9 @@ describe('github utilities', () => {
       const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
-      mockFetch.mockResolvedValueOnce(new Response('points: {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
 
       // Mock footprints directory (empty)
       mockFetch.mockImplementationOnce(() =>
@@ -169,12 +189,14 @@ describe('github utilities', () => {
       );
 
       // Mock .gitmodules fetch with non-footprint submodule
-      mockFetch.mockResolvedValueOnce(new Response(
-        '[submodule "docs"]\n' +
-          '\tpath = docs\n' +
-          '\turl = https://github.com/test/docs.git',
-        { status: 200 }
-      ));
+      mockFetch.mockResolvedValueOnce(
+        new Response(
+          '[submodule "docs"]\n' +
+            '\tpath = docs\n' +
+            '\turl = https://github.com/test/docs.git',
+          { status: 200 }
+        )
+      );
 
       // Act
       const result = await fetchConfigFromUrl('test/repo');
@@ -188,7 +210,9 @@ describe('github utilities', () => {
       const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
-      mockFetch.mockResolvedValueOnce(new Response('points: {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
 
       // Mock footprints directory (empty)
       mockFetch.mockImplementationOnce(() =>
@@ -222,8 +246,10 @@ describe('github utilities', () => {
   });
 
   describe('checkRateLimit', () => {
-    const rawUrl = 'https://raw.githubusercontent.com/user/repo/main/config.yaml';
-    const apiUrl = 'https://api.github.com/repos/user/repo/contents/config.yaml';
+    const rawUrl =
+      'https://raw.githubusercontent.com/user/repo/main/config.yaml';
+    const apiUrl =
+      'https://api.github.com/repos/user/repo/contents/config.yaml';
 
     it('should identify rate limit exceeded for raw content (HTTP 429)', () => {
       const response = new Response(null, { status: 429 });
@@ -239,12 +265,14 @@ describe('github utilities', () => {
           'X-RateLimit-Limit': '60',
           'X-RateLimit-Remaining': '0',
           'X-RateLimit-Used': '60',
-          'X-RateLimit-Reset': '1234567890'
-        }
+          'X-RateLimit-Reset': '1234567890',
+        },
       });
       const result = checkRateLimit(response, apiUrl);
       expect(result.isLimitExceeded).toBe(true);
-      expect(result.error).toContain("You've used your hourly request allowance");
+      expect(result.error).toContain(
+        "You've used your hourly request allowance"
+      );
     });
 
     it('should identify approaching rate limit for API (80% used)', () => {
@@ -254,12 +282,14 @@ describe('github utilities', () => {
           'X-RateLimit-Limit': '100',
           'X-RateLimit-Remaining': '20',
           'X-RateLimit-Used': '80',
-          'X-RateLimit-Reset': '1234567890'
-        }
+          'X-RateLimit-Reset': '1234567890',
+        },
       });
       const result = checkRateLimit(response, apiUrl);
       expect(result.isLimitExceeded).toBe(false);
-      expect(result.error).toContain('Loading from GitHub may become unavailable soon');
+      expect(result.error).toContain(
+        'Loading from GitHub may become unavailable soon'
+      );
     });
 
     it('should handle missing headers gracefully', () => {
@@ -279,7 +309,9 @@ describe('github utilities', () => {
       mockFetch.mockResolvedValue(new Response(null, { status: 429 }));
 
       // Act & Assert
-      await expect(fetchConfigFromUrl('test/repo')).rejects.toThrow(/You've reached your hourly request allowance/);
+      await expect(fetchConfigFromUrl('test/repo')).rejects.toThrow(
+        /You've reached your hourly request allowance/
+      );
     });
 
     it('should return rate limit warning when approaching limit', async () => {
@@ -287,25 +319,31 @@ describe('github utilities', () => {
       const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
       // Default mock for any API call: return 404 with warning headers
-      mockFetch.mockResolvedValue(new Response('[]', {
-        status: 404,
-        headers: {
-          'X-RateLimit-Limit': '100',
-          'X-RateLimit-Remaining': '20',
-          'X-RateLimit-Used': '80',
-          'X-RateLimit-Reset': '1234567890'
-        }
-      }));
+      mockFetch.mockResolvedValue(
+        new Response('[]', {
+          status: 404,
+          headers: {
+            'X-RateLimit-Limit': '100',
+            'X-RateLimit-Remaining': '20',
+            'X-RateLimit-Used': '80',
+            'X-RateLimit-Reset': '1234567890',
+          },
+        })
+      );
 
       // Specifically return config for the first call (main branch root config, raw URL)
-      mockFetch.mockResolvedValueOnce(new Response('points: {}', { status: 200 }));
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
 
       // Act
       const result = await fetchConfigFromUrl('test/repo');
 
       // Assert
       expect(result.config).toBe('points: {}');
-      expect(result.rateLimitWarning).toContain('Loading from GitHub may become unavailable soon');
+      expect(result.rateLimitWarning).toContain(
+        'Loading from GitHub may become unavailable soon'
+      );
     });
   });
 });

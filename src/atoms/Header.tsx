@@ -78,7 +78,7 @@ const VersionText = styled.a`
   color: ${theme.colors.accent};
   text-decoration: none;
   align-items: center;
-  @media (max-width: 350px) {
+  @media (max-width: 767px) {
     display: none;
   }
 `;
@@ -169,8 +169,78 @@ const Header = (): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const {
+    activeConfigId,
+    activeConfigName,
+    configs,
+    isPreview,
+    renameConfig,
+    duplicateConfig,
+    deleteConfig,
+    savePreviewConfig,
+  } = configContext || {};
+
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareLink, setShareLink] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const handleStartEdit = () => {
+    if (activeConfigName && activeConfigId) {
+      setEditValue(activeConfigName);
+      setIsEditing(true);
+    }
+  };
+
+  const handleSaveEdit = (e?: React.MouseEvent | React.FocusEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (renameConfig && activeConfigId && editValue.trim()) {
+      const success = renameConfig(activeConfigId, editValue.trim());
+      if (!success) {
+        return;
+      }
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+    }
+  };
+
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (duplicateConfig && activeConfigId) {
+      duplicateConfig(activeConfigId);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeConfigId && activeConfigName && deleteConfig) {
+      if (
+        window.confirm(`Are you sure you want to delete "${activeConfigName}"?`)
+      ) {
+        deleteConfig(activeConfigId);
+        const isLastConfig = configs && configs.length <= 1;
+        if (isLastConfig || activeConfigId) {
+          navigate('/new');
+        }
+      }
+    }
+  };
 
   /**
    * Toggles the visibility of the settings panel.
@@ -181,6 +251,7 @@ const Header = (): JSX.Element => {
 
   const handleNewClick = () => {
     configContext?.setShowSettings(false);
+    configContext?.selectConfig(null);
     navigate('/new');
   };
 
@@ -280,6 +351,113 @@ const Header = (): JSX.Element => {
               {versionInfo.label}
             </VersionText>
           </ErgogenLogo>
+          {activeConfigName && (
+            <>
+              <ConfigDivider>/</ConfigDivider>
+              <ActiveConfigNameSection
+                data-testid="header-active-config-name"
+                $isEditing={isEditing}
+                onClick={!isEditing && !isPreview ? handleStartEdit : undefined}
+              >
+                {isPreview && (
+                  <SharedLinkIcon data-testid="header-shared-icon">
+                    <span className="material-symbols-outlined">link</span>
+                  </SharedLinkIcon>
+                )}
+                {isEditing ? (
+                  <>
+                    <ConfigNameInput
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleSaveEdit}
+                      onKeyDown={handleKeyDown}
+                      // eslint-disable-next-line
+                      autoFocus
+                      data-testid="header-config-name-input"
+                      aria-label="Edit configuration name"
+                    />
+                    <HeaderItemActions className="header-actions-always-visible">
+                      <HeaderActionIconBtn
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                        }}
+                        onClick={handleSaveEdit}
+                        aria-label="Confirm rename"
+                        data-testid="header-confirm-rename-btn"
+                      >
+                        <span className="material-symbols-outlined">check</span>
+                      </HeaderActionIconBtn>
+                      <HeaderActionIconBtn
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                        }}
+                        onClick={handleCancelEdit}
+                        aria-label="Cancel rename"
+                        data-testid="header-cancel-rename-btn"
+                      >
+                        <span className="material-symbols-outlined">close</span>
+                      </HeaderActionIconBtn>
+                    </HeaderItemActions>
+                  </>
+                ) : isPreview ? (
+                  <>
+                    <ConfigNameText data-testid="header-config-name-text">
+                      {activeConfigName}
+                    </ConfigNameText>
+                    <HeaderItemActions className="header-actions-always-visible">
+                      <HeaderActionIconBtn
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          savePreviewConfig?.();
+                        }}
+                        aria-label="Save preview configuration"
+                        data-testid="header-save-preview-btn"
+                      >
+                        <span className="material-symbols-outlined">save</span>
+                      </HeaderActionIconBtn>
+                    </HeaderItemActions>
+                  </>
+                ) : (
+                  <>
+                    <ConfigNameText
+                      title="Click to rename"
+                      data-testid="header-config-name-text"
+                    >
+                      {activeConfigName}
+                    </ConfigNameText>
+                    <HeaderItemActions className="header-actions-hover">
+                      <HeaderActionIconBtn
+                        onClick={handleStartEdit}
+                        aria-label="Rename configuration"
+                        data-testid="header-rename-btn"
+                      >
+                        <span className="material-symbols-outlined">edit</span>
+                      </HeaderActionIconBtn>
+                      <HeaderActionIconBtn
+                        onClick={handleDuplicate}
+                        aria-label="Duplicate configuration"
+                        data-testid="header-duplicate-btn"
+                      >
+                        <span className="material-symbols-outlined">
+                          content_copy
+                        </span>
+                      </HeaderActionIconBtn>
+                      <HeaderActionIconBtn
+                        onClick={handleDelete}
+                        aria-label="Delete configuration"
+                        data-testid="header-delete-btn"
+                      >
+                        <span className="material-symbols-outlined">
+                          delete
+                        </span>
+                      </HeaderActionIconBtn>
+                    </HeaderItemActions>
+                  </>
+                )}
+              </ActiveConfigNameSection>
+            </>
+          )}
         </LeftContainer>
         <RightContainer>
           {location.pathname === '/' && (
@@ -333,5 +511,124 @@ const Header = (): JSX.Element => {
     </>
   );
 };
+
+const ActiveConfigNameSection = styled.div<{ $isEditing?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  height: 34px;
+  border-radius: 6px;
+  padding: 0 8px;
+  transition:
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out;
+  cursor: ${(props) => (props.$isEditing ? 'default' : 'pointer')};
+  border: 1px solid
+    ${(props) => (props.$isEditing ? theme.colors.accent : 'transparent')};
+  background-color: ${(props) =>
+    props.$isEditing ? theme.colors.backgroundLight : 'transparent'};
+  width: 220px;
+  box-sizing: border-box;
+
+  &:hover {
+    background-color: ${(props) =>
+      props.$isEditing
+        ? theme.colors.backgroundLight
+        : theme.colors.buttonHover};
+    .header-actions-hover {
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 767px) {
+    width: 160px;
+  }
+`;
+
+const HeaderItemActions = styled.div`
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+  margin-left: 4px;
+
+  &.header-actions-always-visible {
+    opacity: 1;
+  }
+
+  @media (max-width: 1023px) {
+    opacity: 1;
+  }
+`;
+
+const HeaderActionIconBtn = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .material-symbols-outlined {
+    font-size: 16px !important;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+    color: ${theme.colors.white};
+  }
+`;
+
+const ConfigDivider = styled.span`
+  color: ${theme.colors.textDark};
+  font-size: ${theme.fontSizes.sm};
+  font-weight: ${theme.fontWeights.semiBold};
+  user-select: none;
+`;
+
+const ConfigNameText = styled.span`
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
+  color: ${theme.colors.text};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  user-select: none;
+`;
+
+const ConfigNameInput = styled.input`
+  background: transparent;
+  border: none;
+  color: ${theme.colors.white};
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
+  padding: 0;
+  flex: 1;
+  outline: none;
+  height: 100%;
+  min-width: 0;
+`;
+
+const SharedLinkIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: ${theme.colors.accent};
+  color: ${theme.colors.white};
+  padding: 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  user-select: none;
+
+  .material-symbols-outlined {
+    font-size: 16px !important;
+  }
+`;
 
 export default Header;

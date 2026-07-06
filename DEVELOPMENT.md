@@ -328,6 +328,22 @@ To allow developers and CI to override the default Ergogen version using the `ER
    - Executes after dependencies are successfully installed.
    - If `packages.json.bak` exists, it restores the original `package.json` and deletes the backup file, ensuring that the workspace remains clean and no modified `package.json` is committed.
 
+## Multi-Configuration Management
+
+The application features a built-in Multi-Configuration Management system allowing users to work on multiple YAML/JSON configurations, switch between them instantly, search their lists, rename, duplicate, and delete configurations.
+
+### Key Architecture Components
+
+1. **State & Actions Context (`ConfigContext.tsx`)**:
+   - Manages active configuration ID (`activeConfigId`), active configuration name (`activeConfigName`), list of saved configurations (`configs`), and a temporary read-only state for URL-shared previews (`isPreview`).
+   - Syncs active config code content (`configInput`) to whichever saved configuration is currently active, auto-saving it dynamically to `localStorage`.
+   - Offers helpers like `createNewConfig`, `deleteConfig`, `duplicateConfig`, `renameConfig`, `selectConfig`, and `exportAllConfigs`.
+2. **Persistence (`constants.ts`)**:
+   - Key name: `ergogen:multi-config` maps to a JSON container following the `MultiConfigContainer` scheme.
+   - Automatically migrates legacy configurations (saved on `LOCAL_STORAGE_CONFIG` or `ergogen:config` key) on startup.
+3. **ZIP Exporter Utilities (`zip.ts`)**:
+   - Offers background worker compilation sequences that compiles all configurations concurrently or sequentially and zips them up into a single file with custom folder structures.
+
 ## Future Tasks
 
 When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:
@@ -453,3 +469,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 3. Consider creating an abstraction layer that handles the common flow: extract -> validate -> resolve conflicts -> merge
 4. Ensure both loading methods use the same validation and error handling patterns
 5. Update tests to verify both paths work consistently
+
+### [TASK-013] Optimize Bulk Export with Concurrent Worker Pools
+
+**Context:** The "Export All" functionality compiles configurations sequentially using the background Ergogen worker. While this works perfectly and keeps the UI responsive, compiling many configurations sequentially can be slow for users with large collections.
+
+**Task:** Refactor the bulk export compiler in `src/utils/zip.ts` to support concurrent compilation pools. Instead of awaiting compilations one-by-one, spawn up to `navigator.hardwareConcurrency || 4` workers to compile configurations concurrently. Ensure the UI export progress bar dynamically calculates overall completion status and handles worker failures gracefully.

@@ -250,6 +250,11 @@ const Welcome = () => {
     }
   }, [shouldNavigate, configContext?.configInput, navigate]);
 
+  // Prune deleted configs on mount
+  useEffect(() => {
+    configContext?.pruneDeletedConfigs?.();
+  }, [configContext]);
+
   const handleSelectExample = async (configValue: string) => {
     if (configContext) {
       // Determine if this is the empty config
@@ -270,7 +275,7 @@ const Welcome = () => {
         example_name: exampleName,
         is_empty: isEmptyConfig,
       });
-      configContext.setConfigInput(configValue);
+      configContext.createNewConfig(configValue);
       await configContext.generateNow(
         configValue,
         configContext.injectionInput,
@@ -357,6 +362,7 @@ const Welcome = () => {
           }
 
           try {
+            configContext.createNewConfig(result.config);
             // Process footprints with conflict resolution
             await processInjections(
               result.footprints,
@@ -412,6 +418,7 @@ const Welcome = () => {
     try {
       const result = await loadLocalFile(file);
 
+      configContext.createNewConfig(result.config);
       // Process footprints with conflict resolution
       await processInjections(
         result.footprints,

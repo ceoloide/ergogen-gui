@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { getErgogenVersionInfo } from '../utils/version';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
+import { useConfigContext } from '../context/ConfigContext';
 
 /**
  * Props for the SideNavigation component.
@@ -31,6 +32,112 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   const startXRef = useRef(0);
   const startWidthRef = useRef(320);
 
+  const configContext = useConfigContext();
+  const navigate = useNavigate();
+
+  const {
+    configs,
+    activeConfigId,
+    selectConfig,
+    renameConfig,
+    duplicateConfig,
+    deleteConfig,
+    setIsBulkDownloadOpen,
+  } = configContext || {};
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const filteredConfigs = useMemo(() => {
+    if (!configs) return [];
+
+    let result = configs;
+    if (searchQuery.trim()) {
+      const terms = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      if (terms.length > 0) {
+        result = configs.filter((cfg) => {
+          const nameLower = cfg.name.toLowerCase();
+          return terms.some((term) => nameLower.includes(term));
+        });
+      }
+    }
+
+    return [...result].sort((a, b) => {
+      const timeAMod = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const timeBMod = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      if (timeAMod !== timeBMod) {
+        return timeBMod - timeAMod;
+      }
+
+      const timeACre = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeBCre = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeACre !== timeBCre) {
+        return timeBCre - timeACre;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [configs, searchQuery]);
+
+  const handleNewConfig = () => {
+    if (selectConfig) {
+      selectConfig(null);
+    }
+    navigate('/new');
+    onClose();
+  };
+
+  const handleDownloadAll = () => {
+    if (setIsBulkDownloadOpen) {
+      setIsBulkDownloadOpen(true);
+    }
+    onClose();
+  };
+
+  const handleSelectConfig = (id: string) => {
+    if (selectConfig) {
+      selectConfig(id);
+      navigate('/');
+      onClose();
+    }
+  };
+
+  const handleStartRename = (id: string, currentName: string) => {
+    setRenamingId(id);
+    setRenameValue(currentName);
+  };
+
+  const handleRenameSubmit = (id: string) => {
+    if (renameConfig && renameValue.trim()) {
+      const success = renameConfig(id, renameValue.trim());
+      if (!success) {
+        return;
+      }
+    }
+    setRenamingId(null);
+  };
+
+  const handleDuplicateConfig = (id: string) => {
+    if (duplicateConfig) {
+      duplicateConfig(id);
+    }
+  };
+
+  const handleDeleteConfig = (id: string, name: string) => {
+    if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
+      if (deleteConfig) {
+        deleteConfig(id);
+        const isDeletingActive = activeConfigId === id;
+        const isLastConfig = configs && configs.length <= 1;
+        if (isDeletingActive || isLastConfig) {
+          navigate('/new');
+          onClose();
+        }
+      }
+    }
+  };
+
   // Track whether we're opening or closing for animation speed
   useEffect(() => {
     const wasOpen = prevIsOpenRef.current;
@@ -40,6 +147,9 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
     } else if (!isOpen && wasOpen) {
       // Closing: was open, now closed
       setIsOpening(false);
+    }
+    if (!isOpen) {
+      setRenamingId(null);
     }
     prevIsOpenRef.current = isOpen;
   }, [isOpen]);
@@ -198,7 +308,136 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             <span className="material-symbols-outlined">close</span>
           </CloseButton>
         </Header>
-        <Content>{/* Content area - can be expanded in the future */}</Content>
+        <Content>
+          <ActionBar>
+            <NewConfigButton
+              onClick={handleNewConfig}
+              aria-label="New"
+              data-testid="side-nav-new-config-button"
+            >
+              <span className="material-symbols-outlined">add</span>
+              <span>New</span>
+            </NewConfigButton>
+            {configs && configs.length > 0 && (
+              <DownloadAllButton
+                onClick={handleDownloadAll}
+                aria-label="Download All"
+                data-testid="side-nav-download-all-button"
+              >
+                <span className="material-symbols-outlined">download</span>
+                <span>Download All</span>
+              </DownloadAllButton>
+            )}
+          </ActionBar>
+
+          <SearchWrapper>
+            <span className="material-symbols-outlined search-icon">
+              search
+            </span>
+            <SearchInput
+              type="text"
+              placeholder="Search configurations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search configurations"
+            />
+            {searchQuery && (
+              <ClearSearchButton onClick={() => setSearchQuery('')}>
+                <span className="material-symbols-outlined">close</span>
+              </ClearSearchButton>
+            )}
+          </SearchWrapper>
+
+          <ConfigListHeader>
+            <span>Saved Configurations</span>
+            <Badge>{filteredConfigs.length}</Badge>
+          </ConfigListHeader>
+
+          <ConfigList>
+            {filteredConfigs.map((cfg) => {
+              const isActive = cfg.id === activeConfigId;
+              const isRenaming = renamingId === cfg.id;
+
+              return (
+                <ConfigItem
+                  key={cfg.id}
+                  $isActive={isActive}
+                  data-testid={`config-item-${cfg.id}`}
+                >
+                  {isRenaming ? (
+                    <RenameForm
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleRenameSubmit(cfg.id);
+                      }}
+                    >
+                      <RenameInput
+                        type="text"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        // eslint-disable-next-line
+                        autoFocus
+                        aria-label="Rename input"
+                      />
+                      <RenameActionBtn type="submit" aria-label="Save name">
+                        <span className="material-symbols-outlined">check</span>
+                      </RenameActionBtn>
+                      <RenameActionBtn
+                        type="button"
+                        onClick={() => setRenamingId(null)}
+                        aria-label="Cancel rename"
+                      >
+                        <span className="material-symbols-outlined">close</span>
+                      </RenameActionBtn>
+                    </RenameForm>
+                  ) : (
+                    <>
+                      <ConfigNameButton
+                        onClick={() => handleSelectConfig(cfg.id)}
+                        $isActive={isActive}
+                        title={cfg.name}
+                      >
+                        <span className="material-symbols-outlined">
+                          description
+                        </span>
+                        <span className="config-title-text">{cfg.name}</span>
+                      </ConfigNameButton>
+                      <ItemActions $isActive={isActive}>
+                        <ActionIconBtn
+                          onClick={() => handleStartRename(cfg.id, cfg.name)}
+                          aria-label={`Rename configuration ${cfg.name}`}
+                        >
+                          <span className="material-symbols-outlined">
+                            edit
+                          </span>
+                        </ActionIconBtn>
+                        <ActionIconBtn
+                          onClick={() => handleDuplicateConfig(cfg.id)}
+                          aria-label={`Duplicate configuration ${cfg.name}`}
+                        >
+                          <span className="material-symbols-outlined">
+                            content_copy
+                          </span>
+                        </ActionIconBtn>
+                        <ActionIconBtn
+                          onClick={() => handleDeleteConfig(cfg.id, cfg.name)}
+                          aria-label={`Delete configuration ${cfg.name}`}
+                        >
+                          <span className="material-symbols-outlined">
+                            delete
+                          </span>
+                        </ActionIconBtn>
+                      </ItemActions>
+                    </>
+                  )}
+                </ConfigItem>
+              );
+            })}
+            {filteredConfigs.length === 0 && (
+              <EmptyState>No configurations found</EmptyState>
+            )}
+          </ConfigList>
+        </Content>
         <Footer>
           <ButtonGroup>
             <OutlineButton
@@ -365,6 +604,293 @@ const Content = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
+`;
+
+const ActionBar = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+`;
+
+const NewConfigButton = styled.button`
+  flex: 1;
+  background-color: ${theme.colors.accent};
+  color: ${theme.colors.white};
+  border: none;
+  border-radius: 6px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.regular};
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+  padding: 0 6px;
+
+  .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.accentDark};
+  }
+`;
+
+const DownloadAllButton = styled.button`
+  flex: 1;
+  background-color: transparent;
+  color: ${theme.colors.white};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.regular};
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+  padding: 0 6px;
+
+  .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+  }
+`;
+
+const SearchWrapper = styled.div`
+  position: relative;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+
+  .search-icon {
+    position: absolute;
+    left: 8px;
+    color: ${theme.colors.textDark};
+    pointer-events: none;
+    font-size: 18px;
+  }
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  background-color: ${theme.colors.backgroundLighter};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  height: 36px;
+  padding: 0 34px;
+  color: ${theme.colors.white};
+  font-size: ${theme.fontSizes.bodySmall};
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.accent};
+  }
+`;
+
+const ClearSearchButton = styled.button`
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+
+  .material-symbols-outlined {
+    font-size: 16px;
+  }
+
+  &:hover {
+    color: ${theme.colors.white};
+  }
+`;
+
+const ConfigListHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: ${theme.fontSizes.bodySmall};
+  color: ${theme.colors.textDark};
+  font-weight: ${theme.fontWeights.semiBold};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+`;
+
+const Badge = styled.span`
+  background-color: ${theme.colors.border};
+  color: ${theme.colors.white};
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: ${theme.fontWeights.semiBold};
+`;
+
+const ConfigList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+`;
+
+const ConfigItem = styled.div<{ $isActive: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 6px;
+  background-color: transparent;
+  border: 1px solid
+    ${(props) => (props.$isActive ? theme.colors.accent : 'transparent')};
+  padding: 2px 6px;
+  height: 38px;
+  min-width: 0;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+
+    /* Show action buttons on hover */
+    .item-actions-hover {
+      opacity: 1;
+    }
+  }
+`;
+
+const ConfigNameButton = styled.button<{ $isActive: boolean }>`
+  flex: 1;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: ${(props) =>
+    props.$isActive ? theme.colors.white : theme.colors.textDark};
+  font-weight: ${(props) =>
+    props.$isActive ? theme.fontWeights.semiBold : theme.fontWeights.regular};
+  font-size: ${theme.fontSizes.bodySmall};
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  padding: 0;
+  height: 100%;
+
+  .material-symbols-outlined {
+    font-size: 18px;
+    color: ${(props) =>
+      props.$isActive ? theme.colors.accent : theme.colors.textDark};
+  }
+
+  .config-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    color: ${theme.colors.white};
+  }
+`;
+
+const ItemActions = styled.div.attrs({ className: 'item-actions-hover' })<{
+  $isActive?: boolean;
+}>`
+  display: flex;
+  gap: 4px;
+  opacity: ${(props) => (props.$isActive ? 1 : 0)};
+  transition: opacity 0.15s ease-in-out;
+
+  @media (max-width: 1023px) {
+    opacity: 1;
+  }
+`;
+
+const ActionIconBtn = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .material-symbols-outlined {
+    font-size: 16px;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.border};
+    color: ${theme.colors.white};
+  }
+`;
+
+const RenameForm = styled.form`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+`;
+
+const RenameInput = styled.input`
+  flex: 1;
+  background: transparent;
+  border: none;
+  height: 100%;
+  padding: 0;
+  color: ${theme.colors.white};
+  font-size: ${theme.fontSizes.bodySmall};
+  font-weight: ${theme.fontWeights.semiBold};
+
+  &:focus {
+    outline: none;
+  }
+`;
+
+const RenameActionBtn = styled.button`
+  background: none;
+  border: none;
+  color: ${theme.colors.textDark};
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+
+  .material-symbols-outlined {
+    font-size: 18px;
+  }
+
+  &:hover {
+    color: ${theme.colors.white};
+  }
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  color: ${theme.colors.textDark};
+  font-size: ${theme.fontSizes.bodySmall};
+  margin-top: 2rem;
+  font-style: italic;
 `;
 
 const Footer = styled.div`
