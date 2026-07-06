@@ -167,9 +167,9 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
             )}
 
             <ButtonGroup>
-              <Button onClick={handleAbort} variant="secondary" size="medium">
+              <SecondaryButton onClick={handleAbort} size="medium">
                 Cancel
-              </Button>
+              </SecondaryButton>
               <Button
                 onClick={handleProceed}
                 disabled={selectedIds.size === 0}
@@ -196,14 +196,13 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
             </ProgressWrapper>
 
             <ButtonGroup>
-              <Button
+              <SecondaryButton
                 onClick={handleAbort}
-                variant="secondary"
                 size="medium"
                 style={{ width: '100%' }}
               >
                 Abort
-              </Button>
+              </SecondaryButton>
             </ButtonGroup>
           </>
         )}
@@ -421,6 +420,15 @@ const GeneratingLabel = styled.span`
 const ProgressRatio = styled.span`
   color: ${theme.colors.textDark};
   font-weight: ${theme.fontWeights.semiBold};
+`;
+
+const SecondaryButton = styled(Button)`
+  background-color: ${theme.colors.backgroundLighter};
+  color: ${theme.colors.textDark};
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+  }
 `;
 
 export default BulkDownloadDialog;

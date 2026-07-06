@@ -502,7 +502,7 @@ export const exportConfigsProgressively = async (
     saveAs(blob, filename);
   } else {
     // 2. Full compilation mode (like export all but progressive and abortable)
-    let activeWorker: Worker | null = null;
+    const activeWorkerRef = { current: null as Worker | null };
 
     const compileConfigAbortable = (
       config: string,
@@ -518,11 +518,12 @@ export const exportConfigsProgressively = async (
           reject(new Error('Failed to create Ergogen worker'));
           return;
         }
-        activeWorker = worker;
+        activeWorkerRef.current = worker;
 
         const timeout = setTimeout(() => {
           worker.terminate();
-          if (activeWorker === worker) activeWorker = null;
+          if (activeWorkerRef.current === worker)
+            activeWorkerRef.current = null;
           reject(new Error('Compilation timed out'));
         }, 30000);
 
@@ -531,12 +532,14 @@ export const exportConfigsProgressively = async (
           if (response.type === 'error') {
             clearTimeout(timeout);
             worker.terminate();
-            if (activeWorker === worker) activeWorker = null;
+            if (activeWorkerRef.current === worker)
+              activeWorkerRef.current = null;
             reject(new Error(response.error));
           } else if (response.type === 'success') {
             clearTimeout(timeout);
             worker.terminate();
-            if (activeWorker === worker) activeWorker = null;
+            if (activeWorkerRef.current === worker)
+              activeWorkerRef.current = null;
             resolve(response.results as Results);
           }
         };
@@ -544,7 +547,8 @@ export const exportConfigsProgressively = async (
         worker.onerror = (error) => {
           clearTimeout(timeout);
           worker.terminate();
-          if (activeWorker === worker) activeWorker = null;
+          if (activeWorkerRef.current === worker)
+            activeWorkerRef.current = null;
           reject(error);
         };
 
@@ -583,11 +587,12 @@ export const exportConfigsProgressively = async (
           resolve(results);
           return;
         }
-        activeWorker = jscadWorker;
+        activeWorkerRef.current = jscadWorker;
 
         const timeout = setTimeout(() => {
           jscadWorker.terminate();
-          if (activeWorker === jscadWorker) activeWorker = null;
+          if (activeWorkerRef.current === jscadWorker)
+            activeWorkerRef.current = null;
           resolve(results);
         }, 30000);
 
@@ -596,14 +601,16 @@ export const exportConfigsProgressively = async (
           if (response.type === 'batch_jscad_to_stl_success') {
             clearTimeout(timeout);
             jscadWorker.terminate();
-            if (activeWorker === jscadWorker) activeWorker = null;
+            if (activeWorkerRef.current === jscadWorker)
+              activeWorkerRef.current = null;
             resolve(response.results as Results);
           }
         };
         jscadWorker.onerror = () => {
           clearTimeout(timeout);
           jscadWorker.terminate();
-          if (activeWorker === jscadWorker) activeWorker = null;
+          if (activeWorkerRef.current === jscadWorker)
+            activeWorkerRef.current = null;
           resolve(results);
         };
         jscadWorker.postMessage({
@@ -617,7 +624,7 @@ export const exportConfigsProgressively = async (
     try {
       for (let i = 0; i < configs.length; i++) {
         if (isAborted()) {
-          if (activeWorker) activeWorker.terminate();
+          if (activeWorkerRef.current) activeWorkerRef.current.terminate();
           return;
         }
         const configRecord = configs[i];
@@ -643,7 +650,7 @@ export const exportConfigsProgressively = async (
           }
 
           if (isAborted()) {
-            if (activeWorker) activeWorker.terminate();
+            if (activeWorkerRef.current) activeWorkerRef.current.terminate();
             return;
           }
 
@@ -741,7 +748,7 @@ export const exportConfigsProgressively = async (
       }
 
       if (isAborted()) {
-        if (activeWorker) activeWorker.terminate();
+        if (activeWorkerRef.current) activeWorkerRef.current.terminate();
         return;
       }
       onProgress(configs.length, configs.length, 'Creating ZIP...');
@@ -759,8 +766,8 @@ export const exportConfigsProgressively = async (
       const filename = `ergogen-export-all-${timestamp}.zip`;
       saveAs(blob, filename);
     } finally {
-      if (activeWorker) {
-        activeWorker.terminate();
+      if (activeWorkerRef.current) {
+        activeWorkerRef.current.terminate();
       }
     }
   }
