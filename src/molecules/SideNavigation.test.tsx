@@ -20,8 +20,20 @@ jest.mock('react-router-dom', () => ({
 
 describe('SideNavigation', () => {
   const mockConfigs = [
-    { id: '1', name: 'Keyboard Alpha', config: 'points: {}' },
-    { id: '2', name: 'Ergonomic Board', config: 'points: {}' },
+    {
+      id: '1',
+      name: 'Keyboard Alpha',
+      config: 'points: {}',
+      createdAt: '2026-07-06T01:00:00.000Z',
+      updatedAt: '2026-07-06T02:00:00.000Z',
+    },
+    {
+      id: '2',
+      name: 'Ergonomic Board',
+      config: 'points: {}',
+      createdAt: '2026-07-06T01:00:00.000Z',
+      updatedAt: '2026-07-06T01:00:00.000Z',
+    },
   ];
 
   const mockContextValue = {
@@ -136,5 +148,46 @@ describe('SideNavigation', () => {
       expect.stringContaining('Keyboard Alpha')
     );
     expect(mockContextValue.deleteConfig).toHaveBeenCalledWith('1');
+  });
+
+  it('sorts configurations by updatedAt desc, then createdAt desc, then name asc', () => {
+    const customConfigs = [
+      {
+        id: '1',
+        name: 'Config C',
+        config: 'points: {}',
+        createdAt: '2026-07-06T00:00:00.000Z',
+        updatedAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: '2',
+        name: 'Config A',
+        config: 'points: {}',
+        createdAt: '2026-07-06T02:00:00.000Z',
+        updatedAt: '2026-07-06T02:00:00.000Z',
+      },
+      {
+        id: '3',
+        name: 'Config B',
+        config: 'points: {}',
+        createdAt: '2026-07-06T01:00:00.000Z',
+        updatedAt: '2026-07-06T02:00:00.000Z',
+      },
+    ];
+
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...mockContextValue,
+      configs: customConfigs,
+    });
+
+    renderComponent();
+
+    const configItems = screen
+      .getAllByTestId(/config-item-/)
+      .map((el) => el.textContent || '');
+
+    expect(configItems[0]).toContain('Config A');
+    expect(configItems[1]).toContain('Config B');
+    expect(configItems[2]).toContain('Config C');
   });
 });

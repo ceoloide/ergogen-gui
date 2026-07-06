@@ -51,12 +51,32 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 
   const filteredConfigs = useMemo(() => {
     if (!configs) return [];
-    if (!searchQuery.trim()) return configs;
-    const terms = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
-    if (terms.length === 0) return configs;
-    return configs.filter((cfg) => {
-      const nameLower = cfg.name.toLowerCase();
-      return terms.some((term) => nameLower.includes(term));
+
+    let result = configs;
+    if (searchQuery.trim()) {
+      const terms = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+      if (terms.length > 0) {
+        result = configs.filter((cfg) => {
+          const nameLower = cfg.name.toLowerCase();
+          return terms.some((term) => nameLower.includes(term));
+        });
+      }
+    }
+
+    return [...result].sort((a, b) => {
+      const timeAMod = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const timeBMod = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      if (timeAMod !== timeBMod) {
+        return timeBMod - timeAMod;
+      }
+
+      const timeACre = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeBCre = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeACre !== timeBCre) {
+        return timeBCre - timeACre;
+      }
+
+      return a.name.localeCompare(b.name);
     });
   }, [configs, searchQuery]);
 
