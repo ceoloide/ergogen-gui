@@ -585,8 +585,9 @@ const HeaderActionIconBtn = styled.button`
 `;
 
 const ConfigDivider = styled.span`
-  color: ${theme.colors.border};
+  color: ${theme.colors.textDark};
   font-size: ${theme.fontSizes.sm};
+  font-weight: ${theme.fontWeights.semiBold};
   user-select: none;
 `;
 
