@@ -250,7 +250,7 @@ const ActionButton = styled.button`
   border: none;
   color: ${theme.colors.textDark};
   font-size: 11px;
-  font-weight: ${theme.fontWeights.medium};
+  font-weight: ${theme.fontWeights.regular};
   cursor: pointer;
   padding: 4px 8px;
   border-radius: 4px;
