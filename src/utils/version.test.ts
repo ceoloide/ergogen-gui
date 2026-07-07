@@ -1,4 +1,4 @@
-import { getErgogenVersionInfo } from './version';
+import { getErgogenVersionInfo, getFullErgogenVersion } from './version';
 import ergogenPkg from 'ergogen/package.json';
 
 describe('getErgogenVersionInfo', () => {
@@ -95,5 +95,70 @@ describe('getErgogenVersionInfo', () => {
       isHash: true,
       isTag: false,
     });
+  });
+});
+
+describe('getFullErgogenVersion', () => {
+  const defaultVersion = ergogenPkg.version;
+
+  it('returns default version when no version is provided', () => {
+    expect(getFullErgogenVersion()).toBe(
+      `github:ergogen/ergogen#v${defaultVersion}`
+    );
+    expect(getFullErgogenVersion('undefined')).toBe(
+      `github:ergogen/ergogen#v${defaultVersion}`
+    );
+    expect(getFullErgogenVersion('null')).toBe(
+      `github:ergogen/ergogen#v${defaultVersion}`
+    );
+  });
+
+  it('returns formatted version for official repo without branch', () => {
+    expect(getFullErgogenVersion('ergogen/ergogen')).toBe(
+      `github:ergogen/ergogen#v${defaultVersion}`
+    );
+  });
+
+  it('returns branch name for official repo with branch', () => {
+    expect(getFullErgogenVersion('ergogen/ergogen#develop')).toBe(
+      'github:ergogen/ergogen#develop'
+    );
+  });
+
+  it('returns default version tag for custom repo without branch', () => {
+    expect(getFullErgogenVersion('ceoloide/ergogen')).toBe(
+      `github:ceoloide/ergogen#v${defaultVersion}`
+    );
+  });
+
+  it('returns custom repo with branch name', () => {
+    expect(getFullErgogenVersion('ceoloide/ergogen#v4.3.0')).toBe(
+      'github:ceoloide/ergogen#v4.3.0'
+    );
+  });
+
+  it('handles github: prefix correctly', () => {
+    expect(getFullErgogenVersion('github:ceoloide/ergogen#develop')).toBe(
+      'github:ceoloide/ergogen#develop'
+    );
+  });
+
+  it('handles NPM versions', () => {
+    expect(getFullErgogenVersion('ergogen@4.2.0')).toBe(
+      'github:ergogen/ergogen#v4.2.0'
+    );
+  });
+
+  it('handles custom NPM packages', () => {
+    expect(getFullErgogenVersion('my-fork-ergogen@4.2.0')).toBe(
+      'github:my-fork-ergogen#v4.2.0'
+    );
+  });
+
+  it('handles 40-character commit hashes correctly', () => {
+    const fullHash = 'fb2509f8e404b9015c7e3ebbd6931754020a2e0a';
+    expect(getFullErgogenVersion(`github:ceoloide/ergogen#${fullHash}`)).toBe(
+      `github:ceoloide/ergogen#${fullHash}`
+    );
   });
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import SideNavigation from './SideNavigation';
 import { useConfigContext } from '../context/ConfigContext';
+import guiPkg from '../../package.json';
 
 // Mock ConfigContext
 jest.mock('../context/ConfigContext', () => ({
@@ -221,7 +222,7 @@ describe('SideNavigation', () => {
     const guiBtn = screen.getByTestId('side-nav-gui-version-button');
     expect(guiBtn).toBeInTheDocument();
     expect(screen.getByText('GUI')).toBeInTheDocument();
-    expect(screen.getByText('0.6.3')).toBeInTheDocument();
+    expect(screen.getByText(guiPkg.version)).toBeInTheDocument();
 
     // Assert Ergogen button and version
     const ergogenBtn = screen.getByTestId('side-nav-ergogen-version-button');
