@@ -134,7 +134,11 @@ const NewButtonText = styled.span`
   }
 `;
 
-const ArchiveIconButton = styled(OutlineIconButton)``;
+const ArchiveIconButton = styled(OutlineIconButton)`
+  @media (max-width: 475px) {
+    display: none;
+  }
+`;
 
 /**
  * A responsive button that is only visible on smaller screens.

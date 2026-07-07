@@ -8,6 +8,16 @@ jest.mock('../context/ConfigContext', () => ({
   useConfigContext: jest.fn(),
 }));
 
+const mockCreateZip = jest.fn();
+jest.mock('../utils/zip', () => ({
+  createZip: (...args: any[]) => mockCreateZip(...args),
+}));
+
+const mockCreateShareableUri = jest.fn().mockReturnValue('https://share.link');
+jest.mock('../utils/share', () => ({
+  createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
+}));
+
 const mockNavigate = jest.fn();
 const mockLocation = { pathname: '/' };
 jest.mock('react-router-dom', () => ({
@@ -156,5 +166,39 @@ describe('Header', () => {
     fireEvent.click(saveBtn);
 
     expect(mockContextValue.savePreviewConfig).toHaveBeenCalled();
+  });
+
+  it('triggers download archive on click', () => {
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...mockContextValue,
+      results: { canonical: 'canonical_yaml' },
+      configInput: 'points: {}',
+    });
+    renderComponent();
+    const downloadOutputsBtn = screen.getByTestId(
+      'header-download-outputs-button'
+    );
+    fireEvent.click(downloadOutputsBtn);
+    expect(mockCreateZip).toHaveBeenCalledWith(
+      { canonical: 'canonical_yaml' },
+      'points: {}',
+      [],
+      false,
+      false
+    );
+  });
+
+  it('triggers share dialog on click', () => {
+    renderComponent();
+    const shareBtn = screen.getByTestId('header-share-button');
+    fireEvent.click(shareBtn);
+    expect(mockCreateShareableUri).toHaveBeenCalledWith({
+      config: 'points: {}',
+      injections: [],
+      canonical: undefined,
+    });
+    expect(
+      screen.getByText('Shareable Configuration Link')
+    ).toBeInTheDocument();
   });
 });
