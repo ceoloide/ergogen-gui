@@ -295,7 +295,7 @@ The share system provides comprehensive error handling:
   - Preserves existing injections not in the shared config
 - **`src/molecules/ShareDialog.tsx`**: Dialog component for displaying and copying share links
 - **`src/App.tsx`**: Handles initial hash fragment loading and hash change events
-- **`src/atoms/Header.tsx`**: Contains the share button and share functionality. The share button is visible on the main page (`/`) but hidden on the Welcome page (`/new`). It's also visible on mobile devices.
+- **`src/atoms/Header.tsx`**: Contains the share button and share functionality. The share button is visible on the main page (`/`) but hidden on the Welcome page (`/new`). On displays 475px or wider, it is visible in the main header. On displays 475px or narrower, it is hidden in the header and shown in the subheader (inside `src/Ergogen.tsx`).
 
 ### Future Enhancements
 
