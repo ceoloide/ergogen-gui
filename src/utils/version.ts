@@ -1,18 +1,23 @@
 import ergogenPkg from 'ergogen/package.json';
 
-interface VersionInfo {
+export interface VersionInfo {
   label: string;
   url: string;
+  displayText: string;
+  isCustom: boolean;
+  isHash?: boolean;
+  isTag?: boolean;
 }
 
 /**
  * Gets the Ergogen version label and GitHub URL for display in the UI.
  *
  * @param version The version string from the environment variable.
- * @returns An object containing the formatted label and the corresponding URL.
+ * @returns An object containing the formatted label, URL, and metadata.
  */
 export const getErgogenVersionInfo = (version?: string): VersionInfo => {
-  const defaultVersion = `v${ergogenPkg.version}`;
+  const defaultVersionLabel = `v${ergogenPkg.version}`;
+  const defaultVersion = ergogenPkg.version;
 
   const repoStr =
     typeof ergogenPkg.repository === 'string'
@@ -28,16 +33,29 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
     : repoStr.replace(/^git\+/, '').replace(/\.git$/, '');
 
   if (!version) {
-    return { label: defaultVersion, url: defaultUrl };
+    return {
+      label: defaultVersionLabel,
+      url: defaultUrl,
+      displayText: defaultVersion,
+      isCustom: false,
+      isHash: false,
+      isTag: false,
+    };
   }
 
   // Handle NPM version (e.g., ergogen@4.2.0)
   if (version.includes('@')) {
+    const parts = version.split('@');
+    const verPart = parts[1] || version;
     return {
       label: version,
       url: version.startsWith('ergogen@')
-        ? `${defaultUrl}/releases/tag/v${version.split('@')[1]}`
-        : `https://www.npmjs.com/package/${version.split('@')[0]}`,
+        ? `${defaultUrl}/releases/tag/v${verPart}`
+        : `https://www.npmjs.com/package/${parts[0]}`,
+      displayText: verPart,
+      isCustom: true,
+      isHash: false,
+      isTag: true,
     };
   }
 
@@ -46,22 +64,63 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
     ? version.slice(7)
     : version;
 
-  // Split into repo and branch
+  // Split into repo and branch/ref
   const [repo, branch] = cleanVersion.split('#');
   const isOfficial = repo === 'ergogen/ergogen';
   const baseUrl = `https://github.com/${repo}`;
 
   if (isOfficial) {
     if (!branch) {
-      return { label: 'latest', url: baseUrl };
+      return {
+        label: 'latest',
+        url: baseUrl,
+        displayText: defaultVersion,
+        isCustom: false,
+        isHash: false,
+        isTag: false,
+      };
     }
-    // For official repo, only show the branch/tag
-    return { label: branch, url: `${baseUrl}/tree/${branch}` };
+
+    const isHash = branch.length === 40 && /^[0-9a-fA-F]{40}$/.test(branch);
+    const displayText = isHash ? branch.substring(0, 7) : branch;
+    const url = isHash
+      ? `${baseUrl}/commit/${branch}`
+      : `${baseUrl}/tree/${branch}`;
+
+    return {
+      label: branch,
+      url,
+      displayText,
+      isCustom: true,
+      isHash,
+      isTag: !isHash,
+    };
   }
 
-  // For custom repos, show the full clean version string (e.g., user/repo or user/repo#branch)
+  // For custom repos:
+  if (!branch) {
+    return {
+      label: cleanVersion,
+      url: baseUrl,
+      displayText: defaultVersion,
+      isCustom: true,
+      isHash: false,
+      isTag: false,
+    };
+  }
+
+  const isHash = branch.length === 40 && /^[0-9a-fA-F]{40}$/.test(branch);
+  const displayText = isHash ? branch.substring(0, 7) : branch;
+  const url = isHash
+    ? `${baseUrl}/commit/${branch}`
+    : `${baseUrl}/tree/${branch}`;
+
   return {
     label: cleanVersion,
-    url: branch ? `${baseUrl}/tree/${branch}` : baseUrl,
+    url,
+    displayText,
+    isCustom: true,
+    isHash,
+    isTag: !isHash,
   };
 };

@@ -328,6 +328,26 @@ To allow developers and CI to override the default Ergogen version using the `ER
    - Executes after dependencies are successfully installed.
    - If `packages.json.bak` exists, it restores the original `package.json` and deletes the backup file, ensuring that the workspace remains clean and no modified `package.json` is committed.
 
+## Version Information & Custom Build Indicators
+
+To improve transparency and debuggability for users running custom repositories, branches, tags, or commit hashes of Ergogen, the application displays version information directly in the sidebar footer and highlights custom builds using dedicated badges:
+
+- **GUI Version Button**: Displays the GitHub logo alongside "GUI" and the local `package.json` version (e.g., `0.6.3`). Clicking it links directly to the GUI codebase on GitHub.
+- **Ergogen Version Button**: Displays the GitHub logo alongside "Ergogen" and the currently built Ergogen version.
+  - **Standard Releases**: Shows the standard version number (e.g., `4.2.1`) in standard gray.
+  - **Custom Builds**: If built using a custom repository or reference (detected via `isCustom`), the version text is colored in green (`theme.colors.accent`) and a vertical `DEV` badge is shown on the right-hand edge of the button.
+  - **Commit Hashes**: Full 40-character commit hashes are automatically truncated to 7 characters (e.g., `fb2509f`) and link directly to `/commit/` on GitHub instead of `/tree/`.
+  - **Other References**: Shorter labels (such as tags like `v4.3.0` or branch names like `develop`) are kept intact and link to `/tree/` on GitHub.
+
+### Custom DEV Chip & Explanation Modal
+
+When the built Ergogen version is custom (`isCustom` is true), a green superscript DEV chip (`<DevChip>`) is displayed next to the app name in both the Header and Sidebar.
+
+- **Icon and Badge**: Contains a beaker (`science`) icon and `DEV` text.
+- **Hover/Tap Popover**: Hovering (desktop) or tapping (mobile) on the chip triggers a floating explanation popover card.
+- **Close Delay**: Incorporates a 250ms mouse-leave transition delay to allow the user's cursor to navigate into the popover and click the repository link without closing the card prematurely.
+- **Global Click Close**: Sets up global window click listeners to automatically close the popover on touch screens or outer clicks.
+
 ## Multi-Configuration Management
 
 The application features a built-in Multi-Configuration Management system allowing users to work on multiple YAML/JSON configurations, switch between them instantly, search their lists, rename, duplicate, and delete configurations.
@@ -492,3 +512,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 **Context:** The Google Tag (`gtag.js`) script tag is currently hardcoded in `public/index.html`. In environments where `REACT_APP_GTAG_ID` is not defined (such as local development or forks), the browser still attempts to download the library from Google with the literal string `%REACT_APP_GTAG_ID%`, causing a console network error.
 
 **Task:** Refactor Google Tag initialization. Remove the script tags from `public/index.html` and implement dynamic script injection inside `src/utils/analytics.ts`. The script should only inject standard DOM script elements if the `REACT_APP_GTAG_ID` is present, valid, and not the CRA replacement placeholder.
+
+### [TASK-015] Componentize and Abstract Version Button Layouts
+
+**Context:** The GUI and Ergogen version buttons inside the sidebar footer are currently built using locally defined styled-components inside `SideNavigation.tsx`. If other sidebars or footers are added in the future, these styling structures might need to be duplicated.
+
+**Task:** Refactor the double-line version buttons and the vertical DEV badges into a reusable atomic/molecular component (e.g. `src/molecules/GithubVersionButton.tsx`) to keep `SideNavigation.tsx` focused and improve design system consistency.

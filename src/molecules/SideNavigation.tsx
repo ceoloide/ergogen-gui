@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { getErgogenVersionInfo } from '../utils/version';
+import { DevChip } from '../atoms/DevChip';
+import guiPkg from '../../package.json';
 import DiscordIcon from '../atoms/DiscordIcon';
 import GithubIcon from '../atoms/GithubIcon';
 import { useConfigContext } from '../context/ConfigContext';
@@ -35,6 +37,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 
   const configContext = useConfigContext();
   const navigate = useNavigate();
+  const guiVersion = guiPkg.version;
 
   const {
     configs,
@@ -303,17 +306,15 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                 alt="Ergogen logo"
               />
             </LogoButton>
-            <AppName onClick={onClose}>Ergogen</AppName>
-            <VersionText
-              href={versionInfo.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={onClose}
-              aria-label={`View Ergogen ${versionInfo.label} on GitHub`}
-              data-testid="side-nav-version-link"
-            >
-              {versionInfo.label}
-            </VersionText>
+            <AppName onClick={onClose}>
+              Ergogen
+              {versionInfo.isCustom && (
+                <DevChip
+                  versionInfo={versionInfo}
+                  data-testid="sidebar-dev-chip"
+                />
+              )}
+            </AppName>
           </LogoSection>
           <CloseButton
             onClick={onClose}
@@ -482,19 +483,44 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             >
               <DiscordIcon />
             </OutlineButton>
-            <OutlineButton
+            <VersionButton
               onClick={() => {
                 window.open(
-                  'https://github.com/ergogen',
+                  'https://github.com/ceoloide/ergogen-gui',
                   '_blank',
                   'noopener,noreferrer'
                 );
               }}
-              aria-label="View the GitHub repositories"
-              data-testid="side-nav-github-button"
+              aria-label={`View Ergogen GUI ${guiVersion} on GitHub`}
+              data-testid="side-nav-gui-version-button"
             >
               <GithubIcon />
-            </OutlineButton>
+              <ButtonContent>
+                <ButtonLabel>GUI</ButtonLabel>
+                <ButtonVersionText>{guiVersion}</ButtonVersionText>
+              </ButtonContent>
+            </VersionButton>
+            <VersionButton
+              onClick={() => {
+                window.open(versionInfo.url, '_blank', 'noopener,noreferrer');
+              }}
+              $hasDevBadge={versionInfo.isCustom}
+              aria-label={`View Ergogen ${versionInfo.displayText} on GitHub`}
+              data-testid="side-nav-ergogen-version-button"
+            >
+              <GithubIcon />
+              <ButtonContent>
+                <ButtonLabel>Ergogen</ButtonLabel>
+                <ButtonVersionText $isCustom={versionInfo.isCustom}>
+                  {versionInfo.displayText}
+                </ButtonVersionText>
+              </ButtonContent>
+              {versionInfo.isCustom && (
+                <DevBadge data-testid="side-nav-ergogen-dev-badge">
+                  <DevBadgeText>DEV</DevBadgeText>
+                </DevBadge>
+              )}
+            </VersionButton>
           </ButtonGroup>
         </Footer>
       </Panel>
@@ -552,6 +578,8 @@ const Header = styled.div`
   padding: 0 1rem;
   height: 3em;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 `;
 
 const LogoSection = styled.div`
@@ -581,12 +609,7 @@ const AppName = styled.div`
   font-weight: ${theme.fontWeights.semiBold};
   color: ${theme.colors.white};
   cursor: pointer;
-`;
-
-const VersionText = styled.a`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.accent};
-  text-decoration: none;
+  display: flex;
   align-items: center;
 `;
 
@@ -909,8 +932,7 @@ const EmptyState = styled.div`
 `;
 
 const Footer = styled.div`
-  padding: 0 1rem;
-  height: 3em;
+  padding: 8px 1rem;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -923,6 +945,86 @@ const ButtonGroup = styled.div`
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  width: 100%;
+`;
+
+const VersionButton = styled.button<{ $hasDevBadge?: boolean }>`
+  background-color: transparent;
+  transition:
+    color 0.15s ease-in-out,
+    background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  color: ${theme.colors.white};
+  display: flex;
+  align-items: center;
+  padding: 8px ${(props) => (props.$hasDevBadge ? '22px' : '10px')} 8px 10px;
+  text-decoration: none;
+  cursor: pointer;
+  height: 34px;
+  position: relative;
+  flex: 0 0 auto;
+  gap: 6px;
+
+  svg {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+  }
+`;
+
+const ButtonContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1.1;
+  min-width: 0;
+`;
+
+const ButtonLabel = styled.span`
+  font-size: 10px;
+  font-weight: ${theme.fontWeights.bold};
+  color: ${theme.colors.white};
+  white-space: nowrap;
+`;
+
+const ButtonVersionText = styled.span<{ $isCustom?: boolean }>`
+  font-size: 8px;
+  color: ${(props) =>
+    props.$isCustom ? theme.colors.accent : theme.colors.textDark};
+  white-space: nowrap;
+`;
+
+const DevBadge = styled.div`
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  background-color: ${theme.colors.backgroundLighter};
+  border-left: 1px solid ${theme.colors.border};
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+`;
+
+const DevBadgeText = styled.span`
+  font-size: 8px;
+  font-weight: ${theme.fontWeights.bold};
+  color: ${theme.colors.accent};
+  transform: rotate(-90deg);
+  white-space: nowrap;
+  line-height: 1;
 `;
 
 const OutlineButton = styled.button`

@@ -213,4 +213,46 @@ describe('SideNavigation', () => {
     expect(screen.queryByLabelText('Rename input')).not.toBeInTheDocument();
     expect(screen.getByText('Keyboard Alpha')).toBeInTheDocument();
   });
+
+  it('renders GUI and Ergogen version buttons in the footer', () => {
+    renderComponent();
+
+    // Assert GUI button and version
+    const guiBtn = screen.getByTestId('side-nav-gui-version-button');
+    expect(guiBtn).toBeInTheDocument();
+    expect(screen.getByText('GUI')).toBeInTheDocument();
+    expect(screen.getByText('0.6.3')).toBeInTheDocument();
+
+    // Assert Ergogen button and version
+    const ergogenBtn = screen.getByTestId('side-nav-ergogen-version-button');
+    expect(ergogenBtn).toBeInTheDocument();
+    expect(screen.getAllByText('Ergogen').length).toBe(2);
+  });
+
+  describe('with custom Ergogen version', () => {
+    const originalEnv = process.env.REACT_APP_ERGOGEN_VERSION;
+
+    beforeEach(() => {
+      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#v4.3.0';
+    });
+
+    afterEach(() => {
+      process.env.REACT_APP_ERGOGEN_VERSION = originalEnv;
+    });
+
+    it('renders the custom version green and displays the DEV marker and DEV chip', () => {
+      renderComponent();
+
+      // Assert DEV chip exists next to app name
+      expect(screen.getByTestId('sidebar-dev-chip-badge')).toBeInTheDocument();
+
+      // Assert Ergogen button has custom version and DEV badge
+      const ergogenBtn = screen.getByTestId('side-nav-ergogen-version-button');
+      expect(ergogenBtn).toBeInTheDocument();
+      expect(screen.getByText('v4.3.0')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('side-nav-ergogen-dev-badge')
+      ).toBeInTheDocument();
+    });
+  });
 });

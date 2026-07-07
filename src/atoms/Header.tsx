@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { getErgogenVersionInfo } from '../utils/version';
+import { DevChip } from './DevChip';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
 import { createShareableUri } from '../utils/share';
@@ -21,6 +22,8 @@ const HeaderContainer = styled.header`
   padding: 0 1rem;
   background-color: ${theme.colors.background};
   flex-shrink: 0;
+  position: relative;
+  z-index: 100;
 
   @media (max-width: 639px) {
     padding: 0 0.5rem;
@@ -65,7 +68,9 @@ const AppName = styled.div`
   font-size: ${theme.fontSizes.base};
   font-weight: ${theme.fontWeights.semiBold};
   color: ${theme.colors.white};
-  @media (max-width: 420px) {
+  display: flex;
+  align-items: center;
+  @media (max-width: 639px) {
     display: none;
   }
 `;
@@ -73,15 +78,6 @@ const AppName = styled.div`
 /**
  * A styled anchor tag for displaying the version number.
  */
-const VersionText = styled.a`
-  font-size: ${theme.fontSizes.sm};
-  color: ${theme.colors.accent};
-  text-decoration: none;
-  align-items: center;
-  @media (max-width: 767px) {
-    display: none;
-  }
-`;
 
 /**
  * A styled button with an outline style, typically for icons.
@@ -133,7 +129,7 @@ const AccentIconButton = styled(OutlineIconButton)`
 `;
 
 const NewButtonText = styled.span`
-  @media (max-width: 375px) {
+  @media (max-width: 510px) {
     display: none;
   }
 `;
@@ -345,16 +341,15 @@ const Header = (): JSX.Element => {
                 alt="Ergogen logo"
               />
             </LogoButton>
-            <AppName>Ergogen</AppName>
-            <VersionText
-              href={versionInfo.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`View Ergogen ${versionInfo.label} on GitHub`}
-              data-testid="version-link"
-            >
-              {versionInfo.label}
-            </VersionText>
+            <AppName>
+              Ergogen
+              {versionInfo.isCustom && (
+                <DevChip
+                  versionInfo={versionInfo}
+                  data-testid="header-dev-chip"
+                />
+              )}
+            </AppName>
           </ErgogenLogo>
           {activeConfigName && (
             <>
@@ -594,6 +589,9 @@ const ConfigDivider = styled.span`
   font-size: ${theme.fontSizes.sm};
   font-weight: ${theme.fontWeights.semiBold};
   user-select: none;
+  @media (max-width: 639px) {
+    display: none;
+  }
 `;
 
 const ConfigNameText = styled.span`
