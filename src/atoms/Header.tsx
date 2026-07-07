@@ -442,7 +442,7 @@ const Header = (): JSX.Element => {
                       >
                         <span className="material-symbols-outlined">edit</span>
                       </HeaderActionIconBtn>
-                      <HeaderActionIconBtn
+                      <HeaderActionSecondaryBtn
                         onClick={handleDuplicate}
                         aria-label="Duplicate configuration"
                         data-testid="header-duplicate-btn"
@@ -450,8 +450,8 @@ const Header = (): JSX.Element => {
                         <span className="material-symbols-outlined">
                           content_copy
                         </span>
-                      </HeaderActionIconBtn>
-                      <HeaderActionIconBtn
+                      </HeaderActionSecondaryBtn>
+                      <HeaderActionSecondaryBtn
                         onClick={handleDelete}
                         aria-label="Delete configuration"
                         data-testid="header-delete-btn"
@@ -459,7 +459,7 @@ const Header = (): JSX.Element => {
                         <span className="material-symbols-outlined">
                           delete
                         </span>
-                      </HeaderActionIconBtn>
+                      </HeaderActionSecondaryBtn>
                     </HeaderItemActions>
                   </>
                 )}
@@ -589,6 +589,12 @@ const HeaderActionIconBtn = styled.button`
   &:hover {
     background-color: ${theme.colors.buttonHover};
     color: ${theme.colors.white};
+  }
+`;
+
+const HeaderActionSecondaryBtn = styled(HeaderActionIconBtn)`
+  @media (max-width: 767px) {
+    display: none;
   }
 `;
 
