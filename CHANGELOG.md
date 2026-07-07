@@ -1,5 +1,24 @@
 # Changelog
 
+## Sidebar Version Displays & DEV Build Indicators
+
+July 07, 2026
+
+![A view of the sidebar showing the GUI version button and the custom Ergogen version badge.](./public/images/changelog/placeholder.png)
+
+Understanding which version of the GUI and Ergogen was currently running in the workspace was previously hidden from the interface. It was also difficult to tell if the application was compiling using a custom repository fork, branch reference, tag, or commit hash.
+
+To improve transparency, we have added version buttons in the sidebar footer and introduced custom dev badges. The sidebar footer now displays two separate buttons: one linking to the GUI codebase (showing its package version, e.g. `0.6.3`) and another linking to the active Ergogen source code. If you are building using a custom Ergogen repository or tag, the version text appears green and shows a vertical `DEV` badge on the button. We also added a green superscript beaker chip next to the logo, which opens an explanation modal with details and links when hovered or tapped.
+
+**What changed:**
+
+- **GUI & Ergogen Footer Buttons**: Added two-line version buttons in the sidebar footer linking to their respective GitHub codebases
+- **Custom build indicators**: Displays custom repository tags, branches, or hashes in green with a vertical `DEV` badge on the Ergogen button
+- **Superscript Beaker Chip**: Shows a superscript beaker chip next to the app logo in both the Header and Sidebar when a custom built version is active
+- **Interactive Explanatory Modal**: Hovering or tapping the beaker chip opens a popup modal with details about the custom source code and a link
+- **Automated commit truncation**: Detects 40-character commit hashes, truncating them to 7 characters (e.g., `fb2509f`) and linking directly to `/commit/` URLs
+- **Cleaned up headers**: Removed the old plain version label next to the logo to declutter the workspace header and sidebar logo sections
+
 ## Advanced Interaction Analytics & Cleanup
 
 July 06, 2026
