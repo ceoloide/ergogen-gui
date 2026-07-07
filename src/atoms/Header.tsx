@@ -126,6 +126,10 @@ const AccentIconButton = styled(OutlineIconButton)`
     background-color: ${theme.colors.accentDark};
     border-color: ${theme.colors.accentDarker};
   }
+
+  @media (max-width: 375px) {
+    display: none;
+  }
 `;
 
 const NewButtonText = styled.span`
@@ -134,7 +138,11 @@ const NewButtonText = styled.span`
   }
 `;
 
-const ArchiveIconButton = styled(OutlineIconButton)``;
+const ArchiveIconButton = styled(OutlineIconButton)`
+  @media (max-width: 475px) {
+    display: none;
+  }
+`;
 
 /**
  * A responsive button that is only visible on smaller screens.
@@ -434,7 +442,7 @@ const Header = (): JSX.Element => {
                       >
                         <span className="material-symbols-outlined">edit</span>
                       </HeaderActionIconBtn>
-                      <HeaderActionIconBtn
+                      <HeaderActionSecondaryBtn
                         onClick={handleDuplicate}
                         aria-label="Duplicate configuration"
                         data-testid="header-duplicate-btn"
@@ -442,8 +450,8 @@ const Header = (): JSX.Element => {
                         <span className="material-symbols-outlined">
                           content_copy
                         </span>
-                      </HeaderActionIconBtn>
-                      <HeaderActionIconBtn
+                      </HeaderActionSecondaryBtn>
+                      <HeaderActionSecondaryBtn
                         onClick={handleDelete}
                         aria-label="Delete configuration"
                         data-testid="header-delete-btn"
@@ -451,7 +459,7 @@ const Header = (): JSX.Element => {
                         <span className="material-symbols-outlined">
                           delete
                         </span>
-                      </HeaderActionIconBtn>
+                      </HeaderActionSecondaryBtn>
                     </HeaderItemActions>
                   </>
                 )}
@@ -581,6 +589,12 @@ const HeaderActionIconBtn = styled.button`
   &:hover {
     background-color: ${theme.colors.buttonHover};
     color: ${theme.colors.white};
+  }
+`;
+
+const HeaderActionSecondaryBtn = styled(HeaderActionIconBtn)`
+  @media (max-width: 767px) {
+    display: none;
   }
 `;
 

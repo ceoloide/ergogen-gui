@@ -1,5 +1,22 @@
 # Changelog
 
+## Responsive Workspace Header & Subheader Buttons
+
+July 07, 2026
+
+![A view of the responsive workspace at small width showing the Share and Archive buttons moved to the subheader.](./public/images/changelog/placeholder.png)
+
+When using the Ergogen workspace on small screens like mobile devices or narrow browser windows, the header quickly became crowded. Important options like "Archive" and "Share" were squeezed together or pushed out of view, making it hard to download or share your work.
+
+To optimize the workspace layout, we have made the main header and subheader responsive. When the display width is 475px or lower, the "Archive" and "Share" buttons are hidden in the main header and relocated to the subheader. To ensure you only see what is relevant, the "Share" button appears to the left of the "Download" button when editing your configuration, while the "Archive" button appears when viewing your outputs, next to the downloads expand toggle.
+
+**What changed:**
+
+- **Responsive Header Layout**: Hides the "Archive" and "Share" buttons from the top header on display widths of 475px or lower
+- **Subheader "Share" Integration**: Relocates the "Share" button to the configuration subheader to the left of the "Download" button on mobile viewports
+- **Subheader "Archive" Integration**: Relocates the "Archive" button to the outputs subheader to the left of the expand toggle button on mobile viewports
+- **Conditional Subheader Actions**: Automatically displays the correct secondary action button depending on whether "Config" or "Outputs" is selected
+
 ## Sidebar Version Displays & DEV Build Indicators
 
 July 07, 2026

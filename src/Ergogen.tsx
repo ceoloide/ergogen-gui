@@ -29,6 +29,9 @@ import Title from './atoms/Title';
 import { theme } from './theme/theme';
 
 import { trackEvent } from './utils/analytics';
+import ShareDialog from './molecules/ShareDialog';
+import { createZip } from './utils/zip';
+import { createShareableUri } from './utils/share';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -82,6 +85,14 @@ const SubHeaderContainer = styled.div`
  */
 const Spacer = styled.div`
   flex-grow: 1;
+`;
+
+const SubHeaderResponsiveIconButton = styled(OutlineIconButton)`
+  display: none;
+
+  @media (max-width: 475px) {
+    display: flex;
+  }
 `;
 
 /**
@@ -285,6 +296,9 @@ const Ergogen = () => {
     extension: 'svg',
     content: '',
   });
+
+  const [shareLink, setShareLink] = useState('');
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   /**
    * Wrapper function to set preview and hide downloads panel.
@@ -495,125 +509,223 @@ const Ergogen = () => {
     document.body.removeChild(element);
   };
 
+  const handleShare = () => {
+    if (!configContext.configInput) {
+      return;
+    }
+
+    const shareableUri = createShareableUri({
+      config: configContext.configInput,
+      injections: configContext.injectionInput,
+      canonical: configContext.results?.canonical,
+    });
+
+    trackEvent('share_button_clicked', {
+      has_injections: !!configContext.injectionInput?.length,
+      injections_count: configContext.injectionInput?.length || 0,
+      source: 'subheader',
+    });
+
+    setShareLink(shareableUri);
+    setShowShareDialog(true);
+  };
+
+  const handleDownloadArchive = () => {
+    if (
+      !configContext.results ||
+      !configContext.configInput ||
+      configContext.isGenerating ||
+      configContext.isJscadConverting
+    ) {
+      return;
+    }
+    trackEvent('archive_single_downloaded', {
+      has_injections: !!configContext.injectionInput?.length,
+      injections_count: configContext.injectionInput?.length || 0,
+      stored_configs_count: configContext.configs?.length || 0,
+      source: 'subheader',
+    });
+    createZip(
+      configContext.results,
+      configContext.configInput,
+      configContext.injectionInput,
+      configContext.debug,
+      configContext.stlPreview
+    );
+  };
+
   return (
-    <ErgogenWrapper>
-      {!configContext.showSettings && (
-        <SubHeaderContainer>
-          <OutlineIconButton
-            className={configContext.showConfig ? 'active' : ''}
-            onClick={() => configContext.setShowConfig(true)}
-            aria-label="Show configuration panel"
-            data-testid="mobile-config-button"
-          >
-            Config
-          </OutlineIconButton>
-          <OutlineIconButton
-            className={!configContext.showConfig ? 'active' : ''}
-            onClick={() => configContext.setShowConfig(false)}
-            aria-label="Show outputs panel"
-            data-testid="mobile-outputs-button"
-          >
-            Outputs
-          </OutlineIconButton>
-          <Spacer />
-          {configContext.showConfig && (
-            <>
-              <GenerateIconButton
-                onClick={() =>
-                  configContext.generateNow(
-                    configContext.configInput,
-                    configContext.injectionInput,
-                    { pointsonly: false }
-                  )
-                }
-                aria-label="Generate configuration"
-                data-testid="mobile-generate-button"
-              >
-                <span className="material-symbols-outlined">refresh</span>
-              </GenerateIconButton>
-              <OutlineIconButton
-                onClick={handleDownload}
-                aria-label="Download configuration"
-                data-testid="mobile-download-button"
-              >
-                <span className="material-symbols-outlined">download</span>
-              </OutlineIconButton>
-            </>
-          )}
-          {!configContext.showConfig && (
-            <OutlineIconButton
-              onClick={() =>
-                configContext.setShowDownloads(!configContext.showDownloads)
-              }
-              aria-label={
-                configContext.showDownloads
-                  ? 'Hide downloads panel'
-                  : 'Show downloads panel'
-              }
-              data-testid="mobile-downloads-toggle-button"
-            >
-              <span className="material-symbols-outlined">
-                {configContext.showDownloads
-                  ? 'expand_content'
-                  : 'collapse_content'}
-              </span>
-            </OutlineIconButton>
-          )}
-        </SubHeaderContainer>
+    <>
+      {showShareDialog && (
+        <ShareDialog
+          shareLink={shareLink}
+          onClose={() => setShowShareDialog(false)}
+        />
       )}
-      <FlexContainer>
-        {!configContext.showSettings ? (
-          <>
+      <ErgogenWrapper>
+        {!configContext.showSettings && (
+          <SubHeaderContainer>
+            <OutlineIconButton
+              className={configContext.showConfig ? 'active' : ''}
+              onClick={() => configContext.setShowConfig(true)}
+              aria-label="Show configuration panel"
+              data-testid="mobile-config-button"
+            >
+              Config
+            </OutlineIconButton>
+            <OutlineIconButton
+              className={!configContext.showConfig ? 'active' : ''}
+              onClick={() => configContext.setShowConfig(false)}
+              aria-label="Show outputs panel"
+              data-testid="mobile-outputs-button"
+            >
+              Outputs
+            </OutlineIconButton>
+            <Spacer />
             {configContext.showConfig && (
-              <ResizablePanel
-                initialWidth={getInitialLeftWidth()}
-                minWidth={250}
-                maxWidth="60%"
-                side="left"
-                data-testid="config-panel"
-              >
-                <EditorContainer>
-                  <StyledConfigEditor data-testid="config-editor" />
-                  <ButtonContainer>
-                    <GrowButton
-                      onClick={() =>
-                        configContext.generateNow(
-                          configContext.configInput,
-                          configContext.injectionInput,
-                          { pointsonly: false }
-                        )
-                      }
-                      aria-label="Generate configuration"
-                      data-testid="generate-button"
-                    >
-                      <span
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          width: '100%',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <span>Generate</span>
-                        <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
-                      </span>
-                    </GrowButton>
-                    <OutlineIconButton
-                      onClick={handleDownload}
-                      aria-label="Download configuration"
-                      data-testid="download-config-button"
-                    >
-                      <span className="material-symbols-outlined">
-                        download
-                      </span>
-                    </OutlineIconButton>
-                  </ButtonContainer>
-                </EditorContainer>
-              </ResizablePanel>
+              <>
+                <GenerateIconButton
+                  onClick={() =>
+                    configContext.generateNow(
+                      configContext.configInput,
+                      configContext.injectionInput,
+                      { pointsonly: false }
+                    )
+                  }
+                  aria-label="Generate configuration"
+                  data-testid="mobile-generate-button"
+                >
+                  <span className="material-symbols-outlined">refresh</span>
+                </GenerateIconButton>
+                <SubHeaderResponsiveIconButton
+                  onClick={handleShare}
+                  disabled={!configContext.configInput}
+                  aria-label="Share configuration"
+                  data-testid="mobile-share-button"
+                >
+                  <span className="material-symbols-outlined">share</span>
+                </SubHeaderResponsiveIconButton>
+                <OutlineIconButton
+                  onClick={handleDownload}
+                  aria-label="Download configuration"
+                  data-testid="mobile-download-button"
+                >
+                  <span className="material-symbols-outlined">download</span>
+                </OutlineIconButton>
+              </>
             )}
-            <RightPane>
-              {configContext.showDownloads ? (
-                <>
+            {!configContext.showConfig && (
+              <>
+                <SubHeaderResponsiveIconButton
+                  onClick={handleDownloadArchive}
+                  disabled={
+                    configContext.isGenerating ||
+                    configContext.isJscadConverting
+                  }
+                  aria-label="Download archive of all generated files"
+                  data-testid="mobile-download-outputs-button"
+                >
+                  <span className="material-symbols-outlined">archive</span>
+                </SubHeaderResponsiveIconButton>
+                <OutlineIconButton
+                  onClick={() =>
+                    configContext.setShowDownloads(!configContext.showDownloads)
+                  }
+                  aria-label={
+                    configContext.showDownloads
+                      ? 'Hide downloads panel'
+                      : 'Show downloads panel'
+                  }
+                  data-testid="mobile-downloads-toggle-button"
+                >
+                  <span className="material-symbols-outlined">
+                    {configContext.showDownloads
+                      ? 'expand_content'
+                      : 'collapse_content'}
+                  </span>
+                </OutlineIconButton>
+              </>
+            )}
+          </SubHeaderContainer>
+        )}
+        <FlexContainer>
+          {!configContext.showSettings ? (
+            <>
+              {configContext.showConfig && (
+                <ResizablePanel
+                  initialWidth={getInitialLeftWidth()}
+                  minWidth={250}
+                  maxWidth="60%"
+                  side="left"
+                  data-testid="config-panel"
+                >
+                  <EditorContainer>
+                    <StyledConfigEditor data-testid="config-editor" />
+                    <ButtonContainer>
+                      <GrowButton
+                        onClick={() =>
+                          configContext.generateNow(
+                            configContext.configInput,
+                            configContext.injectionInput,
+                            { pointsonly: false }
+                          )
+                        }
+                        aria-label="Generate configuration"
+                        data-testid="generate-button"
+                      >
+                        <span
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            width: '100%',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <span>Generate</span>
+                          <ShortcutKey>{getShortcutLabel()}</ShortcutKey>
+                        </span>
+                      </GrowButton>
+                      <OutlineIconButton
+                        onClick={handleDownload}
+                        aria-label="Download configuration"
+                        data-testid="download-config-button"
+                      >
+                        <span className="material-symbols-outlined">
+                          download
+                        </span>
+                      </OutlineIconButton>
+                    </ButtonContainer>
+                  </EditorContainer>
+                </ResizablePanel>
+              )}
+              <RightPane>
+                {configContext.showDownloads ? (
+                  <>
+                    <NestedRightPane>
+                      <StyledFilePreview
+                        data-testid={`${preview.key}-file-preview`}
+                        previewExtension={preview.extension}
+                        previewKey={`${preview.key}-${configContext.resultsVersion}`}
+                        previewContent={preview.content}
+                      />
+                    </NestedRightPane>
+                    <ResizablePanel
+                      initialWidth={getInitialRightWidth()}
+                      minWidth={105}
+                      maxWidth="30%"
+                      side="right"
+                      data-testid="downloads-panel"
+                    >
+                      <ScrollablePanelContainer>
+                        <Downloads
+                          setPreview={handleSetPreview}
+                          previewKey={preview.key}
+                          data-testid="downloads-container"
+                        />
+                      </ScrollablePanelContainer>
+                    </ResizablePanel>
+                  </>
+                ) : (
                   <NestedRightPane>
                     <StyledFilePreview
                       data-testid={`${preview.key}-file-preview`}
@@ -622,168 +734,144 @@ const Ergogen = () => {
                       previewContent={preview.content}
                     />
                   </NestedRightPane>
-                  <ResizablePanel
-                    initialWidth={getInitialRightWidth()}
-                    minWidth={105}
-                    maxWidth="30%"
-                    side="right"
-                    data-testid="downloads-panel"
-                  >
-                    <ScrollablePanelContainer>
-                      <Downloads
-                        setPreview={handleSetPreview}
-                        previewKey={preview.key}
-                        data-testid="downloads-container"
-                      />
-                    </ScrollablePanelContainer>
-                  </ResizablePanel>
-                </>
-              ) : (
-                <NestedRightPane>
-                  <StyledFilePreview
-                    data-testid={`${preview.key}-file-preview`}
-                    previewExtension={preview.extension}
-                    previewKey={`${preview.key}-${configContext.resultsVersion}`}
-                    previewContent={preview.content}
+                )}
+              </RightPane>
+            </>
+          ) : (
+            <>
+              <ResizablePanel
+                initialWidth={getInitialSettingsWidth()}
+                minWidth={150}
+                maxWidth="70%"
+                side="left"
+                data-testid="settings-panel"
+                style={{
+                  display: showMobileEditor && isMobile ? 'none' : undefined,
+                }}
+              >
+                <SettingsPaneContainer>
+                  <OptionContainer>
+                    <Title>Options</Title>
+                    <GenOption
+                      optionId={'autogen'}
+                      label={'Auto-generate'}
+                      setSelected={configContext.setAutoGen}
+                      checked={configContext.autoGen}
+                      aria-label="Enable auto-generate"
+                    />
+                    <GenOption
+                      optionId={'debug'}
+                      label={'Debug'}
+                      setSelected={configContext.setDebug}
+                      checked={configContext.debug}
+                      aria-label="Enable debug mode"
+                    />
+                    <GenOption
+                      optionId={'autogen3d'}
+                      label={
+                        <>
+                          Auto-gen PCB, 3D <small>(slow)</small>
+                        </>
+                      }
+                      setSelected={configContext.setAutoGen3D}
+                      checked={configContext.autoGen3D}
+                      aria-label="Enable auto-generate PCB and 3D (slow)"
+                    />
+                    <GenOption
+                      optionId={'kicanvasPreview'}
+                      label={
+                        <>
+                          KiCad Preview <small>(experimental)</small>
+                        </>
+                      }
+                      setSelected={configContext.setKicanvasPreview}
+                      checked={configContext.kicanvasPreview}
+                      aria-label="Enable KiCad preview (experimental)"
+                    />
+                    <GenOption
+                      optionId={'stlPreview'}
+                      label={
+                        <>
+                          STL Preview <small>(experimental)</small>
+                        </>
+                      }
+                      setSelected={configContext.setStlPreview}
+                      checked={configContext.stlPreview}
+                      aria-label="Enable STL preview (experimental)"
+                    />
+                  </OptionContainer>
+                  <Injections
+                    setInjectionToEdit={setInjectionToEdit}
+                    deleteInjection={handleDeleteInjection}
+                    injectionToEdit={injectionToEdit}
+                    onInjectionSelect={() => setShowMobileEditor(true)}
+                    data-testid="injections-container"
                   />
-                </NestedRightPane>
-              )}
-            </RightPane>
-          </>
-        ) : (
-          <>
-            <ResizablePanel
-              initialWidth={getInitialSettingsWidth()}
-              minWidth={150}
-              maxWidth="70%"
-              side="left"
-              data-testid="settings-panel"
-              style={{
-                display: showMobileEditor && isMobile ? 'none' : undefined,
-              }}
-            >
-              <SettingsPaneContainer>
-                <OptionContainer>
-                  <Title>Options</Title>
-                  <GenOption
-                    optionId={'autogen'}
-                    label={'Auto-generate'}
-                    setSelected={configContext.setAutoGen}
-                    checked={configContext.autoGen}
-                    aria-label="Enable auto-generate"
-                  />
-                  <GenOption
-                    optionId={'debug'}
-                    label={'Debug'}
-                    setSelected={configContext.setDebug}
-                    checked={configContext.debug}
-                    aria-label="Enable debug mode"
-                  />
-                  <GenOption
-                    optionId={'autogen3d'}
-                    label={
-                      <>
-                        Auto-gen PCB, 3D <small>(slow)</small>
-                      </>
-                    }
-                    setSelected={configContext.setAutoGen3D}
-                    checked={configContext.autoGen3D}
-                    aria-label="Enable auto-generate PCB and 3D (slow)"
-                  />
-                  <GenOption
-                    optionId={'kicanvasPreview'}
-                    label={
-                      <>
-                        KiCad Preview <small>(experimental)</small>
-                      </>
-                    }
-                    setSelected={configContext.setKicanvasPreview}
-                    checked={configContext.kicanvasPreview}
-                    aria-label="Enable KiCad preview (experimental)"
-                  />
-                  <GenOption
-                    optionId={'stlPreview'}
-                    label={
-                      <>
-                        STL Preview <small>(experimental)</small>
-                      </>
-                    }
-                    setSelected={configContext.setStlPreview}
-                    checked={configContext.stlPreview}
-                    aria-label="Enable STL preview (experimental)"
-                  />
-                </OptionContainer>
-                <Injections
-                  setInjectionToEdit={setInjectionToEdit}
-                  deleteInjection={handleDeleteInjection}
-                  injectionToEdit={injectionToEdit}
-                  onInjectionSelect={() => setShowMobileEditor(true)}
-                  data-testid="injections-container"
-                />
-              </SettingsPaneContainer>
-            </ResizablePanel>
-            <RightPane $fullWidth={showMobileEditor && isMobile}>
-              <EditorContainer>
-                {isMobile && (
-                  <MobileEditorHeader>
-                    <Title as="h4" style={{ marginTop: 0 }}>
+                </SettingsPaneContainer>
+              </ResizablePanel>
+              <RightPane $fullWidth={showMobileEditor && isMobile}>
+                <EditorContainer>
+                  {isMobile && (
+                    <MobileEditorHeader>
+                      <Title as="h4" style={{ marginTop: 0 }}>
+                        {injectionToEdit.type
+                          ? injectionToEdit.type.charAt(0).toUpperCase() +
+                            injectionToEdit.type.slice(1)
+                          : 'Footprint'}{' '}
+                        name
+                      </Title>
+                      <MobileCloseButton
+                        onClick={() => {
+                          setShowMobileEditor(false);
+                          setInjectionToEdit({
+                            key: -1,
+                            type: '',
+                            name: '',
+                            content: '',
+                          });
+                        }}
+                        aria-label="Close editor"
+                        data-testid="mobile-editor-close"
+                      >
+                        <span className="material-symbols-outlined">close</span>
+                      </MobileCloseButton>
+                    </MobileEditorHeader>
+                  )}
+                  {!isMobile && (
+                    <Title as="h4">
                       {injectionToEdit.type
                         ? injectionToEdit.type.charAt(0).toUpperCase() +
                           injectionToEdit.type.slice(1)
                         : 'Footprint'}{' '}
                       name
                     </Title>
-                    <MobileCloseButton
-                      onClick={() => {
-                        setShowMobileEditor(false);
-                        setInjectionToEdit({
-                          key: -1,
-                          type: '',
-                          name: '',
-                          content: '',
-                        });
-                      }}
-                      aria-label="Close editor"
-                      data-testid="mobile-editor-close"
-                    >
-                      <span className="material-symbols-outlined">close</span>
-                    </MobileCloseButton>
-                  </MobileEditorHeader>
-                )}
-                {!isMobile && (
+                  )}
+                  <Input
+                    value={injectionToEdit.name}
+                    onChange={handleInjectionNameChange}
+                    disabled={injectionToEdit.key === -1}
+                    aria-label={`${injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} name`}
+                    data-testid="footprint-name-input"
+                  />
                   <Title as="h4">
                     {injectionToEdit.type
                       ? injectionToEdit.type.charAt(0).toUpperCase() +
                         injectionToEdit.type.slice(1)
                       : 'Footprint'}{' '}
-                    name
+                    code
                   </Title>
-                )}
-                <Input
-                  value={injectionToEdit.name}
-                  onChange={handleInjectionNameChange}
-                  disabled={injectionToEdit.key === -1}
-                  aria-label={`${injectionToEdit.type ? injectionToEdit.type.charAt(0).toUpperCase() + injectionToEdit.type.slice(1) : 'Footprint'} name`}
-                  data-testid="footprint-name-input"
-                />
-                <Title as="h4">
-                  {injectionToEdit.type
-                    ? injectionToEdit.type.charAt(0).toUpperCase() +
-                      injectionToEdit.type.slice(1)
-                    : 'Footprint'}{' '}
-                  code
-                </Title>
-                <InjectionEditor
-                  injection={injectionToEdit}
-                  setInjection={setInjectionToEdit}
-                  options={{ readOnly: injectionToEdit.key === -1 }}
-                />
-              </EditorContainer>
-            </RightPane>
-          </>
-        )}
-      </FlexContainer>
-    </ErgogenWrapper>
+                  <InjectionEditor
+                    injection={injectionToEdit}
+                    setInjection={setInjectionToEdit}
+                    options={{ readOnly: injectionToEdit.key === -1 }}
+                  />
+                </EditorContainer>
+              </RightPane>
+            </>
+          )}
+        </FlexContainer>
+      </ErgogenWrapper>
+    </>
   );
 };
 
