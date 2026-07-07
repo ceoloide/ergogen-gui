@@ -126,6 +126,10 @@ const AccentIconButton = styled(OutlineIconButton)`
     background-color: ${theme.colors.accentDark};
     border-color: ${theme.colors.accentDarker};
   }
+
+  @media (max-width: 375px) {
+    display: none;
+  }
 `;
 
 const NewButtonText = styled.span`
