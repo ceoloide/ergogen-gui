@@ -124,3 +124,39 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
     isTag: !isHash,
   };
 };
+
+/**
+ * Resolves the full Ergogen version string in the format github:user/repo#version-tag.
+ * If the official ergogen is used, it returns github:ergogen/ergogen#v<version>.
+ *
+ * @param version The version string from the environment variable (or config).
+ * @returns The formatted version string.
+ */
+export const getFullErgogenVersion = (version?: string): string => {
+  if (!version || version === 'undefined' || version === 'null') {
+    return `github:ergogen/ergogen#v${ergogenPkg.version}`;
+  }
+
+  // Handle NPM version (e.g., ergogen@4.2.0)
+  if (version.includes('@')) {
+    const parts = version.split('@');
+    const verPart = parts[1] || version;
+    const pkgName = parts[0];
+    const repo = pkgName === 'ergogen' ? 'ergogen/ergogen' : pkgName;
+    return `github:${repo}#v${verPart}`;
+  }
+
+  // Remove "github:" prefix if present for uniform processing
+  const cleanVersion = version.startsWith('github:')
+    ? version.slice(7)
+    : version;
+
+  // Split into repo and branch/ref
+  const [repo, branch] = cleanVersion.split('#');
+
+  if (!branch) {
+    return `github:${repo}#v${ergogenPkg.version}`;
+  }
+
+  return `github:${repo}#${branch}`;
+};
