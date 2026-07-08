@@ -4,7 +4,6 @@ import {
   createShareableUri,
   getConfigFromHash,
   ShareableConfig,
-  extractUsedFootprintsFromCanonical,
   filterInjectionsForSharing,
   extractUsedInjectionsFromCanonical,
 } from './share';
@@ -134,16 +133,18 @@ describe('share utilities', () => {
       expect(fragment).toBeTruthy();
     });
 
-    it('filters footprint injections when canonical is provided', () => {
+    it('filters injections when canonical is provided', () => {
       // Arrange
       const injections: string[][] = [
         ['footprint', 'used/switch', 'function switch() {}'],
         ['footprint', 'unused/diode', 'function diode() {}'],
         ['template', 'my_template', 'template content'],
+        ['template', 'unused_template', 'old content'],
       ];
       const canonical = {
         pcbs: {
           my_pcb: {
+            template: 'my_template',
             footprints: {
               switch1: { what: 'used/switch' },
             },
@@ -158,7 +159,7 @@ describe('share utilities', () => {
         canonical,
       });
 
-      // Assert - decode and verify only used footprint and template are included
+      // Assert - only the used footprint and used template are included
       const fragment = uri.split('#')[1];
       const decoded = decodeConfig(fragment);
       expect(decoded.success).toBe(true);
@@ -223,8 +224,8 @@ describe('share utilities', () => {
       }
     });
 
-    it('handles canonical with no pcbs section', () => {
-      // Arrange
+    it('handles canonical with no pcbs section (all injections filtered out)', () => {
+      // Arrange: no pcbs section means no footprint, template, or outline usage is detected
       const injections: string[][] = [
         ['footprint', 'some/footprint', 'function fp() {}'],
         ['template', 'my_template', 'template content'],
@@ -241,14 +242,12 @@ describe('share utilities', () => {
         canonical,
       });
 
-      // Assert - only non-footprint injections should be included
+      // Assert - no injections are used so none should be included
       const fragment = uri.split('#')[1];
       const decoded = decodeConfig(fragment);
       expect(decoded.success).toBe(true);
       if (decoded.success) {
-        expect(decoded.config.injections).toEqual([
-          ['template', 'my_template', 'template content'],
-        ]);
+        expect(decoded.config.injections).toBeUndefined();
       }
     });
   });
@@ -339,166 +338,14 @@ describe('share utilities', () => {
     });
   });
 
-  describe('extractUsedFootprintsFromCanonical', () => {
-    it('extracts footprint names from pcbs section', () => {
-      // Arrange
-      const canonical = {
-        pcbs: {
-          my_pcb: {
-            footprints: {
-              switch1: { what: 'ceoloide/switch_choc_v1_v2' },
-              diode1: { what: 'ceoloide/diode_tht_sod123' },
-            },
-          },
-        },
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(
-        new Set(['ceoloide/switch_choc_v1_v2', 'ceoloide/diode_tht_sod123'])
-      );
-    });
-
-    it('extracts footprints from multiple PCBs', () => {
-      // Arrange
-      const canonical = {
-        pcbs: {
-          pcb_left: {
-            footprints: {
-              switch: { what: 'custom/my_switch' },
-            },
-          },
-          pcb_right: {
-            footprints: {
-              mcu: { what: 'ceoloide/mcu_nice_nano' },
-            },
-          },
-        },
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(
-        new Set(['custom/my_switch', 'ceoloide/mcu_nice_nano'])
-      );
-    });
-
-    it('deduplicates footprint names used in multiple places', () => {
-      // Arrange
-      const canonical = {
-        pcbs: {
-          my_pcb: {
-            footprints: {
-              switch1: { what: 'ceoloide/switch_choc_v1_v2' },
-              switch2: { what: 'ceoloide/switch_choc_v1_v2' },
-              switch3: { what: 'ceoloide/switch_choc_v1_v2' },
-            },
-          },
-        },
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set(['ceoloide/switch_choc_v1_v2']));
-    });
-
-    it('returns empty set when canonical is null', () => {
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(null);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set());
-    });
-
-    it('returns empty set when canonical is undefined', () => {
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(undefined);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set());
-    });
-
-    it('returns empty set when canonical has no pcbs section', () => {
-      // Arrange
-      const canonical = {
-        points: {},
-        outlines: {},
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set());
-    });
-
-    it('returns empty set when pcbs has no footprints', () => {
-      // Arrange
-      const canonical = {
-        pcbs: {
-          my_pcb: {
-            outlines: {},
-          },
-        },
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set());
-    });
-
-    it('skips footprints without what property', () => {
-      // Arrange
-      const canonical = {
-        pcbs: {
-          my_pcb: {
-            footprints: {
-              valid: { what: 'valid/footprint' },
-              invalid: { other: 'property' },
-            },
-          },
-        },
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set(['valid/footprint']));
-    });
-
-    it('skips footprints with non-string what property', () => {
-      // Arrange
-      const canonical = {
-        pcbs: {
-          my_pcb: {
-            footprints: {
-              valid: { what: 'valid/footprint' },
-              number_what: { what: 123 },
-              null_what: { what: null },
-            },
-          },
-        },
-      };
-
-      // Act
-      const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-
-      // Assert
-      expect(usedFootprints).toEqual(new Set(['valid/footprint']));
-    });
-  });
-
   describe('filterInjectionsForSharing', () => {
+    // Helper to build a UsedInjections object with empty sets for unused types
+    const usedWith = ({
+      footprints = new Set<string>(),
+      templates = new Set<string>(),
+      outlines = new Set<string>(),
+    } = {}) => ({ footprints, templates, outlines });
+
     it('filters footprint injections to only include used ones', () => {
       // Arrange
       const injections: string[][] = [
@@ -506,13 +353,15 @@ describe('share utilities', () => {
         ['footprint', 'ceoloide/diode_tht_sod123', 'function diode() {}'],
         ['footprint', 'unused/footprint', 'function unused() {}'],
       ];
-      const usedFootprints = new Set([
-        'ceoloide/switch_choc_v1_v2',
-        'ceoloide/diode_tht_sod123',
-      ]);
+      const used = usedWith({
+        footprints: new Set([
+          'ceoloide/switch_choc_v1_v2',
+          'ceoloide/diode_tht_sod123',
+        ]),
+      });
 
       // Act
-      const filtered = filterInjectionsForSharing(injections, usedFootprints);
+      const filtered = filterInjectionsForSharing(injections, used);
 
       // Assert
       expect(filtered).toEqual([
@@ -521,31 +370,69 @@ describe('share utilities', () => {
       ]);
     });
 
-    it('keeps non-footprint injections (templates) unchanged', () => {
+    it('filters template injections to only include used ones', () => {
       // Arrange
       const injections: string[][] = [
-        ['footprint', 'used/footprint', 'function fp() {}'],
-        ['footprint', 'unused/footprint', 'function unused() {}'],
-        ['template', 'my_template', 'template content'],
+        ['template', 'kicad8', 'template content'],
+        ['template', 'kicad5', 'old template'],
       ];
-      const usedFootprints = new Set(['used/footprint']);
+      const used = usedWith({ templates: new Set(['kicad8']) });
 
       // Act
-      const filtered = filterInjectionsForSharing(injections, usedFootprints);
+      const filtered = filterInjectionsForSharing(injections, used);
+
+      // Assert
+      expect(filtered).toEqual([['template', 'kicad8', 'template content']]);
+    });
+
+    it('filters outline injections to only include used ones', () => {
+      // Arrange
+      const injections: string[][] = [
+        ['outline', 'my_shape', 'outline content'],
+        ['outline', 'other_shape', 'other content'],
+      ];
+      const used = usedWith({ outlines: new Set(['my_shape']) });
+
+      // Act
+      const filtered = filterInjectionsForSharing(injections, used);
+
+      // Assert
+      expect(filtered).toEqual([['outline', 'my_shape', 'outline content']]);
+    });
+
+    it('filters all three injection types independently', () => {
+      // Arrange
+      const injections: string[][] = [
+        ['footprint', 'used/fp', 'function fp() {}'],
+        ['footprint', 'unused/fp', 'function fp2() {}'],
+        ['template', 'kicad8', 'template content'],
+        ['template', 'kicad5', 'old template'],
+        ['outline', 'my_shape', 'outline content'],
+        ['outline', 'other_shape', 'other content'],
+      ];
+      const used = usedWith({
+        footprints: new Set(['used/fp']),
+        templates: new Set(['kicad8']),
+        outlines: new Set(['my_shape']),
+      });
+
+      // Act
+      const filtered = filterInjectionsForSharing(injections, used);
 
       // Assert
       expect(filtered).toEqual([
-        ['footprint', 'used/footprint', 'function fp() {}'],
-        ['template', 'my_template', 'template content'],
+        ['footprint', 'used/fp', 'function fp() {}'],
+        ['template', 'kicad8', 'template content'],
+        ['outline', 'my_shape', 'outline content'],
       ]);
     });
 
     it('returns empty array when no injections are provided', () => {
       // Arrange
-      const usedFootprints = new Set(['some/footprint']);
+      const used = usedWith({ footprints: new Set(['some/footprint']) });
 
       // Act
-      const filtered = filterInjectionsForSharing(undefined, usedFootprints);
+      const filtered = filterInjectionsForSharing(undefined, used);
 
       // Assert
       expect(filtered).toEqual([]);
@@ -554,31 +441,13 @@ describe('share utilities', () => {
     it('returns empty array when injections is empty', () => {
       // Arrange
       const injections: string[][] = [];
-      const usedFootprints = new Set(['some/footprint']);
+      const used = usedWith({ footprints: new Set(['some/footprint']) });
 
       // Act
-      const filtered = filterInjectionsForSharing(injections, usedFootprints);
+      const filtered = filterInjectionsForSharing(injections, used);
 
       // Assert
       expect(filtered).toEqual([]);
-    });
-
-    it('returns all non-footprint injections when no footprints are used', () => {
-      // Arrange
-      const injections: string[][] = [
-        ['footprint', 'unused/footprint1', 'function fp1() {}'],
-        ['footprint', 'unused/footprint2', 'function fp2() {}'],
-        ['template', 'my_template', 'template content'],
-      ];
-      const usedFootprints = new Set<string>();
-
-      // Act
-      const filtered = filterInjectionsForSharing(injections, usedFootprints);
-
-      // Assert
-      expect(filtered).toEqual([
-        ['template', 'my_template', 'template content'],
-      ]);
     });
 
     it('handles footprints with nested names (slashes)', () => {
@@ -587,10 +456,12 @@ describe('share utilities', () => {
         ['footprint', 'ceoloide/utility/text', 'function text() {}'],
         ['footprint', 'ceoloide/switch_choc_v1_v2', 'function switch() {}'],
       ];
-      const usedFootprints = new Set(['ceoloide/utility/text']);
+      const used = usedWith({
+        footprints: new Set(['ceoloide/utility/text']),
+      });
 
       // Act
-      const filtered = filterInjectionsForSharing(injections, usedFootprints);
+      const filtered = filterInjectionsForSharing(injections, used);
 
       // Assert
       expect(filtered).toEqual([
@@ -629,6 +500,26 @@ describe('share utilities', () => {
       expect(result.footprints).toEqual(new Set(['mx']));
       expect(result.templates).toEqual(new Set(['kicad8']));
       expect(result.outlines).toEqual(new Set(['my_custom_svg', 'rectangle']));
+    });
+
+    it('extracts footprint names from multiple PCBs', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          pcb_left: { footprints: { switch: { what: 'custom/my_switch' } } },
+          pcb_right: {
+            footprints: { mcu: { what: 'ceoloide/mcu_nice_nano' } },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(
+        new Set(['custom/my_switch', 'ceoloide/mcu_nice_nano'])
+      );
     });
 
     it('extracts templates from pcbs section', () => {
@@ -687,7 +578,7 @@ describe('share utilities', () => {
       );
     });
 
-    it('omits the default what (outline) when not explicitly set', () => {
+    it('omits outline operations without an explicit what field', () => {
       // Arrange: part without explicit what — ergogen defaults to 'outline' at runtime,
       // but the canonical preserves the original YAML (no what field means undefined here)
       const canonical = {
@@ -706,6 +597,47 @@ describe('share utilities', () => {
 
       // Assert: only 'rectangle' is extracted; missing what is skipped
       expect(result.outlines).toEqual(new Set(['rectangle']));
+    });
+
+    it('skips footprints without what property', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              valid: { what: 'valid/footprint' },
+              invalid: { other: 'property' },
+            },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set(['valid/footprint']));
+    });
+
+    it('skips footprints with non-string what property', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          my_pcb: {
+            footprints: {
+              valid: { what: 'valid/footprint' },
+              number_what: { what: 123 },
+              null_what: { what: null },
+            },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set(['valid/footprint']));
     });
 
     it('returns empty sets for null canonical', () => {

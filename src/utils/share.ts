@@ -186,17 +186,17 @@ type CreateShareableUriOptions = {
   injections?: string[][];
   /**
    * Optional canonical output from Ergogen (results.canonical).
-   * When provided, footprint injections are filtered to only include
-   * those actually used in the configuration's PCBs section.
-   * Non-footprint injections (templates, etc.) are always included.
+   * When provided, injections are filtered to only include those actually
+   * used in the configuration (footprints from pcbs, templates from pcbs,
+   * outline injections from outlines).
    */
   canonical?: unknown;
 };
 
 /**
  * Creates a shareable URI with the encoded configuration as a hash fragment.
- * When canonical output is provided, only footprints used in the configuration
- * are included in the share link.
+ * When canonical output is provided, injections are filtered per type so only
+ * those actually referenced in the configuration are included.
  *
  * @param options - Configuration options for creating the shareable URI
  * @returns Full URL with encoded config in hash fragment
@@ -209,8 +209,8 @@ export const createShareableUri = (
   // Filter injections if canonical output is provided
   let injectionsToShare = injections;
   if (canonical && injections && injections.length > 0) {
-    const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
-    injectionsToShare = filterInjectionsForSharing(injections, usedFootprints);
+    const usedInjections = extractUsedInjectionsFromCanonical(canonical);
+    injectionsToShare = filterInjectionsForSharing(injections, usedInjections);
   }
 
   // Only include injections if there are any after filtering
@@ -268,55 +268,7 @@ type CanonicalOutput = {
 };
 
 /**
- * Extracts the names of all footprints used in the PCBs section of the canonical output.
- * This examines the resolved `what` property of each footprint definition to determine
- * which footprints are actually used in the configuration.
- *
- * @param canonical - The canonical output from Ergogen (results.canonical)
- * @returns A Set of footprint names that are used in the configuration
- */
-export const extractUsedFootprintsFromCanonical = (
-  canonical: unknown
-): Set<string> => {
-  const usedFootprints = new Set<string>();
-
-  // Return empty set if canonical is null or undefined
-  if (!canonical || typeof canonical !== 'object') {
-    return usedFootprints;
-  }
-
-  const canonicalOutput = canonical as CanonicalOutput;
-
-  // Return empty set if there's no pcbs section
-  if (!canonicalOutput.pcbs || typeof canonicalOutput.pcbs !== 'object') {
-    return usedFootprints;
-  }
-
-  // Iterate through all PCBs
-  for (const pcbName of Object.keys(canonicalOutput.pcbs)) {
-    const pcb = canonicalOutput.pcbs[pcbName];
-
-    // Skip if no footprints in this PCB
-    if (!pcb || !pcb.footprints || typeof pcb.footprints !== 'object') {
-      continue;
-    }
-
-    // Iterate through all footprints in this PCB
-    for (const footprintName of Object.keys(pcb.footprints)) {
-      const footprint = pcb.footprints[footprintName];
-
-      // Add the footprint name (from 'what' property) if it's a valid string
-      if (footprint && typeof footprint.what === 'string') {
-        usedFootprints.add(footprint.what);
-      }
-    }
-  }
-
-  return usedFootprints;
-};
-
-/**
- * Return type for extractUsedInjectionsFromCanonical, grouping used names by injection type.
+ * Groups used injection names by type, as returned by extractUsedInjectionsFromCanonical.
  */
 type UsedInjections = {
   footprints: Set<string>;
@@ -403,16 +355,18 @@ export const extractUsedInjectionsFromCanonical = (
 };
 
 /**
- * Filters injections to only include footprints that are actually used in the configuration.
- * Non-footprint injections (templates, etc.) are always included.
+ * Filters injections to only include those actually used in the configuration,
+ * based on the sets extracted from canonical output. Each injection type is
+ * checked against its corresponding set: footprints against usedInjections.footprints,
+ * templates against usedInjections.templates, outlines against usedInjections.outlines.
  *
  * @param injections - The array of injections [type, name, content]
- * @param usedFootprints - A Set of footprint names that are used in the configuration
+ * @param usedInjections - Sets of used names per injection type
  * @returns A filtered array of injections
  */
 export const filterInjectionsForSharing = (
   injections: string[][] | undefined,
-  usedFootprints: Set<string>
+  usedInjections: UsedInjections
 ): string[][] => {
   if (!injections || injections.length === 0) {
     return [];
@@ -421,12 +375,11 @@ export const filterInjectionsForSharing = (
   return injections.filter((injection) => {
     const [type, name] = injection;
 
-    // Keep non-footprint injections (templates, etc.)
-    if (type !== 'footprint') {
-      return true;
-    }
+    if (type === 'footprint') return usedInjections.footprints.has(name);
+    if (type === 'template') return usedInjections.templates.has(name);
+    if (type === 'outline') return usedInjections.outlines.has(name);
 
-    // For footprints, only include if they're in the used set
-    return usedFootprints.has(name);
+    // Unknown injection types are included by default
+    return true;
   });
 };
