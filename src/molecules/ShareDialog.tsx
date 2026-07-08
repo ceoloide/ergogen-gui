@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import {
   createShareableUri,
-  extractUsedFootprintsFromCanonical,
+  extractUsedInjectionsFromCanonical,
 } from '../utils/share';
 import { createErgogenWorker } from '../workers/workerFactory';
 
@@ -124,11 +124,24 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
 
       if (response.type === 'success') {
         const canonical = response.results?.canonical;
-        const usedFootprints = extractUsedFootprintsFromCanonical(canonical);
+        const {
+          footprints: usedFootprints,
+          templates: usedTemplates,
+          outlines: usedOutlines,
+        } = extractUsedInjectionsFromCanonical(canonical);
 
         const eligibleItems = safeInjections
           .map(([type, name, content]) => {
-            const isEligible = type !== 'footprint' || usedFootprints.has(name);
+            let isEligible: boolean;
+            if (type === 'footprint') {
+              isEligible = usedFootprints.has(name);
+            } else if (type === 'template') {
+              isEligible = usedTemplates.has(name);
+            } else if (type === 'outline') {
+              isEligible = usedOutlines.has(name);
+            } else {
+              isEligible = true;
+            }
             return { type, name, content, checked: isEligible, isEligible };
           })
           .filter((item) => item.isEligible)

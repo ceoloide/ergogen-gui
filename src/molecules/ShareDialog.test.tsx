@@ -22,6 +22,7 @@ describe('ShareDialog', () => {
     ['footprint', 'mx', 'module.exports = {}'],
     ['footprint', 'choc', 'module.exports = {}'],
     ['template', 'kicad8', 'template_content'],
+    ['outline', 'my_svg', 'outline_content'],
   ];
 
   let mockWorker: any;
@@ -115,7 +116,8 @@ describe('ShareDialog', () => {
       />
     );
 
-    // Act - trigger success message from worker
+    // Act - trigger success message from worker with canonical that includes the used
+    // footprint, the template, and an outline injection
     await act(async () => {
       mockWorker.onmessage({
         data: {
@@ -124,9 +126,15 @@ describe('ShareDialog', () => {
             canonical: {
               pcbs: {
                 board: {
+                  template: 'kicad8',
                   footprints: {
                     sw1: { what: 'mx' }, // 'mx' is used, 'choc' is not
                   },
+                },
+              },
+              outlines: {
+                board: {
+                  base: { what: 'my_svg' }, // 'my_svg' outline injection is used
                 },
               },
             },
@@ -144,9 +152,13 @@ describe('ShareDialog', () => {
     expect(screen.getByLabelText('mx')).toBeInTheDocument();
     expect(screen.getByLabelText('mx')).toBeChecked();
 
-    // 'kicad8' template should be listed because non-footprints are always included
+    // 'kicad8' template should be listed because it is used in the pcbs section
     expect(screen.getByLabelText('kicad8')).toBeInTheDocument();
     expect(screen.getByLabelText('kicad8')).toBeChecked();
+
+    // 'my_svg' outline should be listed because it is used in the outlines section
+    expect(screen.getByLabelText('my_svg')).toBeInTheDocument();
+    expect(screen.getByLabelText('my_svg')).toBeChecked();
 
     // 'choc' footprint should NOT be listed because it is not used in the PCB
     expect(screen.queryByLabelText('choc')).not.toBeInTheDocument();
@@ -172,10 +184,14 @@ describe('ShareDialog', () => {
             canonical: {
               pcbs: {
                 board: {
+                  template: 'kicad8',
                   footprints: {
                     sw1: { what: 'mx' },
                   },
                 },
+              },
+              outlines: {
+                board: { base: { what: 'my_svg' } },
               },
             },
           },
@@ -198,8 +214,87 @@ describe('ShareDialog', () => {
     ).toBeInTheDocument();
     expect(createShareableUri).toHaveBeenCalledWith({
       config: mockConfig,
-      injections: [['footprint', 'mx', 'module.exports = {}']],
+      injections: [
+        ['footprint', 'mx', 'module.exports = {}'],
+        ['outline', 'my_svg', 'outline_content'],
+      ],
     });
+  });
+
+  it('filters templates not used in the canonical pcbs section', async () => {
+    // Arrange
+    render(
+      <ShareDialog
+        config={mockConfig}
+        injections={mockInjections}
+        onClose={mockClose}
+        data-testid="share-dialog"
+      />
+    );
+
+    // Act - worker returns canonical where the pcb uses kicad5 (not kicad8)
+    await act(async () => {
+      mockWorker.onmessage({
+        data: {
+          type: 'success',
+          results: {
+            canonical: {
+              pcbs: {
+                board: {
+                  template: 'kicad5', // 'kicad8' is NOT used
+                  footprints: { sw1: { what: 'mx' } },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Assert: 'kicad8' template injection should NOT appear
+    expect(screen.queryByLabelText('kicad8')).not.toBeInTheDocument();
+    // 'mx' footprint should still appear
+    expect(screen.getByLabelText('mx')).toBeInTheDocument();
+  });
+
+  it('filters outline injections not used in the canonical outlines section', async () => {
+    // Arrange
+    render(
+      <ShareDialog
+        config={mockConfig}
+        injections={mockInjections}
+        onClose={mockClose}
+        data-testid="share-dialog"
+      />
+    );
+
+    // Act - worker returns canonical where no outline uses 'my_svg'
+    await act(async () => {
+      mockWorker.onmessage({
+        data: {
+          type: 'success',
+          results: {
+            canonical: {
+              pcbs: {
+                board: {
+                  template: 'kicad8',
+                  footprints: { sw1: { what: 'mx' } },
+                },
+              },
+              outlines: {
+                board: { base: { what: 'rectangle' } }, // only built-in, no 'my_svg'
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Assert: 'my_svg' outline injection should NOT appear
+    expect(screen.queryByLabelText('my_svg')).not.toBeInTheDocument();
+    // 'mx' and 'kicad8' should still appear
+    expect(screen.getByLabelText('mx')).toBeInTheDocument();
+    expect(screen.getByLabelText('kicad8')).toBeInTheDocument();
   });
 
   it('ignores injections when Include custom libraries is toggled OFF', () => {

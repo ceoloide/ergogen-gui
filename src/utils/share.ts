@@ -252,11 +252,18 @@ type CanonicalPcbFootprint = {
 
 type CanonicalPcb = {
   footprints?: Record<string, CanonicalPcbFootprint>;
+  template?: string;
+  [key: string]: unknown;
+};
+
+type CanonicalOutlineOperation = {
+  what?: string;
   [key: string]: unknown;
 };
 
 type CanonicalOutput = {
   pcbs?: Record<string, CanonicalPcb>;
+  outlines?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -306,6 +313,93 @@ export const extractUsedFootprintsFromCanonical = (
   }
 
   return usedFootprints;
+};
+
+/**
+ * Return type for extractUsedInjectionsFromCanonical, grouping used names by injection type.
+ */
+type UsedInjections = {
+  footprints: Set<string>;
+  templates: Set<string>;
+  outlines: Set<string>;
+};
+
+/**
+ * Extracts all used injection names from the canonical output, covering all three
+ * injection types:
+ *
+ * - **footprints**: collected from `pcbs[*].footprints[*].what`
+ * - **templates**: collected from `pcbs[*].template`
+ * - **outlines**: collected from `outlines[*][op].what` — the `what` field of every
+ *   outline operation. Custom outline injections appear here as a `what` value (just
+ *   like footprint injections appear as `what` in the pcbs section).
+ *
+ * The caller is responsible for intersecting these sets with the loaded custom
+ * injections to determine which ones to include in a share package.
+ *
+ * @param canonical - The canonical output from Ergogen (results.canonical)
+ * @returns An object with three Sets, one per injection type
+ */
+export const extractUsedInjectionsFromCanonical = (
+  canonical: unknown
+): UsedInjections => {
+  const footprints = new Set<string>();
+  const templates = new Set<string>();
+  const outlines = new Set<string>();
+
+  if (!canonical || typeof canonical !== 'object') {
+    return { footprints, templates, outlines };
+  }
+
+  const canonicalOutput = canonical as CanonicalOutput;
+
+  // --- Footprints and templates from pcbs section ---
+  if (canonicalOutput.pcbs && typeof canonicalOutput.pcbs === 'object') {
+    for (const pcb of Object.values(canonicalOutput.pcbs)) {
+      if (!pcb || typeof pcb !== 'object') continue;
+
+      // Template: pcbs[pcb].template is a string naming the template used
+      if (typeof pcb.template === 'string') {
+        templates.add(pcb.template);
+      }
+
+      // Footprints: pcbs[pcb].footprints[fp].what is the footprint injection name
+      if (pcb.footprints && typeof pcb.footprints === 'object') {
+        for (const fp of Object.values(pcb.footprints)) {
+          if (fp && typeof fp.what === 'string') {
+            footprints.add(fp.what);
+          }
+        }
+      }
+    }
+  }
+
+  // --- Outline injection names from outlines section ---
+  // Each outline is a collection of operations (object or array). Each operation
+  // may have a `what` field naming the shape type — custom injections appear here
+  // as their injection name, just like footprint injections appear in pcbs.
+  if (
+    canonicalOutput.outlines &&
+    typeof canonicalOutput.outlines === 'object'
+  ) {
+    for (const outlineEntry of Object.values(canonicalOutput.outlines)) {
+      if (!outlineEntry || typeof outlineEntry !== 'object') continue;
+
+      // Operations can be stored as an array (YAML list) or as a named object
+      const ops: unknown[] = Array.isArray(outlineEntry)
+        ? outlineEntry
+        : Object.values(outlineEntry as Record<string, unknown>);
+
+      for (const op of ops) {
+        const operation = op as CanonicalOutlineOperation;
+        if (operation && typeof operation.what === 'string') {
+          outlines.add(operation.what);
+        }
+      }
+    }
+  }
+
+  return { footprints, templates, outlines };
 };
 
 /**

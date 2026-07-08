@@ -6,6 +6,7 @@ import {
   ShareableConfig,
   extractUsedFootprintsFromCanonical,
   filterInjectionsForSharing,
+  extractUsedInjectionsFromCanonical,
 } from './share';
 import { compressToEncodedURIComponent } from 'lz-string';
 
@@ -595,6 +596,163 @@ describe('share utilities', () => {
       expect(filtered).toEqual([
         ['footprint', 'ceoloide/utility/text', 'function text() {}'],
       ]);
+    });
+  });
+
+  describe('extractUsedInjectionsFromCanonical', () => {
+    it('extracts footprints, templates, and outlines from a full canonical', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          board: {
+            template: 'kicad8',
+            footprints: {
+              sw1: { what: 'mx' },
+            },
+            outlines: {
+              main: { outline: 'board_outline' },
+            },
+          },
+        },
+        outlines: {
+          board_outline: {
+            base: { what: 'my_custom_svg' },
+            cutout: { what: 'rectangle' },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set(['mx']));
+      expect(result.templates).toEqual(new Set(['kicad8']));
+      expect(result.outlines).toEqual(new Set(['my_custom_svg', 'rectangle']));
+    });
+
+    it('extracts templates from pcbs section', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          left: { template: 'kicad5' },
+          right: { template: 'kicad8' },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.templates).toEqual(new Set(['kicad5', 'kicad8']));
+    });
+
+    it('extracts outline what values from outlines section (object-style ops)', () => {
+      // Arrange: canonical outlines with object-keyed operations (the normal canonical form)
+      const canonical = {
+        outlines: {
+          board: {
+            base: { what: 'my_custom_shape' },
+            hole: { what: 'circle' },
+          },
+          top_plate: {
+            main: { what: 'another_custom' },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert: includes both custom and built-in what values
+      expect(result.outlines).toEqual(
+        new Set(['my_custom_shape', 'circle', 'another_custom'])
+      );
+    });
+
+    it('extracts outline what values from outlines section (array-style ops)', () => {
+      // Arrange: canonical outlines where the value is an array (after unnest)
+      const canonical = {
+        outlines: {
+          board: [{ what: 'my_custom_shape' }, { what: 'rectangle' }],
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.outlines).toEqual(
+        new Set(['my_custom_shape', 'rectangle'])
+      );
+    });
+
+    it('omits the default what (outline) when not explicitly set', () => {
+      // Arrange: part without explicit what — ergogen defaults to 'outline' at runtime,
+      // but the canonical preserves the original YAML (no what field means undefined here)
+      const canonical = {
+        outlines: {
+          board: {
+            base: { what: 'rectangle' },
+            derived: {
+              /* no what field — uses ergogen default at runtime */
+            },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert: only 'rectangle' is extracted; missing what is skipped
+      expect(result.outlines).toEqual(new Set(['rectangle']));
+    });
+
+    it('returns empty sets for null canonical', () => {
+      // Act
+      const result = extractUsedInjectionsFromCanonical(null);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set());
+      expect(result.templates).toEqual(new Set());
+      expect(result.outlines).toEqual(new Set());
+    });
+
+    it('returns empty sets when pcbs and outlines sections are absent', () => {
+      // Arrange
+      const canonical = { points: {}, units: {} };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set());
+      expect(result.templates).toEqual(new Set());
+      expect(result.outlines).toEqual(new Set());
+    });
+
+    it('deduplicates across multiple pcbs and outlines', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          left: { template: 'kicad8', footprints: { sw1: { what: 'mx' } } },
+          right: { template: 'kicad8', footprints: { sw2: { what: 'mx' } } },
+        },
+        outlines: {
+          board: {
+            a: { what: 'my_shape' },
+            b: { what: 'my_shape' },
+          },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert: each name appears only once despite multiple references
+      expect(result.footprints).toEqual(new Set(['mx']));
+      expect(result.templates).toEqual(new Set(['kicad8']));
+      expect(result.outlines).toEqual(new Set(['my_shape']));
     });
   });
 });
