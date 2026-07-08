@@ -216,30 +216,41 @@ The application supports sharing keyboard configurations via URL hash fragments.
 Shareable links use the format: `https://ergogen.io/#<encoded-config>` where the hash fragment contains:
 
 - The keyboard configuration (YAML/JSON string)
-- Only the footprint injections that are actually used in the configuration's PCBs section
-- All non-footprint injections (templates, etc.) are always included
+- Only the footprint injections that were selected by the user in the Share dialog (filtered to those actually used in the design)
+- All non-footprint injections (templates, etc.) that were selected by the user
 
 The configuration and injections are compressed and URL-encoded using `lz-string`'s `compressToEncodedURIComponent` function for efficient transmission.
 
 ### Sharing Process
 
-1. **Generation**: When the user clicks the share button, the app:
-   - Collects the current configuration and canonical output
-   - Extracts used footprint names from the canonical output's PCBs section (`pcbs[*].footprints[*].what`)
-   - Filters injections to only include footprints that are used (non-footprint injections like templates are always included)
-   - Encodes them into a `ShareableConfig` object (with optional `injections` field)
-   - Compresses and URL-encodes the JSON representation
-   - Constructs a full URL with the encoded data in the hash fragment
-   - Displays a `ShareDialog` with the link
+The sharing flow is a two-step wizard inside `ShareDialog`:
 
-2. **Auto-copy**: The share link is automatically copied to the clipboard when the dialog opens
+**Step 1 – Selection View:**
 
-3. **Dialog UI**: The `ShareDialog` component provides:
-   - A read-only input field showing the shareable link
-   - A "Copy link" button with visual feedback (changes to "Link copied" with check icon for 2.5 seconds)
-   - Close button (X) in the top right corner
-   - Keyboard support (Escape key closes the dialog)
-   - Responsive layout that wraps the button to a new line on narrow screens
+1. The user clicks the share button in the header or subheader. The `ShareDialog` opens at Step 1.
+2. An **"Include custom libraries"** toggle is shown (defaulted to ON).
+3. When ON and custom injections are present, the dialog immediately spawns a **temporary background worker** (via `createErgogenWorker()`) and runs Ergogen generation in debug mode.
+4. The worker response includes the `canonical` output. The dialog calls `extractUsedFootprintsFromCanonical(canonical)` to identify which footprint names are referenced in the PCBs section.
+5. The dialog builds a **checklist** of eligible injections:
+   - Footprint injections are only included if they appear in the canonical output.
+   - Template and outline injections are always included.
+   - All items default to checked.
+6. The user can uncheck individual items to exclude them from the share package.
+7. When the toggle is OFF, no worker is spawned and no injections are shared.
+8. The user clicks **Share** to proceed to Step 2.
+
+**Step 2 – Copy Link View:**
+
+1. `createShareableUri` is called with the config and the user-selected injections.
+2. The generated link is displayed in a read-only input and **auto-copied** to the clipboard.
+3. A "Copy link" button provides visual feedback (changes to "Link copied" with a check icon for 2.5 seconds).
+
+### Dialog UI
+
+The `ShareDialog` component provides:
+
+- **Step 1**: Toggle switch, loading spinner (while analyzing), error message (if worker fails), injection checklist with type badges (footprint / outline / template), and a Share button.
+- **Step 2**: Read-only share link input, Copy button with feedback, close button (X), Escape key support.
 
 ### Loading Shared Configurations
 
@@ -293,7 +304,8 @@ The share system provides comprehensive error handling:
   - Matches injections by type and name (not just name)
   - Adds new injections that don't exist
   - Preserves existing injections not in the shared config
-- **`src/molecules/ShareDialog.tsx`**: Dialog component for displaying and copying share links
+- **`src/molecules/ShareDialog.tsx`**: Two-step dialog for sharing configurations. Step 1 shows a toggle, runs background worker analysis, and displays an injection checklist. Step 2 shows the generated link and copy button.
+- **`src/molecules/ShareDialog.test.tsx`**: Unit tests for the two-step sharing flow, covering toggle behavior, worker interaction, checklist filtering, and link generation.
 - **`src/App.tsx`**: Handles initial hash fragment loading and hash change events
 - **`src/atoms/Header.tsx`**: Contains the share button and share functionality. The share button is visible on the main page (`/`) but hidden on the Welcome page (`/new`). On displays 475px or wider, it is visible in the main header. On displays 475px or narrower, it is hidden in the header and shown in the subheader (inside `src/Ergogen.tsx`).
 

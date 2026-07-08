@@ -6,7 +6,6 @@ import { getErgogenVersionInfo } from '../utils/version';
 import { DevChip } from './DevChip';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
-import { createShareableUri } from '../utils/share';
 import { trackEvent } from '../utils/analytics';
 import ShareDialog from '../molecules/ShareDialog';
 
@@ -185,7 +184,6 @@ const Header = (): JSX.Element => {
   } = configContext || {};
 
   const [showShareDialog, setShowShareDialog] = useState(false);
-  const [shareLink, setShareLink] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
@@ -292,18 +290,11 @@ const Header = (): JSX.Element => {
       return;
     }
 
-    const shareableUri = createShareableUri({
-      config: configContext.configInput,
-      injections: configContext.injectionInput,
-      canonical: configContext.results?.canonical,
-    });
-
     trackEvent('share_button_clicked', {
       has_injections: !!configContext.injectionInput?.length,
       injections_count: configContext.injectionInput?.length || 0,
     });
 
-    setShareLink(shareableUri);
     setShowShareDialog(true);
   };
 
@@ -320,7 +311,8 @@ const Header = (): JSX.Element => {
     <>
       {showShareDialog && (
         <ShareDialog
-          shareLink={shareLink}
+          config={configContext?.configInput || ''}
+          injections={configContext?.injectionInput || []}
           onClose={() => setShowShareDialog(false)}
           data-testid="share-dialog"
         />
