@@ -192,10 +192,14 @@ describe('Header', () => {
     renderComponent();
     const shareBtn = screen.getByTestId('header-share-button');
     fireEvent.click(shareBtn);
+    expect(screen.getByText('Share Configuration')).toBeInTheDocument();
+
+    const innerShareBtn = screen.getByRole('button', { name: 'Share' });
+    fireEvent.click(innerShareBtn);
+
     expect(mockCreateShareableUri).toHaveBeenCalledWith({
       config: 'points: {}',
-      injections: [],
-      canonical: undefined,
+      injections: undefined,
     });
     expect(
       screen.getByText('Shareable Configuration Link')

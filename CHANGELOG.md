@@ -1,5 +1,25 @@
 # Changelog
 
+## Smarter Share: Choose What to Include
+
+July 08, 2026
+
+![A view of the new Share modal showing the Include custom libraries toggle, a loading spinner, and a checklist of custom footprints and templates with checkboxes.](./public/images/changelog/placeholder.png)
+
+When sharing a keyboard configuration that uses custom footprints or templates, the previous flow automatically bundled all loaded custom libraries into the share link — even ones that weren't actually referenced by the current design. This made links unnecessarily large and risked including work-in-progress libraries you didn't intend to share.
+
+The new Share modal gives you full control. Before generating the link, a first step lets you review exactly which custom libraries will be included. The app silently analyzes your configuration in the background and intelligently filters the list: only footprints that are actually used in your PCB layout are shown, while unused ones are automatically excluded. Templates and outline libraries are always surfaced for review since they affect the whole design. Each item has a checkbox so you can include or exclude it individually.
+
+If you don't want to include any custom libraries at all — for example, when the recipient has their own copy — just toggle "Include custom libraries" off and only the raw configuration text is shared. Once you're happy with the selection, click "Share" to generate the link, which is then automatically copied to your clipboard.
+
+**What changed:**
+
+- **Two-step Share modal**: A new selection step lets you review and choose which custom libraries to include before the link is generated
+- **Smart footprint filtering**: The app runs a background analysis to identify which footprints are actually used in your design, hiding unused ones from the list
+- **"Include custom libraries" toggle**: Quickly opt out of sharing any custom libraries with a single switch (defaults to ON)
+- **Per-item checkboxes**: Fine-grained control to include or exclude individual footprints, templates, or outline libraries
+- **Type badges**: Each library in the list is labeled with its type (footprint, template, or outline) for easy identification
+
 ## Responsive Workspace Header & Subheader Buttons
 
 July 07, 2026

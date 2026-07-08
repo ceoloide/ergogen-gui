@@ -31,7 +31,6 @@ import { theme } from './theme/theme';
 import { trackEvent } from './utils/analytics';
 import ShareDialog from './molecules/ShareDialog';
 import { createZip } from './utils/zip';
-import { createShareableUri } from './utils/share';
 
 // Shortcut key sub-label styled component
 const ShortcutKey = styled.span`
@@ -297,7 +296,6 @@ const Ergogen = () => {
     content: '',
   });
 
-  const [shareLink, setShareLink] = useState('');
   const [showShareDialog, setShowShareDialog] = useState(false);
 
   /**
@@ -514,19 +512,12 @@ const Ergogen = () => {
       return;
     }
 
-    const shareableUri = createShareableUri({
-      config: configContext.configInput,
-      injections: configContext.injectionInput,
-      canonical: configContext.results?.canonical,
-    });
-
     trackEvent('share_button_clicked', {
       has_injections: !!configContext.injectionInput?.length,
       injections_count: configContext.injectionInput?.length || 0,
       source: 'subheader',
     });
 
-    setShareLink(shareableUri);
     setShowShareDialog(true);
   };
 
@@ -558,7 +549,8 @@ const Ergogen = () => {
     <>
       {showShareDialog && (
         <ShareDialog
-          shareLink={shareLink}
+          config={configContext.configInput || ''}
+          injections={configContext.injectionInput || []}
           onClose={() => setShowShareDialog(false)}
         />
       )}
