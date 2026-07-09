@@ -791,6 +791,13 @@ const Ergogen = () => {
                       checked={configContext.stlPreview}
                       aria-label="Enable STL preview (experimental)"
                     />
+                    <GenOption
+                      optionId={'enableAnalytics'}
+                      label={'Enable Analytics'}
+                      setSelected={configContext.setEnableAnalytics}
+                      checked={configContext.enableAnalytics}
+                      aria-label="Enable Google Analytics"
+                    />
                   </OptionContainer>
                   <Injections
                     setInjectionToEdit={setInjectionToEdit}

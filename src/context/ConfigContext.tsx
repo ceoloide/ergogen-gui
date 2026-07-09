@@ -17,7 +17,11 @@ import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
-import { trackEvent } from '../utils/analytics';
+import {
+  trackEvent,
+  initAnalytics,
+  getAnalyticsEnabled,
+} from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import { useConfigLoader } from '../hooks/useConfigLoader';
@@ -165,6 +169,8 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>;
   stlPreview: boolean;
   setStlPreview: Dispatch<SetStateAction<boolean>>;
+  enableAnalytics: boolean;
+  setEnableAnalytics: Dispatch<SetStateAction<boolean>>;
   isGenerating: boolean;
   setIsGenerating: Dispatch<SetStateAction<boolean>>;
   isJscadConverting: boolean;
@@ -552,6 +558,14 @@ const ConfigContextProvider = ({
   const [stlPreview, setStlPreview] = useState<boolean>(
     localStorageOrDefault('ergogen:config:stlPreview', true)
   );
+  const [enableAnalytics, setEnableAnalytics] = useState<boolean>(() => {
+    return getAnalyticsEnabled();
+  });
+
+  useEffect(() => {
+    initAnalytics();
+  }, [enableAnalytics]);
+
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isBulkDownloadOpen, setIsBulkDownloadOpen] = useState<boolean>(false);
   const [showSideNav, setShowSideNav] = useState<boolean>(false);
@@ -806,7 +820,11 @@ const ConfigContextProvider = ({
       'ergogen:config:stlPreview',
       JSON.stringify(stlPreview)
     );
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
+    localStorage.setItem(
+      'ergogen:config:enableAnalytics',
+      JSON.stringify(enableAnalytics)
+    );
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview, enableAnalytics]);
 
   /**
    * Effect to track settings loaded and changes.
@@ -818,6 +836,7 @@ const ConfigContextProvider = ({
       autoGen3D,
       kicanvasPreview,
       stlPreview,
+      enableAnalytics,
     });
 
     if (isInitialMountRef.current) {
@@ -829,9 +848,10 @@ const ConfigContextProvider = ({
         autoGen3D,
         kicanvasPreview,
         stlPreview,
+        enableAnalytics,
       });
     }
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
+  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview, enableAnalytics]);
 
   /**
    * Parses a string as either JSON or YAML.
@@ -1475,6 +1495,8 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
+      enableAnalytics,
+      setEnableAnalytics,
       isGenerating,
       setIsGenerating,
       isJscadConverting,
@@ -1529,6 +1551,8 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
+      enableAnalytics,
+      setEnableAnalytics,
       isGenerating,
       setIsGenerating,
       isJscadConverting,
