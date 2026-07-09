@@ -110,10 +110,19 @@ const App = () => {
  * Top-level service worker registration. Placed here so it runs once when the
  * App component first mounts. The `onUpdate` callback stores a reference to
  * the waiting registration so the Header chip can trigger activation.
+ *
+ * **Dev testing**: add `?force_update` to the URL to immediately show the
+ * update chip without needing a deployed SW update (e.g. `/?force_update`).
+ * Clicking the chip will simply reload the page.
  */
 function useServiceWorkerUpdate(): (() => void) | undefined {
   const [waitingRegistration, setWaitingRegistration] =
     useState<ServiceWorkerRegistration | null>(null);
+
+  // Development helper: ?force_update in the URL immediately shows the chip.
+  const isForceUpdate = new URLSearchParams(window.location.search).has(
+    'force_update'
+  );
 
   useEffect(() => {
     serviceWorkerRegistration.register({
@@ -122,6 +131,15 @@ function useServiceWorkerUpdate(): (() => void) | undefined {
       },
     });
   }, []);
+
+  if (isForceUpdate) {
+    return () => {
+      console.log(
+        '[SW] Force-update triggered via ?force_update URL parameter.'
+      );
+      window.location.reload();
+    };
+  }
 
   if (!waitingRegistration) return undefined;
 
