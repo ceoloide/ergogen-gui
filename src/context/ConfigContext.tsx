@@ -20,8 +20,7 @@ import {
 import {
   trackEvent,
   initAnalytics,
-  getAnalyticsEnabled,
-  checkIsPWA,
+  getSendUsageMetricsEnabled,
 } from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
@@ -170,8 +169,8 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>;
   stlPreview: boolean;
   setStlPreview: Dispatch<SetStateAction<boolean>>;
-  enableAnalytics: boolean;
-  setEnableAnalytics: Dispatch<SetStateAction<boolean>>;
+  sendUsageMetrics: boolean;
+  setSendUsageMetrics: Dispatch<SetStateAction<boolean>>;
   isGenerating: boolean;
   setIsGenerating: Dispatch<SetStateAction<boolean>>;
   isJscadConverting: boolean;
@@ -559,34 +558,13 @@ const ConfigContextProvider = ({
   const [stlPreview, setStlPreview] = useState<boolean>(
     localStorageOrDefault('ergogen:config:stlPreview', true)
   );
-  const [enableAnalytics, setEnableAnalytics] = useState<boolean>(() => {
-    return getAnalyticsEnabled();
+  const [sendUsageMetrics, setSendUsageMetrics] = useState<boolean>(() => {
+    return getSendUsageMetricsEnabled();
   });
 
   useEffect(() => {
     initAnalytics();
-  }, [enableAnalytics]);
-
-  useEffect(() => {
-    if (
-      typeof window === 'undefined' ||
-      typeof window.matchMedia !== 'function'
-    )
-      return;
-    const mediaQuery = window.matchMedia('(display-mode: standalone)');
-    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
-      if (e.matches) {
-        // App was installed/promoted as a PWA in real-time
-        setEnableAnalytics(false);
-      }
-    };
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', handleDisplayModeChange);
-      return () => {
-        mediaQuery.removeEventListener('change', handleDisplayModeChange);
-      };
-    }
-  }, []);
+  }, [sendUsageMetrics]);
 
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isBulkDownloadOpen, setIsBulkDownloadOpen] = useState<boolean>(false);
@@ -843,14 +821,17 @@ const ConfigContextProvider = ({
       JSON.stringify(stlPreview)
     );
     localStorage.setItem(
-      'ergogen:config:enableAnalytics',
-      JSON.stringify(enableAnalytics)
+      'ergogen:config:sendUsageMetrics',
+      JSON.stringify(sendUsageMetrics)
     );
-    localStorage.setItem(
-      'ergogen:config:lastDisplayMode',
-      checkIsPWA() ? 'pwa' : 'web'
-    );
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview, enableAnalytics]);
+  }, [
+    debug,
+    autoGen,
+    autoGen3D,
+    kicanvasPreview,
+    stlPreview,
+    sendUsageMetrics,
+  ]);
 
   /**
    * Effect to track settings loaded and changes.
@@ -862,7 +843,7 @@ const ConfigContextProvider = ({
       autoGen3D,
       kicanvasPreview,
       stlPreview,
-      enableAnalytics,
+      sendUsageMetrics,
     });
 
     if (isInitialMountRef.current) {
@@ -874,10 +855,17 @@ const ConfigContextProvider = ({
         autoGen3D,
         kicanvasPreview,
         stlPreview,
-        enableAnalytics,
+        sendUsageMetrics,
       });
     }
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview, enableAnalytics]);
+  }, [
+    debug,
+    autoGen,
+    autoGen3D,
+    kicanvasPreview,
+    stlPreview,
+    sendUsageMetrics,
+  ]);
 
   /**
    * Parses a string as either JSON or YAML.
@@ -1521,8 +1509,8 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
-      enableAnalytics,
-      setEnableAnalytics,
+      sendUsageMetrics,
+      setSendUsageMetrics,
       isGenerating,
       setIsGenerating,
       isJscadConverting,
@@ -1577,8 +1565,8 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
-      enableAnalytics,
-      setEnableAnalytics,
+      sendUsageMetrics,
+      setSendUsageMetrics,
       isGenerating,
       setIsGenerating,
       isJscadConverting,

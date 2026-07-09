@@ -1,7 +1,7 @@
 import {
   trackEvent,
   initAnalytics,
-  getAnalyticsEnabled,
+  getSendUsageMetricsEnabled,
   checkIsPWA,
 } from './analytics';
 import guiPkg from '../../package.json';
@@ -56,50 +56,29 @@ describe('Analytics Utility', () => {
     });
   });
 
-  describe('getAnalyticsEnabled', () => {
+  describe('getSendUsageMetricsEnabled', () => {
     it('should default to true on web (not PWA mode)', () => {
-      expect(getAnalyticsEnabled()).toBe(true);
+      expect(getSendUsageMetricsEnabled()).toBe(true);
     });
 
     it('should return false if localStorage has it set to false', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'false');
-      expect(getAnalyticsEnabled()).toBe(false);
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      expect(getSendUsageMetricsEnabled()).toBe(false);
     });
 
     it('should return true if localStorage has it set to true', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
-      expect(getAnalyticsEnabled()).toBe(true);
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      expect(getSendUsageMetricsEnabled()).toBe(true);
     });
 
-    it('should return false if transitioning to PWA mode for the first time', () => {
+    it('should default to false in PWA mode if not configured', () => {
       const originalStandalone = (window.navigator as any).standalone;
       Object.defineProperty(window.navigator, 'standalone', {
         value: true,
         configurable: true,
       });
 
-      localStorage.setItem('ergogen:config:lastDisplayMode', 'web');
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
-
-      expect(getAnalyticsEnabled()).toBe(false);
-
-      Object.defineProperty(window.navigator, 'standalone', {
-        value: originalStandalone,
-        configurable: true,
-      });
-    });
-
-    it('should respect explicitly saved preference if storedMode matches pwa mode', () => {
-      const originalStandalone = (window.navigator as any).standalone;
-      Object.defineProperty(window.navigator, 'standalone', {
-        value: true,
-        configurable: true,
-      });
-
-      localStorage.setItem('ergogen:config:lastDisplayMode', 'pwa');
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
-
-      expect(getAnalyticsEnabled()).toBe(true);
+      expect(getSendUsageMetricsEnabled()).toBe(false);
 
       Object.defineProperty(window.navigator, 'standalone', {
         value: originalStandalone,
@@ -110,7 +89,7 @@ describe('Analytics Utility', () => {
 
   describe('initAnalytics', () => {
     it('should inject script tag and define gtag when enabled', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       initAnalytics();
 
       const script = document.getElementById(
@@ -125,12 +104,12 @@ describe('Analytics Utility', () => {
 
     it('should clean up script tag and delete globals when disabled', () => {
       // Setup: first load it
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       initAnalytics();
       expect(document.getElementById('gtag-script')).toBeInTheDocument();
 
       // Change setting to false and re-initialize
-      localStorage.setItem('ergogen:config:enableAnalytics', 'false');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
       initAnalytics();
 
       expect(document.getElementById('gtag-script')).toBeNull();
@@ -140,7 +119,7 @@ describe('Analytics Utility', () => {
 
   describe('trackEvent', () => {
     it('should call window.gtag with GUI, Ergogen versions, and is_pwa when enabled and gtag is defined', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       const eventName = 'test_event';
       const eventParams = { param1: 'value1', param2: 123 };
 
@@ -157,7 +136,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should call window.gtag with default category, versions, and is_pwa when eventParams is not provided', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       const eventName = 'test_event';
 
       trackEvent(eventName);
@@ -171,7 +150,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should allow overriding event_category', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       const eventName = 'test_event';
       const eventParams = { event_category: 'custom_category' };
 
@@ -186,7 +165,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should reflect custom Ergogen versions from environment variables', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#v4.3.0';
       const eventName = 'test_event';
 
@@ -201,8 +180,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should set is_pwa to true when running in standalone mode', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
-      localStorage.setItem('ergogen:config:lastDisplayMode', 'pwa');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       const originalStandalone = (window.navigator as any).standalone;
       Object.defineProperty(window.navigator, 'standalone', {
         value: true,
@@ -225,7 +203,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should not call window.gtag when analytics is disabled', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'false');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
       const mockGtag = jest.fn();
       window.gtag = mockGtag;
 
@@ -235,7 +213,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should not throw or call anything when window.gtag is undefined', () => {
-      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       (window as any).gtag = undefined;
 
       expect(() => trackEvent('test_event')).not.toThrow();

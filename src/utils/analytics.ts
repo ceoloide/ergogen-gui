@@ -26,19 +26,11 @@ export const checkIsPWA = (): boolean => {
 /**
  * Helper to determine if analytics is enabled from local storage,
  * defaulting to true on web and false on PWA (standalone mode).
- * Safely handles transitions when the user installs the PWA from standard web.
  */
-export const getAnalyticsEnabled = (): boolean => {
+export const getSendUsageMetricsEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
   const isPWA = checkIsPWA();
-  const storedMode = localStorage.getItem('ergogen:config:lastDisplayMode');
-  const stored = localStorage.getItem('ergogen:config:enableAnalytics');
-
-  // If we are opening the app in PWA mode for the first time (transitioning from web)
-  // force-reset analytics to disabled by default.
-  if (isPWA && storedMode !== 'pwa') {
-    return false;
-  }
+  const stored = localStorage.getItem('ergogen:config:sendUsageMetrics');
 
   if (stored !== null) {
     try {
@@ -57,7 +49,7 @@ export const getAnalyticsEnabled = (): boolean => {
 export const initAnalytics = (): void => {
   if (typeof window === 'undefined') return;
 
-  const enabled = getAnalyticsEnabled();
+  const enabled = getSendUsageMetricsEnabled();
   const trackingId = process.env.REACT_APP_GTAG_ID;
 
   if (enabled && trackingId) {
@@ -72,7 +64,6 @@ export const initAnalytics = (): void => {
       const dataLayer = win.dataLayer || [];
       win.dataLayer = dataLayer;
 
-       
       win.gtag = function () {
         // eslint-disable-next-line prefer-rest-params
         dataLayer.push(arguments);
@@ -101,7 +92,7 @@ export const trackEvent = (
   eventName: string,
   eventParams?: { [key: string]: string | number | boolean | undefined }
 ): void => {
-  if (getAnalyticsEnabled() && window.gtag) {
+  if (getSendUsageMetricsEnabled() && window.gtag) {
     window.gtag('event', eventName, {
       event_category: 'user_action',
       gui_version: guiPkg.version,
