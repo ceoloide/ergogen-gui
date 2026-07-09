@@ -26,18 +26,28 @@ export const checkIsPWA = (): boolean => {
 /**
  * Helper to determine if analytics is enabled from local storage,
  * defaulting to true on web and false on PWA (standalone mode).
+ * Safely handles transitions when the user installs the PWA from standard web.
  */
 export const getAnalyticsEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
+  const isPWA = checkIsPWA();
+  const storedMode = localStorage.getItem('ergogen:config:lastDisplayMode');
   const stored = localStorage.getItem('ergogen:config:enableAnalytics');
+
+  // If we are opening the app in PWA mode for the first time (transitioning from web)
+  // force-reset analytics to disabled by default.
+  if (isPWA && storedMode !== 'pwa') {
+    return false;
+  }
+
   if (stored !== null) {
     try {
       return JSON.parse(stored);
     } catch {
-      return true;
+      return !isPWA;
     }
   }
-  return !checkIsPWA();
+  return !isPWA;
 };
 
 /**

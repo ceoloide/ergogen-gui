@@ -21,6 +21,7 @@ import {
   trackEvent,
   initAnalytics,
   getAnalyticsEnabled,
+  checkIsPWA,
 } from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
@@ -823,6 +824,10 @@ const ConfigContextProvider = ({
     localStorage.setItem(
       'ergogen:config:enableAnalytics',
       JSON.stringify(enableAnalytics)
+    );
+    localStorage.setItem(
+      'ergogen:config:lastDisplayMode',
+      checkIsPWA() ? 'pwa' : 'web'
     );
   }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview, enableAnalytics]);
 

@@ -70,6 +70,42 @@ describe('Analytics Utility', () => {
       localStorage.setItem('ergogen:config:enableAnalytics', 'true');
       expect(getAnalyticsEnabled()).toBe(true);
     });
+
+    it('should return false if transitioning to PWA mode for the first time', () => {
+      const originalStandalone = (window.navigator as any).standalone;
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: true,
+        configurable: true,
+      });
+
+      localStorage.setItem('ergogen:config:lastDisplayMode', 'web');
+      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+
+      expect(getAnalyticsEnabled()).toBe(false);
+
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: originalStandalone,
+        configurable: true,
+      });
+    });
+
+    it('should respect explicitly saved preference if storedMode matches pwa mode', () => {
+      const originalStandalone = (window.navigator as any).standalone;
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: true,
+        configurable: true,
+      });
+
+      localStorage.setItem('ergogen:config:lastDisplayMode', 'pwa');
+      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+
+      expect(getAnalyticsEnabled()).toBe(true);
+
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: originalStandalone,
+        configurable: true,
+      });
+    });
   });
 
   describe('initAnalytics', () => {
@@ -166,6 +202,7 @@ describe('Analytics Utility', () => {
 
     it('should set is_pwa to true when running in standalone mode', () => {
       localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      localStorage.setItem('ergogen:config:lastDisplayMode', 'pwa');
       const originalStandalone = (window.navigator as any).standalone;
       Object.defineProperty(window.navigator, 'standalone', {
         value: true,
