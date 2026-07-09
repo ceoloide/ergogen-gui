@@ -33,6 +33,10 @@ const Chip = styled.button`
     background-color 0.15s ease,
     border-color 0.15s ease;
 
+  .material-symbols-outlined {
+    font-size: 14px !important;
+  }
+
   &:hover {
     background-color: ${theme.colors.backgroundLighter};
   }
@@ -51,7 +55,10 @@ const UpdateChip = ({ onClick, 'data-testid': dataTestId }: Props) => (
     aria-label="Update available — click to reload and apply"
     data-testid={dataTestId ?? 'update-chip'}
   >
-    Update Available →
+    <span className="material-symbols-outlined" aria-hidden="true">
+      update
+    </span>
+    Update Available
   </Chip>
 );
 
