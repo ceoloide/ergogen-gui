@@ -35,7 +35,6 @@ const Chip = styled.button`
 
   &:hover {
     background-color: ${theme.colors.backgroundLighter};
-    animation: none;
   }
 `;
 
