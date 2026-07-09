@@ -415,11 +415,16 @@ CRA's Workbox plugin detects `src/service-worker.ts` and automatically uses `Inj
 5. `Header.tsx` renders `UpdateChip` (a pulsing green pill) when `onUpdate` is defined.
 6. User clicks the chip → `SKIP_WAITING` is posted to the new SW → SW activates → page reloads with fresh assets.
 
-### Google Analytics Offline
+### Google Analytics & Privacy Controls
 
-`workbox-google-analytics` intercepts all measurement requests and queues them in IndexedDB using Background Sync when the device is offline. They are automatically replayed once connectivity is restored.
+To respect user privacy, Google Analytics is dynamically initialized and can be completely disabled via the **"Enable Analytics"** option in the settings pane:
+- **Web Default**: Enabled by default to collect usage statistics.
+- **PWA Default**: Disabled by default in standalone/PWA mode to ensure a fully private, offline-first experience.
+- **Opt-out Behavior**: When disabled, the Google Analytics script tag (`gtag.js`) is completely omitted/removed from the DOM, and all global objects (`window.gtag`, `window.dataLayer`) are deleted. No interaction with GA4 occurs, and event tracking is entirely skipped.
 
-The `gtag.js` script itself is cached with a `NetworkFirst` strategy (3-second timeout) so it loads from cache when offline.
+When enabled:
+- Offline queuing: `workbox-google-analytics` intercepts measurement requests and queues them in IndexedDB using Background Sync when the device is offline, replaying them automatically once connection is restored.
+- Asset caching: The `gtag.js` script is cached with a `NetworkFirst` strategy (3-second timeout) to support offline loading.
 
 ### PWA Manifest
 
