@@ -5,6 +5,7 @@ import { useConfigContext } from '../context/ConfigContext';
 import { getErgogenVersionInfo } from '../utils/version';
 import { DevChip } from './DevChip';
 import UpdateChip from './UpdateChip';
+import InstallChip from './InstallChip';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
 import { trackEvent } from '../utils/analytics';
@@ -171,9 +172,10 @@ const LogoImage = styled.img`
  */
 type HeaderProps = {
   onUpdate?: () => void;
+  onInstall?: () => void;
 };
 
-const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
+const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -467,6 +469,12 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
         <RightContainer>
           {onUpdate && (
             <UpdateChip onClick={onUpdate} data-testid="header-update-chip" />
+          )}
+          {onInstall && (
+            <InstallChip
+              onClick={onInstall}
+              data-testid="header-install-chip"
+            />
           )}
           {location.pathname === '/' && (
             <>

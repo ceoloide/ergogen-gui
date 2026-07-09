@@ -155,6 +155,76 @@ function useServiceWorkerUpdate(): (() => void) | undefined {
   };
 }
 
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
+/**
+ * Custom hook to manage the PWA installation event.
+ * Captures the 'beforeinstallprompt' event and exposes an install trigger.
+ * Gated behind the `?force_install` URL query parameter.
+ */
+function usePwaInstallPrompt(): (() => void) | undefined {
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+
+  // Check if ?force_install is present in the URL query string
+  const isForceInstall = new URLSearchParams(window.location.search).has(
+    'force_install'
+  );
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      console.log('[PWA] beforeinstallprompt event fired and captured.');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener(
+        'beforeinstallprompt',
+        handleBeforeInstallPrompt
+      );
+    };
+  }, []);
+
+  // Show the chip ONLY if the ?force_install query parameter is provided
+  if (!isForceInstall) return undefined;
+
+  return () => {
+    if (deferredPrompt) {
+      // Show the install prompt
+      void deferredPrompt.prompt();
+      // Wait for the user to respond to the prompt
+      void deferredPrompt.userChoice.then(
+        (choiceResult: { outcome: string }) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('[PWA] User accepted the install prompt');
+          } else {
+            console.log('[PWA] User dismissed the install prompt');
+          }
+          // Clear the saved prompt since it can only be used once
+          setDeferredPrompt(null);
+        }
+      );
+    } else {
+      console.log(
+        '[PWA] Install prompt triggered (Mocked because deferredPrompt is not available on this device/browser)'
+      );
+      alert('Install prompt triggered! (Mocked on this device/browser)');
+    }
+  };
+}
+
 /**
  * Inner component that has access to the config context.
  */
@@ -168,6 +238,7 @@ const AppContent = ({
   const configInput = configContext?.configInput;
   const location = useLocation();
   const onUpdate = useServiceWorkerUpdate();
+  const onInstall = usePwaInstallPrompt();
 
   // Store configs count in a ref to safely read it in useEffect without lint dependencies
   const configsCountRef = useRef(0);
@@ -379,7 +450,7 @@ const AppContent = ({
           data-testid="bulk-download-dialog"
         />
       )}
-      <Header onUpdate={onUpdate} />
+      <Header onUpdate={onUpdate} onInstall={onInstall} />
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
         data-testid="loading-bar"
