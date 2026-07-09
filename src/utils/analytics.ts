@@ -11,6 +11,19 @@ interface GAWindow extends Window {
 }
 
 /**
+ * Detects if the app is currently running in PWA standalone/installed mode.
+ */
+export const checkIsPWA = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const nav = window.navigator as NavigatorStandalone;
+  return (
+    (typeof window.matchMedia === 'function' &&
+      window.matchMedia('(display-mode: standalone)').matches) ||
+    nav.standalone === true
+  );
+};
+
+/**
  * Helper to determine if analytics is enabled from local storage,
  * defaulting to true on web and false on PWA (standalone mode).
  */
@@ -24,13 +37,7 @@ export const getAnalyticsEnabled = (): boolean => {
       return true;
     }
   }
-  // Default: true on web, false on PWA (standalone)
-  const nav = window.navigator as NavigatorStandalone;
-  const isPWA =
-    (typeof window.matchMedia === 'function' &&
-      window.matchMedia('(display-mode: standalone)').matches) ||
-    nav.standalone === true;
-  return !isPWA;
+  return !checkIsPWA();
 };
 
 /**
@@ -91,6 +98,7 @@ export const trackEvent = (
       ergogen_version: getFullErgogenVersion(
         process.env.REACT_APP_ERGOGEN_VERSION
       ),
+      is_pwa: checkIsPWA(),
       ...eventParams,
     });
   }

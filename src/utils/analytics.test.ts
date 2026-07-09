@@ -1,4 +1,9 @@
-import { trackEvent, initAnalytics, getAnalyticsEnabled } from './analytics';
+import {
+  trackEvent,
+  initAnalytics,
+  getAnalyticsEnabled,
+  checkIsPWA,
+} from './analytics';
 import guiPkg from '../../package.json';
 import ergogenPkg from 'ergogen/package.json';
 
@@ -28,6 +33,27 @@ describe('Analytics Utility', () => {
     process.env.REACT_APP_ERGOGEN_VERSION = originalEnv;
     process.env.REACT_APP_GTAG_ID = originalGtagId;
     localStorage.clear();
+  });
+
+  describe('checkIsPWA', () => {
+    it('should return false by default in test environment', () => {
+      expect(checkIsPWA()).toBe(false);
+    });
+
+    it('should return true if standalone property is set on navigator', () => {
+      const originalStandalone = (window.navigator as any).standalone;
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: true,
+        configurable: true,
+      });
+
+      expect(checkIsPWA()).toBe(true);
+
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: originalStandalone,
+        configurable: true,
+      });
+    });
   });
 
   describe('getAnalyticsEnabled', () => {
@@ -77,7 +103,7 @@ describe('Analytics Utility', () => {
   });
 
   describe('trackEvent', () => {
-    it('should call window.gtag with GUI and Ergogen versions when enabled and gtag is defined', () => {
+    it('should call window.gtag with GUI, Ergogen versions, and is_pwa when enabled and gtag is defined', () => {
       localStorage.setItem('ergogen:config:enableAnalytics', 'true');
       const eventName = 'test_event';
       const eventParams = { param1: 'value1', param2: 123 };
@@ -88,12 +114,13 @@ describe('Analytics Utility', () => {
         event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        is_pwa: false,
         param1: 'value1',
         param2: 123,
       });
     });
 
-    it('should call window.gtag with default category and versions when eventParams is not provided', () => {
+    it('should call window.gtag with default category, versions, and is_pwa when eventParams is not provided', () => {
       localStorage.setItem('ergogen:config:enableAnalytics', 'true');
       const eventName = 'test_event';
 
@@ -103,6 +130,7 @@ describe('Analytics Utility', () => {
         event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        is_pwa: false,
       });
     });
 
@@ -117,6 +145,7 @@ describe('Analytics Utility', () => {
         event_category: 'custom_category',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        is_pwa: false,
       });
     });
 
@@ -131,6 +160,30 @@ describe('Analytics Utility', () => {
         event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: 'github:ceoloide/ergogen#v4.3.0',
+        is_pwa: false,
+      });
+    });
+
+    it('should set is_pwa to true when running in standalone mode', () => {
+      localStorage.setItem('ergogen:config:enableAnalytics', 'true');
+      const originalStandalone = (window.navigator as any).standalone;
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: true,
+        configurable: true,
+      });
+
+      trackEvent('test_event');
+
+      expect(window.gtag).toHaveBeenCalledWith('event', 'test_event', {
+        event_category: 'user_action',
+        gui_version: guiPkg.version,
+        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        is_pwa: true,
+      });
+
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: originalStandalone,
+        configurable: true,
       });
     });
 
