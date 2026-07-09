@@ -552,6 +552,8 @@ const ActiveConfigNameSection = styled.div<{ $isEditing?: boolean }>`
 
   @media (max-width: 767px) {
     width: 160px;
+    border-color: ${(props) =>
+      props.$isEditing ? theme.colors.accent : theme.colors.border};
   }
 `;
 
