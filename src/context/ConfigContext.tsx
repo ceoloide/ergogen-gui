@@ -567,6 +567,27 @@ const ConfigContextProvider = ({
     initAnalytics();
   }, [enableAnalytics]);
 
+  useEffect(() => {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.matchMedia !== 'function'
+    )
+      return;
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        // App was installed/promoted as a PWA in real-time
+        setEnableAnalytics(false);
+      }
+    };
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', handleDisplayModeChange);
+      return () => {
+        mediaQuery.removeEventListener('change', handleDisplayModeChange);
+      };
+    }
+  }, []);
+
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isBulkDownloadOpen, setIsBulkDownloadOpen] = useState<boolean>(false);
   const [showSideNav, setShowSideNav] = useState<boolean>(false);

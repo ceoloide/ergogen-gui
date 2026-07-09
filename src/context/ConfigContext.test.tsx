@@ -432,11 +432,73 @@ describe('ConfigContextProvider', () => {
   });
 
   describe('Settings Panel Interaction', () => {
+    const originalMatchMedia = window.matchMedia;
+
     beforeEach(() => {
       mockErgogenWorker.postMessage.mockClear();
       mockErgogenWorker.terminate.mockClear();
       mockJscadWorker.postMessage.mockClear();
       localStorage.clear();
+      window.matchMedia = jest.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }));
+    });
+
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it('should disable enableAnalytics when display-mode: standalone query matches true (PWA promotion)', () => {
+      let changeHandler: (e: { matches: boolean }) => void = () => {};
+      const addEventListenerMock = jest.fn((event, handler) => {
+        if (event === 'change') {
+          changeHandler = handler as (e: { matches: boolean }) => void;
+        }
+      });
+
+      window.matchMedia = jest.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: addEventListenerMock,
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }));
+
+      const TestAnalyticsComponent = () => {
+        const ctx = useConfigContext();
+        return (
+          <span data-testid="analytics-val">
+            {ctx?.enableAnalytics ? 'enabled' : 'disabled'}
+          </span>
+        );
+      };
+
+      const { getByTestId } = render(
+        <ConfigContextProvider
+          configInput="points: {}"
+          setConfigInput={jest.fn()}
+        >
+          <TestAnalyticsComponent />
+        </ConfigContextProvider>
+      );
+
+      expect(getByTestId('analytics-val').textContent).toBe('enabled');
+
+      act(() => {
+        changeHandler({ matches: true });
+      });
+
+      expect(getByTestId('analytics-val').textContent).toBe('disabled');
     });
 
     it('should inhibit auto-generation when showSettings is true', async () => {
