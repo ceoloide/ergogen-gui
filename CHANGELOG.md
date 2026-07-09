@@ -1,5 +1,26 @@
 # Changelog
 
+## Install Ergogen as an App — Now Works Fully Offline
+
+July 09, 2026
+
+![A screenshot of the Ergogen WebUI with a browser's "Install app" prompt visible, and the dark Ergogen icon shown in the address bar.](./public/images/changelog/placeholder.png)
+
+Ergogen is now a fully installable Progressive Web App (PWA). You can add it to your home screen or desktop directly from your browser — no app store required — and it will open in its own window just like a native app.
+
+More importantly, once you've visited the site, everything is cached locally. If you lose your internet connection mid-session or want to work on a plane, the app continues to work exactly as normal. All features — the YAML editor, output generation, 3D preview, and file downloads — are available offline. Even your Google Analytics usage events are queued locally and automatically sent once connectivity is restored, so nothing is lost.
+
+When a new version of Ergogen is deployed, the app detects it in the background the next time you load the page. A small **"Update available"** chip appears in the top-right corner of the header. Clicking it instantly reloads the app with the latest version — no manual refresh hunting required.
+
+**What changed:**
+
+- **Installable app**: Ergogen can now be installed on desktop (Chrome, Edge) and mobile (iOS Safari, Android Chrome) as a standalone app
+- **Full offline support**: All assets — app code, Google Fonts, and the large third-party dependency scripts — are cached on first visit for complete offline use
+- **Offline analytics**: Google Analytics events are queued when offline and automatically replayed when connectivity is restored
+- **"Update available" chip**: A pulsing green chip in the header signals when a new version is ready; one click applies it
+- **Proper PWA icon set**: New 192×192 and 512×512 icons with the dark app background, used on home screens and splash screens
+- **iOS home screen support**: Correct meta tags ensure the app title, icon, and status bar style are set properly when added to an iOS home screen
+
 ## Smarter Share: Choose What to Include
 
 July 08, 2026
