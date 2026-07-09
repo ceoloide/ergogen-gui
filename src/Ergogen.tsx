@@ -791,6 +791,13 @@ const Ergogen = () => {
                       checked={configContext.stlPreview}
                       aria-label="Enable STL preview (experimental)"
                     />
+                    <GenOption
+                      optionId={'sendUsageMetrics'}
+                      label={'Send Usage Metrics'}
+                      setSelected={configContext.setSendUsageMetrics}
+                      checked={configContext.sendUsageMetrics}
+                      aria-label="Send usage metrics"
+                    />
                   </OptionContainer>
                   <Injections
                     setInjectionToEdit={setInjectionToEdit}

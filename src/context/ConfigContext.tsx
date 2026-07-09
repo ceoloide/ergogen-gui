@@ -17,7 +17,11 @@ import {
   createErgogenWorker,
   createJscadWorker,
 } from '../workers/workerFactory';
-import { trackEvent } from '../utils/analytics';
+import {
+  trackEvent,
+  initAnalytics,
+  getSendUsageMetricsEnabled,
+} from '../utils/analytics';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import { useConfigLoader } from '../hooks/useConfigLoader';
@@ -165,6 +169,8 @@ type ContextProps = {
   setKicanvasPreview: Dispatch<SetStateAction<boolean>>;
   stlPreview: boolean;
   setStlPreview: Dispatch<SetStateAction<boolean>>;
+  sendUsageMetrics: boolean;
+  setSendUsageMetrics: Dispatch<SetStateAction<boolean>>;
   isGenerating: boolean;
   setIsGenerating: Dispatch<SetStateAction<boolean>>;
   isJscadConverting: boolean;
@@ -552,6 +558,14 @@ const ConfigContextProvider = ({
   const [stlPreview, setStlPreview] = useState<boolean>(
     localStorageOrDefault('ergogen:config:stlPreview', true)
   );
+  const [sendUsageMetrics, setSendUsageMetrics] = useState<boolean>(() => {
+    return getSendUsageMetricsEnabled();
+  });
+
+  useEffect(() => {
+    initAnalytics();
+  }, [sendUsageMetrics]);
+
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isBulkDownloadOpen, setIsBulkDownloadOpen] = useState<boolean>(false);
   const [showSideNav, setShowSideNav] = useState<boolean>(false);
@@ -806,7 +820,18 @@ const ConfigContextProvider = ({
       'ergogen:config:stlPreview',
       JSON.stringify(stlPreview)
     );
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
+    localStorage.setItem(
+      'ergogen:config:sendUsageMetrics',
+      JSON.stringify(sendUsageMetrics)
+    );
+  }, [
+    debug,
+    autoGen,
+    autoGen3D,
+    kicanvasPreview,
+    stlPreview,
+    sendUsageMetrics,
+  ]);
 
   /**
    * Effect to track settings loaded and changes.
@@ -818,6 +843,7 @@ const ConfigContextProvider = ({
       autoGen3D,
       kicanvasPreview,
       stlPreview,
+      sendUsageMetrics,
     });
 
     if (isInitialMountRef.current) {
@@ -829,9 +855,17 @@ const ConfigContextProvider = ({
         autoGen3D,
         kicanvasPreview,
         stlPreview,
+        sendUsageMetrics,
       });
     }
-  }, [debug, autoGen, autoGen3D, kicanvasPreview, stlPreview]);
+  }, [
+    debug,
+    autoGen,
+    autoGen3D,
+    kicanvasPreview,
+    stlPreview,
+    sendUsageMetrics,
+  ]);
 
   /**
    * Parses a string as either JSON or YAML.
@@ -1475,6 +1509,8 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
+      sendUsageMetrics,
+      setSendUsageMetrics,
       isGenerating,
       setIsGenerating,
       isJscadConverting,
@@ -1529,6 +1565,8 @@ const ConfigContextProvider = ({
       setKicanvasPreview,
       stlPreview,
       setStlPreview,
+      sendUsageMetrics,
+      setSendUsageMetrics,
       isGenerating,
       setIsGenerating,
       isJscadConverting,

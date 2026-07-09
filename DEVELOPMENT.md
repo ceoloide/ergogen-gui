@@ -387,6 +387,64 @@ To prevent editing lag and cursor jumping in the Monaco editor when working with
 - **Focus Blur Flushing**: Any pending debounced state update is immediately flushed via `debouncedSetConfigInput.flush()` when the editor loses focus (such as when a user clicks the "Download" or "Generate" buttons), ensuring other components have the latest value immediately.
 - **Realtime Context Reference**: The context exposes `getRealtimeConfigInput` and `updateRealtimeConfigInput` to track the synchronous, real-time code buffer value via a React ref. Action handlers (like download and compile generation) prefer this realtime value over the debounced state value to ensure they always operate on the absolute latest changes.
 
+## Progressive Web App (PWA)
+
+The application is configured as a fully offline-capable PWA using CRA's built-in Workbox integration.
+
+### Service Worker Architecture
+
+CRA's Workbox plugin detects `src/service-worker.ts` and automatically uses `InjectManifest` mode (instead of `GenerateSW`), giving full control over the service worker logic. The plugin injects the precache manifest into `self.__WB_MANIFEST` at build time.
+
+### Caching Strategies
+
+| Asset type                         | Strategy                      | Cache name                 |
+| ---------------------------------- | ----------------------------- | -------------------------- |
+| Webpack-bundled JS/CSS/HTML        | **Precache** (install-time)   | Workbox default            |
+| `public/dependencies/*.js` scripts | **CacheFirst** (runtime)      | `public-dependencies-v1`   |
+| Google Fonts CSS                   | **StaleWhileRevalidate**      | `google-fonts-stylesheets` |
+| Google Fonts binaries              | **CacheFirst**                | `google-fonts-webfonts`    |
+| gtag.js / GA scripts               | **NetworkFirst** (3s timeout) | `google-analytics-scripts` |
+| GA measurement requests            | **Background Sync queue**     | `workbox-background-sync`  |
+
+### Update Flow
+
+1. Every page load (or every 24 hours max), the browser re-fetches `service-worker.js` from the server.
+2. If the file has changed (new build deployed), the browser installs the new SW in a **"waiting"** state.
+3. `serviceWorkerRegistration.ts` fires its `onUpdate` callback with the waiting `ServiceWorkerRegistration`.
+4. `App.tsx`'s `useServiceWorkerUpdate` hook stores the registration and returns an `onUpdate` handler.
+5. `Header.tsx` renders `UpdateChip` (a pulsing green pill) when `onUpdate` is defined.
+6. User clicks the chip → `SKIP_WAITING` is posted to the new SW → SW activates → page reloads with fresh assets.
+
+### Google Analytics & Privacy Controls
+
+To respect user privacy, Google Analytics is dynamically initialized and can be completely disabled via the **"Send Usage Metrics"** option in the settings pane:
+
+- **Web Default**: Enabled by default to collect usage statistics.
+- **PWA Default**: Disabled by default in standalone/PWA mode to ensure a fully private, offline-first experience.
+- **Opt-out Behavior**: When disabled, the Google Analytics script tag (`gtag.js`) is completely omitted/removed from the DOM, and all global objects (`window.gtag`, `window.dataLayer`) are deleted. No interaction with GA4 occurs, and event tracking is entirely skipped.
+
+When enabled:
+
+- Offline queuing: `workbox-google-analytics` intercepts measurement requests and queues them in IndexedDB using Background Sync when the device is offline, replaying them automatically once connection is restored.
+- Asset caching: The `gtag.js` script is cached with a `NetworkFirst` strategy (3-second timeout) to support offline loading.
+
+### PWA Manifest
+
+`public/manifest.json` uses the full PWA manifest spec:
+
+- `id: "/"` — canonical identity for the PWA install
+- `display_override: ["window-controls-overlay", "standalone"]` — enables title-bar area on desktop PWAs
+- `theme_color / background_color: "#2a2a2a"` — matches the app's dark theme for splash screens
+- Icons: `public/icons/icon-192.png` and `public/icons/icon-512.png` (dark background, white logo)
+
+### PWA Implementation Files
+
+- **`src/service-worker.ts`**: Workbox service worker source (compiled by CRA's InjectManifest plugin)
+- **`src/serviceWorkerRegistration.ts`**: SW registration utility with `onUpdate` callback
+- **`src/atoms/UpdateChip.tsx`**: Pulsing chip rendered in Header when an update is waiting
+- **`public/manifest.json`**: Full PWA web app manifest
+- **`public/icons/`**: PWA icon set (192×192 and 512×512)
+
 ## Future Tasks
 
 When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:
