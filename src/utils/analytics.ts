@@ -5,6 +5,11 @@ interface NavigatorStandalone extends Navigator {
   standalone?: boolean;
 }
 
+interface GAWindow extends Window {
+  dataLayer?: unknown[];
+  gtag?: (...args: unknown[]) => void;
+}
+
 /**
  * Helper to determine if analytics is enabled from local storage,
  * defaulting to true on web and false on PWA (standalone mode).
@@ -46,10 +51,10 @@ export const initAnalytics = (): void => {
       script.id = 'gtag-script';
       document.head.appendChild(script);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const win = window as any;
+      const win = window as unknown as GAWindow;
       const dataLayer = win.dataLayer || [];
       win.dataLayer = dataLayer;
+
        
       win.gtag = function () {
         // eslint-disable-next-line prefer-rest-params
@@ -64,8 +69,7 @@ export const initAnalytics = (): void => {
     if (script) {
       script.remove();
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const win = window as any;
+    const win = window as unknown as GAWindow;
     delete win.gtag;
     delete win.dataLayer;
   }
