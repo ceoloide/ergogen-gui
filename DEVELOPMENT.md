@@ -417,12 +417,14 @@ CRA's Workbox plugin detects `src/service-worker.ts` and automatically uses `Inj
 
 ### Google Analytics & Privacy Controls
 
-To respect user privacy, Google Analytics is dynamically initialized and can be completely disabled via the **"Enable Analytics"** option in the settings pane:
+To respect user privacy, Google Analytics is dynamically initialized and can be completely disabled via the **"Send Usage Metrics"** option in the settings pane:
+
 - **Web Default**: Enabled by default to collect usage statistics.
 - **PWA Default**: Disabled by default in standalone/PWA mode to ensure a fully private, offline-first experience.
 - **Opt-out Behavior**: When disabled, the Google Analytics script tag (`gtag.js`) is completely omitted/removed from the DOM, and all global objects (`window.gtag`, `window.dataLayer`) are deleted. No interaction with GA4 occurs, and event tracking is entirely skipped.
 
 When enabled:
+
 - Offline queuing: `workbox-google-analytics` intercepts measurement requests and queues them in IndexedDB using Background Sync when the device is offline, replaying them automatically once connection is restored.
 - Asset caching: The `gtag.js` script is cached with a `NetworkFirst` strategy (3-second timeout) to support offline loading.
 
