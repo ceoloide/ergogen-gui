@@ -432,7 +432,7 @@ When enabled:
 
 `public/manifest.json` uses the full PWA manifest spec:
 
-- `id: "/"` — canonical identity for the PWA install
+- `id: "./"` — canonical identity for the PWA install
 - `display_override: ["window-controls-overlay", "standalone"]` — enables title-bar area on desktop PWAs
 - `theme_color / background_color: "#2a2a2a"` — matches the app's dark theme for splash screens
 - Icons: `public/icons/icon-192.png` and `public/icons/icon-512.png` (dark background, white logo)
@@ -588,3 +588,15 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 **Context:** The GUI and Ergogen version buttons inside the sidebar footer are currently built using locally defined styled-components inside `SideNavigation.tsx`. If other sidebars or footers are added in the future, these styling structures might need to be duplicated.
 
 **Task:** Refactor the double-line version buttons and the vertical DEV badges into a reusable atomic/molecular component (e.g. `src/molecules/GithubVersionButton.tsx`) to keep `SideNavigation.tsx` focused and improve design system consistency.
+
+### [TASK-016] Implement Custom PWA Install Prompt Button in UI
+
+**Context:** Android Chrome utilizes strict user-engagement heuristics (minimum session time, clicks) before it will automatically surface the native PWA install banner. This behavior makes PWA installation discoverability inconsistent for users. By capturing the browser's native `beforeinstallprompt` event and presenting a custom "Install App" button within the UI, we can provide a persistent and reliable install experience on demand.
+
+**Task:** Implement a custom install flow for PWA:
+
+1. Create a custom hook or global context state to listen to the `beforeinstallprompt` window event, prevent the default browser banner, and capture the event payload.
+2. Expose the captured event and an install trigger function.
+3. Design and implement a subtle "Install App" button/chip in the sidebar, header, or settings menu that is conditionally displayed when the captured installation event is available.
+4. When clicked, trigger the installation prompt (`event.prompt()`) and handle the user's choice (accepted/dismissed) to update the UI state.
+5. Add appropriate analytics tracking events for PWA installation prompts and clicks.

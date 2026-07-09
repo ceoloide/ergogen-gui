@@ -14,7 +14,7 @@ When a new version of Ergogen is deployed, the app detects it in the background 
 
 **What changed:**
 
-- **Installable app**: Ergogen can now be installed on desktop (Chrome, Edge) and mobile (iOS Safari, Android Chrome) as a standalone app
+- **Installable app**: Ergogen can now be installed on desktop (Chrome, Edge) and mobile (iOS Safari, Android Chrome) as a standalone app, including subdirectory deployments like GitHub Pages
 - **Full offline support**: All assets — app code, Google Fonts, and the large third-party dependency scripts — are cached on first visit for complete offline use
 - **Offline analytics**: Google Analytics events are queued when offline and automatically replayed when connectivity is restored
 - **"Update available" chip**: A pulsing green chip in the header signals when a new version is ready; one click applies it

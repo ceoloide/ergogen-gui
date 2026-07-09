@@ -1,5 +1,5 @@
 {
-  "id": "/",
+  "id": "./",
   "short_name": "Ergogen",
   "name": "Ergogen WebUI",
   "description": "A web-based GUI for Ergogen, the ergonomic keyboard layout generator. Design your custom keyboard layout and generate PCB, DXF, and 3D model files — fully offline.",
@@ -27,8 +27,8 @@
       "purpose": "maskable"
     }
   ],
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
