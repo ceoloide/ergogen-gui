@@ -25,7 +25,14 @@
     "react-use": "^17.5.0",
     "styled-components": "^6.1.8",
     "three": "^0.180.0",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "workbox-cacheable-response": "^7.4.1",
+    "workbox-core": "^7.4.1",
+    "workbox-expiration": "^7.4.1",
+    "workbox-google-analytics": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1"
   },
   "scripts": {
     "preinstall": "node scripts/preinstall.js",
@@ -94,10 +101,9 @@
     "ts-node": "^10.9.2",
     "typescript-eslint": "^8.45.0"
   },
-  "knip": {
-    "ignore": [
-      "patch/**",
-      "public/**"
-    ]
+  "jest": {
+    "moduleNameMapper": {
+      "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js"
+    }
   }
 }

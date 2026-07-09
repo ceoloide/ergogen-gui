@@ -17,6 +17,7 @@ import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
 import BulkDownloadDialog from './molecules/BulkDownloadDialog';
 import { trackEvent } from './utils/analytics';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 // Module-level variable to persist hash result across React StrictMode remounts
 // React StrictMode in dev mode intentionally remounts components, which resets refs
@@ -106,6 +107,37 @@ const App = () => {
 };
 
 /**
+ * Top-level service worker registration. Placed here so it runs once when the
+ * App component first mounts. The `onUpdate` callback stores a reference to
+ * the waiting registration so the Header chip can trigger activation.
+ */
+function useServiceWorkerUpdate(): (() => void) | undefined {
+  const [waitingRegistration, setWaitingRegistration] =
+    useState<ServiceWorkerRegistration | null>(null);
+
+  useEffect(() => {
+    serviceWorkerRegistration.register({
+      onUpdate: (registration) => {
+        setWaitingRegistration(registration);
+      },
+    });
+  }, []);
+
+  if (!waitingRegistration) return undefined;
+
+  return () => {
+    // Signal the waiting service worker to skip the waiting phase and activate.
+    waitingRegistration.waiting?.postMessage({ type: 'SKIP_WAITING' });
+    // Once the new SW activates it will control the page; reload to use fresh assets.
+    waitingRegistration.waiting?.addEventListener('statechange', (event) => {
+      if ((event.target as ServiceWorker).state === 'activated') {
+        window.location.reload();
+      }
+    });
+  };
+}
+
+/**
  * Inner component that has access to the config context.
  */
 const AppContent = ({
@@ -117,6 +149,7 @@ const AppContent = ({
   // Get configInput from context to ensure we have the latest value
   const configInput = configContext?.configInput;
   const location = useLocation();
+  const onUpdate = useServiceWorkerUpdate();
 
   // Store configs count in a ref to safely read it in useEffect without lint dependencies
   const configsCountRef = useRef(0);
@@ -328,7 +361,7 @@ const AppContent = ({
           data-testid="bulk-download-dialog"
         />
       )}
-      <Header />
+      <Header onUpdate={onUpdate} />
       <LoadingBar
         visible={configContext?.isGenerating ?? false}
         data-testid="loading-bar"

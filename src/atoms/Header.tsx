@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { getErgogenVersionInfo } from '../utils/version';
 import { DevChip } from './DevChip';
+import UpdateChip from './UpdateChip';
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
 import { trackEvent } from '../utils/analytics';
@@ -168,7 +169,11 @@ const LogoImage = styled.img`
  *
  * @returns {JSX.Element} The rendered header component.
  */
-const Header = (): JSX.Element => {
+type HeaderProps = {
+  onUpdate?: () => void;
+};
+
+const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
   const configContext = useConfigContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -460,6 +465,9 @@ const Header = (): JSX.Element => {
           )}
         </LeftContainer>
         <RightContainer>
+          {onUpdate && (
+            <UpdateChip onClick={onUpdate} data-testid="header-update-chip" />
+          )}
           {location.pathname === '/' && (
             <>
               <AccentIconButton
