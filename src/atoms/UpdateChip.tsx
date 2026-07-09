@@ -21,7 +21,7 @@ const Chip = styled.button`
   padding: 0 10px;
   height: 28px;
   background-color: ${theme.colors.backgroundLight};
-  border: 1px solid ${theme.colors.accent};
+  border: 1px solid ${theme.colors.border};
   border-radius: 6px;
   color: ${theme.colors.white};
   font-size: 11px;
@@ -35,7 +35,6 @@ const Chip = styled.button`
 
   &:hover {
     background-color: ${theme.colors.backgroundLighter};
-    border-color: ${theme.colors.accentDark};
     animation: none;
   }
 `;
@@ -53,7 +52,7 @@ const UpdateChip = ({ onClick, 'data-testid': dataTestId }: Props) => (
     aria-label="Update available — click to reload and apply"
     data-testid={dataTestId ?? 'update-chip'}
   >
-    Update available →
+    Update Available →
   </Chip>
 );
 
