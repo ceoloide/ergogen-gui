@@ -2,6 +2,13 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import App from './App';
 import { getConfigFromHash } from './utils/share';
+import guiPkg from '../package.json';
+
+// Parse dynamic package versions for mock matching
+const currentGuiVersion = guiPkg.version;
+const [major, minor, patch] = currentGuiVersion.split('.').map(Number);
+const newerGuiVersion = `${major}.${minor + 1}.${patch}`;
+const olderGuiVersion = `${major}.${minor - 1 >= 0 ? minor - 1 : 0}.${patch}`;
 
 // Mock react-router-dom components and hooks to avoid React Router compatibility issues in Jest
 jest.mock('react-router-dom', () => ({
@@ -105,7 +112,7 @@ describe('App shared version compatibility checks', () => {
       success: true,
       config: {
         config: 'points: {}',
-        guiVersion: '0.8.9', // Matches current (0.8.9)
+        guiVersion: olderGuiVersion, // Matches or older
         ergogenVersion: 'github:ergogen/ergogen#v4.2.1', // Official
       },
     });
@@ -122,7 +129,7 @@ describe('App shared version compatibility checks', () => {
       success: true,
       config: {
         config: 'points: {}',
-        guiVersion: '0.11.0', // Newer than 0.10.0
+        guiVersion: newerGuiVersion, // Newer
         ergogenVersion: 'github:ergogen/ergogen#v4.2.1',
       },
     });
@@ -148,7 +155,7 @@ describe('App shared version compatibility checks', () => {
       success: true,
       config: {
         config: 'points: {}',
-        guiVersion: '0.8.9',
+        guiVersion: currentGuiVersion,
         ergogenVersion: 'github:ceoloide/ergogen#v4.3.0', // Custom
       },
     });
