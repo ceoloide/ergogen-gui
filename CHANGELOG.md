@@ -1,5 +1,23 @@
 # Changelog
 
+## Environment-Based Feature Flags
+
+July 10, 2026
+
+![Placeholder showing the Custom Libraries panel with only Footprints visible on production, and all tabs visible on development environments.](./public/images/changelog/placeholder.png)
+
+When working across multiple environments, it's important that features don't crash when running on older backends. The recent additions of custom outline and template injections require Ergogen `v4.3.0` or higher, which is not yet present on our standard production environment (running `v4.2.1`). Previously, if users loaded configurations containing these injections in production, it would cause compilation crashes inside the worker.
+
+To solve this, we've implemented a robust hybrid feature flag system. The app now detects the loaded Ergogen version at runtime and conditionally disables or hides outlines and templates features if the running version doesn't support them. Footprints remain fully functional on all versions. Developers can also force-enable or force-disable specific features for testing using URL query parameters or build-time environment variables.
+
+**What changed:**
+
+- **Runtime Capability Detection**: Automatically gates features based on standard semver comparisons of the running Ergogen version
+- **Tab Gating**: Conditionally hides the Outlines and Templates tabs and action buttons in the Custom Libraries sidebar
+- **Safe Loader Extraction**: Ignores outlines and templates in dropped folders, ZIP/EKB archives, and GitHub submodules if they are disabled by the environment
+- **Main-Thread Payload Gating**: Filters out templates and outlines injections on the main thread before invoking generation on the background worker, preventing crashes from legacy local storage values
+- **Developer Overrides**: Supports manual capability forcing via URL query parameters (e.g. `?ff_templates=true`) and build-time environment variables (e.g. `REACT_APP_FEATURE_TEMPLATES=true`)
+
 ## Install Ergogen as an App — Now Works Fully Offline
 
 July 09, 2026
