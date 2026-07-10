@@ -38,6 +38,7 @@ import {
   LEGACY_STORAGE_CONFIG_KEY,
 } from './constants';
 import { exportAllConfigs, downloadAllConfigs } from '../utils/zip';
+import { isFeatureEnabled } from '../utils/featureFlags';
 
 interface SavedConfig {
   id: string;
@@ -912,7 +913,17 @@ const ConfigContextProvider = ({
         return;
       }
       let inputConfig: string | object = targetInput;
-      const inputInjection: string[][] | undefined = injectionInput;
+      let inputInjection: string[][] | undefined = injectionInput;
+      if (inputInjection && Array.isArray(inputInjection)) {
+        inputInjection = inputInjection.filter((injection) => {
+          if (!Array.isArray(injection) || injection.length !== 3) return true;
+          const [type] = injection;
+          if (type === 'outline' && !isFeatureEnabled('outlines')) return false;
+          if (type === 'template' && !isFeatureEnabled('templates'))
+            return false;
+          return true;
+        });
+      }
       const [, parsedConfig] = parseConfig(targetInput);
 
       setError(null);

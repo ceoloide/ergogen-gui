@@ -1,3 +1,5 @@
+import { isFeatureEnabled } from './featureFlags';
+
 /**
  * Converts a standard GitHub file URL to its corresponding raw content URL.
  * @param {string} url - The GitHub URL (e.g., "https://github.com/user/repo/blob/main/file.txt").
@@ -490,21 +492,27 @@ export const fetchConfigFromUrl = async (
       rateLimitTracker
     );
 
-    console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
-    const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
-    const outlines = await fetchFootprintsFromDirectory(
-      outlinesApiUrl,
-      '',
-      rateLimitTracker
-    );
+    let outlines: GitHubFootprint[] = [];
+    if (isFeatureEnabled('outlines')) {
+      console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
+      const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
+      outlines = await fetchFootprintsFromDirectory(
+        outlinesApiUrl,
+        '',
+        rateLimitTracker
+      );
+    }
 
-    console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
-    const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
-    const templates = await fetchFootprintsFromDirectory(
-      templatesApiUrl,
-      '',
-      rateLimitTracker
-    );
+    let templates: GitHubFootprint[] = [];
+    if (isFeatureEnabled('templates')) {
+      console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
+      const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
+      templates = await fetchFootprintsFromDirectory(
+        templatesApiUrl,
+        '',
+        rateLimitTracker
+      );
+    }
 
     // Check for submodules
     console.log('[GitHub] Checking for .gitmodules file');
@@ -536,8 +544,10 @@ export const fetchConfigFromUrl = async (
         for (const submodule of submodules) {
           if (
             submodule.path.startsWith(footprintsPath) ||
-            submodule.path.startsWith(outlinesPath) ||
-            submodule.path.startsWith(templatesPath)
+            (submodule.path.startsWith(outlinesPath) &&
+              isFeatureEnabled('outlines')) ||
+            (submodule.path.startsWith(templatesPath) &&
+              isFeatureEnabled('templates'))
           ) {
             const isOutline = submodule.path.startsWith(outlinesPath);
             const isTemplate = submodule.path.startsWith(templatesPath);
@@ -851,23 +861,29 @@ export const fetchConfigFromUrl = async (
 
     // Now fetch outlines from the outlines folder
     const outlinesPath = configPath ? `${configPath}/outlines` : 'outlines';
-    console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
-    const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
-    const outlines = await fetchFootprintsFromDirectory(
-      outlinesApiUrl,
-      '',
-      rateLimitTracker
-    );
+    let outlines: GitHubFootprint[] = [];
+    if (isFeatureEnabled('outlines')) {
+      console.log(`[GitHub] Looking for outlines in: ${outlinesPath}`);
+      const outlinesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${outlinesPath}?ref=${branch}`;
+      outlines = await fetchFootprintsFromDirectory(
+        outlinesApiUrl,
+        '',
+        rateLimitTracker
+      );
+    }
 
     // Now fetch templates from the templates folder
     const templatesPath = configPath ? `${configPath}/templates` : 'templates';
-    console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
-    const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
-    const templates = await fetchFootprintsFromDirectory(
-      templatesApiUrl,
-      '',
-      rateLimitTracker
-    );
+    let templates: GitHubFootprint[] = [];
+    if (isFeatureEnabled('templates')) {
+      console.log(`[GitHub] Looking for templates in: ${templatesPath}`);
+      const templatesApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${templatesPath}?ref=${branch}`;
+      templates = await fetchFootprintsFromDirectory(
+        templatesApiUrl,
+        '',
+        rateLimitTracker
+      );
+    }
 
     // Check for .gitmodules to handle submodules
     console.log('[GitHub] Checking for .gitmodules file');
@@ -898,8 +914,10 @@ export const fetchConfigFromUrl = async (
         for (const submodule of submodules) {
           if (
             submodule.path.startsWith(footprintsPath) ||
-            submodule.path.startsWith(outlinesPath) ||
-            submodule.path.startsWith(templatesPath)
+            (submodule.path.startsWith(outlinesPath) &&
+              isFeatureEnabled('outlines')) ||
+            (submodule.path.startsWith(templatesPath) &&
+              isFeatureEnabled('templates'))
           ) {
             const isOutline = submodule.path.startsWith(outlinesPath);
             const isTemplate = submodule.path.startsWith(templatesPath);

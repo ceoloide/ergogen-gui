@@ -360,6 +360,32 @@ When the built Ergogen version is custom (`isCustom` is true), a green superscri
 - **Close Delay**: Incorporates a 250ms mouse-leave transition delay to allow the user's cursor to navigate into the popover and click the repository link without closing the card prematurely.
 - **Global Click Close**: Sets up global window click listeners to automatically close the popover on touch screens or outer clicks.
 
+## Feature Flags
+
+The application implements a hybrid feature flag system (`src/utils/featureFlags.ts`) to control the visibility and usage of capabilities based on the active environment and loaded Ergogen version.
+
+This is primarily used to control outline and template injections, which require Ergogen `v4.3.0` or higher:
+
+- **Production builds** (running the standard npm package release `v4.2.1`) have these features disabled to prevent compilation errors inside the worker thread.
+- **Development/Custom builds** (running custom refs or versions `>= v4.3.0`) have them enabled.
+
+### Evaluation Lifecycle
+
+When querying `isFeatureEnabled(featureName)`, the system checks conditions in the following priority order:
+
+1. **URL Query Param Overrides**: e.g., `?ff_templates=true` (high-priority override, useful for manual verification/debugging).
+2. **Build-Time Environment Variables**: Checks if `REACT_APP_FEATURE_TEMPLATES` is set to `'true'` or `'false'`.
+3. **Runtime Version Check**: Checks the loaded Ergogen version (`displayText`). If it is standard semver, it compares it against the feature's minimum required version (`4.3.0`). Custom development references (e.g. `develop` branch or commit hashes) default to enabling the feature.
+
+### Integrated Gating
+
+Feature flags are enforced across the following components:
+
+- **Injections Side Panel (`Injections.tsx`)**: Outlines and Templates tabs and action/upload buttons are conditionally hidden.
+- **Local File Loader (`localFiles.ts`)**: Drops and ZIP archive extraction skip outline/template folders if disabled.
+- **GitHub Loader (`github.ts`)**: Traversal of outlines and templates subfolders/submodules is skipped if disabled.
+- **Generation Payload (`ConfigContext.tsx`)**: Injections are filtered on the main thread before invoking `generateNow` on the worker to prevent compile-time crashes from stale/localStorage values.
+
 ## Multi-Configuration Management
 
 The application features a built-in Multi-Configuration Management system allowing users to work on multiple YAML/JSON configurations, switch between them instantly, search their lists, rename, duplicate, and delete configurations.
@@ -600,3 +626,12 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 3. Design and implement a subtle "Install App" button/chip in the sidebar, header, or settings menu that is conditionally displayed when the captured installation event is available.
 4. When clicked, trigger the installation prompt (`event.prompt()`) and handle the user's choice (accepted/dismissed) to update the UI state.
 5. Add appropriate analytics tracking events for PWA installation prompts and clicks.
+
+### [TASK-017] UI Notifications for Skipped Injections due to Feature Flags
+
+**Context:** When a user loads a configuration containing outlines or templates in an environment running an older Ergogen version (like the production site running `v4.2.1`), these injection types are filtered out silently on the main thread to prevent compilation errors inside the worker. However, because this filtering happens silently, the user receives no feedback explaining why their templates or outlines did not load.
+
+**Task:** Improve user feedback when feature flags gate features during load:
+
+1. When filtering out outlines or templates during ZIP/EKB loads, GitHub loads, or URL hash fragment loads, collect the names of any skipped files.
+2. If any files were skipped, display a non-intrusive warning notification or banner (e.g. using `src/organisms/Banners.tsx`) informing the user that some outlines or templates were skipped because the running Ergogen version doesn't support them, recommending that they run the version of the app supporting Ergogen `v4.3.0` or higher to use these libraries.

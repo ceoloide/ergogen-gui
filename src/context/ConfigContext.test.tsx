@@ -17,6 +17,12 @@ const mockJscadWorker = {
   onmessage: (_e: any) => {},
 };
 
+import { isFeatureEnabled } from '../utils/featureFlags';
+
+jest.mock('../utils/featureFlags', () => ({
+  isFeatureEnabled: jest.fn(() => true),
+}));
+
 jest.mock('../workers/workerFactory', () => ({
   createErgogenWorker: () => mockErgogenWorker,
   createJscadWorker: () => mockJscadWorker,
@@ -65,6 +71,7 @@ describe('ConfigContextProvider', () => {
     window.history.replaceState({}, 'Test page', '/');
     mockErgogenWorker.postMessage.mockClear();
     mockJscadWorker.postMessage.mockClear();
+    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
     localStorage.clear();
   });
 
@@ -1027,6 +1034,48 @@ describe('ConfigContextProvider', () => {
 
       // But configInput state should remain the old value (no re-render update to state yet)
       expect(capturedContext.configInput).toBe('points: {}');
+    });
+  });
+
+  describe('generation injection filtering based on feature flags', () => {
+    it('should filter out outlines and templates from the worker payload when feature flags are disabled', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      // Disable outlines and templates
+      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+        if (feature === 'outlines' || feature === 'templates') return false;
+        return true;
+      });
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Trigger a generation run with all types of injections
+      mockErgogenWorker.postMessage.mockClear();
+      const testInjections = [
+        ['footprint', 'mfootprint', 'fcontent'],
+        ['outline', 'moutline', 'ocontent'],
+        ['template', 'mtemplate', 'tcontent'],
+      ];
+
+      await act(async () => {
+        await capturedContext.generateNow('points: {}', testInjections);
+      });
+
+      // It should trigger postMessage, but only with footprint injection
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'generate',
+          injectionInput: [['footprint', 'mfootprint', 'fcontent']],
+        })
+      );
     });
   });
 });

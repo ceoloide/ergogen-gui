@@ -1,5 +1,10 @@
 import { loadLocalFile } from './localFiles';
 import JSZip from 'jszip';
+import { isFeatureEnabled } from './featureFlags';
+
+jest.mock('./featureFlags', () => ({
+  isFeatureEnabled: jest.fn(() => true),
+}));
 
 // Helper to flush promises
 const flushPromises = () =>
@@ -78,6 +83,7 @@ describe('localFiles utilities', () => {
   beforeEach(() => {
     // Store original FileReader
     originalFileReader = global.FileReader;
+    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -187,6 +193,35 @@ describe('localFiles utilities', () => {
         expect(result.templates).toHaveLength(1);
         expect(result.templates[0].name).toBe('my_template');
         expect(result.templates[0].content).toBe(templateContent);
+      });
+
+      it('skips outlines and templates when they are disabled by feature flags', async () => {
+        // Arrange
+        const configContent = 'points:\n  - [0, 0]';
+        const footprintContent = 'module.exports = {};';
+        const outlineContent = 'module.exports = {};';
+        const templateContent = 'module.exports = {};';
+        const zipFile = await createMockZipFile('test.zip', {
+          'config.yaml': configContent,
+          'footprints/logo_mr_useful.js': footprintContent,
+          'outlines/my_outline.js': outlineContent,
+          'templates/my_template.js': templateContent,
+        });
+
+        // Mock feature flags to return false
+        (isFeatureEnabled as jest.Mock).mockReturnValue(false);
+
+        // Act
+        const result = await loadLocalFile(zipFile);
+
+        // Assert
+        expect(result.config).toBe(configContent);
+        expect(result.footprints).toHaveLength(1); // Footprints are always enabled
+        expect(result.outlines).toHaveLength(0);
+        expect(result.templates).toHaveLength(0);
+
+        // Restore default mocked value
+        (isFeatureEnabled as jest.Mock).mockReturnValue(true);
       });
 
       it('loads an ekb file (which is a zip)', async () => {

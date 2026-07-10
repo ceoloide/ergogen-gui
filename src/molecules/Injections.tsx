@@ -9,6 +9,7 @@ import { useInjectionConflictResolution } from '../hooks/useInjectionConflictRes
 import ConflictResolutionDialog from './ConflictResolutionDialog';
 import Title from '../atoms/Title';
 import { trackEvent } from '../utils/analytics';
+import { isFeatureEnabled } from '../utils/featureFlags';
 
 const ActionsContainer = styled.div`
   display: flex;
@@ -301,26 +302,30 @@ const Injections = ({
         >
           Footprints
         </TabButton>
-        <TabButton
-          $active={activeTab === 'outlines'}
-          onClick={() => {
-            setActiveTab('outlines');
-            setActiveUploadType('outline');
-          }}
-          data-testid="tab-outlines"
-        >
-          Outlines
-        </TabButton>
-        <TabButton
-          $active={activeTab === 'templates'}
-          onClick={() => {
-            setActiveTab('templates');
-            setActiveUploadType('template');
-          }}
-          data-testid="tab-templates"
-        >
-          Templates
-        </TabButton>
+        {isFeatureEnabled('outlines') && (
+          <TabButton
+            $active={activeTab === 'outlines'}
+            onClick={() => {
+              setActiveTab('outlines');
+              setActiveUploadType('outline');
+            }}
+            data-testid="tab-outlines"
+          >
+            Outlines
+          </TabButton>
+        )}
+        {isFeatureEnabled('templates') && (
+          <TabButton
+            $active={activeTab === 'templates'}
+            onClick={() => {
+              setActiveTab('templates');
+              setActiveUploadType('template');
+            }}
+            data-testid="tab-templates"
+          >
+            Templates
+          </TabButton>
+        )}
       </TabsContainer>
 
       {activeTab === 'footprints' && (
@@ -384,7 +389,7 @@ const Injections = ({
         </>
       )}
 
-      {activeTab === 'outlines' && (
+      {activeTab === 'outlines' && isFeatureEnabled('outlines') && (
         <>
           {outlines.map((outline) => {
             return (
@@ -445,7 +450,7 @@ const Injections = ({
         </>
       )}
 
-      {activeTab === 'templates' && (
+      {activeTab === 'templates' && isFeatureEnabled('templates') && (
         <>
           {templates.map((template) => {
             return (
