@@ -218,9 +218,11 @@ function usePwaInstallPrompt(): (() => void) | undefined {
       );
     } else {
       console.log(
-        '[PWA] Install prompt triggered (Mocked because deferredPrompt is not available on this device/browser)'
+        '[PWA] Install prompt triggered (deferredPrompt is not available on this device/browser)'
       );
-      alert('Install prompt triggered! (Mocked on this device/browser)');
+      alert(
+        'PWA installation is not supported by this browser or is restricted on this device. If you are on iOS/iPadOS, please open this site in Safari and select "Add to Home Screen" from the Share menu.'
+      );
     }
   };
 }
