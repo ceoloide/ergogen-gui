@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { GitHubFootprint } from './github';
+import { isFeatureEnabled } from './featureFlags';
 
 /**
  * Result of loading a local file.
@@ -106,13 +107,19 @@ const loadZipArchive = async (file: File): Promise<LocalFileLoadResult> => {
         footprints.push({ name, content });
       });
       promises.push(promise);
-    } else if (relativePath.startsWith('outlines/')) {
+    } else if (
+      relativePath.startsWith('outlines/') &&
+      isFeatureEnabled('outlines')
+    ) {
       const promise = file.async('string').then((content) => {
         const name = extractOutlineName(relativePath);
         outlines.push({ name, content });
       });
       promises.push(promise);
-    } else if (relativePath.startsWith('templates/')) {
+    } else if (
+      relativePath.startsWith('templates/') &&
+      isFeatureEnabled('templates')
+    ) {
       const promise = file.async('string').then((content) => {
         const name = extractTemplateName(relativePath);
         templates.push({ name, content });

@@ -1,4 +1,9 @@
 import { fetchConfigFromUrl, checkRateLimit } from './github';
+import { isFeatureEnabled } from './featureFlags';
+
+jest.mock('./featureFlags', () => ({
+  isFeatureEnabled: jest.fn(() => true),
+}));
 
 // Mock fetch globally
 global.fetch = jest.fn();
@@ -6,6 +11,7 @@ global.fetch = jest.fn();
 describe('github utilities', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
   });
 
   describe('fetchConfigFromUrl with submodules', () => {
@@ -242,6 +248,45 @@ describe('github utilities', () => {
       // Assert
       expect(result.footprints).toHaveLength(0);
       expect(result.config).toBe('points: {}');
+    });
+
+    it('should skip outlines and templates when they are disabled by feature flags', async () => {
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+
+      // Mock config.yaml fetch
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
+
+      // Mock footprints directory (empty)
+      mockFetch.mockImplementationOnce(() =>
+        Promise.resolve(
+          new Response('[]', { status: 404 }) as unknown as Response
+        )
+      );
+
+      // Disable outlines and templates
+      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+        if (feature === 'outlines' || feature === 'templates') return false;
+        return true;
+      });
+
+      // Mock .gitmodules fetch (returns 404)
+      mockFetch.mockResolvedValueOnce(new Response('', { status: 404 }));
+
+      // Act
+      const result = await fetchConfigFromUrl('test/repo');
+
+      // Assert
+      expect(result.config).toBe('points: {}');
+      expect(result.footprints).toHaveLength(0);
+      expect(result.outlines).toHaveLength(0);
+      expect(result.templates).toHaveLength(0);
+
+      // Verify that fetch was not called for outlines or templates paths
+      const urls = mockFetch.mock.calls.map((call) => call[0] as string);
+      expect(urls.some((url) => url.includes('outlines'))).toBe(false);
+      expect(urls.some((url) => url.includes('templates'))).toBe(false);
     });
   });
 
