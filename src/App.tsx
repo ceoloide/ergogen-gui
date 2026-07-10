@@ -18,6 +18,19 @@ import { useInjectionConflictResolution } from './hooks/useInjectionConflictReso
 import BulkDownloadDialog from './molecules/BulkDownloadDialog';
 import { trackEvent } from './utils/analytics';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+import guiPkg from '../package.json';
+import ergogenPkg from 'ergogen/package.json';
+import {
+  parseVersion,
+  compareVersions,
+  getSemverFromErgogenVersion,
+  isCustomErgogenVersion,
+  getFullErgogenVersion,
+  getErgogenVersionInfo,
+} from './utils/version';
+import ShareVersionCompatibilityDialog, {
+  VersionCompatibilityReport,
+} from './molecules/ShareVersionCompatibilityDialog';
 
 // Module-level variable to persist hash result across React StrictMode remounts
 // React StrictMode in dev mode intentionally remounts components, which resets refs
@@ -44,6 +57,8 @@ const App = () => {
   const pendingSharedConfigRef = useRef<{
     config: string;
     injections?: string[][];
+    guiVersion?: string;
+    ergogenVersion?: string;
   } | null>(null);
 
   if (hashResult) {
@@ -56,6 +71,8 @@ const App = () => {
         pendingSharedConfigRef.current = {
           config: sharedConfig.config,
           injections: sharedConfig.injections,
+          guiVersion: sharedConfig.guiVersion,
+          ergogenVersion: sharedConfig.ergogenVersion,
         };
       }
 
@@ -86,6 +103,8 @@ const App = () => {
   const [pendingSharedConfig, setPendingSharedConfig] = useState<{
     config: string;
     injections?: string[][];
+    guiVersion?: string;
+    ergogenVersion?: string;
   } | null>(null);
 
   // Set state from ref on mount to ensure it's available for AppContent
@@ -233,7 +252,12 @@ function usePwaInstallPrompt(): (() => void) | undefined {
 const AppContent = ({
   pendingSharedConfig,
 }: {
-  pendingSharedConfig?: { config: string; injections?: string[][] } | null;
+  pendingSharedConfig?: {
+    config: string;
+    injections?: string[][];
+    guiVersion?: string;
+    ergogenVersion?: string;
+  } | null;
 }) => {
   const configContext = useConfigContext();
   // Get configInput from context to ensure we have the latest value
@@ -288,6 +312,113 @@ const AppContent = ({
     setError: (error) => configContext?.setError(error),
   });
 
+  const [sharedConfigToConfirm, setSharedConfigToConfirm] = useState<{
+    config: string;
+    injections?: string[][];
+    report: VersionCompatibilityReport;
+  } | null>(null);
+
+  const checkVersionCompatibility = (
+    sharedGui?: string,
+    sharedErgogen?: string
+  ): VersionCompatibilityReport => {
+    const currentGui = guiPkg.version;
+    const currentErgogen = getFullErgogenVersion(
+      process.env.REACT_APP_ERGOGEN_VERSION
+    );
+
+    let isCompatible = true;
+    let guiWarning: VersionCompatibilityReport['guiWarning'];
+    let ergogenWarning: VersionCompatibilityReport['ergogenWarning'];
+    let customErgogenWarning: VersionCompatibilityReport['customErgogenWarning'];
+
+    // 1. Check GUI version
+    if (sharedGui) {
+      const parsedCurrent = parseVersion(currentGui);
+      const parsedShared = parseVersion(sharedGui);
+      if (
+        parsedCurrent &&
+        parsedShared &&
+        !compareVersions(parsedCurrent, parsedShared)
+      ) {
+        isCompatible = false;
+        guiWarning = { current: currentGui, shared: sharedGui };
+      }
+    }
+
+    // 2. Check Ergogen version
+    if (sharedErgogen) {
+      // Check if it's custom
+      if (isCustomErgogenVersion(sharedErgogen)) {
+        isCompatible = false;
+        const versionInfo = getErgogenVersionInfo(sharedErgogen);
+        customErgogenWarning = {
+          shared: sharedErgogen,
+          url: versionInfo.url,
+          label: versionInfo.label,
+        };
+      }
+
+      // Check if current is older
+      const currentSemver =
+        getSemverFromErgogenVersion(currentErgogen) || ergogenPkg.version;
+      const sharedSemver = getSemverFromErgogenVersion(sharedErgogen);
+      if (currentSemver && sharedSemver) {
+        const parsedCurrent = parseVersion(currentSemver);
+        const parsedShared = parseVersion(sharedSemver);
+        if (
+          parsedCurrent &&
+          parsedShared &&
+          !compareVersions(parsedCurrent, parsedShared)
+        ) {
+          isCompatible = false;
+          ergogenWarning = { current: currentSemver, shared: sharedSemver };
+        }
+      }
+    }
+
+    return {
+      isCompatible,
+      guiWarning,
+      ergogenWarning,
+      customErgogenWarning,
+    };
+  };
+
+  const loadSharedConfig = (config: string, injections?: string[][]) => {
+    if (!configContext) return;
+
+    if (injections !== undefined && injections.length > 0) {
+      processInjectionsWithConflictResolution(injections, config).catch(
+        (error) => {
+          console.error('[App] Error processing injections:', error);
+          configContext.setError(
+            `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      );
+    } else {
+      configContext.loadPreview(config);
+      configContext.generateNow(config, configContext.injectionInput, {
+        pointsonly: false,
+      });
+    }
+  };
+
+  const handleAcceptShare = () => {
+    if (sharedConfigToConfirm) {
+      loadSharedConfig(
+        sharedConfigToConfirm.config,
+        sharedConfigToConfirm.injections
+      );
+      setSharedConfigToConfirm(null);
+    }
+  };
+
+  const handleCancelShare = () => {
+    setSharedConfigToConfirm(null);
+  };
+
   /**
    * Effect to process pending shared config from initial hash fragment load.
    * This processes the config with conflict resolution after React has rendered.
@@ -311,43 +442,25 @@ const AppContent = ({
     // Mark as processed to prevent re-processing on re-renders
     hasProcessedInitialSharedConfig.current = true;
 
-    // Process the pending shared config with conflict resolution
+    // Perform version check!
+    const report = checkVersionCompatibility(
+      pendingSharedConfig.guiVersion,
+      pendingSharedConfig.ergogenVersion
+    );
 
-    if (
-      pendingSharedConfig.injections !== undefined &&
-      pendingSharedConfig.injections.length > 0
-    ) {
-      // If we have injections, we defer setting the config until conflicts are resolved.
-      // The processInjectionsWithConflictResolution function will handle setting the config
-      // once resolution is complete (or if there are no conflicts).
-      processInjectionsWithConflictResolution(
-        pendingSharedConfig.injections,
-        pendingSharedConfig.config
-      ).catch((error) => {
-        console.error(
-          '[App] Error processing injections from initial hash:',
-          error
-        );
-        configContext.setError(
-          `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
+    if (!report.isCompatible) {
+      setSharedConfigToConfirm({
+        config: pendingSharedConfig.config,
+        injections: pendingSharedConfig.injections,
+        report,
       });
     } else {
-      // No injections to process, just set config in preview state and generate
-      configContext.loadPreview(pendingSharedConfig.config);
-      configContext.generateNow(
+      loadSharedConfig(
         pendingSharedConfig.config,
-        configContext.injectionInput,
-        {
-          pointsonly: false,
-        }
+        pendingSharedConfig.injections
       );
     }
-  }, [
-    configContext,
-    pendingSharedConfig,
-    processInjectionsWithConflictResolution,
-  ]); // Re-run when configContext or pendingSharedConfig becomes available
+  }, [configContext, pendingSharedConfig]);
 
   /**
    * Effect to handle hash fragment changes when navigating to shared configurations.
@@ -367,33 +480,21 @@ const AppContent = ({
 
       if (hashResult.success) {
         const sharedConfig = hashResult.config;
-        // Process injections with conflict resolution
-        if (
-          sharedConfig.injections !== undefined &&
-          sharedConfig.injections.length > 0
-        ) {
-          // Defer setting config until resolution is complete
-          processInjectionsWithConflictResolution(
-            sharedConfig.injections,
-            sharedConfig.config
-          ).catch((error) => {
-            console.error('[App] Error processing injections:', error);
-            configContext.setError(
-              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
+
+        // Perform version check!
+        const report = checkVersionCompatibility(
+          sharedConfig.guiVersion,
+          sharedConfig.ergogenVersion
+        );
+
+        if (!report.isCompatible) {
+          setSharedConfigToConfirm({
+            config: sharedConfig.config,
+            injections: sharedConfig.injections,
+            report,
           });
         } else {
-          // No injections, safe to update config immediately in preview state
-          configContext.loadPreview(sharedConfig.config);
-
-          // No injections to process, just generate
-          configContext.generateNow(
-            sharedConfig.config,
-            configContext.injectionInput,
-            {
-              pointsonly: false,
-            }
-          );
+          loadSharedConfig(sharedConfig.config, sharedConfig.injections);
         }
 
         // Clear the hash fragment after loading
@@ -428,10 +529,18 @@ const AppContent = ({
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [configContext, processInjectionsWithConflictResolution]);
+  }, [configContext]);
 
   return (
     <>
+      {sharedConfigToConfirm && (
+        <ShareVersionCompatibilityDialog
+          report={sharedConfigToConfirm.report}
+          onAccept={handleAcceptShare}
+          onCancel={handleCancelShare}
+          data-testid="share-compatibility-dialog"
+        />
+      )}
       {currentConflict && (
         <ConflictResolutionDialog
           injectionName={currentConflict.name}

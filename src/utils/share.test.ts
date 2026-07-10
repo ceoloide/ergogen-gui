@@ -96,6 +96,39 @@ describe('share utilities', () => {
         expect(decoded.message).toBeTruthy();
       }
     });
+
+    it('decodes config with custom version values', () => {
+      const customGui = '1.2.3';
+      const customErgogen = 'github:myfork/ergogen#v4.5.6';
+      const encoded = encodeConfig(
+        testConfig,
+        undefined,
+        customGui,
+        customErgogen
+      );
+      const decoded = decodeConfig(encoded);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.guiVersion).toBe(customGui);
+        expect(decoded.config.ergogenVersion).toBe(customErgogen);
+      }
+    });
+
+    it('uses fallback values for guiVersion and ergogenVersion when they are missing in payload', () => {
+      // Create a payload that has config but lacks guiVersion and ergogenVersion
+      const legacyPayload = JSON.stringify({
+        config: testConfig,
+      });
+      const encoded = compressToEncodedURIComponent(legacyPayload);
+      const decoded = decodeConfig(encoded);
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.guiVersion).toBe('0.9.0');
+        expect(decoded.config.ergogenVersion).toBe(
+          'github:ergogen/ergogen#v4.2.1'
+        );
+      }
+    });
   });
 
   describe('createShareableUri', () => {

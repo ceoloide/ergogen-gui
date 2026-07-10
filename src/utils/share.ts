@@ -2,6 +2,8 @@ import {
   compressToEncodedURIComponent,
   decompressFromEncodedURIComponent,
 } from 'lz-string';
+import guiPkg from '../../package.json';
+import { getFullErgogenVersion } from './version';
 
 /**
  * Structure for sharing keyboard configuration.
@@ -10,6 +12,8 @@ import {
 export interface ShareableConfig {
   config: string;
   injections?: string[][];
+  guiVersion?: string;
+  ergogenVersion?: string;
 }
 
 /**
@@ -18,16 +22,24 @@ export interface ShareableConfig {
  *
  * @param config - The YAML/JSON configuration string
  * @param injections - Optional array of injections (footprints, templates, etc.)
+ * @param guiVersion - Optional override for GUI version (defaults to package.json version)
+ * @param ergogenVersion - Optional override for Ergogen version (defaults to resolved env version)
  * @returns Encoded and compressed string suitable for URI fragment
  */
 export const encodeConfig = (
   config: string,
-  injections?: string[][]
+  injections?: string[][],
+  guiVersion?: string,
+  ergogenVersion?: string
 ): string => {
   const shareableConfig: ShareableConfig = {
     config,
     // Include all injections if present
     ...(injections && injections.length > 0 ? { injections } : {}),
+    guiVersion: guiVersion || guiPkg.version,
+    ergogenVersion:
+      ergogenVersion ||
+      getFullErgogenVersion(process.env.REACT_APP_ERGOGEN_VERSION),
   };
 
   const jsonString = JSON.stringify(shareableConfig);
@@ -117,6 +129,20 @@ export const decodeConfig = (encodedString: string): DecodeResult => {
     }
 
     const shareableConfig = parsed as ShareableConfig;
+
+    // Apply fallbacks if version information is missing or invalid
+    if (
+      !shareableConfig.guiVersion ||
+      typeof shareableConfig.guiVersion !== 'string'
+    ) {
+      shareableConfig.guiVersion = '0.9.0';
+    }
+    if (
+      !shareableConfig.ergogenVersion ||
+      typeof shareableConfig.ergogenVersion !== 'string'
+    ) {
+      shareableConfig.ergogenVersion = 'github:ergogen/ergogen#v4.2.1';
+    }
 
     // Validate injections if present
     if (

@@ -160,3 +160,53 @@ export const getFullErgogenVersion = (version?: string): string => {
 
   return `github:${repo}#${branch}`;
 };
+
+/**
+ * Parses a version string into [major, minor, patch] numbers.
+ * Returns null if the version string is not standard.
+ */
+export const parseVersion = (v: string): [number, number, number] | null => {
+  const clean = v.replace(/^v/, '');
+  const match = clean.match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+};
+
+/**
+ * Compares two parsed versions. Returns true if v1 >= v2.
+ */
+export const compareVersions = (
+  v1: [number, number, number],
+  v2: [number, number, number]
+): boolean => {
+  for (let i = 0; i < 3; i++) {
+    if (v1[i] > v2[i]) return true;
+    if (v1[i] < v2[i]) return false;
+  }
+  return true; // Equal
+};
+
+/**
+ * Extracts a semver string (X.Y.Z) from an Ergogen version string.
+ * Returns null if no semver pattern is found.
+ */
+export const getSemverFromErgogenVersion = (
+  versionStr: string
+): string | null => {
+  const match = versionStr.match(/(?:^|#|@|v)(\d+\.\d+\.\d+)/);
+  return match ? match[1] : null;
+};
+
+/**
+ * Checks if an Ergogen version string represents a custom/forked version.
+ */
+export const isCustomErgogenVersion = (versionStr: string): boolean => {
+  const clean = versionStr.startsWith('github:')
+    ? versionStr.slice(7)
+    : versionStr;
+  const [repo] = clean.split('#');
+  if (!versionStr.startsWith('github:') && !versionStr.includes('/')) {
+    return false;
+  }
+  return repo !== 'ergogen/ergogen';
+};

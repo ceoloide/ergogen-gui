@@ -1,4 +1,11 @@
-import { getErgogenVersionInfo, getFullErgogenVersion } from './version';
+import {
+  getErgogenVersionInfo,
+  getFullErgogenVersion,
+  parseVersion,
+  compareVersions,
+  getSemverFromErgogenVersion,
+  isCustomErgogenVersion,
+} from './version';
 import ergogenPkg from 'ergogen/package.json';
 
 describe('getErgogenVersionInfo', () => {
@@ -160,5 +167,46 @@ describe('getFullErgogenVersion', () => {
     expect(getFullErgogenVersion(`github:ceoloide/ergogen#${fullHash}`)).toBe(
       `github:ceoloide/ergogen#${fullHash}`
     );
+  });
+});
+
+describe('parseVersion and compareVersions', () => {
+  it('correctly parses semver strings', () => {
+    expect(parseVersion('1.2.3')).toEqual([1, 2, 3]);
+    expect(parseVersion('v0.8.9')).toEqual([0, 8, 9]);
+    expect(parseVersion('10.20.30-beta')).toEqual([10, 20, 30]);
+    expect(parseVersion('invalid')).toBeNull();
+  });
+
+  it('compares parsed versions correctly', () => {
+    expect(compareVersions([4, 3, 0], [4, 2, 1])).toBe(true);
+    expect(compareVersions([4, 3, 0], [4, 3, 0])).toBe(true);
+    expect(compareVersions([5, 0, 0], [4, 3, 0])).toBe(true);
+    expect(compareVersions([4, 2, 1], [4, 3, 0])).toBe(false);
+    expect(compareVersions([3, 9, 9], [4, 0, 0])).toBe(false);
+  });
+});
+
+describe('getSemverFromErgogenVersion', () => {
+  it('extracts semver from various formats', () => {
+    expect(getSemverFromErgogenVersion('github:ergogen/ergogen#v4.2.1')).toBe(
+      '4.2.1'
+    );
+    expect(getSemverFromErgogenVersion('github:ceoloide/ergogen#v4.3.0')).toBe(
+      '4.3.0'
+    );
+    expect(getSemverFromErgogenVersion('ergogen@4.2.0')).toBe('4.2.0');
+    expect(
+      getSemverFromErgogenVersion('github:ceoloide/ergogen#develop')
+    ).toBeNull();
+  });
+});
+
+describe('isCustomErgogenVersion', () => {
+  it('identifies custom forks', () => {
+    expect(isCustomErgogenVersion('github:ceoloide/ergogen#v4.3.0')).toBe(true);
+    expect(isCustomErgogenVersion('github:ergogen/ergogen#v4.2.1')).toBe(false);
+    expect(isCustomErgogenVersion('ergogen@4.2.0')).toBe(false);
+    expect(isCustomErgogenVersion('4.2.0')).toBe(false);
   });
 });
