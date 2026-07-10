@@ -56,7 +56,7 @@ const InstallChip = ({ onClick, 'data-testid': dataTestId }: Props) => (
     data-testid={dataTestId ?? 'install-chip'}
   >
     <span className="material-symbols-outlined" aria-hidden="true">
-      install
+      system_update_alt
     </span>
     Install App
   </Chip>
