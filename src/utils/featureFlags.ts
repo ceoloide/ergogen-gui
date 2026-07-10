@@ -1,4 +1,5 @@
 import { getErgogenVersionInfo } from './version';
+import ergogenPkg from 'ergogen/package.json';
 
 type FeatureName = 'templates' | 'outlines';
 
@@ -63,7 +64,14 @@ export const isFeatureEnabled = (feature: FeatureName): boolean => {
   const versionInfo = getErgogenVersionInfo(
     process.env.REACT_APP_ERGOGEN_VERSION
   );
-  const currentVersion = versionInfo.displayText;
+  let currentVersion = versionInfo.displayText;
+
+  // Defer to the package version carried in the package.json if the versionInfo.displayText
+  // is a custom reference that doesn't resolve to a standard semver string (e.g. branch name or commit hash).
+  if (!parseVersion(currentVersion)) {
+    currentVersion = ergogenPkg.version;
+  }
+
   const requiredVersion = FEATURE_VERSION_REQUIREMENTS[feature];
 
   const parsedCurrent = parseVersion(currentVersion);
@@ -71,12 +79,6 @@ export const isFeatureEnabled = (feature: FeatureName): boolean => {
 
   if (parsedCurrent && parsedRequired) {
     return compareVersions(parsedCurrent, parsedRequired);
-  }
-
-  // Fallback: If it's a custom or development/unreleased version (such as develop branch or commit hash),
-  // we assume it has support for the latest features.
-  if (versionInfo.isCustom) {
-    return true;
   }
 
   return false;
