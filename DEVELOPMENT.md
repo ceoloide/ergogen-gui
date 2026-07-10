@@ -626,3 +626,12 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 3. Design and implement a subtle "Install App" button/chip in the sidebar, header, or settings menu that is conditionally displayed when the captured installation event is available.
 4. When clicked, trigger the installation prompt (`event.prompt()`) and handle the user's choice (accepted/dismissed) to update the UI state.
 5. Add appropriate analytics tracking events for PWA installation prompts and clicks.
+
+### [TASK-017] UI Notifications for Skipped Injections due to Feature Flags
+
+**Context:** When a user loads a configuration containing outlines or templates in an environment running an older Ergogen version (like the production site running `v4.2.1`), these injection types are filtered out silently on the main thread to prevent compilation errors inside the worker. However, because this filtering happens silently, the user receives no feedback explaining why their templates or outlines did not load.
+
+**Task:** Improve user feedback when feature flags gate features during load:
+
+1. When filtering out outlines or templates during ZIP/EKB loads, GitHub loads, or URL hash fragment loads, collect the names of any skipped files.
+2. If any files were skipped, display a non-intrusive warning notification or banner (e.g. using `src/organisms/Banners.tsx`) informing the user that some outlines or templates were skipped because the running Ergogen version doesn't support them, recommending that they run the version of the app supporting Ergogen `v4.3.0` or higher to use these libraries.
