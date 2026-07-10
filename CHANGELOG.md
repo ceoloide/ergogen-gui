@@ -16,7 +16,7 @@ When a new version of Ergogen is deployed, the app detects it in the background 
 
 - **Installable app**: Ergogen can now be installed on desktop (Chrome, Edge) and mobile (iOS Safari, Android Chrome) as a standalone app, including subdirectory deployments and optimized icon formats for mobile Chrome (removed multi-resolution ICO file)
 - **Custom PWA Install Prompt**: Implemented a custom install chip in the header (gated under `?force_install`) that captures PWA install events and triggers the native install flow on demand
-- **Full offline support**: All assets — app code, Google Fonts, and the large third-party dependency scripts — are cached on first visit for complete offline use
+- **Full offline support**: All assets — app code, Google Fonts, large third-party dependency scripts, and example preview SVGs — are cached on first visit for complete offline use
 - **Offline analytics**: Google Analytics events are queued when offline and automatically replayed when connectivity is restored
 - **"Update available" chip**: A pulsing green chip in the header signals when a new version is ready; one click applies it
 - **Proper PWA icon set**: New 192×192 and 512×512 icons with the dark app background, used on home screens and splash screens

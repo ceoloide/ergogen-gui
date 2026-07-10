@@ -41,6 +41,8 @@ import { initialize as initializeGoogleAnalytics } from 'workbox-google-analytic
 
 declare const self: ServiceWorkerGlobalScope;
 
+const publicUrl = process.env.PUBLIC_URL || '';
+
 // --------------------------------------------------------------------------
 // Core: claim clients and set up skip-waiting message handler
 // --------------------------------------------------------------------------
@@ -92,7 +94,8 @@ registerRoute(
 // --------------------------------------------------------------------------
 
 registerRoute(
-  ({ url }: { url: URL }) => url.pathname.startsWith('/dependencies/'),
+  ({ url }: { url: URL }) =>
+    url.pathname.startsWith(`${publicUrl}/dependencies/`),
   new CacheFirst({
     cacheName: 'public-dependencies-v1',
     plugins: [
@@ -100,6 +103,27 @@ registerRoute(
       new ExpirationPlugin({
         maxEntries: 20,
         // 30-day cache — these files only change when we update the project.
+        maxAgeSeconds: 60 * 60 * 24 * 30,
+      }),
+    ],
+  })
+);
+
+// --------------------------------------------------------------------------
+// Runtime – Public images (previews and logo assets)
+// --------------------------------------------------------------------------
+registerRoute(
+  ({ url }: { url: URL }) =>
+    url.pathname.startsWith(`${publicUrl}/images/`) ||
+    url.pathname === `${publicUrl}/ergogen.png` ||
+    url.pathname === `${publicUrl}/favicon.ico`,
+  new CacheFirst({
+    cacheName: 'public-images-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({
+        maxEntries: 50,
+        // 30-day cache — static assets that rarely change.
         maxAgeSeconds: 60 * 60 * 24 * 30,
       }),
     ],
