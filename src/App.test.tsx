@@ -122,7 +122,7 @@ describe('App shared version compatibility checks', () => {
       success: true,
       config: {
         config: 'points: {}',
-        guiVersion: '0.9.5', // Newer
+        guiVersion: '0.11.0', // Newer than 0.10.0
         ergogenVersion: 'github:ergogen/ergogen#v4.2.1',
       },
     });
