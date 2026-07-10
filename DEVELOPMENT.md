@@ -625,3 +625,14 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 
 1. When filtering out outlines or templates during ZIP/EKB loads, GitHub loads, or URL hash fragment loads, collect the names of any skipped files.
 2. If any files were skipped, display a non-intrusive warning notification or banner (e.g. using `src/organisms/Banners.tsx`) informing the user that some outlines or templates were skipped because the running Ergogen version doesn't support them, recommending that they run the version of the app supporting Ergogen `v4.3.0` or higher to use these libraries.
+
+### [TASK-018] Enhance Share Compatibility Dialog with Badges and Analytics
+
+**Context:** The `ShareVersionCompatibilityDialog` warning dialog displays simple warning text sections for version mismatches. It does not track acceptance or cancellation events, nor does it display prominent visual icons/badges.
+
+**Task:** Enhance the version compatibility check workflow:
+
+1. Add visually prominent warning icons or status badges (e.g., using curated SVG icons matching the theme warning state color) inside each mismatch block in `ShareVersionCompatibilityDialog`.
+2. Add a GitHub icon or pill badge for custom repository references to make links stand out.
+3. Integrate analytics event tracking when compatibility dialog decisions are made, logging `share_compatibility_accept` and `share_compatibility_cancel` events with metadata detailing the current and shared version parameters.
+4. Add corresponding unit tests to verify the events are sent and icons render properly.
