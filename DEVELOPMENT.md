@@ -218,8 +218,11 @@ Shareable links use the format: `https://ergogen.io/#<encoded-config>` where the
 - The keyboard configuration (YAML/JSON string)
 - Only the footprint injections that were selected by the user in the Share dialog (filtered to those actually used in the design)
 - All non-footprint injections (templates, etc.) that were selected by the user
+- **Version metadata**:
+  - `guiVersion`: The version of the GUI in package.json at the time of creation (e.g. `0.8.9`)
+  - `ergogenVersion`: The full Ergogen version used (e.g. `github:ceoloide/ergogen#v4.3.0` or official `github:ergogen/ergogen#v4.2.1`)
 
-The configuration and injections are compressed and URL-encoded using `lz-string`'s `compressToEncodedURIComponent` function for efficient transmission.
+The configuration, injections, and version metadata are compressed and URL-encoded using `lz-string`'s `compressToEncodedURIComponent` function for efficient transmission.
 
 ### Sharing Process
 
@@ -256,26 +259,18 @@ The `ShareDialog` component provides:
 
 When a user navigates to a URL with a hash fragment:
 
-1. **Initial Load**: On page load, `App.tsx` synchronously checks for a hash fragment before initializing localStorage:
-   - Extracts and decodes the hash fragment
-   - Validates the structure (must have `config` as string, optional `injections` as `string[][]`)
-   - If valid, sets initial config and merges injections with conflict resolution, storing both in localStorage
-   - If invalid, stores error message for display via the error banner
-   - Clears the hash fragment after processing
-   - **Note**: Initial load uses overwrite strategy (no dialog) since it happens synchronously before React renders
+1. **Initial Load / Hash Changes**: On page load or hash change, `App.tsx` checks for a hash fragment, decodes, and validates the shared payload structure.
+2. **Version Compatibility Checking**: Before loading the configuration, the application performs environment checks:
+   - If the current GUI version is older than the one in the share link, or if the current Ergogen version is older than the one in the share link, or if the share link used a custom Ergogen version:
+     - The loading is intercepted and a **Version Compatibility Warning Modal** (`ShareVersionCompatibilityDialog`) is shown.
+     - The user is alerted of the version mismatches (e.g., GUI/Ergogen version differences) or that a custom Ergogen fork was used (with a clickable link to the GitHub repository/ref for investigation).
+     - The user can choose to **Accept and Load** (which imports the configuration as is) or **Cancel** (which aborts loading completely).
+   - **Backward Compatibility**: If a parsed share link lacks version information (legacy links), the application assumes it was shared with GUI version `0.9.0` and official Ergogen version `4.2.1` (`github:ergogen/ergogen#v4.2.1`).
+   - If all versions are compatible (or the user accepts the compatibility warning dialog), the configuration loading proceeds.
 
-2. **Hash Change Events**: When navigating to a shared URL while already on the page:
-   - `AppContent` component listens for `hashchange` events
-   - Repeats the same extraction, validation, and loading process
-   - **Shows conflict resolution dialog** for any injection conflicts (footprints, templates, etc.)
-   - Updates the configuration state and triggers regeneration after conflicts are resolved
-
-3. **Injection Merging**: When loading shared configurations:
-   - Uses `mergeInjectionArraysWithResolution` utility function with conflict resolution
-   - Shows `ConflictResolutionDialog` for each conflict, allowing user to choose skip, overwrite, or keep both
-   - Works for all injection types (footprints, templates, etc.)
-   - New injections are added if they don't exist
-   - Existing injections not present in the shared config are preserved
+3. **Conflict Resolution**:
+   - If injections are present, conflict resolution is performed using `ConflictResolutionDialog` for name conflicts.
+   - Updates the configuration state and triggers regeneration.
 
 ### Error Handling
 
@@ -289,40 +284,35 @@ The share system provides comprehensive error handling:
 ### Sharing Implementation
 
 - **`src/utils/share.ts`**: Core sharing utilities:
-  - `encodeConfig`: Compresses and encodes configuration and injections
-  - `decodeConfig`: Decompresses and validates shared configurations, returns `DecodeResult` union type
-  - `createShareableUri`: Constructs the full shareable URL. Accepts an options object with:
-    - `config`: The YAML/JSON configuration string (required)
-    - `injections`: Optional array of injections
-    - `canonical`: Optional canonical output from Ergogen. When provided, footprint injections are automatically filtered to only include those used in the PCBs section
-  - `getConfigFromHash`: Extracts and decodes hash fragment from current URL
-  - `extractUsedFootprintsFromCanonical`: Extracts footprint names from canonical output's PCBs section
-  - `filterInjectionsForSharing`: Filters injections to only include used footprints (keeps all non-footprint injections)
-- **`src/utils/injections.ts`**: Contains functions for merging injection arrays:
-  - `mergeInjectionArraysWithResolution`: Merges with conflict resolution (skip, overwrite, keep-both)
-  - `mergeInjectionArrays`: Default merge with overwrite strategy (uses `mergeInjectionArraysWithResolution` internally)
-  - Matches injections by type and name (not just name)
-  - Adds new injections that don't exist
-  - Preserves existing injections not in the shared config
-- **`src/molecules/ShareDialog.tsx`**: Two-step dialog for sharing configurations. Step 1 shows a toggle, runs background worker analysis, and displays an injection checklist. Step 2 shows the generated link and copy button.
-- **`src/molecules/ShareDialog.test.tsx`**: Unit tests for the two-step sharing flow, covering toggle behavior, worker interaction, checklist filtering, and link generation.
-- **`src/App.tsx`**: Handles initial hash fragment loading and hash change events
-- **`src/atoms/Header.tsx`**: Contains the share button and share functionality. The share button is visible on the main page (`/`) but hidden on the Welcome page (`/new`). On displays 475px or wider, it is visible in the main header. On displays 475px or narrower, it is hidden in the header and shown in the subheader (inside `src/Ergogen.tsx`).
+  - `encodeConfig`: Compresses and encodes configuration and injections, automatically embedding GUI and Ergogen version metadata.
+  - `decodeConfig`: Decompresses and validates shared configurations. Assigns default fallback versions (`0.9.0` for GUI, `github:ergogen/ergogen#v4.2.1` for Ergogen) for backward compatibility when versions are missing in the payload. Returns `DecodeResult`.
+  - `createShareableUri`: Constructs the full shareable URL.
+  - `getConfigFromHash`: Extracts and decodes hash fragment from current URL.
+  - `extractUsedFootprintsFromCanonical`: Extracts footprint names from canonical output's PCBs section.
+  - `filterInjectionsForSharing`: Filters injections to only include used footprints.
+- **`src/utils/version.ts`**: Contains version parsing, comparison, and extraction utilities (`parseVersion`, `compareVersions`, `getSemverFromErgogenVersion`, `isCustomErgogenVersion`).
+- **`src/utils/injections.ts`**: Contains functions for merging injection arrays.
+- **`src/molecules/ShareDialog.tsx`**: Two-step dialog for sharing configurations.
+- **`src/molecules/ShareDialog.test.tsx`**: Unit tests for the two-step sharing flow.
+- **`src/molecules/ShareVersionCompatibilityDialog.tsx`**: Themed warning modal shown when loading a shared config with version mismatches or a custom Ergogen version.
+- **`src/molecules/ShareVersionCompatibilityDialog.test.tsx`**: Unit tests for the warning dialog.
+- **`src/App.tsx`**: Handles initial hash loading, hash change events, and integrates version compatibility warning checks before loading shared configurations.
+- **`src/App.test.tsx`**: Integration tests verifying App's mount and hashchange behavior when receiving compatible, incompatible, and custom-version share links.
+- **`src/atoms/Header.tsx`**: Contains the share button and share functionality.
 
 ### Future Enhancements
 
 Several potential improvements could enhance the sharing feature:
 
 1. **URL Length Validation**: Very large configurations might create URLs that exceed browser URL length limits (typically 2048-8192 characters depending on browser). Could add validation to warn users or suggest alternative sharing methods when URLs become too long.
-2. **Share Link Metadata**: Currently, share links only contain the configuration and injections. Could enhance the `ShareableConfig` interface to include optional metadata like keyboard name/description, creation timestamp, version information, or author information.
-3. **QR Code Generation**: For easier mobile sharing, could generate QR codes that users can scan to load configurations directly on mobile devices.
-4. **Share Link Shortening**: Very long URLs can be unwieldy. Could integrate with URL shortening services or create a custom short link service with a backend API.
-5. **Mobile Native Sharing**: On mobile devices, could integrate with native sharing APIs (Web Share API) to allow sharing through the device's native share menu (SMS, email, social media, etc.).
-6. **Share Link History**: Track previously generated share links in localStorage, allowing users to easily access and re-share recent configurations.
-7. **Share Link Validation**: Add a "Test Link" feature that validates a share link works correctly before sharing it with others.
-8. **Better Error Recovery**: When encountering partially corrupted share links, attempt to recover and load what's possible rather than showing a complete error (e.g., load config even if injections are corrupted).
-9. **Share Link Expiration**: Add optional expiration dates or time-to-live (TTL) for share links, useful for temporary sharing scenarios.
-10. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
+2. **QR Code Generation**: For easier mobile sharing, could generate QR codes that users can scan to load configurations directly on mobile devices.
+3. **Share Link Shortening**: Very long URLs can be unwieldy. Could integrate with URL shortening services or create a custom short link service with a backend API.
+4. **Mobile Native Sharing**: On mobile devices, could integrate with native sharing APIs (Web Share API) to allow sharing through the device's native share menu (SMS, email, social media, etc.).
+5. **Share Link History**: Track previously generated share links in localStorage, allowing users to easily access and re-share recent configurations.
+6. **Share Link Validation**: Add a "Test Link" feature that validates a share link works correctly before sharing it with others.
+7. **Better Error Recovery**: When encountering partially corrupted share links, attempt to recover and load what's possible rather than showing a complete error (e.g., load config even if injections are corrupted).
+8. **Share Link Expiration**: Add optional expiration dates or time-to-live (TTL) for share links, useful for temporary sharing scenarios.
+9. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
 
 ## Ergogen Version Override Lifecycle
 
@@ -635,3 +625,14 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 
 1. When filtering out outlines or templates during ZIP/EKB loads, GitHub loads, or URL hash fragment loads, collect the names of any skipped files.
 2. If any files were skipped, display a non-intrusive warning notification or banner (e.g. using `src/organisms/Banners.tsx`) informing the user that some outlines or templates were skipped because the running Ergogen version doesn't support them, recommending that they run the version of the app supporting Ergogen `v4.3.0` or higher to use these libraries.
+
+### [TASK-018] Enhance Share Compatibility Dialog with Badges and Analytics
+
+**Context:** The `ShareVersionCompatibilityDialog` warning dialog displays simple warning text sections for version mismatches. It does not track acceptance or cancellation events, nor does it display prominent visual icons/badges.
+
+**Task:** Enhance the version compatibility check workflow:
+
+1. Add visually prominent warning icons or status badges (e.g., using curated SVG icons matching the theme warning state color) inside each mismatch block in `ShareVersionCompatibilityDialog`.
+2. Add a GitHub icon or pill badge for custom repository references to make links stand out.
+3. Integrate analytics event tracking when compatibility dialog decisions are made, logging `share_compatibility_accept` and `share_compatibility_cancel` events with metadata detailing the current and shared version parameters.
+4. Add corresponding unit tests to verify the events are sent and icons render properly.

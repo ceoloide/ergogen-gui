@@ -5,11 +5,8 @@ jest.mock('ergogen/package.json', () => ({
   },
 }));
 
-import {
-  isFeatureEnabled,
-  parseVersion,
-  compareVersions,
-} from './featureFlags';
+import { isFeatureEnabled } from './featureFlags';
+import { parseVersion, compareVersions } from './version';
 
 describe('featureFlags utilities', () => {
   describe('parseVersion', () => {

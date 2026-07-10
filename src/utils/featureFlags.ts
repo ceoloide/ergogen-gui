@@ -1,4 +1,8 @@
-import { getErgogenVersionInfo } from './version';
+import {
+  getErgogenVersionInfo,
+  parseVersion,
+  compareVersions,
+} from './version';
 import ergogenPkg from 'ergogen/package.json';
 
 type FeatureName = 'templates' | 'outlines';
@@ -7,31 +11,6 @@ type FeatureName = 'templates' | 'outlines';
 const FEATURE_VERSION_REQUIREMENTS: Record<FeatureName, string> = {
   templates: '4.3.0',
   outlines: '4.3.0',
-};
-
-/**
- * Parses a version string into [major, minor, patch] numbers.
- * Returns null if the version string is not standard.
- */
-export const parseVersion = (v: string): [number, number, number] | null => {
-  const clean = v.replace(/^v/, '');
-  const match = clean.match(/^(\d+)\.(\d+)\.(\d+)/);
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-};
-
-/**
- * Compares two parsed versions. Returns true if v1 >= v2.
- */
-export const compareVersions = (
-  v1: [number, number, number],
-  v2: [number, number, number]
-): boolean => {
-  for (let i = 0; i < 3; i++) {
-    if (v1[i] > v2[i]) return true;
-    if (v1[i] < v2[i]) return false;
-  }
-  return true; // Equal
 };
 
 /**

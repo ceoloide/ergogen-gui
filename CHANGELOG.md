@@ -1,5 +1,24 @@
 # Changelog
 
+## Shared Link Version Compatibility Warnings
+
+July 10, 2026
+
+![A warning modal showing GUI Version Mismatch, Ergogen Version Mismatch, and Custom Ergogen Version warnings with Accept and Cancel buttons.](./public/images/changelog/placeholder.png)
+
+When sharing configurations, users might open shared links on older versions of the GUI or with different Ergogen backends, which could lead to compatibility issues or compile crashes. For example, if a share link uses templates or outlines that require Ergogen v4.3.0+, but the receiving website is running Ergogen v4.2.1, it would fail to compile without warning.
+
+To address this, we've implemented version compatibility checking for shared links. Share links now embed the GUI version and the full Ergogen version (including custom branches and forks) in their encoded payload. On load or hash change, the receiving site compares its local environment with the link's metadata. If the local GUI or Ergogen version is older, or if a custom fork was used to create the link, a themed Version Compatibility Warning Modal is shown. This modal details the mismatch and warns of potential issues. It provides a clickable link to the custom GitHub repository/ref for investigation, and lets the user choose to Accept and load the configuration anyway, or Cancel and abort. To ensure backward compatibility, legacy links without version metadata fallback to assuming GUI version 0.9.0 and official Ergogen version 4.2.1.
+
+**What changed:**
+
+- **Embedded Version Metadata**: Automatically encodes the local GUI version and active Ergogen version (with full custom fork/branch paths) in all new shareable link payloads
+- **Environment Comparison**: Resolves and compares current GUI and Ergogen versions against incoming share link metadata using standard semver comparisons
+- **Version Compatibility Warning Modal**: Intercepts config loading to display a styled modal informing the user of newer GUI/Ergogen versions or custom Ergogen versions in use
+- **GitHub Reference Linking**: Extracts and displays a clickable link referencing the custom GitHub repository and ref when custom Ergogen forks are used
+- **Action Control**: Restricts config loading, letting the user explicitly Accept (load the config as is) or Cancel (discard and abort)
+- **Legacy Fallbacks**: Gracefully parses older shared links lacking version fields by assuming GUI v0.9.0 and official Ergogen v4.2.1 fallback values
+
 ## Environment-Based Feature Flags
 
 July 10, 2026
