@@ -429,7 +429,7 @@ CRA's Workbox plugin detects `src/service-worker.ts` and automatically uses `Inj
 3. `serviceWorkerRegistration.ts` fires its `onUpdate` callback with the waiting `ServiceWorkerRegistration`.
 4. `App.tsx`'s `useServiceWorkerUpdate` hook stores the registration and returns an `onUpdate` handler.
 5. `Header.tsx` renders `UpdateChip` (a pulsing green pill) when `onUpdate` is defined.
-6. User clicks the chip → `SKIP_WAITING` is posted to the new SW → SW activates → page reloads with fresh assets.
+6. User clicks the chip → `SKIP_WAITING` is posted to the new SW → SW activates → page reloads with fresh assets (with a 1-second safety fallback reload if the event doesn't fire).
 
 ### Google Analytics & Privacy Controls
 
