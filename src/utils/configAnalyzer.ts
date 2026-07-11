@@ -20,6 +20,7 @@ export interface KeyboardAnalyticsPayload {
   matrix_col_names: string;
   matrix_row_names: string;
   matrix_keys: number;
+  keyboard_keys: number;
   config_id: string;
   [key: string]: string | number | boolean | undefined;
 }
@@ -345,6 +346,9 @@ export function analyzeConfiguration(
   const fullHash = sha256(hashInput);
   const config_id = fullHash.substring(0, 12);
 
+  const keyboard_keys =
+    !is_mirrored && is_reversible ? matrix_keys * 2 : matrix_keys;
+
   return {
     total_generation_time_ms: totalGenerationTimeMs,
     count_outlines,
@@ -365,6 +369,7 @@ export function analyzeConfiguration(
     matrix_col_names,
     matrix_row_names,
     matrix_keys,
+    keyboard_keys,
     config_id,
   };
 }

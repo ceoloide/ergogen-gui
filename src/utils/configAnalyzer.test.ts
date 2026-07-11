@@ -272,4 +272,100 @@ pt_a:
     // Output string should have two identical coordinates, but the order of sorting should be deterministic.
     expect(payload.config_id).toBeDefined();
   });
+
+  describe('keyboard_keys metric calculation', () => {
+    const pointsYaml = `
+matrix_pinky_bottom:
+  x: 10
+  y: 20
+  r: 0
+  meta:
+    zone:
+      name: matrix
+`;
+
+    it('should equal matrix_keys when is_mirrored = true and is_reversible = true', () => {
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      rows:
+        bottom:
+  mirror: true
+pcbs:
+  main:
+    reversible: true
+`;
+      const payload = analyzeConfiguration(canonical, pointsYaml, 0);
+      expect(payload.is_mirrored).toBe(true);
+      expect(payload.is_reversible).toBe(true);
+      expect(payload.matrix_keys).toBe(2);
+      expect(payload.keyboard_keys).toBe(2);
+    });
+
+    it('should be doubled when is_mirrored = false and is_reversible = true', () => {
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      rows:
+        bottom:
+  mirror: false
+pcbs:
+  main:
+    reversible: true
+`;
+      const payload = analyzeConfiguration(canonical, pointsYaml, 0);
+      expect(payload.is_mirrored).toBe(false);
+      expect(payload.is_reversible).toBe(true);
+      expect(payload.matrix_keys).toBe(1);
+      expect(payload.keyboard_keys).toBe(2);
+    });
+
+    it('should equal matrix_keys when is_mirrored = false and is_reversible = false', () => {
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      rows:
+        bottom:
+  mirror: false
+pcbs:
+  main:
+    reversible: false
+`;
+      const payload = analyzeConfiguration(canonical, pointsYaml, 0);
+      expect(payload.is_mirrored).toBe(false);
+      expect(payload.is_reversible).toBe(false);
+      expect(payload.matrix_keys).toBe(1);
+      expect(payload.keyboard_keys).toBe(1);
+    });
+
+    it('should equal matrix_keys when is_mirrored = true and is_reversible = false', () => {
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      rows:
+        bottom:
+  mirror: true
+pcbs:
+  main:
+    reversible: false
+`;
+      const payload = analyzeConfiguration(canonical, pointsYaml, 0);
+      expect(payload.is_mirrored).toBe(true);
+      expect(payload.is_reversible).toBe(false);
+      expect(payload.matrix_keys).toBe(2);
+      expect(payload.keyboard_keys).toBe(2);
+    });
+  });
 });

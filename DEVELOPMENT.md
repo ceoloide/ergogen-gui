@@ -452,6 +452,7 @@ This parses and extracts:
 
 - Outline, PCB, and Case counts
 - Boolean flags like `is_reversible` and `is_mirrored`
+- `keyboard_keys` representing the estimated physical switch count (doubled if reversible and asymmetric, otherwise matching `matrix_keys`)
 - Alpha-sorted granular matrix zone details (zone names, counts, column names, row names, etc.)
 - A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout.
 
