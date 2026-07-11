@@ -368,4 +368,21 @@ pcbs:
       expect(payload.keyboard_keys).toBe(2);
     });
   });
+
+  describe('previous_config_id', () => {
+    it('should include previous_config_id in the payload when provided', () => {
+      const payload = analyzeConfiguration(
+        sampleCanonical,
+        samplePoints,
+        123,
+        'prev_hash_123'
+      );
+      expect(payload.previous_config_id).toBe('prev_hash_123');
+    });
+
+    it('should leave previous_config_id undefined in the payload when not provided', () => {
+      const payload = analyzeConfiguration(sampleCanonical, samplePoints, 123);
+      expect(payload.previous_config_id).toBeUndefined();
+    });
+  });
 });

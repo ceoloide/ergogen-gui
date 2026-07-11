@@ -446,7 +446,7 @@ When enabled:
 
 #### Keyboard Generation Tracking
 
-Upon successful keyboard generation, an asynchronous task is dispatched (to prevent blocking the main UI thread) that parses the generated `canonical.yaml` and `points.yaml` payloads using [configAnalyzer.ts](file:///Users/mmassarelli/Documents/GitHub/ergogen-gui/src/utils/configAnalyzer.ts).
+Upon successful keyboard generation, the layout is analyzed using [configAnalyzer.ts](file:///Users/mmassarelli/Documents/GitHub/ergogen-gui/src/utils/configAnalyzer.ts).
 
 This parses and extracts:
 
@@ -455,8 +455,14 @@ This parses and extracts:
 - `keyboard_keys` representing the estimated physical switch count (doubled if reversible and asymmetric, otherwise matching `matrix_keys`)
 - Alpha-sorted granular matrix zone details (zone names, counts, column names, row names, etc.)
 - A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout.
+- A `previous_config_id` chaining layouts together inside the user session.
 
-A custom event `keyboard_generated` is then tracked via the analytics service with this detailed configuration payload.
+To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
+
+- **Settlement Debounce**: Keyboard layout generation is logged with a **5-second settlement debounce**. This filters out intermediate states as the user is typing, ensuring only final configurations are logged.
+- **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
+- **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, immediately clears the lineage context and cancels any pending tracking timeouts, ensuring subsequent builds start fresh.
+- **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
 
 ### PWA Manifest
 
@@ -656,3 +662,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 **Context:** During the settings pane layout restructuring, we defined `SettingsCard` and `SettingsGroupTitle` styled components inside `Ergogen.tsx`. These layout components are currently settings-specific but could be reused if more options screens or side sheets are added in the future.
 
 **Task:** If other options tabs, popup submenus, or settings configurations are introduced, extract `SettingsCard` and `SettingsGroupTitle` into a unified settings layout file (e.g. under `src/atoms/SettingsLayout.tsx`) to maintain clean division of concerns and prevent code duplication.
+
+### [TASK-020] Make GA4 Tracking Debounce Delay Configurable
+
+**Context:** We implemented a 5-second tracking debounce delay in `ConfigContext.tsx` to prevent intermediate typing states from firing GA4 events. While 5 seconds works well, it is hardcoded inside `ConfigContext.tsx`.
+
+**Task:** Extract the 5-second debounce delay value into a central constants file (e.g. `src/context/constants.ts`) or make it a setting parameter, so developers can easily tune the debounce sensitivity.

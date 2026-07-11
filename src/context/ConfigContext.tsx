@@ -538,6 +538,31 @@ const ConfigContextProvider = ({
     return realtimeConfigInputRef.current;
   }, []);
 
+  const lastTrackedConfigIdRef = useRef<string | undefined>(undefined);
+  const pendingAnalyticsRef = useRef<{
+    timeoutId: NodeJS.Timeout;
+    payload: KeyboardAnalyticsPayload;
+    configId: string;
+  } | null>(null);
+
+  const flushPendingAnalytics = useCallback(() => {
+    if (pendingAnalyticsRef.current) {
+      const { timeoutId, payload, configId } = pendingAnalyticsRef.current;
+      clearTimeout(timeoutId);
+      trackEvent('keyboard_generated', payload);
+      lastTrackedConfigIdRef.current = configId;
+      pendingAnalyticsRef.current = null;
+    }
+  }, []);
+
+  const resetLineage = useCallback(() => {
+    lastTrackedConfigIdRef.current = undefined;
+    if (pendingAnalyticsRef.current) {
+      clearTimeout(pendingAnalyticsRef.current.timeoutId);
+      pendingAnalyticsRef.current = null;
+    }
+  }, []);
+
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
     'ergogen:injection',
     initialInjectionInput
@@ -688,24 +713,42 @@ const ConfigContextProvider = ({
             stored_configs_count: configsRef.current.length,
           });
 
-          // Asynchronously perform configuration analysis and track GA4 event
-          setTimeout(() => {
-            try {
-              const canonicalText = yaml.dump(newResults.canonical || {});
-              const pointsText = yaml.dump(newResults.points || {});
-              const payload: KeyboardAnalyticsPayload = analyzeConfiguration(
-                canonicalText,
-                pointsText,
-                Math.round(duration)
-              );
-              trackEvent('keyboard_generated', payload);
-            } catch (err) {
-              console.error(
-                'Failed to generate keyboard configuration analytics:',
-                err
-              );
+          // Perform configuration analysis and track GA4 event (debounced)
+          try {
+            const canonicalText = yaml.dump(newResults.canonical || {});
+            const pointsText = yaml.dump(newResults.points || {});
+            const payload: KeyboardAnalyticsPayload = analyzeConfiguration(
+              canonicalText,
+              pointsText,
+              Math.round(duration),
+              lastTrackedConfigIdRef.current
+            );
+
+            // Avoid sending redundant tracking events when the config hasn't changed geometrically
+            if (payload.config_id !== lastTrackedConfigIdRef.current) {
+              // Clear any existing pending tracking timer
+              if (pendingAnalyticsRef.current) {
+                clearTimeout(pendingAnalyticsRef.current.timeoutId);
+              }
+
+              const timeoutId = setTimeout(() => {
+                trackEvent('keyboard_generated', payload);
+                lastTrackedConfigIdRef.current = payload.config_id;
+                pendingAnalyticsRef.current = null;
+              }, 5000);
+
+              pendingAnalyticsRef.current = {
+                timeoutId,
+                payload,
+                configId: payload.config_id,
+              };
             }
-          }, 0);
+          } catch (err) {
+            console.error(
+              'Failed to generate keyboard configuration analytics:',
+              err
+            );
+          }
 
           // Store preview or demo SVG in the active configuration
           const svgContent =
@@ -828,6 +871,24 @@ const ConfigContextProvider = ({
       }
     };
   }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
+
+  // Flush pending analytics on unmount and visibility change to hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingAnalytics();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', flushPendingAnalytics);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', flushPendingAnalytics);
+      flushPendingAnalytics();
+    };
+  }, [flushPendingAnalytics]);
 
   /**
    * Effect to save user settings to local storage whenever they change.
@@ -1125,66 +1186,74 @@ const ConfigContextProvider = ({
     [setConfigInputProp]
   );
 
-  const selectConfig = useCallback((id: string | null) => {
-    if (id === null) {
-      setActiveConfigId(null);
-      activeConfigIdRef.current = null;
-      setIsPreview(false);
-      setPreviewConfig(null);
-      setConfigInputState('');
-      configInputRef.current = '';
-      saveMultiConfigToStorage(configsRef.current, null);
-    } else {
-      const found = configsRef.current.find((c) => c.id === id);
-      if (found) {
-        setActiveConfigId(id);
-        activeConfigIdRef.current = id;
+  const selectConfig = useCallback(
+    (id: string | null) => {
+      resetLineage();
+      if (id === null) {
+        setActiveConfigId(null);
+        activeConfigIdRef.current = null;
         setIsPreview(false);
         setPreviewConfig(null);
-        setConfigInputState(found.config);
-        configInputRef.current = found.config;
-        saveMultiConfigToStorage(configsRef.current, id);
-        trackEvent('config_selected', {
-          stored_configs_count: configsRef.current.length,
-        });
+        setConfigInputState('');
+        configInputRef.current = '';
+        saveMultiConfigToStorage(configsRef.current, null);
+      } else {
+        const found = configsRef.current.find((c) => c.id === id);
+        if (found) {
+          setActiveConfigId(id);
+          activeConfigIdRef.current = id;
+          setIsPreview(false);
+          setPreviewConfig(null);
+          setConfigInputState(found.config);
+          configInputRef.current = found.config;
+          saveMultiConfigToStorage(configsRef.current, id);
+          trackEvent('config_selected', {
+            stored_configs_count: configsRef.current.length,
+          });
+        }
       }
-    }
-  }, []);
+    },
+    [resetLineage]
+  );
 
-  const createNewConfig = useCallback((content: string, name?: string) => {
-    const nextUntitledNum = getNextIndexForPattern(
-      configsRef.current,
-      /^Untitled\s+(\d+)$/
-    );
-    const configName = name || `Untitled ${nextUntitledNum}`;
-    const newId = generateUUID();
-    const now = new Date().toISOString();
-    const newConfig: SavedConfig = {
-      id: newId,
-      name: configName,
-      config: content,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const updatedConfigs = [...configsRef.current, newConfig];
-    setConfigs(updatedConfigs);
-    setActiveConfigId(newId);
-    setIsPreview(false);
-    setPreviewConfig(null);
-    setConfigInputState(content);
+  const createNewConfig = useCallback(
+    (content: string, name?: string) => {
+      resetLineage();
+      const nextUntitledNum = getNextIndexForPattern(
+        configsRef.current,
+        /^Untitled\s+(\d+)$/
+      );
+      const configName = name || `Untitled ${nextUntitledNum}`;
+      const newId = generateUUID();
+      const now = new Date().toISOString();
+      const newConfig: SavedConfig = {
+        id: newId,
+        name: configName,
+        config: content,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const updatedConfigs = [...configsRef.current, newConfig];
+      setConfigs(updatedConfigs);
+      setActiveConfigId(newId);
+      setIsPreview(false);
+      setPreviewConfig(null);
+      setConfigInputState(content);
 
-    trackEvent('config_created', {
-      stored_configs_count: updatedConfigs.length,
-    });
+      trackEvent('config_created', {
+        stored_configs_count: updatedConfigs.length,
+      });
 
-    // Synchronously update the refs to avoid race conditions with consecutive calls
-    configsRef.current = updatedConfigs;
-    activeConfigIdRef.current = newId;
-    configInputRef.current = content;
+      // Synchronously update the refs to avoid race conditions with consecutive calls
+      configsRef.current = updatedConfigs;
+      activeConfigIdRef.current = newId;
+      configInputRef.current = content;
 
-    saveMultiConfigToStorage(updatedConfigs, newId);
-    return newId;
-  }, []);
+      saveMultiConfigToStorage(updatedConfigs, newId);
+      return newId;
+    },
+    [resetLineage]
+  );
 
   const renameConfig = useCallback(
     (id: string, newName: string) => {
@@ -1222,72 +1291,84 @@ const ConfigContextProvider = ({
     [setError]
   );
 
-  const duplicateConfig = useCallback((id: string) => {
-    const found = configsRef.current.find((c) => c.id === id);
-    if (found) {
-      const newId = generateUUID();
-      const now = new Date().toISOString();
-      const newConfig: SavedConfig = {
-        id: newId,
-        name: `${found.name} (Copy)`,
-        config: found.config,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const updatedConfigs = [...configsRef.current, newConfig];
-      setConfigs(updatedConfigs);
-      setActiveConfigId(newId);
-      setIsPreview(false);
-      setPreviewConfig(null);
-      setConfigInputState(found.config);
+  const duplicateConfig = useCallback(
+    (id: string) => {
+      resetLineage();
+      const found = configsRef.current.find((c) => c.id === id);
+      if (found) {
+        const newId = generateUUID();
+        const now = new Date().toISOString();
+        const newConfig: SavedConfig = {
+          id: newId,
+          name: `${found.name} (Copy)`,
+          config: found.config,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const updatedConfigs = [...configsRef.current, newConfig];
+        setConfigs(updatedConfigs);
+        setActiveConfigId(newId);
+        setIsPreview(false);
+        setPreviewConfig(null);
+        setConfigInputState(found.config);
 
-      // Synchronously update the refs to avoid race conditions
-      configsRef.current = updatedConfigs;
-      activeConfigIdRef.current = newId;
-      configInputRef.current = found.config;
+        // Synchronously update the refs to avoid race conditions
+        configsRef.current = updatedConfigs;
+        activeConfigIdRef.current = newId;
+        configInputRef.current = found.config;
 
-      saveMultiConfigToStorage(updatedConfigs, newId);
-      trackEvent('config_duplicated', {
-        stored_configs_count: updatedConfigs.length,
+        saveMultiConfigToStorage(updatedConfigs, newId);
+        trackEvent('config_duplicated', {
+          stored_configs_count: updatedConfigs.length,
+        });
+      }
+    },
+    [resetLineage]
+  );
+
+  const deleteConfig = useCallback(
+    (id: string) => {
+      resetLineage();
+      const currentActiveId = activeConfigIdRef.current;
+      const deletedConfigObj = configsRef.current.find((c) => c.id === id);
+
+      const remainingConfigs = configsRef.current.filter((c) => c.id !== id);
+      setConfigs(remainingConfigs);
+      configsRef.current = remainingConfigs;
+
+      const isDeletingActive = currentActiveId === id;
+      const isLastConfig = configsRef.current.length <= 1;
+
+      if (isLastConfig || isDeletingActive) {
+        setActiveConfigId(null);
+        activeConfigIdRef.current = null;
+        setConfigInputState('');
+        configInputRef.current = '';
+        saveMultiConfigToStorage(remainingConfigs, null);
+      } else {
+        saveMultiConfigToStorage(remainingConfigs, currentActiveId);
+      }
+
+      if (deletedConfigObj) {
+        saveToDeletedStorage(deletedConfigObj);
+      }
+
+      trackEvent('config_deleted', {
+        stored_configs_count: remainingConfigs.length,
       });
-    }
-  }, []);
+    },
+    [resetLineage]
+  );
 
-  const deleteConfig = useCallback((id: string) => {
-    const currentActiveId = activeConfigIdRef.current;
-    const deletedConfigObj = configsRef.current.find((c) => c.id === id);
-
-    const remainingConfigs = configsRef.current.filter((c) => c.id !== id);
-    setConfigs(remainingConfigs);
-    configsRef.current = remainingConfigs;
-
-    const isDeletingActive = currentActiveId === id;
-    const isLastConfig = configsRef.current.length <= 1;
-
-    if (isLastConfig || isDeletingActive) {
-      setActiveConfigId(null);
-      activeConfigIdRef.current = null;
-      setConfigInputState('');
-      configInputRef.current = '';
-      saveMultiConfigToStorage(remainingConfigs, null);
-    } else {
-      saveMultiConfigToStorage(remainingConfigs, currentActiveId);
-    }
-
-    if (deletedConfigObj) {
-      saveToDeletedStorage(deletedConfigObj);
-    }
-
-    trackEvent('config_deleted', {
-      stored_configs_count: remainingConfigs.length,
-    });
-  }, []);
-
-  const loadPreview = useCallback((config: string) => {
-    setIsPreview(true);
-    setPreviewConfig(config);
-    setConfigInputState(config);
-  }, []);
+  const loadPreview = useCallback(
+    (config: string) => {
+      resetLineage();
+      setIsPreview(true);
+      setPreviewConfig(config);
+      setConfigInputState(config);
+    },
+    [resetLineage]
+  );
 
   const savePreviewConfig = useCallback(() => {
     if (!isPreviewRef.current) return;

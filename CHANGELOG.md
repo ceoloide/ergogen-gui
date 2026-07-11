@@ -1,5 +1,23 @@
 # Changelog
 
+## GA4 Generation Lineage & Settlement Debounce
+
+July 11, 2026
+
+![A placeholder image representing the GA4 generation lineage and debounce feature.](./public/images/changelog/placeholder.png)
+
+Previously, with the auto-generation feature active, the compiler ran as the user typed (with a 300ms debounce). This caused intermediate and incomplete states to immediately fire `keyboard_generated` tracking events. This cluttered Google Analytics and BigQuery with duplicate, disconnected hashes (e.g. `Mar` -> `Marco M` -> `Marco Massarelli`), skewing metrics and making it difficult to analyze individual configuration revisions.
+
+To resolve this, we implemented a 5-second tracking debounce (settlement delay) alongside lineage chaining. The tracking debounce ensures that intermediate typing states are filtered out, only firing when the user finishes making edits. Lineage chaining adds a `previous_config_id` parameter to the GA4 event, linking sequential configuration edits together. Additionally, we added load boundary detection and safety flushes when navigating away or closing the tab, ensuring that final layout changes are guaranteed to be tracked without losing any data.
+
+**What changed:**
+
+- **Tracking Settlement Debounce**: Delays GA4 `keyboard_generated` events by 5 seconds to ignore temporary intermediate states while typing
+- **Generation Lineage Chaining**: Logs `previous_config_id` in each GA4 event to link layout changes together in chronological trees
+- **Redundancy Suppression**: Skips sending tracking events if the layout geometry has not changed since the last logged layout
+- **Load Boundary Resets**: Clears the lineage pointer when a new configuration is created, selected, duplicated, deleted, or previewed
+- **Safety Exit Flush**: Listens to page visibility change and unload events to immediately flush any queued tracking events
+
 ## Grouped Settings Options with Descriptions
 
 July 11, 2026

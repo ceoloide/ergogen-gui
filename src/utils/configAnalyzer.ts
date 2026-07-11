@@ -22,6 +22,7 @@ export interface KeyboardAnalyticsPayload {
   matrix_keys: number;
   keyboard_keys: number;
   config_id: string;
+  previous_config_id?: string;
   [key: string]: string | number | boolean | undefined;
 }
 
@@ -177,7 +178,8 @@ const getPointZone = (pt: unknown): string | undefined => {
 export function analyzeConfiguration(
   canonicalYaml: string,
   pointsYaml: string,
-  totalGenerationTimeMs: number
+  totalGenerationTimeMs: number,
+  previousConfigId?: string
 ): KeyboardAnalyticsPayload {
   const canonicalObj = (yaml.load(canonicalYaml) || {}) as Record<
     string,
@@ -371,5 +373,6 @@ export function analyzeConfiguration(
     matrix_keys,
     keyboard_keys,
     config_id,
+    previous_config_id: previousConfigId,
   };
 }

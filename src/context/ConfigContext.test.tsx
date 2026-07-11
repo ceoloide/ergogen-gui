@@ -28,6 +28,14 @@ jest.mock('../workers/workerFactory', () => ({
   createJscadWorker: () => mockJscadWorker,
 }));
 
+import { trackEvent } from '../utils/analytics';
+jest.mock('../utils/analytics', () => ({
+  trackEvent: jest.fn(),
+  initAnalytics: jest.fn(),
+  getSendUsageMetricsEnabled: () => true,
+  checkIsPWA: () => false,
+}));
+
 // Mock ergogen globally
 global.window.ergogen = {
   process: jest.fn(),
@@ -1076,6 +1084,301 @@ describe('ConfigContextProvider', () => {
           injectionInput: [['footprint', 'mfootprint', 'fcontent']],
         })
       );
+    });
+  });
+
+  describe('GA4 Keyboard Generation Tracking & Debouncing', () => {
+    const getKeyboardGeneratedCalls = () => {
+      return (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'keyboard_generated'
+      );
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      (trackEvent as jest.Mock).mockClear();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should debounce tracking by 5 seconds and only send the latest event', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Trigger first success response (will calculate config_id A)
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 10, y: 20, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      // Advance time slightly (e.g., 2 seconds) - event should not be tracked yet
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect(getKeyboardGeneratedCalls().length).toBe(0);
+
+      // Trigger second success response before debounce expires (different coordinates, config_id B)
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 15, y: 25, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      // Advance time by 4 seconds - still shouldn't fire because timer reset
+      act(() => {
+        jest.advanceTimersByTime(4000);
+      });
+      expect(getKeyboardGeneratedCalls().length).toBe(0);
+
+      // Advance time by 1 more second to reach 5 seconds of total delay for B
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // It should have tracked B, with previous_config_id of undefined (root)
+      expect(getKeyboardGeneratedCalls().length).toBe(1);
+      expect(getKeyboardGeneratedCalls()[0][1]).toEqual(
+        expect.objectContaining({
+          config_name: 'Sweep',
+          previous_config_id: undefined,
+        })
+      );
+    });
+
+    it('should correctly chain lineages across multiple distinct generations', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // 1. First compile (config A)
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 10, y: 20, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      // Let debounce run and complete
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(getKeyboardGeneratedCalls().length).toBe(1);
+      const firstPayload = getKeyboardGeneratedCalls()[0][1];
+      const firstConfigId = firstPayload.config_id;
+      expect(firstPayload.previous_config_id).toBeUndefined();
+
+      // 2. Second compile (config B)
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 20, y: 30, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      // Let debounce run
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(getKeyboardGeneratedCalls().length).toBe(2);
+      const secondPayload = getKeyboardGeneratedCalls()[1][1];
+      expect(secondPayload.previous_config_id).toBe(firstConfigId);
+    });
+
+    it('should ignore duplicate compilation results with identical layout geometries', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // 1. First compile
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 10, y: 20, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      // Let debounce run
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(getKeyboardGeneratedCalls().length).toBe(1);
+
+      // 2. Second compile with identical values
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 10, y: 20, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      // Should still be called only once!
+      expect(getKeyboardGeneratedCalls().length).toBe(1);
+    });
+
+    it('should reset lineage when a config lifecycle action (like selectConfig) is triggered', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // 1. First compile
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 10, y: 20, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(getKeyboardGeneratedCalls().length).toBe(1);
+
+      // Trigger config select to load/switch configs
+      act(() => {
+        capturedContext.selectConfig(null);
+      });
+
+      // 2. Second compile (different coordinates, should have previous_config_id = undefined)
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Corne', author: 'foobar' } },
+              points: {
+                p1: { x: 30, y: 40, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      expect(getKeyboardGeneratedCalls().length).toBe(2);
+      const secondPayload = getKeyboardGeneratedCalls()[1][1];
+      expect(secondPayload.previous_config_id).toBeUndefined();
+    });
+
+    it('should flush pending events immediately on unmount', () => {
+      const { unmount } = render(
+        <ConfigContextProvider configInput="points: {}">
+          <div />
+        </ConfigContextProvider>
+      );
+
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: {
+              canonical: { meta: { name: 'Sweep', author: 'david' } },
+              points: {
+                p1: { x: 10, y: 20, r: 0, meta: { zone: { name: 'matrix' } } },
+              },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      expect(getKeyboardGeneratedCalls().length).toBe(0);
+
+      // Unmount the component -> should flush immediately
+      unmount();
+
+      expect(getKeyboardGeneratedCalls().length).toBe(1);
     });
   });
 });
