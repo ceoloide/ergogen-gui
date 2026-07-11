@@ -134,7 +134,7 @@ const App = () => {
  * update chip without needing a deployed SW update (e.g. `/?force_update`).
  * Clicking the chip will simply reload the page.
  */
-function useServiceWorkerUpdate(): (() => void) | undefined {
+export function useServiceWorkerUpdate(): (() => void) | undefined {
   const [waitingRegistration, setWaitingRegistration] =
     useState<ServiceWorkerRegistration | null>(null);
 
@@ -163,14 +163,24 @@ function useServiceWorkerUpdate(): (() => void) | undefined {
   if (!waitingRegistration) return undefined;
 
   return () => {
+    if ('serviceWorker' in navigator) {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+    }
+
     // Signal the waiting service worker to skip the waiting phase and activate.
-    waitingRegistration.waiting?.postMessage({ type: 'SKIP_WAITING' });
-    // Once the new SW activates it will control the page; reload to use fresh assets.
-    waitingRegistration.waiting?.addEventListener('statechange', (event) => {
-      if ((event.target as ServiceWorker).state === 'activated') {
-        window.location.reload();
-      }
-    });
+    const worker = waitingRegistration.waiting;
+    if (worker) {
+      worker.postMessage({ type: 'SKIP_WAITING' });
+    } else {
+      // Fallback: reload immediately if there is no waiting worker
+      window.location.reload();
+    }
   };
 }
 
