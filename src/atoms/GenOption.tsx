@@ -6,7 +6,8 @@ import { theme } from '../theme/theme';
  * Props for the GenOption component.
  * @typedef {object} Props
  * @property {string} optionId - A unique identifier for the checkbox input and its label.
- * @property {React.ReactNode} label - The content to be displayed as the label for the checkbox.
+ * @property {React.ReactNode} label - The content to be displayed as the title for the option.
+ * @property {React.ReactNode} [description] - Optional detailed description of the option.
  * @property {boolean} checked - The checked state of the checkbox.
  * @property {Dispatch<SetStateAction<boolean>>} setSelected - A function to update the checked state.
  * @property {string} [aria-label] - An optional aria-label for the checkbox.
@@ -14,6 +15,7 @@ import { theme } from '../theme/theme';
 type Props = {
   optionId: string;
   label: React.ReactNode;
+  description?: React.ReactNode;
   checked: boolean;
   setSelected: Dispatch<SetStateAction<boolean>>;
   'aria-label'?: string;
@@ -26,21 +28,41 @@ const OptionContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem;
-  gap: 1rem;
+  padding: 0.75rem 1rem;
+  gap: 1.5rem;
   width: 100%;
+  box-sizing: border-box;
 `;
 
 /**
- * A styled label for the option text.
+ * A styled label for the option text wrapper.
  */
 const OptionLabel = styled.label`
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  color: ${theme.colors.text};
-  font-size: ${theme.fontSizes.base};
   cursor: pointer;
   user-select: none;
   text-align: left;
+`;
+
+/**
+ * Styled option title.
+ */
+const OptionTitle = styled.span`
+  color: ${theme.colors.text};
+  font-size: ${theme.fontSizes.base};
+  font-weight: ${theme.fontWeights.semiBold};
+`;
+
+/**
+ * Styled option description.
+ */
+const OptionDescription = styled.span`
+  color: ${theme.colors.textDarker};
+  font-size: ${theme.fontSizes.sm};
+  margin-top: 0.25rem;
+  line-height: 1.4;
 `;
 
 /**
@@ -105,7 +127,7 @@ const SwitchThumb = styled.span<{ $checked: boolean }>`
 
 /**
  * A component that renders a Material Design switch option for generation settings.
- * It includes a label and manages its own checked state through the provided props.
+ * It includes a label (title), description and manages its own checked state through the provided props.
  *
  * @param {Props} props - The props for the component.
  * @returns {JSX.Element} A container with a switch and a label.
@@ -113,13 +135,17 @@ const SwitchThumb = styled.span<{ $checked: boolean }>`
 const GenOption = ({
   optionId,
   label,
+  description,
   setSelected,
   checked,
   'aria-label': ariaLabel,
 }: Props): JSX.Element => {
   return (
     <OptionContainer>
-      <OptionLabel htmlFor={optionId}>{label}</OptionLabel>
+      <OptionLabel htmlFor={optionId}>
+        <OptionTitle>{label}</OptionTitle>
+        {description && <OptionDescription>{description}</OptionDescription>}
+      </OptionLabel>
       <SwitchWrapper>
         <SwitchContainer $checked={checked} htmlFor={optionId}>
           <HiddenInput
