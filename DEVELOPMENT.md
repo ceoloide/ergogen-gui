@@ -444,6 +444,19 @@ When enabled:
 - Offline queuing: `workbox-google-analytics` intercepts measurement requests and queues them in IndexedDB using Background Sync when the device is offline, replaying them automatically once connection is restored.
 - Asset caching: The `gtag.js` script is cached with a `NetworkFirst` strategy (3-second timeout) to support offline loading.
 
+#### Keyboard Generation Tracking
+
+Upon successful keyboard generation, an asynchronous task is dispatched (to prevent blocking the main UI thread) that parses the generated `canonical.yaml` and `points.yaml` payloads using [configAnalyzer.ts](file:///Users/mmassarelli/Documents/GitHub/ergogen-gui/src/utils/configAnalyzer.ts).
+
+This parses and extracts:
+
+- Outline, PCB, and Case counts
+- Boolean flags like `is_reversible` and `is_mirrored`
+- Alpha-sorted granular matrix zone details (zone names, counts, column names, row names, etc.)
+- A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout.
+
+A custom event `keyboard_generated` is then tracked via the analytics service with this detailed configuration payload.
+
 ### PWA Manifest
 
 `public/manifest.json` uses the full PWA manifest spec:
