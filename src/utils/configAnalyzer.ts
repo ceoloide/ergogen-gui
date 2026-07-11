@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import yaml from 'js-yaml';
 
 export interface KeyboardAnalyticsPayload {
@@ -22,6 +21,7 @@ export interface KeyboardAnalyticsPayload {
   matrix_row_names: string;
   matrix_keys: number;
   config_id: string;
+  [key: string]: string | number | boolean | undefined;
 }
 
 /**
@@ -133,13 +133,14 @@ export function sha256(ascii: string): string {
 /**
  * Helper to recursively search an object for specific boolean flags.
  */
-function searchRecursive(obj: any, keys: string[]): boolean {
+function searchRecursive(obj: unknown, keys: string[]): boolean {
   if (!obj || typeof obj !== 'object') return false;
+  const record = obj as Record<string, unknown>;
   for (const k of keys) {
-    if (obj[k] === true) return true;
+    if (record[k] === true) return true;
   }
-  for (const key of Object.keys(obj)) {
-    if (searchRecursive(obj[key], keys)) return true;
+  for (const key of Object.keys(record)) {
+    if (searchRecursive(record[key], keys)) return true;
   }
   return false;
 }
@@ -154,12 +155,19 @@ const round2 = (num: number): number => {
 /**
  * Extracts point's zone name from its metadata.
  */
-const getPointZone = (pt: any): string | undefined => {
-  if (!pt || !pt.meta) return undefined;
-  if (typeof pt.meta.zone === 'object' && pt.meta.zone !== null) {
-    return pt.meta.zone.name;
+const getPointZone = (pt: unknown): string | undefined => {
+  if (!pt || typeof pt !== 'object') return undefined;
+  const meta = (pt as Record<string, unknown>).meta;
+  if (!meta || typeof meta !== 'object') return undefined;
+  const zone = (meta as Record<string, unknown>).zone;
+  if (!zone) return undefined;
+  if (typeof zone === 'object' && zone !== null) {
+    return (zone as Record<string, unknown>).name as string | undefined;
   }
-  return pt.meta.zone;
+  if (typeof zone === 'string') {
+    return zone;
+  }
+  return undefined;
 };
 
 /**
@@ -170,18 +178,25 @@ export function analyzeConfiguration(
   pointsYaml: string,
   totalGenerationTimeMs: number
 ): KeyboardAnalyticsPayload {
-  const canonicalObj = (yaml.load(canonicalYaml) || {}) as any;
-  const pointsObj = (yaml.load(pointsYaml) || {}) as any;
+  const canonicalObj = (yaml.load(canonicalYaml) || {}) as Record<
+    string,
+    unknown
+  >;
+  const pointsObj = (yaml.load(pointsYaml) || {}) as Record<string, unknown>;
 
   // 1. Outline counts
-  const outlinesObj = canonicalObj.outlines || {};
+  const outlinesObj = (canonicalObj.outlines || {}) as Record<string, unknown>;
   const outlineKeys = Object.keys(outlinesObj);
   const count_outlines = outlineKeys.filter((k) => !k.startsWith('_')).length;
   const count_raw_outlines = outlineKeys.length;
 
   // 2. PCB & Case counts
-  const count_pcbs = Object.keys(canonicalObj.pcbs || {}).length;
-  const count_cases = Object.keys(canonicalObj.cases || {}).length;
+  const count_pcbs = Object.keys(
+    (canonicalObj.pcbs || {}) as Record<string, unknown>
+  ).length;
+  const count_cases = Object.keys(
+    (canonicalObj.cases || {}) as Record<string, unknown>
+  ).length;
 
   // 3. Flags and Metadata
   const is_reversible = searchRecursive(canonicalObj.pcbs, [
@@ -189,16 +204,20 @@ export function analyzeConfiguration(
     'reverse',
   ]);
   const is_mirrored = searchRecursive(canonicalObj.points, ['mirror']);
-  const metaName = canonicalObj.meta?.name ?? 'noname';
-  const metaAuthor = canonicalObj.meta?.author ?? 'noauthor';
-  const count_zones = Object.keys(canonicalObj.points?.zones || {}).length;
+  const metaObj = (canonicalObj.meta || {}) as Record<string, unknown>;
+  const metaName = (metaObj.name as string) ?? 'noname';
+  const metaAuthor = (metaObj.author as string) ?? 'noauthor';
+  const pointsStanza = (canonicalObj.points || {}) as Record<string, unknown>;
+  const count_zones = Object.keys(
+    (pointsStanza.zones || {}) as Record<string, unknown>
+  ).length;
 
   // 4. Granular Matrix Zone Analysis
-  const zonesObj = canonicalObj.points?.zones || {};
+  const zonesObj = (pointsStanza.zones || {}) as Record<string, unknown>;
   const zoneKeys = Object.keys(zonesObj);
 
   const matrixZonesList = zoneKeys.filter((key) => {
-    const zone = zonesObj[key];
+    const zone = zonesObj[key] as Record<string, unknown> | undefined;
     return (
       zone && typeof zone === 'object' && ('columns' in zone || 'rows' in zone)
     );
@@ -228,12 +247,14 @@ export function analyzeConfiguration(
     const rowNamesArr: string[] = [];
 
     for (const zoneName of sortedZones) {
-      const zone = zonesObj[zoneName];
+      const zone = zonesObj[zoneName] as Record<string, unknown> | undefined;
 
-      const cols = Object.keys(zone?.columns || {});
+      const cols = Object.keys(
+        (zone?.columns || {}) as Record<string, unknown>
+      );
       const sortedCols = [...cols].sort();
 
-      const rows = Object.keys(zone?.rows || {});
+      const rows = Object.keys((zone?.rows || {}) as Record<string, unknown>);
       const sortedRows = [...rows].sort();
 
       // Mirroring check
@@ -241,9 +262,9 @@ export function analyzeConfiguration(
         zone?.mirror === true ||
         (typeof zone?.mirror === 'object' && zone?.mirror !== null);
       const hasRootMirror =
-        canonicalObj.points?.mirror === true ||
-        (typeof canonicalObj.points?.mirror === 'object' &&
-          canonicalObj.points?.mirror !== null);
+        pointsStanza.mirror === true ||
+        (typeof pointsStanza.mirror === 'object' &&
+          pointsStanza.mirror !== null);
       const isZoneMirrored = hasZoneMirror || hasRootMirror;
 
       const pointsInZone = pointsKeys.filter((k) => {
@@ -251,8 +272,14 @@ export function analyzeConfiguration(
         const zName = getPointZone(pt);
         if (zName !== zoneName) return false;
         // Filter out mirrored points from the baseline count
-        if (pt?.meta?.mirrored === true || k.startsWith('mirror_'))
-          return false;
+        if (pt && typeof pt === 'object') {
+          const ptMeta = (pt as Record<string, unknown>).meta;
+          if (ptMeta && typeof ptMeta === 'object') {
+            if ((ptMeta as Record<string, unknown>).mirrored === true)
+              return false;
+          }
+        }
+        if (k.startsWith('mirror_')) return false;
         return true;
       });
 
@@ -282,14 +309,14 @@ export function analyzeConfiguration(
 
   // 5. Deterministic Geometric Hash (config_id)
   const processedPoints = pointsKeys.map((name) => {
-    const pt = pointsObj[name];
+    const pt = pointsObj[name] as Record<string, unknown> | undefined;
     const zoneName = getPointZone(pt);
     const isMatrixZone = zoneName ? matrixZonesList.includes(zoneName) : false;
     const type = isMatrixZone ? 'K' : 'A';
 
-    const x = round2(pt?.x ?? 0);
-    const y = round2(pt?.y ?? 0);
-    const r = round2(pt?.r ?? 0);
+    const x = round2((pt?.x as number) ?? 0);
+    const y = round2((pt?.y as number) ?? 0);
+    const r = round2((pt?.r as number) ?? 0);
 
     return {
       name,
