@@ -180,14 +180,44 @@ const StyledConfigEditor = styled(ConfigEditor)`
   min-height: 0;
 `;
 
-/**
- * A container for settings and options.
- */
 const OptionContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
+`;
+
+/**
+ * A title for settings sections.
+ */
+const SettingsGroupTitle = styled.h4`
+  font-size: ${theme.fontSizes.sm};
+  font-weight: ${theme.fontWeights.semiBold};
+  color: ${theme.colors.textDarker};
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1.5rem 0.5rem 0.5rem 0.5rem;
+`;
+
+/**
+ * A container for grouped settings cards.
+ */
+const SettingsCard = styled.div`
+  background-color: ${theme.colors.backgroundLight};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  width: 100%;
+
+  & > div {
+    border-bottom: 1px solid ${theme.colors.border};
+    &:last-child {
+      border-bottom: none;
+    }
+  }
 `;
 
 const SettingsPaneContainer = styled.div`
@@ -744,60 +774,78 @@ const Ergogen = () => {
                 <SettingsPaneContainer>
                   <OptionContainer>
                     <Title>Options</Title>
-                    <GenOption
-                      optionId={'autogen'}
-                      label={'Auto-generate'}
-                      setSelected={configContext.setAutoGen}
-                      checked={configContext.autoGen}
-                      aria-label="Enable auto-generate"
-                    />
-                    <GenOption
-                      optionId={'debug'}
-                      label={'Debug'}
-                      setSelected={configContext.setDebug}
-                      checked={configContext.debug}
-                      aria-label="Enable debug mode"
-                    />
-                    <GenOption
-                      optionId={'autogen3d'}
-                      label={
-                        <>
-                          Auto-gen PCB, 3D <small>(slow)</small>
-                        </>
-                      }
-                      setSelected={configContext.setAutoGen3D}
-                      checked={configContext.autoGen3D}
-                      aria-label="Enable auto-generate PCB and 3D (slow)"
-                    />
-                    <GenOption
-                      optionId={'kicanvasPreview'}
-                      label={
-                        <>
-                          KiCad Preview <small>(experimental)</small>
-                        </>
-                      }
-                      setSelected={configContext.setKicanvasPreview}
-                      checked={configContext.kicanvasPreview}
-                      aria-label="Enable KiCad preview (experimental)"
-                    />
-                    <GenOption
-                      optionId={'stlPreview'}
-                      label={
-                        <>
-                          STL Preview <small>(experimental)</small>
-                        </>
-                      }
-                      setSelected={configContext.setStlPreview}
-                      checked={configContext.stlPreview}
-                      aria-label="Enable STL preview (experimental)"
-                    />
-                    <GenOption
-                      optionId={'sendUsageMetrics'}
-                      label={'Send Usage Metrics'}
-                      setSelected={configContext.setSendUsageMetrics}
-                      checked={configContext.sendUsageMetrics}
-                      aria-label="Send usage metrics"
-                    />
+
+                    <SettingsGroupTitle>General</SettingsGroupTitle>
+                    <SettingsCard>
+                      <GenOption
+                        optionId={'autogen'}
+                        label={'Auto-generate'}
+                        description={
+                          'Automatically compile configuration and update previews on changes.'
+                        }
+                        setSelected={configContext.setAutoGen}
+                        checked={configContext.autoGen}
+                        aria-label="Enable auto-generate"
+                      />
+                      <GenOption
+                        optionId={'autogen3d'}
+                        label={'Auto-generate PCB & 3D'}
+                        description={
+                          'Build 3D models and PCB files during generation (can be slow).'
+                        }
+                        setSelected={configContext.setAutoGen3D}
+                        checked={configContext.autoGen3D}
+                        aria-label="Enable auto-generate PCB and 3D (slow)"
+                      />
+                      <GenOption
+                        optionId={'debug'}
+                        label={'Debug'}
+                        description={
+                          'Include verbose debug information in log outputs.'
+                        }
+                        setSelected={configContext.setDebug}
+                        checked={configContext.debug}
+                        aria-label="Enable debug mode"
+                      />
+                    </SettingsCard>
+
+                    <SettingsGroupTitle>
+                      Previews (Experimental)
+                    </SettingsGroupTitle>
+                    <SettingsCard>
+                      <GenOption
+                        optionId={'kicanvasPreview'}
+                        label={'KiCad Preview'}
+                        description={
+                          'Render interactive PCB layouts using KiCanvas.'
+                        }
+                        setSelected={configContext.setKicanvasPreview}
+                        checked={configContext.kicanvasPreview}
+                        aria-label="Enable KiCad preview (experimental)"
+                      />
+                      <GenOption
+                        optionId={'stlPreview'}
+                        label={'STL Preview'}
+                        description={'Render 3D preview of cases and board.'}
+                        setSelected={configContext.setStlPreview}
+                        checked={configContext.stlPreview}
+                        aria-label="Enable STL preview (experimental)"
+                      />
+                    </SettingsCard>
+
+                    <SettingsGroupTitle>Privacy</SettingsGroupTitle>
+                    <SettingsCard>
+                      <GenOption
+                        optionId={'sendUsageMetrics'}
+                        label={'Send Usage Metrics'}
+                        description={
+                          'Help improve Ergogen Web UI by sharing anonymous usage statistics.'
+                        }
+                        setSelected={configContext.setSendUsageMetrics}
+                        checked={configContext.sendUsageMetrics}
+                        aria-label="Send usage metrics"
+                      />
+                    </SettingsCard>
                   </OptionContainer>
                   <Injections
                     setInjectionToEdit={setInjectionToEdit}
