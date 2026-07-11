@@ -163,11 +163,16 @@ export function useServiceWorkerUpdate(): (() => void) | undefined {
   if (!waitingRegistration) return undefined;
 
   return () => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     if ('serviceWorker' in navigator) {
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing) {
           refreshing = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
           window.location.reload();
         }
       });
@@ -177,6 +182,10 @@ export function useServiceWorkerUpdate(): (() => void) | undefined {
     const worker = waitingRegistration.waiting;
     if (worker) {
       worker.postMessage({ type: 'SKIP_WAITING' });
+      // Safety fallback: if controllerchange doesn't trigger a reload within 1 second, reload anyway.
+      timeoutId = setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } else {
       // Fallback: reload immediately if there is no waiting worker
       window.location.reload();

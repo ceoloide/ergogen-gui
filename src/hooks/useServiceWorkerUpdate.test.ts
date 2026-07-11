@@ -31,6 +31,7 @@ describe('useServiceWorkerUpdate hook', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
 
     // Mock window.location
     mockReload = jest.fn();
@@ -57,6 +58,7 @@ describe('useServiceWorkerUpdate hook', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     Object.defineProperty(global, 'navigator', {
       value: originalNavigator,
       writable: true,
@@ -145,6 +147,50 @@ describe('useServiceWorkerUpdate hook', () => {
     act(() => {
       registeredCallback();
     });
+    expect(mockReload).toHaveBeenCalledTimes(1);
+
+    // Fast-forward safety timeout; should not trigger another reload since it was cleared or already reloaded
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(mockReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('should trigger reload via safety fallback timeout if controllerchange does not fire', () => {
+    const mockPostMessage = jest.fn();
+    const mockWaitingWorker = {
+      postMessage: mockPostMessage,
+    };
+    const mockRegistration = {
+      waiting: mockWaitingWorker,
+    } as unknown as ServiceWorkerRegistration;
+
+    let onUpdateCallback: any = null;
+    (serviceWorkerRegistration.register as jest.Mock).mockImplementation(
+      (config) => {
+        onUpdateCallback = config.onUpdate;
+      }
+    );
+
+    const { result } = renderHook(() => useServiceWorkerUpdate());
+
+    act(() => {
+      onUpdateCallback?.(mockRegistration);
+    });
+
+    expect(result.current).toBeInstanceOf(Function);
+
+    act(() => {
+      result.current?.();
+    });
+
+    expect(mockReload).not.toHaveBeenCalled();
+
+    // Advance fake timers by 1000ms
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
     expect(mockReload).toHaveBeenCalledTimes(1);
   });
 

@@ -48,4 +48,19 @@ describe('UpdateChip', () => {
     // Assert
     expect(screen.getByTestId('update-chip')).toBeInTheDocument();
   });
+
+  it('changes text to "Updating version..." and disables the button when clicked', () => {
+    // Arrange
+    const onUpdate = jest.fn();
+    render(<UpdateChip onClick={onUpdate} />);
+    const chip = screen.getByRole('button', { name: /update available/i });
+
+    // Act
+    fireEvent.click(chip);
+
+    // Assert
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Updating version...')).toBeInTheDocument();
+    expect(chip).toBeDisabled();
+  });
 });
