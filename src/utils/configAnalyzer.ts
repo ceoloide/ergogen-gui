@@ -8,8 +8,8 @@ export interface KeyboardAnalyticsPayload {
   count_cases: number;
   is_reversible: boolean;
   is_mirrored: boolean;
-  'meta.name': string;
-  'meta.author': string;
+  config_name: string;
+  config_author: string;
   count_zones: number;
   matrix_zones: number;
   has_matrix: boolean;
@@ -205,8 +205,8 @@ export function analyzeConfiguration(
   ]);
   const is_mirrored = searchRecursive(canonicalObj.points, ['mirror']);
   const metaObj = (canonicalObj.meta || {}) as Record<string, unknown>;
-  const metaName = (metaObj.name as string) ?? 'noname';
-  const metaAuthor = (metaObj.author as string) ?? 'noauthor';
+  const metaName = (metaObj.name as string) ?? 'no_name';
+  const metaAuthor = (metaObj.author as string) ?? 'no_author';
   const pointsStanza = (canonicalObj.points || {}) as Record<string, unknown>;
   const count_zones = Object.keys(
     (pointsStanza.zones || {}) as Record<string, unknown>
@@ -353,8 +353,8 @@ export function analyzeConfiguration(
     count_cases,
     is_reversible,
     is_mirrored,
-    'meta.name': metaName,
-    'meta.author': metaAuthor,
+    config_name: metaName,
+    config_author: metaAuthor,
     count_zones,
     matrix_zones,
     has_matrix,

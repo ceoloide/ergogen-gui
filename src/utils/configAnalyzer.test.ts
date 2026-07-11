@@ -129,8 +129,8 @@ mirror_thumb_t1_1:
     expect(payload.count_cases).toBe(1);
     expect(payload.is_reversible).toBe(true);
     expect(payload.is_mirrored).toBe(true);
-    expect(payload['meta.name']).toBe('sweep');
-    expect(payload['meta.author']).toBe('david');
+    expect(payload.config_name).toBe('sweep');
+    expect(payload.config_author).toBe('david');
     expect(payload.count_zones).toBe(2);
   });
 
@@ -140,8 +140,8 @@ points:
   zones: {}
 `;
     const payload = analyzeConfiguration(canonicalNoMeta, '{}', 0);
-    expect(payload['meta.name']).toBe('noname');
-    expect(payload['meta.author']).toBe('noauthor');
+    expect(payload.config_name).toBe('no_name');
+    expect(payload.config_author).toBe('no_author');
   });
 
   it('performs granular matrix zone analysis with alphabetical sorting', () => {
