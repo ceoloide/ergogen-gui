@@ -781,7 +781,7 @@ const Ergogen = () => {
                         optionId={'autogen'}
                         label={'Auto-generate'}
                         description={
-                          'Automatically compile configuration and update previews on changes.'
+                          'Automatically generate new outputs and update previews on changes.'
                         }
                         setSelected={configContext.setAutoGen}
                         checked={configContext.autoGen}
@@ -800,9 +800,7 @@ const Ergogen = () => {
                       <GenOption
                         optionId={'debug'}
                         label={'Debug'}
-                        description={
-                          'Include verbose debug information in log outputs.'
-                        }
+                        description={'Include debug files in the outputs.'}
                         setSelected={configContext.setDebug}
                         checked={configContext.debug}
                         aria-label="Enable debug mode"
@@ -826,7 +824,7 @@ const Ergogen = () => {
                       <GenOption
                         optionId={'stlPreview'}
                         label={'STL Preview'}
-                        description={'Render 3D preview of cases and board.'}
+                        description={'Render 3D preview of generated cases.'}
                         setSelected={configContext.setStlPreview}
                         checked={configContext.stlPreview}
                         aria-label="Enable STL preview (experimental)"
