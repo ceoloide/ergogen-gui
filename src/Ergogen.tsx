@@ -187,9 +187,6 @@ const OptionContainer = styled.div`
   width: 100%;
 `;
 
-/**
- * A title for settings sections.
- */
 const SettingsGroupTitle = styled.h4`
   font-size: ${theme.fontSizes.sm};
   font-weight: ${theme.fontWeights.semiBold};
@@ -197,6 +194,10 @@ const SettingsGroupTitle = styled.h4`
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin: 1.5rem 0.5rem 0.5rem 0.5rem;
+
+  &:first-of-type {
+    margin-top: 0.5rem;
+  }
 `;
 
 /**
@@ -773,8 +774,6 @@ const Ergogen = () => {
               >
                 <SettingsPaneContainer>
                   <OptionContainer>
-                    <Title>Options</Title>
-
                     <SettingsGroupTitle>General</SettingsGroupTitle>
                     <SettingsCard>
                       <GenOption
