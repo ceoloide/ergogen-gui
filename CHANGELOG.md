@@ -1,5 +1,22 @@
 # Changelog
 
+## Grouped Settings Options with Descriptions
+
+July 11, 2026
+
+![A screenshot showing the restructured options pane with Settings grouped into cards and descriptions underneath.](./public/images/changelog/placeholder.png)
+
+Previously, all configuration settings and toggles were displayed in a flat, unorganized list. The switches only had brief, simple labels, leaving users without any explanation or context about what each option did (e.g. what the differences between various preview options were, or what the performance implications were).
+
+To improve this, we have restructured the options pane to group settings into visually distinct, clean cards: General, Previews (Experimental), and Privacy. Each settings option now features a bold title and a detailed description explaining its function and impact, with the toggle switch aligned to the right. Additionally, the entire label area (including the title and description) is clickable, making it much easier for users to toggle options on desktop and mobile devices.
+
+**What changed:**
+
+- **Visual Grouping**: Organizes settings into clear General, Previews (Experimental), and Privacy cards
+- **Title and Description Layout**: Displays a bold setting title with a descriptive explanation stacked vertically underneath
+- **Enhanced Toggle Targets**: Wraps both the title and description inside the interactive label element to increase touch/click targets
+- **Consistent Card Styling**: Applies unified styled-components with rounded corners, subtle backgrounds, and internal dividers
+
 ## Enhanced Keyboard Generation Analytics & Config Identifier
 
 July 11, 2026

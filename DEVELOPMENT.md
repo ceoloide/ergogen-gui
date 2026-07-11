@@ -650,3 +650,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 2. Add a GitHub icon or pill badge for custom repository references to make links stand out.
 3. Integrate analytics event tracking when compatibility dialog decisions are made, logging `share_compatibility_accept` and `share_compatibility_cancel` events with metadata detailing the current and shared version parameters.
 4. Add corresponding unit tests to verify the events are sent and icons render properly.
+
+### [TASK-019] Extract Settings Layout Components to Reusable Atomic Styles
+
+**Context:** During the settings pane layout restructuring, we defined `SettingsCard` and `SettingsGroupTitle` styled components inside `Ergogen.tsx`. These layout components are currently settings-specific but could be reused if more options screens or side sheets are added in the future.
+
+**Task:** If other options tabs, popup submenus, or settings configurations are introduced, extract `SettingsCard` and `SettingsGroupTitle` into a unified settings layout file (e.g. under `src/atoms/SettingsLayout.tsx`) to maintain clean division of concerns and prevent code duplication.
