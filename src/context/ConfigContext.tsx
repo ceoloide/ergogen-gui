@@ -22,6 +22,10 @@ import {
   initAnalytics,
   getSendUsageMetricsEnabled,
 } from '../utils/analytics';
+import {
+  analyzeConfiguration,
+  KeyboardAnalyticsPayload,
+} from '../utils/configAnalyzer';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import { useConfigLoader } from '../hooks/useConfigLoader';
@@ -683,6 +687,25 @@ const ConfigContextProvider = ({
             has_outlines: !!newResults.outlines,
             stored_configs_count: configsRef.current.length,
           });
+
+          // Asynchronously perform configuration analysis and track GA4 event
+          setTimeout(() => {
+            try {
+              const canonicalText = yaml.dump(newResults.canonical || {});
+              const pointsText = yaml.dump(newResults.points || {});
+              const payload: KeyboardAnalyticsPayload = analyzeConfiguration(
+                canonicalText,
+                pointsText,
+                Math.round(duration)
+              );
+              trackEvent('keyboard_generated', payload);
+            } catch (err) {
+              console.error(
+                'Failed to generate keyboard configuration analytics:',
+                err
+              );
+            }
+          }, 0);
 
           // Store preview or demo SVG in the active configuration
           const svgContent =
