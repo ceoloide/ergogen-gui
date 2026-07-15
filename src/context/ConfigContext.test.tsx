@@ -1381,4 +1381,66 @@ describe('ConfigContextProvider', () => {
       expect(getKeyboardGeneratedCalls().length).toBe(1);
     });
   });
+
+  describe('KiCad 5 deprecation warning detection', () => {
+    it('should set deprecationWarning when a PCB uses kicad5 template and ceoloide footprint', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      const kicad5Config = `
+pcbs:
+  my_pcb:
+    template: kicad5
+    footprints:
+      f1:
+        what: ceoloide/key
+`;
+
+      await act(async () => {
+        await capturedContext.generateNow(kicad5Config, undefined);
+      });
+
+      expect(capturedContext.deprecationWarning).toContain(
+        'KiCad 5 is deprecated'
+      );
+    });
+
+    it('should NOT set deprecationWarning when a PCB uses kicad8 template and ceoloide footprint', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider configInput="points: {}">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      const kicad8Config = `
+pcbs:
+  my_pcb:
+    template: kicad8
+    footprints:
+      f1:
+        what: ceoloide/key
+`;
+
+      await act(async () => {
+        await capturedContext.generateNow(kicad8Config, undefined);
+      });
+
+      expect(capturedContext.deprecationWarning).toBeNull();
+    });
+  });
 });
