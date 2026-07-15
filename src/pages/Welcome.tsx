@@ -161,38 +161,38 @@ const GitHubInputContainer = styled.div`
 `;
 
 const RepoSelectContainer = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
   background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
-  padding: 0 0.5rem 0 0.75rem;
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: border-color 0.15s ease-in-out;
+
+  &:hover {
+    border-color: ${theme.colors.accent};
+  }
 
   svg {
-    width: 16px;
-    height: 16px;
-    color: ${theme.colors.textDark};
+    width: 18px;
+    height: 18px;
+    color: ${theme.colors.white};
   }
 `;
 
 const RepoSelect = styled.select`
-  background: transparent;
-  border: none;
-  color: ${theme.colors.text};
-  font-family: ${theme.fonts.body};
-  font-size: ${theme.fontSizes.base};
-  outline: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
   cursor: pointer;
-  padding: 0.75rem 1.5rem 0.75rem 0.25rem;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
-  background-repeat: no-repeat;
-  background-position-x: 100%;
-  background-position-y: 50%;
 
   option {
     background-color: ${theme.colors.backgroundLight};
