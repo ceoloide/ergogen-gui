@@ -15,6 +15,7 @@ import { trackEvent } from '../utils/analytics';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import GithubIcon from '../atoms/GithubIcon';
 import CodebergIcon from '../atoms/CodebergIcon';
+import ForgejoIcon from '../atoms/ForgejoIcon';
 
 const Spinner = styled.div`
   border: 3px solid rgba(255, 255, 255, 0.3);
@@ -344,7 +345,9 @@ const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
   const [githubInput, setGithubInput] = useState('');
-  const [provider, setProvider] = useState<'github' | 'codeberg'>('github');
+  const [provider, setProvider] = useState<'github' | 'codeberg' | 'forgejo'>(
+    'github'
+  );
   const [isLocalLoading, setIsLocalLoading] = useState(false);
   const [isRepoLoading, setIsRepoLoading] = useState(false);
   const isLoading = isLocalLoading || isRepoLoading;
@@ -358,6 +361,8 @@ const Welcome = () => {
       setProvider('github');
     } else if (val.includes('codeberg.org/')) {
       setProvider('codeberg');
+    } else if (val.startsWith('http://') || val.startsWith('https://')) {
+      setProvider('forgejo');
     }
   };
 
@@ -387,7 +392,10 @@ const Welcome = () => {
   useEffect(() => {
     const queryParameters = new URLSearchParams(window.location.search);
     const hasRemoteUrlParam =
-      queryParameters.has('github') || queryParameters.has('codeberg');
+      queryParameters.has('github') ||
+      queryParameters.has('codeberg') ||
+      queryParameters.has('forgejo') ||
+      queryParameters.has('gitea');
 
     if ((shouldNavigate || hasRemoteUrlParam) && configContext?.configInput) {
       navigate('/');
@@ -532,6 +540,13 @@ const Welcome = () => {
     ) {
       if (provider === 'codeberg') {
         fetchUrl = `https://codeberg.org/${fetchUrl}`;
+      } else if (provider === 'forgejo') {
+        setError(
+          'Forgejo/Gitea requires a full URL including the host (e.g., https://git.gay/owner/repo)'
+        );
+        setIsRepoLoading(false);
+        setIsGenerating(false);
+        return;
       } else {
         fetchUrl = `https://github.com/${fetchUrl}`;
       }
@@ -564,7 +579,12 @@ const Welcome = () => {
         }
       })
       .catch((e) => {
-        const providerName = provider === 'github' ? 'GitHub' : 'Codeberg';
+        const providerName =
+          provider === 'github'
+            ? 'GitHub'
+            : provider === 'codeberg'
+              ? 'Codeberg'
+              : 'Forgejo/Gitea';
         setError(
           `Failed to load from ${providerName} repository: ${e.message}`
         );
@@ -775,14 +795,22 @@ const Welcome = () => {
             </p>
             <GitHubInputContainer>
               <RepoSelectContainer>
-                {provider === 'github' ? <GithubIcon /> : <CodebergIcon />}
+                {provider === 'github' ? (
+                  <GithubIcon />
+                ) : provider === 'codeberg' ? (
+                  <CodebergIcon />
+                ) : (
+                  <ForgejoIcon />
+                )}
                 <span className="material-symbols-outlined">
                   arrow_drop_down
                 </span>
                 <RepoSelect
                   value={provider}
                   onChange={(e) =>
-                    setProvider(e.target.value as 'github' | 'codeberg')
+                    setProvider(
+                      e.target.value as 'github' | 'codeberg' | 'forgejo'
+                    )
                   }
                   disabled={isLoading}
                   aria-label="Repository provider source"
@@ -790,10 +818,15 @@ const Welcome = () => {
                 >
                   <option value="github">GitHub</option>
                   <option value="codeberg">Codeberg</option>
+                  <option value="forgejo">Forgejo</option>
                 </RepoSelect>
               </RepoSelectContainer>
               <GitHubInput
-                placeholder="user/repo"
+                placeholder={
+                  provider === 'forgejo'
+                    ? 'https://host/owner/repo'
+                    : 'user/repo'
+                }
                 value={githubInput}
                 onChange={(e) => handleRepoInputChange(e.target.value)}
                 onKeyDown={(e) => {

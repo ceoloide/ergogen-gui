@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { fetchConfigFromUrl } from '../utils/github';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
 import '../utils/codeberg';
+import '../utils/forgejo';
 
 interface UseConfigLoaderProps {
   processInjectionsWithConflictResolution: (
@@ -24,8 +25,10 @@ export const useConfigLoader = ({
       const queryParameters = new URLSearchParams(window.location.search);
       const githubUrl = queryParameters.get('github');
       const codebergUrl = queryParameters.get('codeberg');
+      const forgejoUrl = queryParameters.get('forgejo');
+      const giteaUrl = queryParameters.get('gitea');
 
-      let remoteUrl = githubUrl || codebergUrl;
+      let remoteUrl = githubUrl || codebergUrl || forgejoUrl || giteaUrl;
 
       if (remoteUrl) {
         if (codebergUrl && !codebergUrl.includes('codeberg.org')) {

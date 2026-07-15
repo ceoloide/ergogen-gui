@@ -1,6 +1,7 @@
 import { gitProviderRegistry } from './gitProvider';
 import './github';
 import './codeberg';
+import './forgejo';
 
 describe('gitProviderRegistry', () => {
   it('should resolve github.com URLs to GitHubProvider', () => {
@@ -181,5 +182,43 @@ describe('gitProviderRegistry', () => {
     } finally {
       global.fetch = originalFetch;
     }
+  });
+
+  describe('ForgejoProvider', () => {
+    it('should resolve custom host Gitea/Forgejo URLs to ForgejoProvider', () => {
+      const url = 'https://git.gay/MrsFreckles/lunera';
+      const provider = gitProviderRegistry.resolve(url);
+      expect(provider).toBeDefined();
+      expect(provider?.canHandle(url)).toBe(true);
+      expect(provider?.canHandle('https://github.com/owner/repo')).toBe(false);
+      expect(provider?.canHandle('https://codeberg.org/owner/repo')).toBe(
+        false
+      );
+    });
+
+    it('should fetch config using the correct derived custom host API URL', async () => {
+      const url =
+        'https://git.gay/MrsFreckles/lunera/src/branch/main/config.yaml';
+      const provider = gitProviderRegistry.resolve(url);
+      expect(provider).toBeDefined();
+
+      const originalFetch = global.fetch;
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve('forgejo config content'),
+      });
+      global.fetch = mockFetch;
+
+      try {
+        const result = await provider?.fetchConfig(url);
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://git.gay/api/v1/repos/MrsFreckles/lunera/raw/config.yaml?ref=main'
+        );
+        expect(result?.config).toBe('forgejo config content');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
   });
 });

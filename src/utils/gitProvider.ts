@@ -117,20 +117,23 @@ export abstract class BaseGitProvider implements GitProvider {
     filePath?: string;
     isRepoRoot: boolean;
     baseUrl: string;
+    host?: string;
   };
 
   abstract fetchFileContent(
     owner: string,
     repo: string,
     path: string,
-    ref: string
+    ref: string,
+    host?: string
   ): Promise<string>;
 
   abstract listDirectory(
     owner: string,
     repo: string,
     path: string,
-    ref: string
+    ref: string,
+    host?: string
   ): Promise<GitFileItem[]>;
 
   // Hook for provider-specific response validation (e.g. rate limit checking)
@@ -142,6 +145,7 @@ export abstract class BaseGitProvider implements GitProvider {
   async fetchConfig(url: string): Promise<ErgogenWorkspaceBundle> {
     const parsed = this.parseUrl(url);
     const { owner, repo, branch, filePath, isRepoRoot } = parsed;
+    const host = parsed.host;
 
     const footprints: GitInjection[] = [];
     const outlines: GitInjection[] = [];
@@ -160,7 +164,8 @@ export abstract class BaseGitProvider implements GitProvider {
           owner,
           repo,
           '.gitmodules',
-          targetBranch
+          targetBranch,
+          host
         );
         const submodules = parseGitmodules(gitmodulesContent);
 
@@ -193,6 +198,7 @@ export abstract class BaseGitProvider implements GitProvider {
             const subProvider = gitProviderRegistry.resolve(submodule.url);
             if (subProvider instanceof BaseGitProvider) {
               const subParsed = subProvider.parseUrl(submodule.url);
+              const subHost = subParsed.host;
               let submoduleFootprints: GitInjection[] = [];
 
               try {
@@ -202,7 +208,8 @@ export abstract class BaseGitProvider implements GitProvider {
                     subParsed.repo,
                     '',
                     'main',
-                    ['.js']
+                    ['.js'],
+                    subHost
                   );
               } catch (_e) {
                 if (_e instanceof RateLimitError) throw _e;
@@ -213,7 +220,8 @@ export abstract class BaseGitProvider implements GitProvider {
                       subParsed.repo,
                       '',
                       'master',
-                      ['.js']
+                      ['.js'],
+                      subHost
                     );
                 } catch (_e2) {
                   if (_e2 instanceof RateLimitError) throw _e2;
@@ -243,7 +251,13 @@ export abstract class BaseGitProvider implements GitProvider {
         throw new Error('Invalid URL. File path not specified.');
       }
 
-      const config = await this.fetchFileContent(owner, repo, filePath, branch);
+      const config = await this.fetchFileContent(
+        owner,
+        repo,
+        filePath,
+        branch,
+        host
+      );
       enforceFileSizeLimit(config.length, false);
 
       const filename = filePath.split('/').pop() || '';
@@ -272,7 +286,8 @@ export abstract class BaseGitProvider implements GitProvider {
           repo,
           footprintsPath,
           branch,
-          ['.js']
+          ['.js'],
+          host
         );
         footprints.push(...resolvedFootprints);
       } catch (_e) {
@@ -287,7 +302,8 @@ export abstract class BaseGitProvider implements GitProvider {
             repo,
             outlinesPath,
             branch,
-            ['.js', '.svg']
+            ['.js', '.svg'],
+            host
           );
           outlines.push(...resolvedOutlines);
         } catch (_e) {
@@ -302,7 +318,8 @@ export abstract class BaseGitProvider implements GitProvider {
             repo,
             templatesPath,
             branch,
-            ['.js']
+            ['.js'],
+            host
           );
           templates.push(...resolvedTemplates);
         } catch (_e) {
@@ -343,7 +360,8 @@ export abstract class BaseGitProvider implements GitProvider {
           owner,
           repo,
           'config.yaml',
-          targetBranch
+          targetBranch,
+          host
         );
         configPath = '';
       } catch (e: unknown) {
@@ -361,7 +379,8 @@ export abstract class BaseGitProvider implements GitProvider {
             owner,
             repo,
             'config.yml',
-            targetBranch
+            targetBranch,
+            host
           );
           configPath = '';
         } catch (e2: unknown) {
@@ -379,7 +398,8 @@ export abstract class BaseGitProvider implements GitProvider {
               owner,
               repo,
               'ergogen/config.yaml',
-              targetBranch
+              targetBranch,
+              host
             );
             configPath = 'ergogen';
           } catch (e3: unknown) {
@@ -397,7 +417,8 @@ export abstract class BaseGitProvider implements GitProvider {
                 owner,
                 repo,
                 'ergogen/config.yml',
-                targetBranch
+                targetBranch,
+                host
               );
               configPath = 'ergogen';
             } catch (e4: unknown) {
@@ -413,7 +434,8 @@ export abstract class BaseGitProvider implements GitProvider {
               const { configYamls, anyYamls } = await this.bfsForYamlFiles(
                 owner,
                 repo,
-                targetBranch
+                targetBranch,
+                host
               );
 
               if (configYamls.length > 0) {
@@ -422,7 +444,8 @@ export abstract class BaseGitProvider implements GitProvider {
                   owner,
                   repo,
                   selectedPath,
-                  targetBranch
+                  targetBranch,
+                  host
                 );
                 configPath = selectedPath.includes('/')
                   ? selectedPath.substring(0, selectedPath.lastIndexOf('/'))
@@ -433,7 +456,8 @@ export abstract class BaseGitProvider implements GitProvider {
                   owner,
                   repo,
                   selectedPath,
-                  targetBranch
+                  targetBranch,
+                  host
                 );
                 configPath = selectedPath.includes('/')
                   ? selectedPath.substring(0, selectedPath.lastIndexOf('/'))
@@ -552,12 +576,13 @@ export abstract class BaseGitProvider implements GitProvider {
     repo: string,
     dirPath: string,
     branch: string,
-    allowedExtensions: string[]
+    allowedExtensions: string[],
+    host?: string
   ): Promise<GitInjection[]> {
     const result: GitInjection[] = [];
     const fetchRec = async (p: string) => {
       try {
-        const items = await this.listDirectory(owner, repo, p, branch);
+        const items = await this.listDirectory(owner, repo, p, branch, host);
         for (const item of items) {
           const itemPath = item.path.startsWith(p)
             ? item.path
@@ -575,7 +600,8 @@ export abstract class BaseGitProvider implements GitProvider {
                   owner,
                   repo,
                   itemPath,
-                  branch
+                  branch,
+                  host
                 );
                 const cleanName = dirPath
                   ? itemPath.slice(dirPath.length + 1).replace(/\.[^/.]+$/, '')
@@ -609,7 +635,8 @@ export abstract class BaseGitProvider implements GitProvider {
   async bfsForYamlFiles(
     owner: string,
     repo: string,
-    branch: string
+    branch: string,
+    host?: string
   ): Promise<{
     configYamls: string[];
     anyYamls: string[];
@@ -631,7 +658,8 @@ export abstract class BaseGitProvider implements GitProvider {
           owner,
           repo,
           currentPath,
-          branch
+          branch,
+          host
         );
         for (const item of items) {
           if (item.type === 'file') {
