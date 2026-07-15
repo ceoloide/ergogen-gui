@@ -196,8 +196,12 @@ const DropdownTrigger = styled.button`
   height: 100%;
   color: ${theme.colors.white};
 
+  transition: background-color 0.15s ease-in-out;
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+
   &:hover {
-    color: ${theme.colors.accent};
+    background-color: ${theme.colors.buttonHover};
   }
 
   &:disabled {
