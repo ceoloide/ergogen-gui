@@ -6,7 +6,7 @@ import { getErgogenVersionInfo } from '../utils/version';
 import { DevChip } from '../atoms/DevChip';
 import guiPkg from '../../package.json';
 import DiscordIcon from '../atoms/DiscordIcon';
-import GithubIcon from '../atoms/GithubIcon';
+import { GithubVersionButton } from './GithubVersionButton';
 import { useConfigContext } from '../context/ConfigContext';
 import { trackEvent } from '../utils/analytics';
 
@@ -30,10 +30,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 }) => {
   const prevIsOpenRef = useRef(isOpen);
   const [isOpening, setIsOpening] = useState(isOpen);
-  const [panelWidth, setPanelWidth] = useState(345);
+  const [panelWidth, setPanelWidth] = useState(360);
   const isResizingRef = useRef(false);
   const startXRef = useRef(0);
-  const startWidthRef = useRef(345);
+  const startWidthRef = useRef(360);
 
   const configContext = useConfigContext();
   const navigate = useNavigate();
@@ -180,7 +180,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
       const deltaX = e.clientX - startXRef.current;
       const newWidth = startWidthRef.current + deltaX;
       const maxWidth = Math.min(600, window.innerWidth * 0.9);
-      const constrainedWidth = Math.max(345, Math.min(newWidth, maxWidth));
+      const constrainedWidth = Math.max(360, Math.min(newWidth, maxWidth));
       setPanelWidth(constrainedWidth);
     };
 
@@ -199,7 +199,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
       const deltaX = touch.clientX - startXRef.current;
       const newWidth = startWidthRef.current + deltaX;
       const maxWidth = Math.min(600, window.innerWidth * 0.9);
-      const constrainedWidth = Math.max(345, Math.min(newWidth, maxWidth));
+      const constrainedWidth = Math.max(360, Math.min(newWidth, maxWidth));
       setPanelWidth(constrainedWidth);
     };
 
@@ -483,44 +483,20 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
             >
               <DiscordIcon />
             </OutlineButton>
-            <VersionButton
-              onClick={() => {
-                window.open(
-                  'https://github.com/ceoloide/ergogen-gui',
-                  '_blank',
-                  'noopener,noreferrer'
-                );
-              }}
-              aria-label={`View Ergogen GUI ${guiVersion} on GitHub`}
+            <GithubVersionButton
+              label="Web UI"
+              version={guiVersion}
+              url="https://github.com/ceoloide/ergogen-gui"
               data-testid="side-nav-gui-version-button"
-            >
-              <GithubIcon />
-              <ButtonContent>
-                <ButtonLabel>GUI</ButtonLabel>
-                <ButtonVersionText>{guiVersion}</ButtonVersionText>
-              </ButtonContent>
-            </VersionButton>
-            <VersionButton
-              onClick={() => {
-                window.open(versionInfo.url, '_blank', 'noopener,noreferrer');
-              }}
-              $hasDevBadge={versionInfo.isCustom}
-              aria-label={`View Ergogen ${versionInfo.displayText} on GitHub`}
+            />
+            <GithubVersionButton
+              label="Ergogen"
+              version={versionInfo.displayText}
+              url={versionInfo.url}
+              isCustom={versionInfo.isCustom}
               data-testid="side-nav-ergogen-version-button"
-            >
-              <GithubIcon />
-              <ButtonContent>
-                <ButtonLabel>Ergogen</ButtonLabel>
-                <ButtonVersionText $isCustom={versionInfo.isCustom}>
-                  {versionInfo.displayText}
-                </ButtonVersionText>
-              </ButtonContent>
-              {versionInfo.isCustom && (
-                <DevBadge data-testid="side-nav-ergogen-dev-badge">
-                  <DevBadgeText>DEV</DevBadgeText>
-                </DevBadge>
-              )}
-            </VersionButton>
+              devBadgeTestId="side-nav-ergogen-dev-badge"
+            />
           </ButtonGroup>
         </Footer>
       </Panel>
@@ -946,85 +922,6 @@ const ButtonGroup = styled.div`
   gap: 10px;
   flex-wrap: wrap;
   width: 100%;
-`;
-
-const VersionButton = styled.button<{ $hasDevBadge?: boolean }>`
-  background-color: transparent;
-  transition:
-    color 0.15s ease-in-out,
-    background-color 0.15s ease-in-out,
-    border-color 0.15s ease-in-out,
-    box-shadow 0.15s ease-in-out;
-  border: 1px solid ${theme.colors.border};
-  border-radius: 6px;
-  color: ${theme.colors.white};
-  display: flex;
-  align-items: center;
-  padding: 8px ${(props) => (props.$hasDevBadge ? '22px' : '10px')} 8px 10px;
-  text-decoration: none;
-  cursor: pointer;
-  height: 34px;
-  position: relative;
-  flex: 0 0 auto;
-  gap: 6px;
-
-  svg {
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-  }
-
-  &:hover {
-    background-color: ${theme.colors.buttonHover};
-  }
-`;
-
-const ButtonContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  line-height: 1.1;
-  min-width: 0;
-`;
-
-const ButtonLabel = styled.span`
-  font-size: 10px;
-  font-weight: ${theme.fontWeights.bold};
-  color: ${theme.colors.white};
-  white-space: nowrap;
-`;
-
-const ButtonVersionText = styled.span<{ $isCustom?: boolean }>`
-  font-size: 8px;
-  color: ${(props) =>
-    props.$isCustom ? theme.colors.accent : theme.colors.textDark};
-  white-space: nowrap;
-`;
-
-const DevBadge = styled.div`
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 16px;
-  background-color: ${theme.colors.backgroundLighter};
-  border-left: 1px solid ${theme.colors.border};
-  border-top-right-radius: 5px;
-  border-bottom-right-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
-`;
-
-const DevBadgeText = styled.span`
-  font-size: 8px;
-  font-weight: ${theme.fontWeights.bold};
-  color: ${theme.colors.accent};
-  transform: rotate(-90deg);
-  white-space: nowrap;
-  line-height: 1;
 `;
 
 const OutlineButton = styled.button`

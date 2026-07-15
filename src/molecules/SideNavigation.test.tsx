@@ -221,7 +221,7 @@ describe('SideNavigation', () => {
     // Assert GUI button and version
     const guiBtn = screen.getByTestId('side-nav-gui-version-button');
     expect(guiBtn).toBeInTheDocument();
-    expect(screen.getByText('GUI')).toBeInTheDocument();
+    expect(screen.getByText('Web UI')).toBeInTheDocument();
     expect(screen.getByText(guiPkg.version)).toBeInTheDocument();
 
     // Assert Ergogen button and version
