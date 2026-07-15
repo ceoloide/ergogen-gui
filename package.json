@@ -1,6 +1,6 @@
 {
   "name": "ergogen-gui",
-  "version": "0.11.14",
+  "version": "0.12.14",
   "description": "A web-based GUI for Ergogen, the ergonomic keyboard layout generator.",
   "license": "MIT",
   "private": false,
