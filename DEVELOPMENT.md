@@ -332,7 +332,7 @@ Several potential improvements could enhance the sharing feature:
 
 ## Ergogen Version Override Lifecycle
 
-To allow developers and CI to override the default Ergogen version using the `ERGOGEN_VERSION` environment variable without permanently modifying `package.json` or breaking `yarn install --frozen-lockfile` in CI, the project implements a temporary package.json patching workflow:
+To allow developers and CI to override the default Ergogen version using the `ERGOGEN_VERSION` environment variable without permanently modifying `package.json` (or breaking the build due to `yarn.lock` mismatch in CI), the project implements a temporary package.json patching workflow:
 
 1. **Pre-install (`scripts/preinstall.js`)**:
    - Executes before dependencies are resolved and installed.
@@ -340,7 +340,7 @@ To allow developers and CI to override the default Ergogen version using the `ER
    - If the version matches or is not set, it does nothing (and cleans up any stale `packages.json.bak` backups).
 
 2. **Installation**:
-   - `yarn install --frozen-lockfile` runs with the temporarily patched `package.json`. Because the lockfile (which was generated and committed locally using the same version) matches `package.json`, the frozen lockfile verification succeeds.
+   - In CI, if `ERGOGEN_VERSION` is set, `yarn install` is run without `--frozen-lockfile` to allow the package manager to dynamically update the lockfile in memory for the custom Ergogen dependency. If `ERGOGEN_VERSION` is not set, `yarn install --frozen-lockfile` is used to guarantee consistent builds.
 
 3. **Post-install (`scripts/postinstall.js`)**:
    - Executes after dependencies are successfully installed.
