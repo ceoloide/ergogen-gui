@@ -16,6 +16,7 @@ To solve this, we updated the GitHub Actions workflow to conditionally execute t
 - **Flexible Custom Builds**: Dynamically updates the dependency tree in memory when running custom Ergogen versions, preventing lockfile mismatch errors
 - **Standard Build Safety**: Guarantees identical, frozen lockfile builds for all standard releases where no override version is specified
 - **Version Bump**: Updates the application version to 0.11.13
+
 ## Resolved Build Type Constraints
 
 July 15, 2026

@@ -90,6 +90,7 @@ const FilePreview = ({
         return (
           <PcbPreview
             pcb={previewContent}
+            previewKey={previewKey}
             key={previewKey}
             aria-label={ariaLabel || `PCB preview for ${previewKey}`}
             data-testid={dataTestId && `${dataTestId}-pcb`}
