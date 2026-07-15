@@ -3,11 +3,8 @@
 /* eslint-env worker */
 /* global self */
 
-import {
-  JscadWorkerRequest,
-  JscadWorkerResponse,
-  ResultsLike,
-} from './jscad.worker.types';
+import { JscadWorkerRequest, JscadWorkerResponse } from './jscad.worker.types';
+import { Results } from '../types/results';
 
 console.log('<-> JSCAD worker module starting...');
 
@@ -131,13 +128,13 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
   }
 
   try {
-    const originalResults: ResultsLike | undefined = results;
+    const originalResults: Results | undefined = results;
     if (!originalResults || !originalResults.cases) {
       throw new Error('No results or cases provided to process.');
     }
 
     // Clone shallowly to avoid mutating caller's object directly
-    const updatedResults: ResultsLike = { ...originalResults };
+    const updatedResults: Results = { ...originalResults };
     updatedResults.cases = { ...originalResults.cases };
 
     const entries = Object.entries(updatedResults.cases);
@@ -214,7 +211,7 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
         }
 
         updatedResults.cases[name] = {
-          ...(updatedResults.cases[name] as any),
+          jscad: updatedResults.cases[name]?.jscad ?? '',
           stl: stlContent,
         };
       } catch (caseError: unknown) {

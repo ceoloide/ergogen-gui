@@ -5,13 +5,7 @@
  * and ensure results are applied in the correct order using config version tracking.
  */
 
-/**
- * Minimal structural types to describe the results payload shared with the worker.
- * We only care about the shape of `cases`; all other keys are passed through.
- */
-type JscadCase = { jscad?: string; stl?: string | ArrayBuffer | Uint8Array };
-type JscadCases = Record<string, JscadCase>;
-export type ResultsLike = { cases?: JscadCases; [key: string]: unknown };
+import { Results } from '../types/results';
 
 /**
  * Request sent to JSCAD worker to convert JSCAD cases to STL format.
@@ -20,7 +14,7 @@ export type ResultsLike = { cases?: JscadCases; [key: string]: unknown };
 export type JscadWorkerRequest = {
   type: 'batch_jscad_to_stl';
   /** Full results object that may contain `cases` with JSCAD strings */
-  results: ResultsLike;
+  results: Results;
   /** Config version to track which generation this batch belongs to */
   configVersion: number;
 };
@@ -31,7 +25,7 @@ export type JscadWorkerRequest = {
 export type JscadWorkerResponse = {
   type: 'success' | 'error';
   /** On success, contains the entire results object with updated cases */
-  results?: ResultsLike;
+  results?: Results;
   /** On error, contains the error message */
   error?: string;
   /** Echo of the config version from the request */
