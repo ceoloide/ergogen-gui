@@ -157,18 +157,34 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
         // Convert JSCAD to STL
         const result = convertFn({ source: jscad, format: 'stlb' });
 
-        const firstPart = result?.data?.[0];
-        let stlContent: ArrayBuffer | Uint8Array | null = null;
+        let stlContent: ArrayBuffer | null = null;
+        if (result?.data && Array.isArray(result.data)) {
+          // Calculate total byte length
+          let totalLength = 0;
+          const buffers = result.data.map((part: unknown) => {
+            if (part instanceof ArrayBuffer) {
+              totalLength += part.byteLength;
+              return new Uint8Array(part);
+            } else if (part && typeof part === 'object' && 'buffer' in part) {
+              const view = part as any;
+              totalLength += view.byteLength;
+              return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+            } else if (typeof part === 'string') {
+              const buf = new TextEncoder().encode(part);
+              totalLength += buf.byteLength;
+              return buf;
+            }
+            return new Uint8Array(0);
+          });
 
-        if (firstPart instanceof ArrayBuffer) {
-          stlContent = firstPart;
-        } else if (ArrayBuffer.isView(firstPart)) {
-          const view = firstPart as ArrayBufferViewLike;
-          stlContent = new Uint8Array(
-            view.buffer,
-            view.byteOffset,
-            view.byteLength
-          );
+          // Concatenate all parts
+          const concatenated = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const buf of buffers) {
+            concatenated.set(buf, offset);
+            offset += buf.byteLength;
+          }
+          stlContent = concatenated.buffer;
         }
 
         if (!stlContent || stlContent.byteLength === 0) {
