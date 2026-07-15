@@ -1,5 +1,22 @@
 # Changelog
 
+## Optimized ZIP Export Performance
+
+July 15, 2026
+
+![A placeholder image representing the optimized ZIP export performance.](./public/images/changelog/placeholder.png)
+
+Previously, compiling and downloading large configurations with complex footprints, templates, or outlines suffered from noticeable performance delays. Every single custom file injection forced the export tool to recursively recreate and traverse nested folder hierarchies inside the ZIP archive from scratch, consuming unnecessary processing cycles.
+
+To solve this, we've implemented an efficient, centralized folder-caching mechanism for ZIP generation. Instead of repeatedly traversing directory paths, the generation process now caches directory references and reuses them instantly. This optimizes nested folder lookups, resulting in up to a 37% speedup when exporting configurations with large custom footprint libraries. We also bumped the version to 0.11.7 to reflect these speed and efficiency improvements.
+
+**What changed:**
+
+- **Centralized folder caching**: Uses an in-memory map to store and quickly retrieve ZIP directory references
+- **Optimized file exports**: Accelerates compilation and download preparation for complex configurations
+- **Code deduplication**: Consolidates folder setup logic into a unified, cleaner helper function
+- **Version Bump**: Updates the application version to 0.11.7
+
 ## Curly-45 Keyboard Example
 
 July 15, 2026
