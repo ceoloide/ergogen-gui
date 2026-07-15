@@ -70,7 +70,7 @@ type OutlineOutput = {
 };
 type CaseOutput = {
   jscad?: string;
-  stl?: string;
+  stl?: string | ArrayBuffer | Uint8Array;
 };
 type PcbsOutput = Record<string, string>;
 

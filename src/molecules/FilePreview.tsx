@@ -17,7 +17,7 @@ import TextPreview from '../atoms/TextPreview';
 type Props = {
   previewExtension: string;
   previewKey: string;
-  previewContent: string;
+  previewContent: string | ArrayBuffer | Uint8Array;
   width?: number | string;
   height?: number | string;
   className?: string;
@@ -52,7 +52,7 @@ const FilePreview = ({
       case 'svg':
         return (
           <SvgPreview
-            svg={previewContent}
+            svg={previewContent as string}
             width={width}
             height={height}
             aria-label={ariaLabel || `SVG preview for ${previewKey}`}
@@ -63,7 +63,7 @@ const FilePreview = ({
         return (
           <TextPreview
             language="yaml"
-            content={previewContent}
+            content={previewContent as string}
             aria-label={ariaLabel || `YAML preview for ${previewKey}`}
             data-testid={dataTestId && `${dataTestId}-yaml`}
           />
@@ -72,7 +72,7 @@ const FilePreview = ({
         return (
           <TextPreview
             language="text"
-            content={previewContent}
+            content={previewContent as string}
             aria-label={ariaLabel || `Text preview for ${previewKey}`}
             data-testid={dataTestId && `${dataTestId}-txt`}
           />
@@ -81,7 +81,7 @@ const FilePreview = ({
         return (
           <TextPreview
             language="javascript"
-            content={previewContent}
+            content={previewContent as string}
             aria-label={ariaLabel || `JSCAD code preview for ${previewKey}`}
             data-testid={dataTestId && `${dataTestId}-jscad-text`}
           />
@@ -89,7 +89,8 @@ const FilePreview = ({
       case 'kicad_pcb':
         return (
           <PcbPreview
-            pcb={previewContent}
+            pcb={previewContent as string}
+            previewKey={previewKey}
             key={previewKey}
             aria-label={ariaLabel || `PCB preview for ${previewKey}`}
             data-testid={dataTestId && `${dataTestId}-pcb`}
