@@ -564,61 +564,85 @@ const ConfigContextProvider = ({
   const sendUsageMetrics = settings?.sendUsageMetrics ?? true;
 
   const setDebug = useCallback(
-    (val: boolean) => {
-      setSettings((prev) => ({
-        ...(prev || getDefaultSettings()),
-        debug: val,
-      }));
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.debug)
+            : valueOrFunc;
+        return { ...current, debug: val };
+      });
     },
     [setSettings]
   );
 
   const setAutoGen = useCallback(
-    (val: boolean) => {
-      setSettings((prev) => ({
-        ...(prev || getDefaultSettings()),
-        autoGen: val,
-      }));
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.autoGen)
+            : valueOrFunc;
+        return { ...current, autoGen: val };
+      });
     },
     [setSettings]
   );
 
   const setAutoGen3D = useCallback(
-    (val: boolean) => {
-      setSettings((prev) => ({
-        ...(prev || getDefaultSettings()),
-        autoGen3D: val,
-      }));
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.autoGen3D)
+            : valueOrFunc;
+        return { ...current, autoGen3D: val };
+      });
     },
     [setSettings]
   );
 
   const setKicanvasPreview = useCallback(
-    (val: boolean) => {
-      setSettings((prev) => ({
-        ...(prev || getDefaultSettings()),
-        kicanvasPreview: val,
-      }));
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.kicanvasPreview)
+            : valueOrFunc;
+        return { ...current, kicanvasPreview: val };
+      });
     },
     [setSettings]
   );
 
   const setStlPreview = useCallback(
-    (val: boolean) => {
-      setSettings((prev) => ({
-        ...(prev || getDefaultSettings()),
-        stlPreview: val,
-      }));
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.stlPreview)
+            : valueOrFunc;
+        return { ...current, stlPreview: val };
+      });
     },
     [setSettings]
   );
 
   const setSendUsageMetrics = useCallback(
-    (val: boolean) => {
-      setSettings((prev) => ({
-        ...(prev || getDefaultSettings()),
-        sendUsageMetrics: val,
-      }));
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.sendUsageMetrics)
+            : valueOrFunc;
+        return { ...current, sendUsageMetrics: val };
+      });
     },
     [setSettings]
   );
@@ -818,7 +842,7 @@ const ConfigContextProvider = ({
               setIsJscadConverting(true);
               const request: JscadWorkerRequest = {
                 type: 'batch_jscad_to_stl',
-                results: newResults as ResultsLike,
+                results: newResults,
                 configVersion: currentConfigVersion.current,
               };
               jscadWorkerRef.current.postMessage(request);
