@@ -619,12 +619,17 @@ const Welcome = () => {
       if (provider === 'codeberg') {
         fetchUrl = `https://codeberg.org/${fetchUrl}`;
       } else if (provider === 'forgejo') {
-        setError(
-          'Forgejo/Gitea requires a full URL including the host (e.g., https://git.gay/owner/repo)'
-        );
-        setIsRepoLoading(false);
-        setIsGenerating(false);
-        return;
+        const segments = fetchUrl.split('/');
+        if (segments.length >= 2 && segments[0].includes('.')) {
+          fetchUrl = `https://${fetchUrl}`;
+        } else {
+          setError(
+            'Forgejo/Gitea requires a URL including the host (e.g., host/owner/repo)'
+          );
+          setIsRepoLoading(false);
+          setIsGenerating(false);
+          return;
+        }
       } else {
         fetchUrl = `https://github.com/${fetchUrl}`;
       }
