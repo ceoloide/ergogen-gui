@@ -172,7 +172,7 @@ class GitHubProvider extends BaseGitProvider {
     };
   }
 
-  protected async fetchFileContent(
+  public async fetchFileContent(
     owner: string,
     repo: string,
     path: string,
@@ -189,7 +189,7 @@ class GitHubProvider extends BaseGitProvider {
     return await res.text();
   }
 
-  protected async listDirectory(
+  public async listDirectory(
     owner: string,
     repo: string,
     path: string,
