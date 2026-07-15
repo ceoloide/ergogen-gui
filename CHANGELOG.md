@@ -1,5 +1,22 @@
 # Changelog
 
+## Conditional Dependency Installation in CI/CD
+
+July 15, 2026
+
+![A diagram representing the conditional installation flow in GitHub Actions.](./public/images/changelog/placeholder.png)
+
+Previously, deploying or building the application in environments with a custom `ERGOGEN_VERSION` environment variable specified would lead to workflow errors. The build workflow in GitHub Actions enforced `yarn install --frozen-lockfile`, but the custom `ERGOGEN_VERSION` automatically triggers a preinstall hook that modifies the dependency mapping in `package.json`. This mismatch between `package.json` and the lockfile caused the workflow to fail unless developers manually aligned `yarn.lock` locally before each deployment.
+
+To solve this, we updated the GitHub Actions workflow to conditionally execute the dependency installation. If a custom `ERGOGEN_VERSION` is specified, the workflow runs `yarn install` instead of enforcing `--frozen-lockfile`. This allows the package manager to dynamically update the dependency tree and resolve the custom version in memory. If no custom version is set, the workflow defaults back to `--frozen-lockfile` to guarantee standard reproducible builds. We have also bumped the version to 0.11.13.
+
+**What changed:**
+
+- **Conditional Install Workflow**: Checks for the presence of the `ERGOGEN_VERSION` environment variable before selecting the installation command
+- **Flexible Custom Builds**: Dynamically updates the dependency tree in memory when running custom Ergogen versions, preventing lockfile mismatch errors
+- **Standard Build Safety**: Guarantees identical, frozen lockfile builds for all standard releases where no override version is specified
+- **Version Bump**: Updates the application version to 0.11.13
+
 ## Optimized STL Parsing Performance
 
 July 15, 2026
