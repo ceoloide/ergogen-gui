@@ -8,32 +8,21 @@ import { isFeatureEnabled } from './featureFlags';
 import { parseGitmodules, fetchFootprintsFromRepo } from './github';
 import { enforceFileSizeLimit } from './ergogenBundleLoader';
 
-// Helper to fetch file content CORS-safely using the Gitea contents API and decoding Base64
+// Helper to fetch file content CORS-safely using the Gitea raw API endpoint
 const fetchFileContentCodeberg = async (
   owner: string,
   repo: string,
   path: string,
   ref: string
 ): Promise<string> => {
-  const apiUrl = `https://codeberg.org/api/v1/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
+  const apiUrl = `https://codeberg.org/api/v1/repos/${owner}/${repo}/raw/${path}?ref=${ref}`;
   const res = await fetch(apiUrl);
   if (!res.ok) {
     throw new Error(
       `Failed to fetch file content from Codeberg API: ${res.status}`
     );
   }
-  const data = await res.json();
-  if (data.type !== 'file' || !data.content) {
-    throw new Error('Target path is not a file or has no content');
-  }
-  // Decode Base64 content safely supporting UTF-8
-  const cleaned = data.content.replace(/\s/g, '');
-  return decodeURIComponent(
-    atob(cleaned)
-      .split('')
-      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-      .join('')
-  );
+  return await res.text();
 };
 
 class CodebergProvider implements GitProvider {
