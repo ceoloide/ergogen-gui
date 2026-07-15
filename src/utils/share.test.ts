@@ -683,6 +683,79 @@ describe('share utilities', () => {
       expect(result.outlines).toEqual(new Set());
     });
 
+    it('returns empty sets for undefined canonical', () => {
+      // Act
+      const result = extractUsedInjectionsFromCanonical(undefined);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set());
+      expect(result.templates).toEqual(new Set());
+      expect(result.outlines).toEqual(new Set());
+    });
+
+    it('returns empty sets for empty object canonical', () => {
+      // Act
+      const result = extractUsedInjectionsFromCanonical({});
+
+      // Assert
+      expect(result.footprints).toEqual(new Set());
+      expect(result.templates).toEqual(new Set());
+      expect(result.outlines).toEqual(new Set());
+    });
+
+    it('returns empty sets for non-object primitive canonical values', () => {
+      // Act
+      const numResult = extractUsedInjectionsFromCanonical(123);
+      const strResult = extractUsedInjectionsFromCanonical('invalid');
+      const boolResult = extractUsedInjectionsFromCanonical(true);
+
+      // Assert
+      expect(numResult.footprints).toEqual(new Set());
+      expect(strResult.footprints).toEqual(new Set());
+      expect(boolResult.footprints).toEqual(new Set());
+    });
+
+    it('handles malformed pcbs and outlines sections gracefully', () => {
+      // Arrange: sections are defined but are not of the expected type (objects)
+      const canonical = {
+        pcbs: 'not-an-object',
+        outlines: 456,
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set());
+      expect(result.templates).toEqual(new Set());
+      expect(result.outlines).toEqual(new Set());
+    });
+
+    it('skips malformed pcb configurations or outline structures', () => {
+      // Arrange: entries inside pcbs and outlines are primitive types or malformed structures
+      const canonical = {
+        pcbs: {
+          invalid_pcb: 'should-be-ignored',
+          valid_pcb: {
+            template: 789, // should be ignored (non-string)
+            footprints: 'invalid-footprints-format', // should be ignored (non-object)
+          },
+        },
+        outlines: {
+          invalid_outline: null, // should be ignored
+          another_invalid: 'not-an-object', // should be ignored
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.footprints).toEqual(new Set());
+      expect(result.templates).toEqual(new Set());
+      expect(result.outlines).toEqual(new Set());
+    });
+
     it('returns empty sets when pcbs and outlines sections are absent', () => {
       // Arrange
       const canonical = { points: {}, units: {} };
