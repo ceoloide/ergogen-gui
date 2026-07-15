@@ -43,7 +43,14 @@ jobs:
           git config --global --add url."https://github.com/".insteadOf "git+ssh://git@github.com/"
           git config --global --add url."https://github.com/".insteadOf "git@github.com:"
       - name: Yarn install
-        run: yarn install --frozen-lockfile
+        run: |
+          if [ -n "$ERGOGEN_VERSION" ]; then
+            echo "ERGOGEN_VERSION is set, running yarn install"
+            yarn install
+          else
+            echo "ERGOGEN_VERSION is not set, running yarn install --frozen-lockfile"
+            yarn install --frozen-lockfile
+          fi
         env:
           ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Yarn build
