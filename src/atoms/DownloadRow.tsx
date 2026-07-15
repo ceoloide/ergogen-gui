@@ -166,7 +166,7 @@ const DownloadRow = ({
       file_name: fileName,
     });
     const element = document.createElement('a');
-    const file = new Blob([content], { type: 'octet/stream' });
+    const file = new Blob([content as BlobPart], { type: 'octet/stream' });
     element.href = URL.createObjectURL(file);
     element.download = `${fileName}.${extension}`;
     document.body.appendChild(element);

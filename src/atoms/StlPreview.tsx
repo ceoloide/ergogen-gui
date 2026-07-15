@@ -245,7 +245,7 @@ const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
               stlData.byteOffset + stlData.byteLength
             );
           }
-          return parseBinaryStl(buffer);
+          return parseBinaryStl(buffer as ArrayBuffer);
         }
       };
 
