@@ -8,7 +8,7 @@
  */
 type Props = {
   pcb: string;
-  key: string;
+  previewKey: string;
   'aria-label'?: string;
   'data-testid'?: string;
 };
@@ -22,12 +22,12 @@ type Props = {
  */
 const PcbPreview = ({
   pcb,
-  key,
+  previewKey,
   'aria-label': ariaLabel,
   'data-testid': dataTestId,
 }: Props): JSX.Element => (
   <kicanvas-embed
-    key={key}
+    key={previewKey}
     controls="full"
     controlslist="nodownload nooverlay"
     theme="kicad"

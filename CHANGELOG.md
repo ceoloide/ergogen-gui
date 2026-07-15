@@ -1,5 +1,23 @@
 # Changelog
 
+## End-to-End Binary STL Export and Preview Pipeline
+
+July 15, 2026
+
+![A diagram representing the optimized binary STL pipeline from compiler to preview and zip download.](./public/images/changelog/placeholder.png)
+
+Previously, generating and exporting 3D cases suffered from significant overhead due to UTF-8 decoding of compiled binary buffers inside the JSCAD background worker, string search-and-replace of ASCII headers, and subsequent re-encoding using TextEncoder back to ArrayBuffers on the main thread for 3D rendering. This constant conversion between binary arrays and strings slowed down 3D generation times and limited performance on larger meshes.
+
+To resolve this, we implemented an end-to-end binary STL pipeline. The background JSCAD worker now requests the binary STL format (`stlb`) directly from the compiler, returns the raw ArrayBuffer to the main thread, and avoids all string-decoding and header regex steps. The Three.js previewer and ZIP download utilities have been refactored to accept ArrayBuffers and Uint8Arrays natively, bypassing any encoding overhead. We have also bumped the version to 0.11.14.
+
+**What changed:**
+
+- **Binary JSCAD Worker Output**: Configures the JSCAD worker to compile to binary `stlb` format and extract raw ArrayBuffer results directly
+- **Bypassed String Decoding**: Eliminates worker-thread UTF-8 string decoding and regex-based header replacements
+- **Direct 3D Preview Parsing**: Bypasses main-thread `TextEncoder` operations, feeding the ArrayBuffer directly to the binary STL parser in StlPreview
+- **Raw Binary Exports**: Emits binary files directly into generated ZIP archives without conversion overhead
+- **Version Bump**: Updates the application version to 0.11.14
+
 ## Conditional Dependency Installation in CI/CD
 
 July 15, 2026
@@ -16,6 +34,7 @@ To solve this, we updated the GitHub Actions workflow to conditionally execute t
 - **Flexible Custom Builds**: Dynamically updates the dependency tree in memory when running custom Ergogen versions, preventing lockfile mismatch errors
 - **Standard Build Safety**: Guarantees identical, frozen lockfile builds for all standard releases where no override version is specified
 - **Version Bump**: Updates the application version to 0.11.13
+
 ## Resolved Build Type Constraints
 
 July 15, 2026

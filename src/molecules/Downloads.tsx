@@ -56,7 +56,7 @@ type Props = {
 type DownloadObj = {
   fileName: string;
   extension: string;
-  content: string;
+  content: string | ArrayBuffer | Uint8Array;
   previewKey?: string;
   preview?: Preview;
 };

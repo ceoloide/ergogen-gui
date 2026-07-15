@@ -43,8 +43,6 @@ const workerScope = self as unknown as JscadWorkerGlobal;
 
 let convertFn: ConvertFunction | null = null;
 let initializationError: Error | null = null;
-const utf8Decoder =
-  typeof TextDecoder === 'undefined' ? null : new TextDecoder();
 
 function getBasePath() {
   // Use PUBLIC_URL if available
@@ -157,36 +155,60 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
 
       try {
         // Convert JSCAD to STL
-        const result = convertFn({ source: jscad, format: 'stla' });
+        console.log('[JSCAD Worker] Converting case:', name, 'format stlb');
+        const result = convertFn({ source: jscad, format: 'stlb' });
+        console.log(
+          '[JSCAD Worker] Convert result:',
+          result
+            ? { mimeType: result.mimeType, dataLength: result.data?.length }
+            : null
+        );
 
-        const firstPart = result?.data?.[0];
-        let stlContent: string | null = null;
+        let stlContent: ArrayBuffer | null = null;
+        if (result?.data && Array.isArray(result.data)) {
+          // Calculate total byte length
+          let totalLength = 0;
+          const buffers = result.data.map((part: unknown, index: number) => {
+            console.log(
+              `[JSCAD Worker] Part ${index}:`,
+              part,
+              'type:',
+              typeof part,
+              'isView:',
+              ArrayBuffer.isView(part),
+              'isBuffer:',
+              part instanceof ArrayBuffer
+            );
+            if (part instanceof ArrayBuffer) {
+              totalLength += part.byteLength;
+              return new Uint8Array(part);
+            } else if (part && typeof part === 'object' && 'buffer' in part) {
+              const view = part as any;
+              totalLength += view.byteLength;
+              return new Uint8Array(
+                view.buffer,
+                view.byteOffset,
+                view.byteLength
+              );
+            } else if (typeof part === 'string') {
+              const buf = new TextEncoder().encode(part);
+              totalLength += buf.byteLength;
+              return buf;
+            }
+            return new Uint8Array(0);
+          });
 
-        if (typeof firstPart === 'string') {
-          stlContent = firstPart;
-        } else if (firstPart instanceof ArrayBuffer && utf8Decoder) {
-          stlContent = utf8Decoder.decode(new Uint8Array(firstPart));
-        } else if (ArrayBuffer.isView(firstPart) && utf8Decoder) {
-          const view = firstPart as ArrayBufferViewLike;
-          const array = new Uint8Array(
-            view.buffer,
-            view.byteOffset,
-            view.byteLength
-          );
-          stlContent = utf8Decoder.decode(array);
+          // Concatenate all parts
+          const concatenated = new Uint8Array(totalLength);
+          let offset = 0;
+          for (const buf of buffers) {
+            concatenated.set(buf, offset);
+            offset += buf.byteLength;
+          }
+          stlContent = concatenated.buffer;
         }
 
-        if (!stlContent) {
-          console.warn(
-            `Generated STL content is empty or unsupported type for case: ${name}`
-          );
-          continue;
-        }
-
-        // Rename default STL header from "solid csg.js" to the specific case name for clarity
-        stlContent = stlContent.replace(/^solid csg\.js\b/, `solid ${name}`);
-
-        if (!stlContent || stlContent.trim() === '') {
+        if (!stlContent || stlContent.byteLength === 0) {
           console.warn(`Generated STL content is empty for case: ${name}`);
           continue;
         }
