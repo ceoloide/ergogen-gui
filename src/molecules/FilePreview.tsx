@@ -17,7 +17,7 @@ import TextPreview from '../atoms/TextPreview';
 type Props = {
   previewExtension: string;
   previewKey: string;
-  previewContent: string;
+  previewContent: string | ArrayBuffer | Uint8Array;
   width?: number | string;
   height?: number | string;
   className?: string;
