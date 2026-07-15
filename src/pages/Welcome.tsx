@@ -164,12 +164,12 @@ const RepoSelectContainer = styled.div`
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.25rem;
   background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
-  width: 46px;
-  height: 46px;
+  padding: 0.75rem 0.5rem 0.75rem 0.75rem;
+  box-sizing: border-box;
   flex-shrink: 0;
   cursor: pointer;
   transition: border-color 0.15s ease-in-out;
@@ -182,6 +182,15 @@ const RepoSelectContainer = styled.div`
     width: 18px;
     height: 18px;
     color: ${theme.colors.white};
+    display: block;
+  }
+
+  .material-symbols-outlined {
+    font-size: 18px;
+    color: ${theme.colors.textDarker};
+    display: block;
+    user-select: none;
+    margin-right: -0.15rem;
   }
 `;
 
@@ -761,6 +770,9 @@ const Welcome = () => {
             <GitHubInputContainer>
               <RepoSelectContainer>
                 {provider === 'github' ? <GithubIcon /> : <CodebergIcon />}
+                <span className="material-symbols-outlined">
+                  arrow_drop_down
+                </span>
                 <RepoSelect
                   value={provider}
                   onChange={(e) =>
@@ -775,11 +787,7 @@ const Welcome = () => {
                 </RepoSelect>
               </RepoSelectContainer>
               <GitHubInput
-                placeholder={
-                  provider === 'github'
-                    ? 'github.com/ceoloide/corney-island'
-                    : 'codeberg.org/ceoloide/corney-island'
-                }
+                placeholder="user/repo"
                 value={githubInput}
                 onChange={(e) => handleRepoInputChange(e.target.value)}
                 onKeyDown={(e) => {
