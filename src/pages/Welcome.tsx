@@ -150,7 +150,7 @@ const OptionBox = styled.div`
   }
 `;
 
-const GitHubInputContainer = styled.div`
+const RepoInputContainer = styled.div`
   display: flex;
   gap: 0.5rem;
   width: 100%;
@@ -399,7 +399,7 @@ const allExamples: ConfigOption[] = exampleOptions
 const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
-  const [githubInput, setGithubInput] = useState('');
+  const [repoInput, setRepoInput] = useState('');
   const [provider, setProvider] = useState<'github' | 'codeberg' | 'forgejo'>(
     'github'
   );
@@ -427,7 +427,7 @@ const Welcome = () => {
   const [isDragging, setIsDragging] = useState(false);
 
   const handleRepoInputChange = (val: string) => {
-    setGithubInput(val);
+    setRepoInput(val);
     if (val.includes('github.com/')) {
       setProvider('github');
     } else if (val.includes('codeberg.org/')) {
@@ -598,7 +598,7 @@ const Welcome = () => {
   };
 
   const handleGitProvider = () => {
-    if (!githubInput || !configContext) return;
+    if (!repoInput || !configContext) return;
     const { setError, clearError, setIsGenerating } = configContext;
     setIsRepoLoading(true);
     setIsGenerating(true); // Show progress bar during loading
@@ -606,11 +606,11 @@ const Welcome = () => {
 
     // Track loading
     trackEvent('repo_loaded', {
-      repo_url: githubInput,
+      repo_url: repoInput,
       provider,
     });
 
-    let fetchUrl = githubInput.trim();
+    let fetchUrl = repoInput.trim();
     if (
       !fetchUrl.includes('://') &&
       !fetchUrl.includes('github.com') &&
@@ -873,10 +873,11 @@ const Welcome = () => {
           <OptionBox>
             <h2>From Repo</h2>
             <p>
-              Link to a YAML config file on GitHub or Codeberg, or simply a
-              repository name like &quot;user/repo&quot;.
+              Link to a YAML config file on a Git provider (e.g. GitHub,
+              Codeberg, Forgejo), or simply a repository name like
+              &quot;user/repo&quot;.
             </p>
-            <GitHubInputContainer>
+            <RepoInputContainer>
               <UnifiedInputGroup>
                 <CustomDropdownContainer ref={dropdownRef}>
                   <DropdownTrigger
@@ -937,13 +938,13 @@ const Welcome = () => {
                   placeholder={
                     provider === 'forgejo' ? 'host/user/repo' : 'user/repo'
                   }
-                  value={githubInput}
+                  value={repoInput}
                   onChange={(e) => handleRepoInputChange(e.target.value)}
                   onKeyDown={(e) => {
                     if (
                       e.key === 'Enter' &&
                       !isLoading &&
-                      githubInput.trim() !== ''
+                      repoInput.trim() !== ''
                     ) {
                       e.preventDefault();
                       handleGitProvider();
@@ -951,13 +952,13 @@ const Welcome = () => {
                   }}
                   disabled={isLoading}
                   aria-label="Repository URL or path"
-                  data-testid="github-input"
+                  data-testid="repo-input"
                 />
                 <LoadButton
                   onClick={handleGitProvider}
-                  disabled={isLoading || !githubInput}
+                  disabled={isLoading || !repoInput}
                   aria-label="Load configuration from repository"
-                  data-testid="github-load-button"
+                  data-testid="repo-load-button"
                 >
                   {isRepoLoading ? (
                     <Spinner />
@@ -971,7 +972,7 @@ const Welcome = () => {
                   )}
                 </LoadButton>
               </UnifiedInputGroup>
-            </GitHubInputContainer>
+            </RepoInputContainer>
           </OptionBox>
         </OptionsContainer>
 
