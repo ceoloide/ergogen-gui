@@ -44,6 +44,7 @@ import {
 import { exportAllConfigs, downloadAllConfigs } from '../utils/zip';
 import {
   filterInjectionsByFeatureFlags,
+  getSkippedInjectionsWarning,
   checkForDeprecationWarnings,
   preparePreviewConfig,
 } from '../utils/generationHelpers';
@@ -1038,8 +1039,12 @@ const ConfigContextProvider = ({
       currentConfigVersion.current += 1;
 
       const warning = checkForDeprecationWarnings(parsedConfig);
-      if (warning) {
-        setDeprecationWarning(warning);
+      const skippedWarning = getSkippedInjectionsWarning(injectionInput);
+      const combinedWarning = [warning, skippedWarning]
+        .filter(Boolean)
+        .join('\n');
+      if (combinedWarning) {
+        setDeprecationWarning(combinedWarning);
       }
 
       const inputConfig =

@@ -49,8 +49,8 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
           How would you like to resolve this conflict?
         </Message>
 
-        <CheckboxContainer>
-          <input
+        <ToggleContainer>
+          <HiddenCheckbox
             type="checkbox"
             id="apply-to-all"
             checked={applyToAll}
@@ -58,8 +58,14 @@ const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
             data-testid={dataTestId && `${dataTestId}-apply-to-all`}
             aria-label="Apply this choice to all conflicts"
           />
+          <Switch
+            $checked={applyToAll}
+            onClick={() => setApplyToAll(!applyToAll)}
+            role="checkbox"
+            aria-checked={applyToAll}
+          />
           <label htmlFor="apply-to-all">Apply to all conflicts</label>
-        </CheckboxContainer>
+        </ToggleContainer>
 
         <ButtonGroup>
           <Button
@@ -140,20 +146,54 @@ const Message = styled.p`
   }
 `;
 
-const CheckboxContainer = styled.div`
+const ToggleContainer = styled.div`
   display: flex;
   align-items: center;
   margin-bottom: 1.5rem;
-  gap: 0.5rem;
-
-  input[type='checkbox'] {
-    cursor: pointer;
-  }
+  gap: 0.75rem;
 
   label {
     cursor: pointer;
     font-size: ${theme.fontSizes.base};
     color: ${theme.colors.textDark};
+    user-select: none;
+  }
+`;
+
+const HiddenCheckbox = styled.input`
+  border: 0;
+  clip: rect(0 0 0 0);
+  clippath: inset(50%);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+`;
+
+const Switch = styled.div<{ $checked: boolean }>`
+  position: relative;
+  width: 44px;
+  height: 22px;
+  background-color: ${(props) =>
+    props.$checked ? theme.colors.accent : theme.colors.backgroundLighter};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: ${(props) => (props.$checked ? '24px' : '2px')};
+    width: 16px;
+    height: 16px;
+    background-color: ${theme.colors.text};
+    border-radius: 50%;
+    transition: left 0.2s ease-in-out;
   }
 `;
 

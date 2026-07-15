@@ -17,6 +17,32 @@ export const filterInjectionsByFeatureFlags = (
 };
 
 /**
+ * Check if custom outline/template injections are defined but their feature flags are disabled.
+ * Returns a warning string if any are skipped, or null otherwise.
+ */
+export const getSkippedInjectionsWarning = (
+  injections: string[][] | undefined
+): string | null => {
+  if (!injections || !Array.isArray(injections)) return null;
+  const hasOutlines = injections.some(
+    (i) => Array.isArray(i) && i[0] === 'outline'
+  );
+  const hasTemplates = injections.some(
+    (i) => Array.isArray(i) && i[0] === 'template'
+  );
+  const outlinesSkipped = hasOutlines && !isFeatureEnabled('outlines');
+  const templatesSkipped = hasTemplates && !isFeatureEnabled('templates');
+
+  if (outlinesSkipped || templatesSkipped) {
+    const skippedTypes: string[] = [];
+    if (outlinesSkipped) skippedTypes.push('outlines');
+    if (templatesSkipped) skippedTypes.push('templates');
+    return `Custom ${skippedTypes.join(' and ')} were skipped because the respective feature flags are disabled in settings.`;
+  }
+  return null;
+};
+
+/**
  * Scan the parsed configuration object for KiCad 5 footprints and templates.
  * Returns a deprecation warning string if KiCad 5 is found, or null otherwise.
  */

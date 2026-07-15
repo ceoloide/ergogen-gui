@@ -1,5 +1,11 @@
 import { isFeatureEnabled } from './featureFlags';
 import { enforceFileSizeLimit } from './ergogenBundleLoader';
+import {
+  GitProvider,
+  gitProviderRegistry,
+  GitHubFootprint,
+  ErgogenWorkspaceBundle,
+} from './gitProvider';
 
 /**
  * Converts a standard GitHub file URL to its corresponding raw content URL.
@@ -364,9 +370,9 @@ const fetchFootprintsFromDirectory = async (
  * @returns {Promise<GitHubLoadResult>} A promise that resolves with the config content, footprints, and config path.
  * @throws {Error} Throws an error if the fetch fails for all attempted locations.
  */
-export const fetchConfigFromUrl = async (
+const fetchGitHubConfig = async (
   url: string
-): Promise<GitHubLoadResult> => {
+): Promise<ErgogenWorkspaceBundle> => {
   console.log(`[GitHub] Starting fetch from URL: ${url}`);
   let newUrl = url.trim();
 
@@ -1026,4 +1032,30 @@ export const fetchConfigFromUrl = async (
   } catch (_e) {
     return await fetchWithBranch('master');
   }
+};
+
+class GitHubProvider implements GitProvider {
+  canHandle(url: string): boolean {
+    const cleanUrl = url.trim();
+    return (
+      cleanUrl.includes('github.com') ||
+      /^[a-zA-Z0-9-]+\/[a-zA-Z0-9_.-]+$/.test(cleanUrl)
+    );
+  }
+
+  async fetchConfig(url: string): Promise<ErgogenWorkspaceBundle> {
+    return fetchGitHubConfig(url);
+  }
+}
+
+gitProviderRegistry.register(new GitHubProvider());
+
+export const fetchConfigFromUrl = async (
+  url: string
+): Promise<ErgogenWorkspaceBundle> => {
+  const provider = gitProviderRegistry.resolve(url);
+  if (!provider) {
+    throw new Error(`Unsupported repository provider URL: ${url}`);
+  }
+  return provider.fetchConfig(url);
 };

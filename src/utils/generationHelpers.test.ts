@@ -1,5 +1,6 @@
 import {
   filterInjectionsByFeatureFlags,
+  getSkippedInjectionsWarning,
   checkForDeprecationWarnings,
   preparePreviewConfig,
 } from './generationHelpers';
@@ -170,6 +171,50 @@ describe('generationHelpers', () => {
         cases: { case1: {} },
       };
       expect(preparePreviewConfig(config, true)).toEqual(config);
+    });
+  });
+
+  describe('getSkippedInjectionsWarning', () => {
+    it('should return null if no outlines or templates are injected', () => {
+      const injections = [['footprint', 'my-fp', 'content']];
+      expect(getSkippedInjectionsWarning(injections)).toBeNull();
+    });
+
+    it('should return warning when outlines feature is disabled and outlines are injected', () => {
+      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+        return feature !== 'outlines';
+      });
+      const injections = [
+        ['outline', 'my-outline', 'content'],
+        ['footprint', 'my-fp', 'content'],
+      ];
+      expect(getSkippedInjectionsWarning(injections)).toBe(
+        'Custom outlines were skipped because the respective feature flags are disabled in settings.'
+      );
+    });
+
+    it('should return warning when templates feature is disabled and templates are injected', () => {
+      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+        return feature !== 'templates';
+      });
+      const injections = [
+        ['template', 'my-template', 'content'],
+        ['footprint', 'my-fp', 'content'],
+      ];
+      expect(getSkippedInjectionsWarning(injections)).toBe(
+        'Custom templates were skipped because the respective feature flags are disabled in settings.'
+      );
+    });
+
+    it('should return combined warning when both are disabled and injected', () => {
+      (isFeatureEnabled as jest.Mock).mockImplementation(() => false);
+      const injections = [
+        ['outline', 'my-outline', 'content'],
+        ['template', 'my-template', 'content'],
+      ];
+      expect(getSkippedInjectionsWarning(injections)).toBe(
+        'Custom outlines and templates were skipped because the respective feature flags are disabled in settings.'
+      );
     });
   });
 });

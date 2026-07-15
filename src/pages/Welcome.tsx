@@ -13,6 +13,8 @@ import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { trackEvent } from '../utils/analytics';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
+import GithubIcon from '../atoms/GithubIcon';
+import CodebergIcon from '../atoms/CodebergIcon';
 
 const Spinner = styled.div`
   border: 3px solid rgba(255, 255, 255, 0.3);
@@ -158,6 +160,51 @@ const GitHubInputContainer = styled.div`
   }
 `;
 
+const RepoSelectContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: ${theme.colors.backgroundLighter};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  padding: 0 0.5rem 0 0.75rem;
+  flex-shrink: 0;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: ${theme.colors.textDark};
+  }
+`;
+
+const RepoSelect = styled.select`
+  background: transparent;
+  border: none;
+  color: ${theme.colors.text};
+  font-family: ${theme.fonts.body};
+  font-size: ${theme.fontSizes.base};
+  outline: none;
+  cursor: pointer;
+  padding: 0.75rem 1.5rem 0.75rem 0.25rem;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position-x: 100%;
+  background-position-y: 50%;
+
+  option {
+    background-color: ${theme.colors.backgroundLight};
+    color: ${theme.colors.text};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
 const GitHubInput = styled.input`
   flex: 1;
   min-width: 0;
@@ -268,10 +315,20 @@ const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
   const [githubInput, setGithubInput] = useState('');
+  const [provider, setProvider] = useState<'github' | 'codeberg'>('github');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldNavigate, setShouldNavigate] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
+
+  const handleRepoInputChange = (val: string) => {
+    setGithubInput(val);
+    if (val.includes('github.com/')) {
+      setProvider('github');
+    } else if (val.includes('codeberg.org/')) {
+      setProvider('codeberg');
+    }
+  };
 
   // Use the injection conflict resolution hook
   const {
@@ -422,18 +479,29 @@ const Welcome = () => {
     if (!githubInput || !configContext) return;
     const { setError, clearError, setIsGenerating } = configContext;
     setIsLoading(true);
-    setIsGenerating(true); // Show progress bar during GitHub loading
+    setIsGenerating(true); // Show progress bar during loading
     clearError();
 
-    // Track GitHub loading
-    trackEvent('github_loaded', {
-      github_url: githubInput,
+    // Track loading
+    trackEvent('repo_loaded', {
+      repo_url: githubInput,
+      provider,
     });
 
-    // Reset any pending conflict resolution state from previous loads
-    // Note: currentConflict is managed by the hook, so we only reset local state
+    let fetchUrl = githubInput.trim();
+    if (
+      !fetchUrl.includes('://') &&
+      !fetchUrl.includes('github.com') &&
+      !fetchUrl.includes('codeberg.org')
+    ) {
+      if (provider === 'codeberg') {
+        fetchUrl = `https://codeberg.org/${fetchUrl}`;
+      } else {
+        fetchUrl = `https://github.com/${fetchUrl}`;
+      }
+    }
 
-    fetchConfigFromUrl(githubInput)
+    fetchConfigFromUrl(fetchUrl)
       .then(async (result) => {
         if (configContext) {
           // Show rate limit warning if present
@@ -472,7 +540,7 @@ const Welcome = () => {
         }
       })
       .catch((e) => {
-        setError(`Failed to load from GitHub: ${e.message}`);
+        setError(`Failed to load from remote repository: ${e.message}`);
         configContext?.setInfo(null);
         // Ensure we reset loading state and don't navigate
         setIsLoading(false);
@@ -685,16 +753,35 @@ const Welcome = () => {
             </Button>
           </OptionBox>
           <OptionBox>
-            <h2>From GitHub</h2>
+            <h2>From Repo</h2>
             <p>
-              Link to a YAML config file on GitHub, or simply a repo like
-              &quot;user/repo&quot;.
+              Link to a YAML config file on GitHub or Codeberg, or simply a
+              repository name like &quot;user/repo&quot;.
             </p>
             <GitHubInputContainer>
+              <RepoSelectContainer>
+                {provider === 'github' ? <GithubIcon /> : <CodebergIcon />}
+                <RepoSelect
+                  value={provider}
+                  onChange={(e) =>
+                    setProvider(e.target.value as 'github' | 'codeberg')
+                  }
+                  disabled={isLoading}
+                  aria-label="Repository provider source"
+                  data-testid="repo-provider-select"
+                >
+                  <option value="github">GitHub</option>
+                  <option value="codeberg">Codeberg</option>
+                </RepoSelect>
+              </RepoSelectContainer>
               <GitHubInput
-                placeholder="github.com/ceoloide/corney-island"
+                placeholder={
+                  provider === 'github'
+                    ? 'github.com/ceoloide/corney-island'
+                    : 'codeberg.org/ceoloide/corney-island'
+                }
                 value={githubInput}
-                onChange={(e) => setGithubInput(e.target.value)}
+                onChange={(e) => handleRepoInputChange(e.target.value)}
                 onKeyDown={(e) => {
                   if (
                     e.key === 'Enter' &&
@@ -706,13 +793,13 @@ const Welcome = () => {
                   }
                 }}
                 disabled={isLoading}
-                aria-label="GitHub repository URL"
+                aria-label="Repository URL or path"
                 data-testid="github-input"
               />
               <Button
                 onClick={handleGitHub}
                 disabled={isLoading || !githubInput}
-                aria-label="Load configuration from GitHub"
+                aria-label="Load configuration from repository"
                 data-testid="github-load-button"
               >
                 {isLoading ? (
