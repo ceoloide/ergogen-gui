@@ -1018,16 +1018,22 @@ const ConfigContextProvider = ({
 
       if (parsedConfig && parsedConfig.pcbs) {
         let warningFound = false;
-        for (const pcbKey in parsedConfig.pcbs) {
-          // eslint-disable-next-line
-          const pcb = (parsedConfig.pcbs as Record<string, any>)[pcbKey];
-          if (!pcb.template || pcb.template === 'kicad5') {
+        const pcbs = parsedConfig.pcbs as Record<
+          string,
+          { template?: string; footprints?: Record<string, { what?: string }> }
+        >;
+        for (const pcb of Object.values(pcbs)) {
+          if (
+            pcb &&
+            typeof pcb === 'object' &&
+            (!pcb.template || pcb.template === 'kicad5')
+          ) {
             const footprints = pcb.footprints;
-            if (footprints) {
-              for (const fpKey in footprints) {
-                const footprint = footprints[fpKey];
+            if (footprints && typeof footprints === 'object') {
+              for (const footprint of Object.values(footprints)) {
                 if (
                   footprint &&
+                  typeof footprint === 'object' &&
                   typeof footprint.what === 'string' &&
                   footprint.what.startsWith('ceoloide')
                 ) {
