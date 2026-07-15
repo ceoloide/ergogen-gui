@@ -9,6 +9,7 @@ import Reviung41 from './reviung41';
 import Tiny20 from './tiny20';
 import Alpha from './alpha';
 import Plank from './plank';
+import Curly45 from './curly45';
 
 /**
  * Represents a group of configuration options for the react-select component.
@@ -50,7 +51,7 @@ const simpleExamples = [Absolem, Atreus];
 
 const completeExamples = [Adux, CorneyIsland, Sweeplike, Reviung41, Tiny20];
 
-const miscExamples = [Wubbo, Alpha, Plank];
+const miscExamples = [Wubbo, Alpha, Plank, Curly45];
 
 /**
  * An array of grouped example configurations to be displayed in the select dropdown.

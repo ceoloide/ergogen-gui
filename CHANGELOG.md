@@ -1,5 +1,21 @@
 # Changelog
 
+## Curly-45 Keyboard Example
+
+July 15, 2026
+
+![A screenshot showing the new Curly-45 keyboard layout example preview.](./public/images/changelog/placeholder.png)
+
+Previously, the selection of keyboard layout examples was limited, lacking a representative curly column-staggered layout keyboard config. This made it harder for users looking to start their designs from a curly physical layout.
+
+To solve this, we've integrated the popular Curly-45 configuration as a built-in example under the "Miscellaneous" section. Users can now load the Curly-45 example directly from the welcome screen, providing an excellent reference for layouts utilizing a curly columns zone configuration. We also bumped the package version to 0.11.6 to reflect the new release.
+
+**What changed:**
+
+- **Curly-45 Example**: Adds the Curly-45 keyboard configuration as a built-in option in the welcome menu
+- **Pre-rendered Previews**: Automatically generates and caches the vector preview outline for the Curly-45 layout
+- **Version Bump**: Updates the application version to 0.11.6 in the configuration manifests
+
 ## GA4 Generation Lineage & Settlement Debounce
 
 July 11, 2026
