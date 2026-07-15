@@ -217,6 +217,19 @@ const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
     try {
       // Parse STL data
       const parseStl = (stlData: string | ArrayBuffer | Uint8Array) => {
+        if (
+          !stlData ||
+          (typeof stlData === 'string' && stlData.trim() === '') ||
+          (stlData instanceof ArrayBuffer && stlData.byteLength === 0) ||
+          (ArrayBuffer.isView(stlData) && stlData.byteLength === 0)
+        ) {
+          console.warn('[StlPreview] Empty STL data received, returning empty geometry.');
+          return {
+            vertices: new Float32Array(0),
+            normals: new Float32Array(0),
+          };
+        }
+
         if (typeof stlData === 'string') {
           // Check if string starts with "solid" (ASCII STL)
           const trimmed = stlData.trim();
