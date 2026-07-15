@@ -34,6 +34,40 @@ type Results = {
   [key: string]: unknown;
 };
 
+const writeInjections = (parentFolder: JSZip, injections: string[][]) => {
+  const folderCache = new Map<string, JSZip>();
+  for (const injection of injections) {
+    const [type, name, content] = injection;
+    let innerFolderName = 'footprints';
+    if (type === 'outline') {
+      innerFolderName = 'outlines';
+    } else if (type === 'template') {
+      innerFolderName = 'templates';
+    }
+
+    const targetFolder = parentFolder.folder(innerFolderName);
+    if (targetFolder) {
+      const pathParts = name.split('/');
+      const fileName = pathParts.pop();
+      let currentFolder = targetFolder;
+      let currentKey = innerFolderName;
+      for (const part of pathParts) {
+        const nextKey = `${currentKey}/${part}`;
+        let nextFolder = folderCache.get(nextKey);
+        if (!nextFolder) {
+          nextFolder = currentFolder.folder(part) || currentFolder;
+          folderCache.set(nextKey, nextFolder);
+        }
+        currentFolder = nextFolder;
+        currentKey = nextKey;
+      }
+      if (fileName) {
+        currentFolder.file(`${fileName}.js`, content);
+      }
+    }
+  }
+};
+
 export const createZip = async (
   results: Results,
   config: string,
@@ -121,30 +155,7 @@ export const createZip = async (
 
   // Save injections into their respective folders based on type
   if (injections && injections.length > 0) {
-    for (const injection of injections) {
-      const [type, name, content] = injection;
-
-      // Select folder based on type
-      let folderName = 'footprints';
-      if (type === 'outline') {
-        folderName = 'outlines';
-      } else if (type === 'template') {
-        folderName = 'templates';
-      }
-
-      const targetFolder = zip.folder(folderName);
-      if (targetFolder) {
-        const pathParts = name.split('/');
-        const fileName = pathParts.pop();
-        let currentFolder = targetFolder;
-        for (const part of pathParts) {
-          currentFolder = currentFolder.folder(part) || currentFolder;
-        }
-        if (fileName) {
-          currentFolder.file(`${fileName}.js`, content);
-        }
-      }
-    }
+    writeInjections(zip, injections);
   }
 
   // Generate the zip file
@@ -351,28 +362,7 @@ export const exportAllConfigs = async (
       }
 
       if (injections && injections.length > 0) {
-        for (const injection of injections) {
-          const [type, name, content] = injection;
-          let innerFolderName = 'footprints';
-          if (type === 'outline') {
-            innerFolderName = 'outlines';
-          } else if (type === 'template') {
-            innerFolderName = 'templates';
-          }
-
-          const targetFolder = configFolder.folder(innerFolderName);
-          if (targetFolder) {
-            const pathParts = name.split('/');
-            const fileName = pathParts.pop();
-            let currentFolder = targetFolder;
-            for (const part of pathParts) {
-              currentFolder = currentFolder.folder(part) || currentFolder;
-            }
-            if (fileName) {
-              currentFolder.file(`${fileName}.js`, content);
-            }
-          }
-        }
+        writeInjections(configFolder, injections);
       }
     } catch (e) {
       console.error(`Failed to compile config ${configRecord.name}:`, e);
@@ -421,28 +411,7 @@ export const downloadAllConfigs = async (
 
   // Add injections folders in the zip root
   if (injections && injections.length > 0) {
-    for (const injection of injections) {
-      const [type, name, content] = injection;
-      let innerFolderName = 'footprints';
-      if (type === 'outline') {
-        innerFolderName = 'outlines';
-      } else if (type === 'template') {
-        innerFolderName = 'templates';
-      }
-
-      const targetFolder = zip.folder(innerFolderName);
-      if (targetFolder) {
-        const pathParts = name.split('/');
-        const fileName = pathParts.pop();
-        let currentFolder = targetFolder;
-        for (const part of pathParts) {
-          currentFolder = currentFolder.folder(part) || currentFolder;
-        }
-        if (fileName) {
-          currentFolder.file(`${fileName}.js`, content);
-        }
-      }
-    }
+    writeInjections(zip, injections);
   }
 
   const blob = await zip.generateAsync({
@@ -493,28 +462,7 @@ export const exportConfigsProgressively = async (
     // Add injections folders in the zip root
     if (injections && injections.length > 0) {
       if (isAborted()) return;
-      for (const injection of injections) {
-        const [type, name, content] = injection;
-        let innerFolderName = 'footprints';
-        if (type === 'outline') {
-          innerFolderName = 'outlines';
-        } else if (type === 'template') {
-          innerFolderName = 'templates';
-        }
-
-        const targetFolder = zip.folder(innerFolderName);
-        if (targetFolder) {
-          const pathParts = name.split('/');
-          const fileName = pathParts.pop();
-          let currentFolder = targetFolder;
-          for (const part of pathParts) {
-            currentFolder = currentFolder.folder(part) || currentFolder;
-          }
-          if (fileName) {
-            currentFolder.file(`${fileName}.js`, content);
-          }
-        }
-      }
+      writeInjections(zip, injections);
     }
 
     if (isAborted()) return;
@@ -761,28 +709,7 @@ export const exportConfigsProgressively = async (
           }
 
           if (injections && injections.length > 0) {
-            for (const injection of injections) {
-              const [type, name, content] = injection;
-              let innerFolderName = 'footprints';
-              if (type === 'outline') {
-                innerFolderName = 'outlines';
-              } else if (type === 'template') {
-                innerFolderName = 'templates';
-              }
-
-              const targetFolder = configFolder.folder(innerFolderName);
-              if (targetFolder) {
-                const pathParts = name.split('/');
-                const fileName = pathParts.pop();
-                let currentFolder = targetFolder;
-                for (const part of pathParts) {
-                  currentFolder = currentFolder.folder(part) || currentFolder;
-                }
-                if (fileName) {
-                  currentFolder.file(`${fileName}.js`, content);
-                }
-              }
-            }
+            writeInjections(configFolder, injections);
           }
         } catch (e) {
           console.error(`Failed to compile config ${configRecord.name}:`, e);
