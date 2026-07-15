@@ -161,28 +161,53 @@ const GitHubInputContainer = styled.div`
   }
 `;
 
-const RepoSelectContainer = styled.div`
-  position: relative;
+const UnifiedInputGroup = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.25rem;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
   background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
-  padding: 1rem 0.5rem 1rem 0.75rem;
   box-sizing: border-box;
-  flex-shrink: 0;
-  cursor: pointer;
   transition: border-color 0.15s ease-in-out;
 
-  &:hover {
+  &:focus-within {
     border-color: ${theme.colors.accent};
+  }
+`;
+
+const CustomDropdownContainer = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  user-select: none;
+`;
+
+const DropdownTrigger = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: transparent;
+  border: none;
+  padding: 0 0.5rem 0 0.75rem;
+  cursor: pointer;
+  height: 100%;
+  color: ${theme.colors.white};
+
+  &:hover {
+    color: ${theme.colors.accent};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   svg {
     width: 18px;
     height: 18px;
-    color: ${theme.colors.white};
     display: block;
   }
 
@@ -190,47 +215,27 @@ const RepoSelectContainer = styled.div`
     font-size: 18px;
     color: ${theme.colors.textDarker};
     display: block;
-    user-select: none;
     margin-right: -0.15rem;
   }
 `;
 
-const RepoSelect = styled.select`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-
-  option {
-    background-color: ${theme.colors.backgroundLight};
-    color: ${theme.colors.text};
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-  }
+const DropdownDivider = styled.div`
+  width: 1px;
+  background-color: ${theme.colors.border};
+  margin: 0.75rem 0;
+  flex-shrink: 0;
 `;
 
-const GitHubInput = styled.input`
+const UnifiedInput = styled.input`
   flex: 1;
   min-width: 0;
-  background-color: ${theme.colors.backgroundLighter};
-  border: 1px solid ${theme.colors.border};
-  border-radius: 6px;
-  padding: 1rem 1rem;
+  background: transparent;
+  border: none;
+  padding: 1rem;
   color: ${theme.colors.text};
   font-family: ${theme.fonts.body};
   font-size: ${theme.fontSizes.base};
   outline: none;
-  transition: border-color 0.15s ease-in-out;
-
-  &:focus {
-    border-color: ${theme.colors.accent};
-  }
 
   &::selection {
     background-color: ${theme.colors.accent};
@@ -238,8 +243,47 @@ const GitHubInput = styled.input`
   }
 
   &:disabled {
-    opacity: 0.5;
     cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
+const DropdownMenu = styled.div`
+  position: absolute;
+  top: 105%;
+  left: 0;
+  background-color: ${theme.colors.backgroundLight};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  padding: 0.25rem 0;
+  min-width: 130px;
+  z-index: 105;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+`;
+
+const DropdownItem = styled.div<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  font-size: ${theme.fontSizes.bodySmall || '13px'};
+  color: ${({ $active }) =>
+    $active ? theme.colors.white : theme.colors.textDark};
+  background-color: ${({ $active }) =>
+    $active ? theme.colors.accent : 'transparent'};
+  cursor: pointer;
+
+  &:hover {
+    background-color: ${({ $active }) =>
+      $active ? theme.colors.accent : theme.colors.backgroundLighter};
+    color: ${theme.colors.white};
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: currentColor;
+    display: block;
   }
 `;
 
@@ -352,6 +396,22 @@ const Welcome = () => {
   const [isRepoLoading, setIsRepoLoading] = useState(false);
   const isLoading = isLocalLoading || isRepoLoading;
   const [shouldNavigate, setShouldNavigate] = useState(false);
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const [isDragging, setIsDragging] = useState(false);
 
@@ -794,55 +854,85 @@ const Welcome = () => {
               repository name like &quot;user/repo&quot;.
             </p>
             <GitHubInputContainer>
-              <RepoSelectContainer>
-                {provider === 'github' ? (
-                  <GithubIcon />
-                ) : provider === 'codeberg' ? (
-                  <CodebergIcon />
-                ) : (
-                  <ForgejoIcon />
-                )}
-                <span className="material-symbols-outlined">
-                  arrow_drop_down
-                </span>
-                <RepoSelect
-                  value={provider}
-                  onChange={(e) =>
-                    setProvider(
-                      e.target.value as 'github' | 'codeberg' | 'forgejo'
-                    )
+              <UnifiedInputGroup>
+                <CustomDropdownContainer ref={dropdownRef}>
+                  <DropdownTrigger
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    disabled={isLoading}
+                    aria-label="Repository provider source"
+                    data-testid="repo-provider-trigger"
+                  >
+                    {provider === 'github' ? (
+                      <GithubIcon />
+                    ) : provider === 'codeberg' ? (
+                      <CodebergIcon />
+                    ) : (
+                      <ForgejoIcon />
+                    )}
+                    <span className="material-symbols-outlined">
+                      arrow_drop_down
+                    </span>
+                  </DropdownTrigger>
+                  {isDropdownOpen && (
+                    <DropdownMenu>
+                      <DropdownItem
+                        $active={provider === 'github'}
+                        onClick={() => {
+                          setProvider('github');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <GithubIcon />
+                        GitHub
+                      </DropdownItem>
+                      <DropdownItem
+                        $active={provider === 'codeberg'}
+                        onClick={() => {
+                          setProvider('codeberg');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <CodebergIcon />
+                        Codeberg
+                      </DropdownItem>
+                      <DropdownItem
+                        $active={provider === 'forgejo'}
+                        onClick={() => {
+                          setProvider('forgejo');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <ForgejoIcon />
+                        Forgejo
+                      </DropdownItem>
+                    </DropdownMenu>
+                  )}
+                </CustomDropdownContainer>
+                <DropdownDivider />
+                <UnifiedInput
+                  placeholder={
+                    provider === 'forgejo'
+                      ? 'https://host/owner/repo'
+                      : 'user/repo'
                   }
+                  value={githubInput}
+                  onChange={(e) => handleRepoInputChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      !isLoading &&
+                      githubInput.trim() !== ''
+                    ) {
+                      e.preventDefault();
+                      handleGitHub();
+                    }
+                  }}
                   disabled={isLoading}
-                  aria-label="Repository provider source"
-                  data-testid="repo-provider-select"
-                >
-                  <option value="github">GitHub</option>
-                  <option value="codeberg">Codeberg</option>
-                  <option value="forgejo">Forgejo</option>
-                </RepoSelect>
-              </RepoSelectContainer>
-              <GitHubInput
-                placeholder={
-                  provider === 'forgejo'
-                    ? 'https://host/owner/repo'
-                    : 'user/repo'
-                }
-                value={githubInput}
-                onChange={(e) => handleRepoInputChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === 'Enter' &&
-                    !isLoading &&
-                    githubInput.trim() !== ''
-                  ) {
-                    e.preventDefault();
-                    handleGitHub();
-                  }
-                }}
-                disabled={isLoading}
-                aria-label="Repository URL or path"
-                data-testid="github-input"
-              />
+                  aria-label="Repository URL or path"
+                  data-testid="github-input"
+                />
+              </UnifiedInputGroup>
               <LoadButton
                 onClick={handleGitHub}
                 disabled={isLoading || !githubInput}
