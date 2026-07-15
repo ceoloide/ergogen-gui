@@ -174,7 +174,7 @@ export const parseGitmodules = (
  * @param {{warning: string | null}} rateLimitTracker - Mutable object to track rate limit warnings.
  * @returns {Promise<GitHubFootprint[]>} A promise that resolves with the list of footprints.
  */
-const fetchFootprintsFromRepo = async (
+export const fetchFootprintsFromRepo = async (
   owner: string,
   repo: string,
   branch: string,
