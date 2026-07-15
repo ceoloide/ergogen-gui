@@ -385,7 +385,11 @@ const Welcome = () => {
 
   // Navigate to home when config has been set
   useEffect(() => {
-    if (shouldNavigate && configContext?.configInput) {
+    const queryParameters = new URLSearchParams(window.location.search);
+    const hasRemoteUrlParam =
+      queryParameters.has('github') || queryParameters.has('codeberg');
+
+    if ((shouldNavigate || hasRemoteUrlParam) && configContext?.configInput) {
       navigate('/');
       setShouldNavigate(false);
     }
