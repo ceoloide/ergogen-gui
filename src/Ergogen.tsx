@@ -460,8 +460,15 @@ const Ergogen = () => {
   switch (preview.extension) {
     case 'svg':
     case 'kicad_pcb':
-    case 'stl':
       preview.content = typeof result === 'string' ? result : '';
+      break;
+    case 'stl':
+      preview.content =
+        typeof result === 'string' ||
+        result instanceof ArrayBuffer ||
+        ArrayBuffer.isView(result)
+          ? (result as any)
+          : '';
       break;
     case 'jscad':
       preview.content =
