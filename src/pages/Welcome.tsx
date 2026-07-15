@@ -299,6 +299,13 @@ const LoadButton = styled(Button)`
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 0 5px 5px 0;
+  height: 100%;
+
+  &:active {
+    transform: none;
+    outline: none;
+  }
 
   svg,
   .material-symbols-outlined {
@@ -936,24 +943,24 @@ const Welcome = () => {
                   aria-label="Repository URL or path"
                   data-testid="github-input"
                 />
+                <LoadButton
+                  onClick={handleGitHub}
+                  disabled={isLoading || !githubInput}
+                  aria-label="Load configuration from repository"
+                  data-testid="github-load-button"
+                >
+                  {isRepoLoading ? (
+                    <Spinner />
+                  ) : (
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ display: 'block' }}
+                    >
+                      cloud_download
+                    </span>
+                  )}
+                </LoadButton>
               </UnifiedInputGroup>
-              <LoadButton
-                onClick={handleGitHub}
-                disabled={isLoading || !githubInput}
-                aria-label="Load configuration from repository"
-                data-testid="github-load-button"
-              >
-                {isRepoLoading ? (
-                  <Spinner />
-                ) : (
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ display: 'block' }}
-                  >
-                    cloud_download
-                  </span>
-                )}
-              </LoadButton>
             </GitHubInputContainer>
           </OptionBox>
         </OptionsContainer>
