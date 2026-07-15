@@ -345,7 +345,9 @@ const Welcome = () => {
   const configContext = useConfigContext();
   const [githubInput, setGithubInput] = useState('');
   const [provider, setProvider] = useState<'github' | 'codeberg'>('github');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLocalLoading, setIsLocalLoading] = useState(false);
+  const [isRepoLoading, setIsRepoLoading] = useState(false);
+  const isLoading = isLocalLoading || isRepoLoading;
   const [shouldNavigate, setShouldNavigate] = useState(false);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -500,14 +502,15 @@ const Welcome = () => {
 
   const handleConflictCancel = () => {
     handleConflictCancelBase();
-    setIsLoading(false);
+    setIsLocalLoading(false);
+    setIsRepoLoading(false);
     configContext?.setIsGenerating(false);
   };
 
   const handleGitHub = () => {
     if (!githubInput || !configContext) return;
     const { setError, clearError, setIsGenerating } = configContext;
-    setIsLoading(true);
+    setIsRepoLoading(true);
     setIsGenerating(true); // Show progress bar during loading
     clearError();
 
@@ -572,11 +575,11 @@ const Welcome = () => {
         setError(`Failed to load from remote repository: ${e.message}`);
         configContext?.setInfo(null);
         // Ensure we reset loading state and don't navigate
-        setIsLoading(false);
+        setIsRepoLoading(false);
         setIsGenerating(false);
       })
       .finally(() => {
-        setIsLoading(false);
+        setIsRepoLoading(false);
         // Note: isGenerating will be reset by generateNow or needs explicit reset on error
       });
   };
@@ -592,7 +595,7 @@ const Welcome = () => {
     if (!configContext) return;
 
     const { setError, clearError, setIsGenerating } = configContext;
-    setIsLoading(true);
+    setIsLocalLoading(true);
     setIsGenerating(true); // Show progress bar during file loading
     clearError();
 
@@ -636,10 +639,10 @@ const Welcome = () => {
       );
       configContext.setInfo(null);
       // Ensure we reset loading state and don't navigate
-      setIsLoading(false);
+      setIsLocalLoading(false);
       setIsGenerating(false);
     } finally {
-      setIsLoading(false);
+      setIsLocalLoading(false);
       // Note: isGenerating will be reset by generateNow or needs explicit reset on error
     }
   };
@@ -772,7 +775,7 @@ const Welcome = () => {
               aria-label="Select local file to load"
               data-testid="local-file-button"
             >
-              {isLoading ? (
+              {isLocalLoading ? (
                 <>
                   <Spinner /> Loading...
                 </>
@@ -830,7 +833,7 @@ const Welcome = () => {
                 aria-label="Load configuration from repository"
                 data-testid="github-load-button"
               >
-                {isLoading ? (
+                {isRepoLoading ? (
                   <Spinner />
                 ) : (
                   <span
