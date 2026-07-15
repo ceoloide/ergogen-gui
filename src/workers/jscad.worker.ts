@@ -155,13 +155,16 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
 
       try {
         // Convert JSCAD to STL
+        console.log('[JSCAD Worker] Converting case:', name, 'format stlb');
         const result = convertFn({ source: jscad, format: 'stlb' });
+        console.log('[JSCAD Worker] Convert result:', result ? { mimeType: result.mimeType, dataLength: result.data?.length } : null);
 
         let stlContent: ArrayBuffer | null = null;
         if (result?.data && Array.isArray(result.data)) {
           // Calculate total byte length
           let totalLength = 0;
-          const buffers = result.data.map((part: unknown) => {
+          const buffers = result.data.map((part: unknown, index: number) => {
+            console.log(`[JSCAD Worker] Part ${index}:`, part, 'type:', typeof part, 'isView:', ArrayBuffer.isView(part), 'isBuffer:', part instanceof ArrayBuffer);
             if (part instanceof ArrayBuffer) {
               totalLength += part.byteLength;
               return new Uint8Array(part);
