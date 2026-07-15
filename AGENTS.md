@@ -20,6 +20,7 @@ For detailed component architecture, feature implementations, and the list of fu
 ### Commit Procedure
 
 - **CRITICAL:** You **MUST** run `yarn precommit` before every commit. This command formats, lints, checks for unused dependencies, and runs the entire test suite. Address all errors before proceeding. Warnings can be ignored, but should be mentioned as potential follow-up tasks.
+- **Avoid Committing Temporary Files**: If the environment is running with a custom `ERGOGEN_VERSION` environment variable, then `yarn.lock`, `ergogen.js`, and `corney_island.svg` should not be committed and should be treated as temporary files.
 - **Update DEVELOPMENT.md**: You **MUST** update the `DEVELOPMENT.md` file to reflect any significant changes to the application's architecture, component structure, or development workflow. This ensures the knowledge base remains current.
 - **Update CHANGELOG.md**: For every major change or PR, you **MUST** add an entry to `CHANGELOG.md`. See the Changelog section below for formatting guidelines.
 
