@@ -617,7 +617,8 @@ export abstract class BaseGitProvider implements GitProvider {
         for (const item of items) {
           if (item.type === 'file') {
             const isYaml =
-              item.name.endsWith('.yaml') || item.name.endsWith('.yml');
+              (item.name.endsWith('.yaml') || item.name.endsWith('.yml')) &&
+              !item.name.startsWith('.');
             if (isYaml) {
               if (item.name === 'config.yaml' || item.name === 'config.yml') {
                 configYamls.push(item.path);

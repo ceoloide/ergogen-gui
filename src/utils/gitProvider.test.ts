@@ -109,4 +109,61 @@ describe('gitProviderRegistry', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('should ignore yaml/yml files starting with a dot during BFS', async () => {
+    const provider = gitProviderRegistry.resolve(
+      'https://codeberg.org/dlford/quokka'
+    );
+    expect(provider).toBeDefined();
+
+    const originalFetch = global.fetch;
+    const mockFetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/raw/quokka.yaml')) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('quokka config content'),
+        });
+      }
+      if (
+        url.includes('/contents/config.yaml') ||
+        url.includes('/contents/config.yml') ||
+        url.includes('/contents/ergogen/')
+      ) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+        });
+      }
+      if (url.includes('/contents?ref=main')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve([
+              { name: '.travis.yml', type: 'file', path: '.travis.yml' },
+              { name: 'quokka.yaml', type: 'file', path: 'quokka.yaml' },
+            ]),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+      });
+    });
+    global.fetch = mockFetch;
+
+    try {
+      const result = await provider?.fetchConfig(
+        'https://codeberg.org/dlford/quokka'
+      );
+      expect(result?.config).toBe('quokka config content');
+      expect(result?.configPath).toBe('');
+      // Verify we skipped .travis.yml and went straight to quokka.yaml
+      const calledUrls = mockFetch.mock.calls.map((call) => call[0]);
+      expect(calledUrls).not.toContain(
+        'https://codeberg.org/api/v1/repos/dlford/quokka/raw/.travis.yml?ref=main'
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
