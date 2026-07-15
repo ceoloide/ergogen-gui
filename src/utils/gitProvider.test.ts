@@ -140,6 +140,12 @@ describe('gitProviderRegistry', () => {
           json: () =>
             Promise.resolve([
               { name: '.travis.yml', type: 'file', path: '.travis.yml' },
+              { name: 'metadata.yaml', type: 'file', path: 'metadata.yaml' },
+              {
+                name: 'virtual_env.yml',
+                type: 'file',
+                path: 'virtual_env.yml',
+              },
               { name: 'quokka.yaml', type: 'file', path: 'quokka.yaml' },
             ]),
         });
@@ -157,10 +163,16 @@ describe('gitProviderRegistry', () => {
       );
       expect(result?.config).toBe('quokka config content');
       expect(result?.configPath).toBe('');
-      // Verify we skipped .travis.yml and went straight to quokka.yaml
+      // Verify we skipped excluded files and went straight to quokka.yaml
       const calledUrls = mockFetch.mock.calls.map((call) => call[0]);
       expect(calledUrls).not.toContain(
         'https://codeberg.org/api/v1/repos/dlford/quokka/raw/.travis.yml?ref=main'
+      );
+      expect(calledUrls).not.toContain(
+        'https://codeberg.org/api/v1/repos/dlford/quokka/raw/metadata.yaml?ref=main'
+      );
+      expect(calledUrls).not.toContain(
+        'https://codeberg.org/api/v1/repos/dlford/quokka/raw/virtual_env.yml?ref=main'
       );
     } finally {
       global.fetch = originalFetch;
