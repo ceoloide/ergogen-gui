@@ -316,24 +316,34 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
           const nx = view.getFloat32(offset, true);
           const ny = view.getFloat32(offset + 4, true);
           const nz = view.getFloat32(offset + 8, true);
-          offset += 12;
 
-          // Three vertices
-          for (let j = 0; j < 3; j++) {
-            vertices[vOffset] = view.getFloat32(offset, true);
-            vertices[vOffset + 1] = view.getFloat32(offset + 4, true);
-            vertices[vOffset + 2] = view.getFloat32(offset + 8, true);
+          // Unrolled inner loop for the three vertices using absolute offsets from current base offset
+          // Vertex 1
+          vertices[vOffset] = view.getFloat32(offset + 12, true);
+          vertices[vOffset + 1] = view.getFloat32(offset + 16, true);
+          vertices[vOffset + 2] = view.getFloat32(offset + 20, true);
+          normals[vOffset] = nx;
+          normals[vOffset + 1] = ny;
+          normals[vOffset + 2] = nz;
 
-            normals[vOffset] = nx;
-            normals[vOffset + 1] = ny;
-            normals[vOffset + 2] = nz;
+          // Vertex 2
+          vertices[vOffset + 3] = view.getFloat32(offset + 24, true);
+          vertices[vOffset + 4] = view.getFloat32(offset + 28, true);
+          vertices[vOffset + 5] = view.getFloat32(offset + 32, true);
+          normals[vOffset + 3] = nx;
+          normals[vOffset + 4] = ny;
+          normals[vOffset + 5] = nz;
 
-            vOffset += 3;
-            offset += 12;
-          }
+          // Vertex 3
+          vertices[vOffset + 6] = view.getFloat32(offset + 36, true);
+          vertices[vOffset + 7] = view.getFloat32(offset + 40, true);
+          vertices[vOffset + 8] = view.getFloat32(offset + 44, true);
+          normals[vOffset + 6] = nx;
+          normals[vOffset + 7] = ny;
+          normals[vOffset + 8] = nz;
 
-          // Skip attribute byte count
-          offset += 2;
+          vOffset += 9;
+          offset += 50; // Each triangle is exactly 50 bytes (12 normal + 36 vertices + 2 attribute count)
         }
 
         return {
