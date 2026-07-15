@@ -29,3 +29,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 yarn_start.log
+
+# temporary worker test files
+src/workers/*.tmp.ts

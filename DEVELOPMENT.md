@@ -56,6 +56,22 @@ The application offloads long-running, computationally intensive tasks to Web Wo
 
 Communication with the workers is managed through a standard message-passing system (`postMessage` and `onmessage`), with the main application thread and workers exchanging data as needed.
 
+### Worker Factory & Jest Testing
+
+To handle Web Worker instantiation in a centralized and testable way, the application uses `src/workers/workerFactory.ts`. This module exports `createErgogenWorker` and `createJscadWorker`.
+
+Since these factory functions utilize ESM-native `import.meta.url` for locating the worker scripts in Webpack 5, executing them directly in Jest's Node/CommonJS runner would throw a syntax error (`SyntaxError: Cannot use 'import.meta' outside a module`). 
+
+To resolve this during testing without sacrificing production bundle safety:
+1. The test runner dynamically reads `src/workers/workerFactory.ts` at execution time.
+2. It replaces `import.meta.url` with a mockup URL string (`"http://localhost"`).
+3. It writes a temporary file `src/workers/workerFactory.tmp.ts`.
+4. It requires this temporary file dynamically to perform the assertions (e.g. mock environment checks, instantiation, and error recovery handling).
+5. It cleans up the temporary file immediately after tests complete.
+
+The temporary file pattern is registered in `.gitignore` and required dynamically to bypass Knip's unused-import checks.
+
+
 ## Local File Loading
 
 The application supports loading Ergogen configurations from local files on the user's computer. This includes support for multiple file formats and drag-and-drop functionality.

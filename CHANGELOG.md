@@ -1,5 +1,22 @@
 # Changelog
 
+## Web Worker Factory Unit Tests
+
+July 15, 2026
+
+![A diagram representing the Jest test runner executing tests for Web Worker factory functions.](./public/images/changelog/placeholder.png)
+
+Previously, the worker factory functions responsible for instantiating the background Ergogen and JSCAD compilation threads lacked comprehensive unit testing coverage. Because Jest runs inside a Node-based JSDOM environment where ESM-specific `import.meta.url` expressions are syntactically unsupported, testing these factory methods risked compile-time failures and regressions as the codebase evolved.
+
+To address this, we developed a robust test suite for the worker factory functions. By dynamically compiling a temporary representation of the factory code during the Jest lifecycle, we bypass build-tool ESM syntax limitations while maintaining 100% production code fidelity. The new unit tests cover browser environment checks, fallback handling when workers are missing, successful instantiation paths, and runtime constructor exception tracking.
+
+**What changed:**
+
+- **Factory Testing Coverage**: Adds full unit test coverage for Ergogen and JSCAD worker factory helper functions
+- **Robust ESM Testing Utility**: Implements dynamic transpilation patching during tests to support Jest testing on files using `import.meta.url`
+- **Environment Simulation**: Adds test cases verifying worker behavior when `window` or `Worker` are undefined
+- **Error Protection**: Tests recovery and console error logging when worker constructors encounter instantiation failures
+
 ## Optimized ZIP Export Performance
 
 July 15, 2026
