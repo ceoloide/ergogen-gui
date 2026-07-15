@@ -9,7 +9,7 @@
  * Minimal structural types to describe the results payload shared with the worker.
  * We only care about the shape of `cases`; all other keys are passed through.
  */
-type JscadCase = { jscad?: string; stl?: string };
+type JscadCase = { jscad?: string; stl?: string | ArrayBuffer | Uint8Array };
 type JscadCases = Record<string, JscadCase>;
 export type ResultsLike = { cases?: JscadCases; [key: string]: unknown };
 

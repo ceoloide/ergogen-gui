@@ -14,7 +14,7 @@ import * as THREE from 'three';
  * @property {string} [data-testid] - An optional data-testid for testing purposes.
  */
 interface StlPreviewProps {
-  stl: string;
+  stl: string | ArrayBuffer | Uint8Array;
   'aria-label'?: string;
   'data-testid'?: string;
 }
@@ -199,7 +199,9 @@ const CameraController: React.FC<{
 /**
  * Scene content with model and camera controller
  */
-const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
+const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
+  stl,
+}) => {
   const meshRef = React.useRef<THREE.Mesh>(null);
   const [geometry, setGeometry] = React.useState<THREE.BufferGeometry | null>(
     null
@@ -214,20 +216,36 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
   React.useEffect(() => {
     try {
       // Parse STL data
-      const parseStl = (stlString: string) => {
-        // Check if string starts with "solid" (ASCII STL)
-        const trimmed = stlString.trim();
-        const startsWithSolid = trimmed.toLowerCase().startsWith('solid');
+      const parseStl = (stlData: string | ArrayBuffer | Uint8Array) => {
+        if (typeof stlData === 'string') {
+          // Check if string starts with "solid" (ASCII STL)
+          const trimmed = stlData.trim();
+          const startsWithSolid = trimmed.toLowerCase().startsWith('solid');
 
-        // Additional check: ASCII STL should contain "facet" keyword
-        const hasRequiredKeywords =
-          startsWithSolid &&
-          (stlString.includes('facet') || stlString.includes('FACET'));
+          // Additional check: ASCII STL should contain "facet" keyword
+          const hasRequiredKeywords =
+            startsWithSolid &&
+            (stlData.includes('facet') || stlData.includes('FACET'));
 
-        if (hasRequiredKeywords) {
-          return parseAsciiStl(stlString);
+          if (hasRequiredKeywords) {
+            return parseAsciiStl(stlData);
+          } else {
+            const buffer = new TextEncoder().encode(stlData).buffer;
+            return parseBinaryStl(buffer);
+          }
         } else {
-          return parseBinaryStl(stlString);
+          let buffer = stlData instanceof Uint8Array ? stlData.buffer : stlData;
+          if (
+            stlData instanceof Uint8Array &&
+            (stlData.byteOffset !== 0 ||
+              stlData.byteLength !== stlData.buffer.byteLength)
+          ) {
+            buffer = stlData.buffer.slice(
+              stlData.byteOffset,
+              stlData.byteOffset + stlData.byteLength
+            );
+          }
+          return parseBinaryStl(buffer);
         }
       };
 
@@ -283,8 +301,7 @@ const SceneContent: React.FC<{ stl: string }> = ({ stl }) => {
         };
       };
 
-      const parseBinaryStl = (stlString: string) => {
-        const buffer = new TextEncoder().encode(stlString).buffer;
+      const parseBinaryStl = (buffer: ArrayBuffer) => {
         const view = new DataView(buffer);
 
         // Validate minimum size for binary STL (80-byte header + 4-byte triangle count)

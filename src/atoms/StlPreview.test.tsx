@@ -97,4 +97,62 @@ endsolid test`;
     // Assert
     expect(screen.getByTestId('stl-binary-preview')).toBeInTheDocument();
   });
+
+  it('renders a binary STL preview using ArrayBuffer directly', () => {
+    // Generate a 1-triangle binary STL buffer
+    const buffer = new ArrayBuffer(84 + 50);
+    const view = new DataView(buffer);
+    for (let i = 0; i < 80; i++) {
+      view.setUint8(i, 0x41);
+    }
+    view.setUint32(80, 1, true); // 1 triangle
+
+    // Normal vector
+    view.setFloat32(84, 0.0, true);
+    view.setFloat32(88, 0.5, true);
+    view.setFloat32(92, 0.0, true);
+
+    // Vertices
+    for (let j = 0; j < 9; j++) {
+      view.setFloat32(96 + j * 4, 0.5, true);
+    }
+    view.setUint16(132, 0, true); // attribute count
+
+    // Act
+    render(<StlPreview stl={buffer} data-testid="stl-arraybuffer-preview" />);
+
+    // Assert
+    expect(screen.getByTestId('stl-arraybuffer-preview')).toBeInTheDocument();
+  });
+
+  it('renders a binary STL preview using Uint8Array directly', () => {
+    // Generate a 1-triangle binary STL buffer
+    const buffer = new ArrayBuffer(84 + 50);
+    const view = new DataView(buffer);
+    for (let i = 0; i < 80; i++) {
+      view.setUint8(i, 0x41);
+    }
+    view.setUint32(80, 1, true); // 1 triangle
+
+    // Normal vector
+    view.setFloat32(84, 0.0, true);
+    view.setFloat32(88, 0.5, true);
+    view.setFloat32(92, 0.0, true);
+
+    // Vertices
+    for (let j = 0; j < 9; j++) {
+      view.setFloat32(96 + j * 4, 0.5, true);
+    }
+    view.setUint16(132, 0, true); // attribute count
+
+    const uint8Array = new Uint8Array(buffer);
+
+    // Act
+    render(
+      <StlPreview stl={uint8Array} data-testid="stl-uint8array-preview" />
+    );
+
+    // Assert
+    expect(screen.getByTestId('stl-uint8array-preview')).toBeInTheDocument();
+  });
 });

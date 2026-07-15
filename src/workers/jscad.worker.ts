@@ -43,8 +43,6 @@ const workerScope = self as unknown as JscadWorkerGlobal;
 
 let convertFn: ConvertFunction | null = null;
 let initializationError: Error | null = null;
-const utf8Decoder =
-  typeof TextDecoder === 'undefined' ? null : new TextDecoder();
 
 function getBasePath() {
   // Use PUBLIC_URL if available
@@ -157,36 +155,23 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
 
       try {
         // Convert JSCAD to STL
-        const result = convertFn({ source: jscad, format: 'stla' });
+        const result = convertFn({ source: jscad, format: 'stlb' });
 
         const firstPart = result?.data?.[0];
-        let stlContent: string | null = null;
+        let stlContent: ArrayBuffer | Uint8Array | null = null;
 
-        if (typeof firstPart === 'string') {
+        if (firstPart instanceof ArrayBuffer) {
           stlContent = firstPart;
-        } else if (firstPart instanceof ArrayBuffer && utf8Decoder) {
-          stlContent = utf8Decoder.decode(new Uint8Array(firstPart));
-        } else if (ArrayBuffer.isView(firstPart) && utf8Decoder) {
+        } else if (ArrayBuffer.isView(firstPart)) {
           const view = firstPart as ArrayBufferViewLike;
-          const array = new Uint8Array(
+          stlContent = new Uint8Array(
             view.buffer,
             view.byteOffset,
             view.byteLength
           );
-          stlContent = utf8Decoder.decode(array);
         }
 
-        if (!stlContent) {
-          console.warn(
-            `Generated STL content is empty or unsupported type for case: ${name}`
-          );
-          continue;
-        }
-
-        // Rename default STL header from "solid csg.js" to the specific case name for clarity
-        stlContent = stlContent.replace(/^solid csg\.js\b/, `solid ${name}`);
-
-        if (!stlContent || stlContent.trim() === '') {
+        if (!stlContent || stlContent.byteLength === 0) {
           console.warn(`Generated STL content is empty for case: ${name}`);
           continue;
         }

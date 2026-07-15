@@ -21,7 +21,7 @@ const spin = keyframes`
 export interface Preview {
   extension: string;
   key: string;
-  content: string;
+  content: string | ArrayBuffer | Uint8Array;
 }
 
 /**
@@ -29,14 +29,14 @@ export interface Preview {
  * @typedef {object} Props
  * @property {string} fileName - The name of the file to be downloaded.
  * @property {string} extension - The file extension.
- * @property {string} content - The content of the file.
+ * @property {string | ArrayBuffer | Uint8Array} content - The content of the file.
  * @property {Preview} [preview] - An optional preview object. If provided, a preview button is shown.
  * @property {(preview: Preview) => void} setPreview - Function to set the active preview.
  */
 type Props = {
   fileName: string;
   extension: string;
-  content: string;
+  content: string | ArrayBuffer | Uint8Array;
   preview?: Preview;
   setPreview: (preview: Preview) => void;
   previewKey: string;
