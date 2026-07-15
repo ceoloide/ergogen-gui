@@ -1,5 +1,21 @@
 # Changelog
 
+## Resolved Build Type Constraints
+
+July 15, 2026
+
+![A diagram representing TypeScript compiler checks and resolution of parser return types.](./public/images/changelog/placeholder.png)
+
+Previously, compiling the application encountered strict TypeScript constraints on configuration object parsing. The return type signature of `parseConfig` inside the configuration context incorrectly assumed section values were arrays (`unknown[]`), resulting in invalid type casting conflicts and compilation failures when resolving PCB properties.
+
+To address this, we corrected the type signature of `parseConfig` inside `src/context/ConfigContext.tsx` to return `Record<string, unknown>`. We also reverted the experimental Ergogen compiler upgrade, maintaining the stable library versions.
+
+**What changed:**
+
+- **TypeScript Type Resolution**: Refactors the parsed configuration parser types to allow safe type casting of configuration sections
+- **Reverted Compiler Upgrade**: Discards the experimental Ergogen upgrade and returns the compiler dependency and lockfile to their stable release states
+- **Version Bump**: Bumps the project version to `0.11.13`
+
 ## Optimized STL Parsing Performance
 
 July 15, 2026
