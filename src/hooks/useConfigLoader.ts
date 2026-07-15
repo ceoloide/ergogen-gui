@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchConfigFromUrl } from '../utils/github';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
 import '../utils/codeberg';
@@ -16,6 +16,7 @@ export const useConfigLoader = ({
   setError,
 }: UseConfigLoaderProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     const loadInitialConfig = async () => {
@@ -77,7 +78,10 @@ export const useConfigLoader = ({
       }
     };
 
-    loadInitialConfig();
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      loadInitialConfig();
+    }
   }, [processInjectionsWithConflictResolution, setError]); // Run once on mount
 
   return { isLoading };
