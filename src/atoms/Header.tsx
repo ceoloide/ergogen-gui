@@ -25,9 +25,11 @@ const HeaderContainer = styled.header`
   flex-shrink: 0;
   position: relative;
   z-index: 100;
+  border-bottom: 1px solid ${theme.colors.border};
 
   @media (max-width: 639px) {
     padding: 0 0.5rem;
+    border-bottom: none;
   }
 `;
 
