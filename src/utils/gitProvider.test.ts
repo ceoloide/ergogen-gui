@@ -146,6 +146,7 @@ describe('gitProviderRegistry', () => {
                 type: 'file',
                 path: 'virtual_env.yml',
               },
+              { name: '.github', type: 'dir', path: '.github' },
               { name: 'quokka.yaml', type: 'file', path: 'quokka.yaml' },
             ]),
         });
@@ -173,6 +174,9 @@ describe('gitProviderRegistry', () => {
       );
       expect(calledUrls).not.toContain(
         'https://codeberg.org/api/v1/repos/dlford/quokka/raw/virtual_env.yml?ref=main'
+      );
+      expect(calledUrls).not.toContain(
+        'https://codeberg.org/api/v1/repos/dlford/quokka/contents/.github?ref=main'
       );
     } finally {
       global.fetch = originalFetch;

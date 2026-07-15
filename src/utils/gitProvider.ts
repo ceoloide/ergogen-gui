@@ -630,7 +630,9 @@ export abstract class BaseGitProvider implements GitProvider {
               }
             }
           } else if (item.type === 'dir' && depth < GIT_BFS_MAX_DEPTH) {
-            queue.push({ path: item.path, depth: depth + 1 });
+            if (!item.name.startsWith('.')) {
+              queue.push({ path: item.path, depth: depth + 1 });
+            }
           }
         }
 
