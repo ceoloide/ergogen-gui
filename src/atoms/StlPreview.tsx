@@ -223,7 +223,9 @@ const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
           (stlData instanceof ArrayBuffer && stlData.byteLength === 0) ||
           (ArrayBuffer.isView(stlData) && stlData.byteLength === 0)
         ) {
-          console.warn('[StlPreview] Empty STL data received, returning empty geometry.');
+          console.warn(
+            '[StlPreview] Empty STL data received, returning empty geometry.'
+          );
           return {
             vertices: new Float32Array(0),
             normals: new Float32Array(0),

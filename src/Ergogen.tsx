@@ -467,7 +467,7 @@ const Ergogen = () => {
         typeof result === 'string' ||
         result instanceof ArrayBuffer ||
         ArrayBuffer.isView(result)
-          ? (result as any)
+          ? (result as string | ArrayBuffer | Uint8Array)
           : '';
       break;
     case 'jscad':
