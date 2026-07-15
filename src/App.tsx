@@ -4,6 +4,7 @@ import styled from 'styled-components';
 
 import Ergogen from './Ergogen';
 import Welcome from './pages/Welcome';
+import KleEditorPage from './pages/KleEditorPage';
 import Header from './atoms/Header';
 import LoadingBar from './atoms/LoadingBar';
 import Banners from './organisms/Banners';
@@ -599,6 +600,7 @@ const AppContent = ({
             element={configInput ? <Ergogen /> : <Navigate to="/new" replace />}
           />
           <Route path="/new" element={<Welcome />} />
+          <Route path="/kle-editor" element={<KleEditorPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageWrapper>
