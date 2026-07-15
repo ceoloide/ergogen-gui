@@ -317,6 +317,18 @@ describe('localFiles utilities', () => {
         );
       });
 
+      it('throws error when config.yaml is missing from ekb', async () => {
+        // Arrange
+        const ekbFile = await createMockZipFile('test.ekb', {
+          'other_file.yaml': 'content',
+        });
+
+        // Act & Assert
+        await expect(loadLocalFile(ekbFile)).rejects.toThrow(
+          'The archive is missing a config.yaml file in the root directory.'
+        );
+      });
+
       it('ignores non-js files in footprints folder', async () => {
         // Arrange
         const zipFile = await createMockZipFile('test.zip', {
