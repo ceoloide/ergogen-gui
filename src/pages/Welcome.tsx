@@ -8,12 +8,33 @@ import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
+import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
 import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { trackEvent } from '../utils/analytics';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 
-// Styled Components
+const Spinner = styled.div`
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 3px solid ${theme.colors.accent};
+  width: 1.2rem;
+  height: 1.2rem;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 const WelcomePageWrapper = styled.div<{ $isDragging?: boolean }>`
   background-color: ${theme.colors.background};
   color: ${theme.colors.white};
@@ -361,11 +382,11 @@ const Welcome = () => {
     }
 
     // Convert footprints, outlines, and templates to injection array format
-    const injections: string[][] = [
-      ...footprints.map((fp) => ['footprint', fp.name, fp.content]),
-      ...outlines.map((ot) => ['outline', ot.name, ot.content]),
-      ...templates.map((tmpl) => ['template', tmpl.name, tmpl.content]),
-    ];
+    const injections = mapSeparateToInjectionsArray(
+      footprints,
+      outlines,
+      templates
+    );
 
     // Use the hook's process function
     await processInjectionsWithConflictResolution(
@@ -422,6 +443,19 @@ const Welcome = () => {
 
           try {
             configContext.createNewConfig(result.config);
+
+            const footprintCount = result.footprints.length;
+            const outlineCount = result.outlines.length;
+            const templateCount = result.templates.length;
+
+            if (footprintCount || outlineCount || templateCount) {
+              configContext.setInfo(
+                `Config loaded successfully from GitHub. Found ${footprintCount} footprints, ${outlineCount} outlines, and ${templateCount} templates.`
+              );
+            } else {
+              configContext.setInfo('Config loaded successfully from GitHub.');
+            }
+
             // Process footprints with conflict resolution
             await processInjections(
               result.footprints,
@@ -439,6 +473,7 @@ const Welcome = () => {
       })
       .catch((e) => {
         setError(`Failed to load from GitHub: ${e.message}`);
+        configContext?.setInfo(null);
         // Ensure we reset loading state and don't navigate
         setIsLoading(false);
         setIsGenerating(false);
@@ -478,6 +513,19 @@ const Welcome = () => {
       const result = await loadLocalFile(file);
 
       configContext.createNewConfig(result.config);
+
+      const footprintCount = result.footprints.length;
+      const outlineCount = result.outlines.length;
+      const templateCount = result.templates.length;
+
+      if (footprintCount || outlineCount || templateCount) {
+        configContext.setInfo(
+          `Config loaded successfully. Found ${footprintCount} footprints, ${outlineCount} outlines, and ${templateCount} templates.`
+        );
+      } else {
+        configContext.setInfo('Config loaded successfully.');
+      }
+
       // Process footprints with conflict resolution
       await processInjections(
         result.footprints,
@@ -489,6 +537,7 @@ const Welcome = () => {
       setError(
         `Failed to load local file: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+      configContext.setInfo(null);
       // Ensure we reset loading state and don't navigate
       setIsLoading(false);
       setIsGenerating(false);
@@ -514,6 +563,7 @@ const Welcome = () => {
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isLoading) return;
     setIsDragging(true);
   };
 
@@ -525,6 +575,7 @@ const Welcome = () => {
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isLoading) return;
     // Check if we're actually leaving the wrapper element
     const currentTarget = e.currentTarget as HTMLElement;
     const relatedTarget = e.relatedTarget as HTMLElement | null;
@@ -538,6 +589,7 @@ const Welcome = () => {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isLoading) return;
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
@@ -623,7 +675,13 @@ const Welcome = () => {
               aria-label="Select local file to load"
               data-testid="local-file-button"
             >
-              {isLoading ? 'Loading...' : 'Choose File'}
+              {isLoading ? (
+                <>
+                  <Spinner /> Loading...
+                </>
+              ) : (
+                'Choose File'
+              )}
             </Button>
           </OptionBox>
           <OptionBox>
@@ -657,7 +715,13 @@ const Welcome = () => {
                 aria-label="Load configuration from GitHub"
                 data-testid="github-load-button"
               >
-                {isLoading ? 'Loading...' : 'Load'}
+                {isLoading ? (
+                  <>
+                    <Spinner /> Loading...
+                  </>
+                ) : (
+                  'Load'
+                )}
               </Button>
             </GitHubInputContainer>
           </OptionBox>

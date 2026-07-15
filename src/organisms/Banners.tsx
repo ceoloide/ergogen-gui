@@ -86,10 +86,32 @@ const Banners = () => {
     return null;
   }
 
-  const { error, deprecationWarning, clearError, clearWarning } = configContext;
+  const {
+    error,
+    deprecationWarning,
+    info,
+    clearError,
+    clearWarning,
+    clearInfo,
+  } = configContext;
 
   return (
     <BannersContainer data-testid="banners-container">
+      {info && (
+        <Banner type="info" data-testid="info-banner">
+          <BannerContent>
+            <BannerIcon>info</BannerIcon>
+            <BannerText>{info}</BannerText>
+          </BannerContent>
+          <CloseButton
+            onClick={clearInfo}
+            aria-label="Close info message"
+            data-testid="close-info-banner"
+          >
+            &times;
+          </CloseButton>
+        </Banner>
+      )}
       {deprecationWarning && (
         <Banner type="warning" data-testid="warning-banner">
           <BannerContent>

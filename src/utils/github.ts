@@ -1,4 +1,5 @@
 import { isFeatureEnabled } from './featureFlags';
+import { enforceFileSizeLimit } from './ergogenBundleLoader';
 
 /**
  * Converts a standard GitHub file URL to its corresponding raw content URL.
@@ -24,6 +25,10 @@ export const checkRateLimit = (
   response: Response,
   url: string
 ): { isLimitExceeded: boolean; error: string | null } => {
+  if (!response) {
+    return { isLimitExceeded: false, error: null };
+  }
+
   // Check if this is a raw content URL (raw.githubusercontent.com)
   const isRawContent = url.includes('raw.githubusercontent.com');
 
@@ -44,10 +49,10 @@ export const checkRateLimit = (
   }
 
   // For api.github.com requests, check rate limit headers
-  const limit = response.headers.get('X-RateLimit-Limit') || 'unknown';
-  const remaining = response.headers.get('X-RateLimit-Remaining') || 'unknown';
-  const used = response.headers.get('X-RateLimit-Used') || 'unknown';
-  const reset = response.headers.get('X-RateLimit-Reset') || 'unknown';
+  const limit = response.headers?.get('X-RateLimit-Limit') || 'unknown';
+  const remaining = response.headers?.get('X-RateLimit-Remaining') || 'unknown';
+  const used = response.headers?.get('X-RateLimit-Used') || 'unknown';
+  const reset = response.headers?.get('X-RateLimit-Reset') || 'unknown';
 
   // Log rate limit info
   console.log(
@@ -443,6 +448,7 @@ export const fetchConfigFromUrl = async (
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const config = await response.text();
+    enforceFileSizeLimit(config.length, false);
 
     // Check if the file is named config.yaml to decide if we should look for footprints
     const filename = baseUrl.split('/').pop() || '';
@@ -1002,9 +1008,8 @@ export const fetchConfigFromUrl = async (
       console.warn('[GitHub] No .gitmodules found or failed to parse:', error);
     }
 
-    console.log(`[GitHub] Total footprints loaded: ${footprints.length}`);
-    console.log(`[GitHub] Total outlines loaded: ${outlines.length}`);
-    console.log(`[GitHub] Total templates loaded: ${templates.length}`);
+    enforceFileSizeLimit(config.length, false);
+
     return {
       config,
       footprints,
