@@ -3,6 +3,7 @@ import {
   ErgogenWorkspaceBundle,
   BaseGitProvider,
   GitFileItem,
+  RateLimitError,
 } from './gitProvider';
 
 export type { GitInjection } from './gitProvider';
@@ -219,7 +220,7 @@ class GitHubProvider extends BaseGitProvider {
       this.rateLimitWarning = result.error;
     }
     if (result.isLimitExceeded) {
-      throw new Error(result.error || 'Rate limit exceeded');
+      throw new RateLimitError(result.error || 'Rate limit exceeded');
     }
   }
 

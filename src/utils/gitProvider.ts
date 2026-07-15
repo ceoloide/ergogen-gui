@@ -2,6 +2,13 @@ import { isFeatureEnabled } from './featureFlags';
 import { enforceFileSizeLimit } from './ergogenBundleLoader';
 import { GIT_BFS_MAX_REQUESTS, GIT_BFS_MAX_DEPTH } from '../context/constants';
 
+export class RateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RateLimitError';
+  }
+}
+
 export interface GitInjection {
   name: string;
   content: string;
@@ -198,6 +205,7 @@ export abstract class BaseGitProvider implements GitProvider {
                     ['.js']
                   );
               } catch (_e) {
+                if (_e instanceof RateLimitError) throw _e;
                 try {
                   submoduleFootprints =
                     await subProvider.fetchFootprintsFromDirectory(
@@ -208,6 +216,7 @@ export abstract class BaseGitProvider implements GitProvider {
                       ['.js']
                     );
                 } catch (_e2) {
+                  if (_e2 instanceof RateLimitError) throw _e2;
                   console.warn(
                     `Failed to fetch submodule footprints from ${submodule.url}`
                   );
@@ -223,6 +232,7 @@ export abstract class BaseGitProvider implements GitProvider {
           }
         }
       } catch (_error) {
+        if (_error instanceof RateLimitError) throw _error;
         // No .gitmodules found or failed to parse (perfectly fine)
       }
     };
@@ -266,6 +276,7 @@ export abstract class BaseGitProvider implements GitProvider {
         );
         footprints.push(...resolvedFootprints);
       } catch (_e) {
+        if (_e instanceof RateLimitError) throw _e;
         // Optional folder missing
       }
 
@@ -280,6 +291,7 @@ export abstract class BaseGitProvider implements GitProvider {
           );
           outlines.push(...resolvedOutlines);
         } catch (_e) {
+          if (_e instanceof RateLimitError) throw _e;
           // Optional folder missing
         }
       }
@@ -294,6 +306,7 @@ export abstract class BaseGitProvider implements GitProvider {
           );
           templates.push(...resolvedTemplates);
         } catch (_e) {
+          if (_e instanceof RateLimitError) throw _e;
           // Optional folder missing
         }
       }
@@ -466,6 +479,7 @@ export abstract class BaseGitProvider implements GitProvider {
         );
         footprints.push(...resolvedFootprints);
       } catch (_e) {
+        if (_e instanceof RateLimitError) throw _e;
         // Optional folder missing
       }
 
@@ -480,6 +494,7 @@ export abstract class BaseGitProvider implements GitProvider {
           );
           outlines.push(...resolvedOutlines);
         } catch (_e) {
+          if (_e instanceof RateLimitError) throw _e;
           // Optional folder missing
         }
       }
@@ -494,6 +509,7 @@ export abstract class BaseGitProvider implements GitProvider {
           );
           templates.push(...resolvedTemplates);
         } catch (_e) {
+          if (_e instanceof RateLimitError) throw _e;
           // Optional folder missing
         }
       }
@@ -523,6 +539,7 @@ export abstract class BaseGitProvider implements GitProvider {
     try {
       return await fetchWithBranch('main');
     } catch (_e) {
+      if (_e instanceof RateLimitError) throw _e;
       return await fetchWithBranch('master');
     }
   }
@@ -565,6 +582,7 @@ export abstract class BaseGitProvider implements GitProvider {
                   : itemPath.replace(/\.[^/.]+$/, '');
                 result.push({ name: cleanName, content });
               } catch (err: unknown) {
+                if (err instanceof RateLimitError) throw err;
                 const error = err as Error;
                 console.warn(
                   `Failed to fetch file content: ${itemPath}`,
@@ -577,6 +595,7 @@ export abstract class BaseGitProvider implements GitProvider {
           }
         }
       } catch (_e) {
+        if (_e instanceof RateLimitError) throw _e;
         // Folder directory does not exist or inaccessible (standard case)
       }
     };
