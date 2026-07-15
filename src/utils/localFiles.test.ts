@@ -1,4 +1,4 @@
-import { loadLocalFile } from './localFiles';
+import { loadLocalFile, LocalFileLoadResult } from './localFiles';
 import JSZip from 'jszip';
 import { isFeatureEnabled } from './featureFlags';
 

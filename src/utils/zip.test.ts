@@ -63,7 +63,10 @@ describe('createZip', () => {
     await createZip(results as any, config, undefined, false, false);
 
     expect(mockZip.file).toHaveBeenCalledWith('config.yaml', config);
-    expect(mockZip.file).toHaveBeenCalledWith('demo.svg', '<svg>demo</svg>');
+    expect(mockFolders['outputs'].file).toHaveBeenCalledWith(
+      'demo.svg',
+      '<svg>demo</svg>'
+    );
   });
 
   it('should include outlines and filter "_" prefixed files when debug is false', async () => {
@@ -77,7 +80,8 @@ describe('createZip', () => {
     await createZip(results as any, '', undefined, false, false);
 
     const outlinesFolder = mockFolders['outlines'];
-    expect(mockZip.folder).toHaveBeenCalledWith('outlines');
+    expect(mockZip.folder).toHaveBeenCalledWith('outputs');
+    expect(mockFolders['outputs'].folder).toHaveBeenCalledWith('outlines');
     expect(outlinesFolder.file).toHaveBeenCalledWith(
       'visible.dxf',
       'visible-dxf'
@@ -103,6 +107,8 @@ describe('createZip', () => {
     await createZip(results as any, '', undefined, true, false);
 
     const outlinesFolder = mockFolders['outlines'];
+    expect(mockZip.folder).toHaveBeenCalledWith('outputs');
+    expect(mockFolders['outputs'].folder).toHaveBeenCalledWith('outlines');
     expect(outlinesFolder.file).toHaveBeenCalledWith(
       'visible.dxf',
       'visible-dxf'
@@ -124,7 +130,8 @@ describe('createZip', () => {
     await createZip(results as any, '', undefined, false, false);
 
     const pcbsFolder = mockFolders['pcbs'];
-    expect(mockZip.folder).toHaveBeenCalledWith('pcbs');
+    expect(mockZip.folder).toHaveBeenCalledWith('outputs');
+    expect(mockFolders['outputs'].folder).toHaveBeenCalledWith('pcbs');
     expect(pcbsFolder.file).toHaveBeenCalledWith(
       'main.kicad_pcb',
       'pcb-content'
@@ -145,6 +152,8 @@ describe('createZip', () => {
     // stlPreview = false
     await createZip(results as any, '', undefined, false, false);
     let casesFolder = mockFolders['cases'];
+    expect(mockZip.folder).toHaveBeenCalledWith('outputs');
+    expect(mockFolders['outputs'].folder).toHaveBeenCalledWith('cases');
     expect(casesFolder.file).toHaveBeenCalledWith(
       'case1.jscad',
       'jscad-content'
@@ -161,6 +170,8 @@ describe('createZip', () => {
     // stlPreview = true
     await createZip(results as any, '', undefined, false, true);
     casesFolder = mockFolders['cases'];
+    expect(mockZip.folder).toHaveBeenCalledWith('outputs');
+    expect(mockFolders['outputs'].folder).toHaveBeenCalledWith('cases');
     expect(casesFolder.file).toHaveBeenCalledWith(
       'case1.jscad',
       'jscad-content'
@@ -180,7 +191,8 @@ describe('createZip', () => {
     await createZip(results as any, config, undefined, true, false);
 
     const debugFolder = mockFolders['debug'];
-    expect(mockZip.folder).toHaveBeenCalledWith('debug');
+    expect(mockZip.folder).toHaveBeenCalledWith('outputs');
+    expect(mockFolders['outputs'].folder).toHaveBeenCalledWith('debug');
     expect(debugFolder.file).toHaveBeenCalledWith('raw.txt', config);
     expect(debugFolder.file).toHaveBeenCalledWith(
       'canonical.yaml',

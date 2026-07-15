@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchConfigFromUrl } from '../utils/github';
+import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
 
 interface UseConfigLoaderProps {
   processInjectionsWithConflictResolution: (
@@ -46,27 +47,11 @@ export const useConfigLoader = ({
           }
 
           // Convert footprints, outlines, and templates to injection array format
-          const footprintInjections: string[][] = result.footprints.map(
-            (fp) => ['footprint', fp.name, fp.content]
+          const newInjections = mapSeparateToInjectionsArray(
+            result.footprints,
+            result.outlines,
+            result.templates
           );
-
-          const outlineInjections: string[][] = result.outlines.map((fp) => [
-            'outline',
-            fp.name,
-            fp.content,
-          ]);
-
-          const templateInjections: string[][] = result.templates.map((fp) => [
-            'template',
-            fp.name,
-            fp.content,
-          ]);
-
-          const newInjections = [
-            ...footprintInjections,
-            ...outlineInjections,
-            ...templateInjections,
-          ];
 
           // Process injections with conflict resolution
           await processInjectionsWithConflictResolution(

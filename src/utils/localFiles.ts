@@ -1,15 +1,13 @@
-import JSZip from 'jszip';
-import { GitHubFootprint } from './github';
-import { isFeatureEnabled } from './featureFlags';
+import { parseZipArchive, enforceFileSizeLimit } from './ergogenBundleLoader';
 
 /**
  * Result of loading a local file.
  */
-type LocalFileLoadResult = {
+export type LocalFileLoadResult = {
   config: string;
-  footprints: GitHubFootprint[];
-  outlines: GitHubFootprint[];
-  templates: GitHubFootprint[];
+  footprints: { name: string; content: string }[];
+  outlines: { name: string; content: string }[];
+  templates: { name: string; content: string }[];
 };
 
 /**
@@ -33,111 +31,9 @@ const loadTextFile = async (file: File): Promise<string> => {
 };
 
 /**
- * Extracts footprint name from a file path within the footprints folder.
- * Removes the 'footprints/' prefix and the '.js' extension.
- * @param path - The full path within the zip (e.g., 'footprints/ceoloide/utility_text.js').
- * @returns The footprint name (e.g., 'ceoloide/utility_text').
- */
-/**
- * Extracts outline name from a file path within the outlines folder.
- * Removes the 'outlines/' prefix and the '.js' extension.
- * @param path - The full path within the zip (e.g., 'outlines/my_outline.js').
- * @returns The outline name (e.g., 'my_outline').
- */
-const extractOutlineName = (path: string): string => {
-  // Remove 'outlines/' prefix
-  let name = path.replace(/^outlines\//, '');
-  // Remove '.js' extension
-  name = name.replace(/\.js$/, '');
-  return name;
-};
-
-const extractFootprintName = (path: string): string => {
-  // Remove 'footprints/' prefix
-  let name = path.replace(/^footprints\//, '');
-  // Remove '.js' extension
-  name = name.replace(/\.js$/, '');
-  return name;
-};
-
-const extractTemplateName = (path: string): string => {
-  // Remove 'templates/' prefix
-  let name = path.replace(/^templates\//, '');
-  // Remove '.js' extension
-  name = name.replace(/\.js$/, '');
-  return name;
-};
-
-/**
- * Loads a zip or ekb archive and extracts config.yaml and footprints.
- * @param file - The zip/ekb file to load.
- * @returns A promise that resolves with the config and footprints.
- * @throws Error if config.yaml is missing from the archive.
- */
-const loadZipArchive = async (file: File): Promise<LocalFileLoadResult> => {
-  const arrayBuffer = await file.arrayBuffer();
-  const zip = await JSZip.loadAsync(arrayBuffer);
-
-  // Find config.yaml in the root (check both config.yaml and config.yml)
-  let configFile = zip.file('config.yaml') || zip.file('config.yml');
-  if (!configFile) {
-    // Try case-insensitive search
-    configFile = zip.file(/^config\.(yaml|yml)$/i)[0];
-  }
-  if (!configFile) {
-    throw new Error(
-      'The archive is missing a config.yaml file in the root directory.'
-    );
-  }
-
-  const config = await configFile.async('string');
-
-  // Extract footprints, outlines and templates
-  const footprints: GitHubFootprint[] = [];
-  const outlines: GitHubFootprint[] = [];
-  const templates: GitHubFootprint[] = [];
-  const promises: Promise<void>[] = [];
-
-  zip.forEach((relativePath, file) => {
-    if (file.dir || !relativePath.endsWith('.js')) return;
-
-    if (relativePath.startsWith('footprints/')) {
-      const promise = file.async('string').then((content) => {
-        const name = extractFootprintName(relativePath);
-        footprints.push({ name, content });
-      });
-      promises.push(promise);
-    } else if (
-      relativePath.startsWith('outlines/') &&
-      isFeatureEnabled('outlines')
-    ) {
-      const promise = file.async('string').then((content) => {
-        const name = extractOutlineName(relativePath);
-        outlines.push({ name, content });
-      });
-      promises.push(promise);
-    } else if (
-      relativePath.startsWith('templates/') &&
-      isFeatureEnabled('templates')
-    ) {
-      const promise = file.async('string').then((content) => {
-        const name = extractTemplateName(relativePath);
-        templates.push({ name, content });
-      });
-      promises.push(promise);
-    }
-  });
-
-  // Wait for all files to be read
-  await Promise.all(promises);
-
-  return { config, footprints, outlines, templates };
-};
-
-/**
- * Loads a local file (yaml, json, zip, or ekb) and extracts config and footprints.
+ * Loads a local file (yaml, json, zip, or ekb) and extracts config and footprints/outlines/templates.
  * @param file - The file to load.
- * @returns A promise that resolves with the config and footprints.
+ * @returns A promise that resolves with the config and injections.
  * @throws Error if the file type is not supported or if required files are missing.
  */
 export const loadLocalFile = async (
@@ -145,14 +41,33 @@ export const loadLocalFile = async (
 ): Promise<LocalFileLoadResult> => {
   const fileName = file.name.toLowerCase();
   const extension = fileName.split('.').pop();
+  const isArchive = extension === 'zip' || extension === 'ekb';
+
+  // Enforce size limits
+  enforceFileSizeLimit(file.size, isArchive);
 
   if (extension === 'yaml' || extension === 'yml' || extension === 'json') {
     // Load as text file
     const config = await loadTextFile(file);
     return { config, footprints: [], outlines: [], templates: [] };
-  } else if (extension === 'zip' || extension === 'ekb') {
+  } else if (isArchive) {
     // Load as zip archive
-    return await loadZipArchive(file);
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await parseZipArchive(arrayBuffer);
+
+    const footprints = result.injections
+      .filter((i) => i.type === 'footprint')
+      .map((i) => ({ name: i.name, content: i.content }));
+
+    const outlines = result.injections
+      .filter((i) => i.type === 'outline')
+      .map((i) => ({ name: i.name, content: i.content }));
+
+    const templates = result.injections
+      .filter((i) => i.type === 'template')
+      .map((i) => ({ name: i.name, content: i.content }));
+
+    return { config: result.config, footprints, outlines, templates };
   } else {
     throw new Error(
       `Unsupported file type. Accepted formats: *.yaml, *.json, *.zip, *.ekb`

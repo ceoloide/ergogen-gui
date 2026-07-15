@@ -1,5 +1,23 @@
 # Changelog
 
+## Unified Ergogen Bundle Loader and REST Directory Restructuring
+
+July 15, 2026
+
+![A diagram representing the unified loading pipelines and restructured archive outputs.](./public/images/changelog/placeholder.png)
+
+Previously, loading custom Ergogen configurations and injection files (footprints, outlines, and templates) from ZIP/EKB archives or GitHub repositories was handled by duplicate, ad-hoc validation and parsing logic. Additionally, exported output files (PCBs, outlines, cases, etc.) were placed at the root of generated archives, causing folder namespace conflicts with input injection folders (specifically `outlines/`).
+
+To resolve this, we introduced a unified [ergogenBundleLoader.ts](file:///Users/mmassarelli/Documents/GitHub/ergogen-gui/src/utils/ergogenBundleLoader.ts) library that centralizes archive extraction, structure validation, file size limits (50MB for archives, 10MB for text configs), and injection projection. The Welcome page was updated to provide visual spinner indicators, disable concurrent input interactions, and display counts of loaded components in a global notification banner. Lastly, the ZIP generation pipeline was restructured to write all generated outputs under an `outputs/` subdirectory, completely resolving naming collisions. We have also bumped the version to 0.15.0.
+
+**What changed:**
+
+- **Centralized Bundle Loader**: Created `ergogenBundleLoader.ts` to host unified validation, file size enforcement, and zip extraction logic.
+- **Visual Loading Indicators**: Integrated spinner animations inside Welcome page action buttons and disabled dropped input interactions during loading.
+- **REST Outputs Restructuring**: Modified the ZIP exporter to store all generated compilation outputs under an `outputs/` directory inside exported archives.
+- **In-App Load Summaries**: Introduced a global info banner to display a summary of loaded custom libraries.
+- **Version Bump**: Updates the application version to 0.15.0.
+
 ## End-to-End Binary STL Export and Preview Pipeline
 
 July 15, 2026

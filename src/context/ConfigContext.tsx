@@ -156,6 +156,9 @@ type ContextProps = {
   clearError: () => void;
   deprecationWarning: string | null;
   clearWarning: () => void;
+  info: string | null;
+  setInfo: Dispatch<SetStateAction<string | null>>;
+  clearInfo: () => void;
   results: Results | null;
   resultsVersion: number;
   setResultsVersion: Dispatch<SetStateAction<number>>;
@@ -549,6 +552,7 @@ const ConfigContextProvider = ({
   const [deprecationWarning, setDeprecationWarning] = useState<string | null>(
     null
   );
+  const [info, setInfo] = useState<string | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
   const [settings, setSettings] = useLocalStorage<AppSettings>(
@@ -686,6 +690,7 @@ const ConfigContextProvider = ({
 
   const clearError = useCallback(() => setError(null), []);
   const clearWarning = useCallback(() => setDeprecationWarning(null), []);
+  const clearInfo = useCallback(() => setInfo(null), []);
 
   /**
    * Handler for messages received from the Ergogen worker.
@@ -1584,6 +1589,9 @@ const ConfigContextProvider = ({
       clearError,
       deprecationWarning,
       clearWarning,
+      info,
+      setInfo,
+      clearInfo,
       results,
       resultsVersion,
       setResultsVersion,
@@ -1642,6 +1650,9 @@ const ConfigContextProvider = ({
       clearError,
       deprecationWarning,
       clearWarning,
+      info,
+      setInfo,
+      clearInfo,
       results,
       resultsVersion,
       setResultsVersion,
