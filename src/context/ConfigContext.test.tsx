@@ -69,7 +69,31 @@ Object.defineProperty(window, 'localStorage', {
 const TestComponent = () => {
   const context = useConfigContext();
   return (
-    <div data-testid="context-results">{JSON.stringify(context?.results)}</div>
+    <div>
+      <div data-testid="context-results">
+        {JSON.stringify(context?.results)}
+      </div>
+      <div data-testid="context-config">{context?.configInput}</div>
+    </div>
+  );
+};
+
+const mockInitialConfig = (config: string) => {
+  localStorage.setItem(
+    'ergogen:multi-config',
+    JSON.stringify({
+      version: 2,
+      activeConfigId: 'test-active-id',
+      configs: [
+        {
+          id: 'test-active-id',
+          name: 'Test Config',
+          config: config,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    })
   );
 };
 
@@ -108,16 +132,14 @@ describe('ConfigContextProvider', () => {
       '/?github=https://github.com/ceoloide/corney-island/blob/main/ergogen/config.yaml'
     );
 
-    const setConfigInputMock = jest.fn();
-
-    render(
-      <ConfigContextProvider configInput="" setConfigInput={setConfigInputMock}>
-        <div></div>
+    const { getByTestId } = render(
+      <ConfigContextProvider>
+        <TestComponent />
       </ConfigContextProvider>
     );
 
     await waitFor(() => {
-      expect(setConfigInputMock).toHaveBeenCalledWith(mockConfig);
+      expect(getByTestId('context-config').textContent).toBe(mockConfig);
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -152,16 +174,14 @@ describe('ConfigContextProvider', () => {
       '/?github=github.com/ceoloide/corney-island/blob/main/ergogen/config.yaml'
     );
 
-    const setConfigInputMock = jest.fn();
-
-    render(
-      <ConfigContextProvider configInput="" setConfigInput={setConfigInputMock}>
-        <div></div>
+    const { getByTestId } = render(
+      <ConfigContextProvider>
+        <TestComponent />
       </ConfigContextProvider>
     );
 
     await waitFor(() => {
-      expect(setConfigInputMock).toHaveBeenCalledWith(mockConfig);
+      expect(getByTestId('context-config').textContent).toBe(mockConfig);
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -216,17 +236,15 @@ describe('ConfigContextProvider', () => {
     // Set the URL for the test
     window.history.pushState({}, 'Test page', '/?github=ceoloide/test-repo');
 
-    const setConfigInputMock = jest.fn();
-
-    render(
-      <ConfigContextProvider configInput="" setConfigInput={setConfigInputMock}>
-        <div></div>
+    const { getByTestId } = render(
+      <ConfigContextProvider>
+        <TestComponent />
       </ConfigContextProvider>
     );
 
     // Wait for config to be set
     await waitFor(() => {
-      expect(setConfigInputMock).toHaveBeenCalledWith(mockConfig);
+      expect(getByTestId('context-config').textContent).toBe(mockConfig);
     });
 
     // Verify that the footprint was loaded by checking localStorage
@@ -245,12 +263,9 @@ describe('ConfigContextProvider', () => {
   describe('STL Conversion', () => {
     it('should batch convert JSCAD to STL when stlPreview is true', async () => {
       localStorage.setItem('ergogen:config:stlPreview', 'true');
-      const setConfigInputMock = jest.fn();
+      mockInitialConfig(mockConfig);
       const { getByTestId } = render(
-        <ConfigContextProvider
-          configInput={mockConfig}
-          setConfigInput={setConfigInputMock}
-        >
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -313,7 +328,6 @@ describe('ConfigContextProvider', () => {
 
     it('should discard stale STL results from old config versions', async () => {
       localStorage.setItem('ergogen:config:stlPreview', 'true');
-      const setConfigInputMock = jest.fn();
       const TestComponentWithTrigger = () => {
         const ctx = useConfigContext();
         return (
@@ -333,11 +347,9 @@ describe('ConfigContextProvider', () => {
         );
       };
 
+      mockInitialConfig(mockConfig);
       const { getByTestId } = render(
-        <ConfigContextProvider
-          configInput={mockConfig}
-          setConfigInput={setConfigInputMock}
-        >
+        <ConfigContextProvider>
           <TestComponentWithTrigger />
         </ConfigContextProvider>
       );
@@ -477,11 +489,9 @@ describe('ConfigContextProvider', () => {
         );
       };
 
+      mockInitialConfig('points: {}');
       const { getByTestId } = render(
-        <ConfigContextProvider
-          configInput="points: {}"
-          setConfigInput={jest.fn()}
-        >
+        <ConfigContextProvider>
           <TestSettingsComponent />
         </ConfigContextProvider>
       );
@@ -517,11 +527,9 @@ describe('ConfigContextProvider', () => {
         );
       };
 
+      mockInitialConfig('points: {}');
       const { getByTestId } = render(
-        <ConfigContextProvider
-          configInput="points: {}"
-          setConfigInput={jest.fn()}
-        >
+        <ConfigContextProvider>
           <TestSettingsComponent />
         </ConfigContextProvider>
       );
@@ -1023,8 +1031,9 @@ describe('ConfigContextProvider', () => {
         return null;
       };
 
+      mockInitialConfig('points: {}');
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1059,8 +1068,9 @@ describe('ConfigContextProvider', () => {
         return true;
       });
 
+      mockInitialConfig('points: {}');
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1097,6 +1107,7 @@ describe('ConfigContextProvider', () => {
     beforeEach(() => {
       jest.useFakeTimers();
       (trackEvent as jest.Mock).mockClear();
+      mockInitialConfig('points: {}');
     });
 
     afterEach(() => {
@@ -1111,7 +1122,7 @@ describe('ConfigContextProvider', () => {
       };
 
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1181,7 +1192,7 @@ describe('ConfigContextProvider', () => {
       };
 
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1242,7 +1253,7 @@ describe('ConfigContextProvider', () => {
       };
 
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1298,7 +1309,7 @@ describe('ConfigContextProvider', () => {
       };
 
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1354,7 +1365,7 @@ describe('ConfigContextProvider', () => {
 
     it('should flush pending events immediately on unmount', () => {
       const { unmount } = render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <div />
         </ConfigContextProvider>
       );
@@ -1391,7 +1402,7 @@ describe('ConfigContextProvider', () => {
       };
 
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );
@@ -1422,7 +1433,7 @@ pcbs:
       };
 
       render(
-        <ConfigContextProvider configInput="points: {}">
+        <ConfigContextProvider>
           <TestComponent />
         </ConfigContextProvider>
       );

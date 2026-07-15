@@ -33,16 +33,20 @@ import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen
 import type {
   JscadWorkerRequest,
   JscadWorkerResponse,
-  ResultsLike,
 } from '../workers/jscad.worker.types';
 
 import {
   CONFIG_LOCAL_STORAGE_KEY,
   MULTI_CONFIG_STORAGE_KEY,
   LEGACY_STORAGE_CONFIG_KEY,
+  ANALYTICS_DEBOUNCE_DELAY,
 } from './constants';
 import { exportAllConfigs, downloadAllConfigs } from '../utils/zip';
-import { isFeatureEnabled } from '../utils/featureFlags';
+import {
+  filterInjectionsByFeatureFlags,
+  checkForDeprecationWarnings,
+  preparePreviewConfig,
+} from '../utils/generationHelpers';
 
 interface SavedConfig {
   id: string;
@@ -59,32 +63,35 @@ interface MultiConfigContainer {
   configs: SavedConfig[];
 }
 
-// Strongly-typed shape for Ergogen results used in the UI
-type DemoOutput = {
-  dxf?: string;
-  svg?: string;
-};
-type OutlineOutput = {
-  dxf?: string;
-  svg?: string;
-};
-type CaseOutput = {
-  jscad?: string;
-  stl?: string | ArrayBuffer | Uint8Array;
-};
-type PcbsOutput = Record<string, string>;
+import { Results } from '../types/results';
 
-// Backward-compatible results type with known top-level keys and an index signature
-type Results = {
-  canonical?: unknown;
-  points?: unknown;
-  units?: unknown;
-  demo?: DemoOutput;
-  outlines?: Record<string, OutlineOutput>;
-  cases?: Record<string, CaseOutput>;
-  pcbs?: PcbsOutput;
-  [key: string]: unknown;
+interface AppSettings {
+  debug: boolean;
+  autoGen: boolean;
+  autoGen3D: boolean;
+  kicanvasPreview: boolean;
+  stlPreview: boolean;
+  sendUsageMetrics: boolean;
+}
+
+const getLegacySetting = (key: string, defaultValue: boolean): boolean => {
+  if (typeof window === 'undefined') return defaultValue;
+  try {
+    const item = localStorage.getItem(key);
+    return item !== null ? JSON.parse(item) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
 };
+
+const getDefaultSettings = (): AppSettings => ({
+  debug: getLegacySetting('ergogen:config:debug', false),
+  autoGen: getLegacySetting('ergogen:config:autoGen', true),
+  autoGen3D: getLegacySetting('ergogen:config:autoGen3D', true),
+  kicanvasPreview: getLegacySetting('ergogen:config:kicanvasPreview', true),
+  stlPreview: getLegacySetting('ergogen:config:stlPreview', true),
+  sendUsageMetrics: getSendUsageMetricsEnabled(),
+});
 
 declare global {
   interface Window {
@@ -103,8 +110,6 @@ declare global {
  * Props for the ConfigContextProvider component.
  */
 type Props = {
-  configInput?: string | undefined;
-  setConfigInput?: Dispatch<SetStateAction<string | undefined>>;
   initialInjectionInput?: string[][];
   hashError?: string | null;
   children: React.ReactNode[] | React.ReactNode;
@@ -192,21 +197,6 @@ type ProcessOptions = {
  * The main React context for managing Ergogen configuration and results.
  */
 const ConfigContext = createContext<ContextProps | null>(null);
-
-/**
- * Retrieves a value from local storage, or returns a default value if not found.
- * @param {string} key - The local storage key.
- * @param {any} defaultValue - The default value to return if the key is not found.
- * @returns {any} The parsed value from local storage or the default value.
- */
-const localStorageOrDefault = (key: string, defaultValue: unknown) => {
-  const storedValue = localStorage.getItem(key);
-  if (storedValue) {
-    return JSON.parse(storedValue);
-  } else {
-    return defaultValue;
-  }
-};
 
 const generateUUID = () => {
   if (
@@ -438,8 +428,6 @@ const migrateLegacyConfig = (): MultiConfigContainer => {
  * @returns {JSX.Element} The context provider wrapping the children.
  */
 const ConfigContextProvider = ({
-  configInput,
-  setConfigInput: setConfigInputProp,
   initialInjectionInput,
   hashError,
   children,
@@ -482,9 +470,6 @@ const ConfigContextProvider = ({
 
   const [configInputState, setConfigInputState] = useState<string | undefined>(
     () => {
-      if (configInput !== undefined) {
-        return configInput;
-      }
       if (multiConfig.activeConfigId) {
         const active = multiConfig.configs.find(
           (c) => c.id === multiConfig.activeConfigId
@@ -494,13 +479,6 @@ const ConfigContextProvider = ({
       return '';
     }
   );
-
-  // Sync configInput prop if it changes from outside
-  useEffect(() => {
-    if (configInput !== undefined) {
-      setConfigInputState(configInput);
-    }
-  }, [configInput]);
 
   const configsRef = useRef<SavedConfig[]>(configs);
   const activeConfigIdRef = useRef<string | null>(activeConfigId);
@@ -573,24 +551,101 @@ const ConfigContextProvider = ({
   );
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
-  const [debug, setDebug] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:debug', false)
+  const [settings, setSettings] = useLocalStorage<AppSettings>(
+    'ergogen:settings',
+    getDefaultSettings()
   );
-  const [autoGen, setAutoGen] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:autoGen', true)
+
+  const debug = settings?.debug ?? false;
+  const autoGen = settings?.autoGen ?? true;
+  const autoGen3D = settings?.autoGen3D ?? true;
+  const kicanvasPreview = settings?.kicanvasPreview ?? true;
+  const stlPreview = settings?.stlPreview ?? true;
+  const sendUsageMetrics = settings?.sendUsageMetrics ?? true;
+
+  const setDebug = useCallback(
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.debug)
+            : valueOrFunc;
+        return { ...current, debug: val };
+      });
+    },
+    [setSettings]
   );
-  const [autoGen3D, setAutoGen3D] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:autoGen3D', true)
+
+  const setAutoGen = useCallback(
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.autoGen)
+            : valueOrFunc;
+        return { ...current, autoGen: val };
+      });
+    },
+    [setSettings]
   );
-  const [kicanvasPreview, setKicanvasPreview] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:kicanvasPreview', true)
+
+  const setAutoGen3D = useCallback(
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.autoGen3D)
+            : valueOrFunc;
+        return { ...current, autoGen3D: val };
+      });
+    },
+    [setSettings]
   );
-  const [stlPreview, setStlPreview] = useState<boolean>(
-    localStorageOrDefault('ergogen:config:stlPreview', true)
+
+  const setKicanvasPreview = useCallback(
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.kicanvasPreview)
+            : valueOrFunc;
+        return { ...current, kicanvasPreview: val };
+      });
+    },
+    [setSettings]
   );
-  const [sendUsageMetrics, setSendUsageMetrics] = useState<boolean>(() => {
-    return getSendUsageMetricsEnabled();
-  });
+
+  const setStlPreview = useCallback(
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.stlPreview)
+            : valueOrFunc;
+        return { ...current, stlPreview: val };
+      });
+    },
+    [setSettings]
+  );
+
+  const setSendUsageMetrics = useCallback(
+    (valueOrFunc: SetStateAction<boolean>) => {
+      setSettings((prev) => {
+        const current = prev || getDefaultSettings();
+        const val =
+          typeof valueOrFunc === 'function'
+            ? valueOrFunc(current.sendUsageMetrics)
+            : valueOrFunc;
+        return { ...current, sendUsageMetrics: val };
+      });
+    },
+    [setSettings]
+  );
 
   useEffect(() => {
     initAnalytics();
@@ -735,7 +790,7 @@ const ConfigContextProvider = ({
                 trackEvent('keyboard_generated', payload);
                 lastTrackedConfigIdRef.current = payload.config_id;
                 pendingAnalyticsRef.current = null;
-              }, 5000);
+              }, ANALYTICS_DEBOUNCE_DELAY);
 
               pendingAnalyticsRef.current = {
                 timeoutId,
@@ -787,7 +842,7 @@ const ConfigContextProvider = ({
               setIsJscadConverting(true);
               const request: JscadWorkerRequest = {
                 type: 'batch_jscad_to_stl',
-                results: newResults as ResultsLike,
+                results: newResults,
                 configVersion: currentConfigVersion.current,
               };
               jscadWorkerRef.current.postMessage(request);
@@ -891,34 +946,6 @@ const ConfigContextProvider = ({
   }, [flushPendingAnalytics]);
 
   /**
-   * Effect to save user settings to local storage whenever they change.
-   */
-  useEffect(() => {
-    localStorage.setItem('ergogen:config:debug', JSON.stringify(debug));
-    localStorage.setItem('ergogen:config:autoGen', JSON.stringify(autoGen));
-    localStorage.setItem('ergogen:config:autoGen3D', JSON.stringify(autoGen3D));
-    localStorage.setItem(
-      'ergogen:config:kicanvasPreview',
-      JSON.stringify(kicanvasPreview)
-    );
-    localStorage.setItem(
-      'ergogen:config:stlPreview',
-      JSON.stringify(stlPreview)
-    );
-    localStorage.setItem(
-      'ergogen:config:sendUsageMetrics',
-      JSON.stringify(sendUsageMetrics)
-    );
-  }, [
-    debug,
-    autoGen,
-    autoGen3D,
-    kicanvasPreview,
-    stlPreview,
-    sendUsageMetrics,
-  ]);
-
-  /**
    * Effect to track settings loaded and changes.
    */
   useEffect(() => {
@@ -996,18 +1023,7 @@ const ConfigContextProvider = ({
       if (!targetInput) {
         return;
       }
-      let inputConfig: string | object = targetInput;
-      let inputInjection: string[][] | undefined = injectionInput;
-      if (inputInjection && Array.isArray(inputInjection)) {
-        inputInjection = inputInjection.filter((injection) => {
-          if (!Array.isArray(injection) || injection.length !== 3) return true;
-          const [type] = injection;
-          if (type === 'outline' && !isFeatureEnabled('outlines')) return false;
-          if (type === 'template' && !isFeatureEnabled('templates'))
-            return false;
-          return true;
-        });
-      }
+      const inputInjection = filterInjectionsByFeatureFlags(injectionInput);
       const [, parsedConfig] = parseConfig(targetInput);
 
       setError(null);
@@ -1016,49 +1032,13 @@ const ConfigContextProvider = ({
       generationStartTimeRef.current = performance.now();
       currentConfigVersion.current += 1;
 
-      if (parsedConfig && parsedConfig.pcbs) {
-        let warningFound = false;
-        const pcbs = parsedConfig.pcbs as Record<
-          string,
-          { template?: string; footprints?: Record<string, { what?: string }> }
-        >;
-        for (const pcb of Object.values(pcbs)) {
-          if (
-            pcb &&
-            typeof pcb === 'object' &&
-            (!pcb.template || pcb.template === 'kicad5')
-          ) {
-            const footprints = pcb.footprints;
-            if (footprints && typeof footprints === 'object') {
-              for (const footprint of Object.values(footprints)) {
-                if (
-                  footprint &&
-                  typeof footprint === 'object' &&
-                  typeof footprint.what === 'string' &&
-                  footprint.what.startsWith('ceoloide')
-                ) {
-                  setDeprecationWarning(
-                    'KiCad 5 is deprecated. Please add "template: kicad8" to your PCB definitions to avoid errors when opening PCB files with KiCad 8 or newer.'
-                  );
-                  warningFound = true;
-                  break;
-                }
-              }
-            }
-          }
-          if (warningFound) {
-            break;
-          }
-        }
+      const warning = checkForDeprecationWarnings(parsedConfig);
+      if (warning) {
+        setDeprecationWarning(warning);
       }
 
-      if (parsedConfig?.points && options?.pointsonly) {
-        inputConfig = {
-          ...parsedConfig,
-          pcbs: undefined,
-          cases: undefined,
-        };
-      }
+      const inputConfig =
+        preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
       try {
         if (ergogenWorkerRef.current) {
@@ -1125,9 +1105,6 @@ const ConfigContextProvider = ({
       if (newVal === prevVal) return;
 
       setConfigInputState(newVal);
-      if (setConfigInputProp) {
-        setConfigInputProp(newVal);
-      }
 
       if (isPreviewRef.current) {
         if (newVal !== previewConfigRef.current) {
@@ -1189,7 +1166,7 @@ const ConfigContextProvider = ({
         }
       }
     },
-    [setConfigInputProp]
+    []
   );
 
   const selectConfig = useCallback(
