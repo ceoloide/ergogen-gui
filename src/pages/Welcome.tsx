@@ -235,7 +235,7 @@ const UnifiedInput = styled.input`
   min-width: 0;
   background: transparent;
   border: none;
-  padding: 1rem;
+  padding: 1rem 1rem 1rem 0.5rem;
   color: ${theme.colors.text};
   font-family: ${theme.fonts.body};
   font-size: ${theme.fontSizes.base};
@@ -433,6 +433,13 @@ const Welcome = () => {
     } else if (val.includes('codeberg.org/')) {
       setProvider('codeberg');
     } else if (val.startsWith('http://') || val.startsWith('https://')) {
+      setProvider('forgejo');
+    } else if (
+      val.includes('/') &&
+      !val.includes('github.com/') &&
+      !val.includes('codeberg.org/') &&
+      val.split('/')[0].includes('.')
+    ) {
       setProvider('forgejo');
     }
   };
@@ -923,9 +930,7 @@ const Welcome = () => {
                 <DropdownDivider />
                 <UnifiedInput
                   placeholder={
-                    provider === 'forgejo'
-                      ? 'https://host/owner/repo'
-                      : 'user/repo'
+                    provider === 'forgejo' ? 'host/user/repo' : 'user/repo'
                   }
                   value={githubInput}
                   onChange={(e) => handleRepoInputChange(e.target.value)}
