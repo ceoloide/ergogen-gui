@@ -256,6 +256,10 @@ const LoadButton = styled(Button)`
     display: block;
     font-size: 18px;
   }
+
+  ${Spinner} {
+    margin-right: 0;
+  }
 `;
 
 const HiddenFileInput = styled.input`
@@ -827,9 +831,7 @@ const Welcome = () => {
                 data-testid="github-load-button"
               >
                 {isLoading ? (
-                  <>
-                    <Spinner /> Loading...
-                  </>
+                  <Spinner />
                 ) : (
                   <span
                     className="material-symbols-outlined"
