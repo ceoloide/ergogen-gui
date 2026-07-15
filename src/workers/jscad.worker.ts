@@ -1,10 +1,10 @@
 /// <reference lib="webworker" />
 
-/* eslint-env worker */
-/* global self */
-
 import { JscadWorkerRequest, JscadWorkerResponse } from './jscad.worker.types';
 import { Results } from '../types/results';
+
+// @ts-expect-error: Loading openjscad.js UMD module statically
+import '../../public/dependencies/openjscad.js';
 
 console.log('<-> JSCAD worker module starting...');
 
@@ -41,27 +41,7 @@ const workerScope = self as unknown as JscadWorkerGlobal;
 let convertFn: ConvertFunction | null = null;
 let initializationError: Error | null = null;
 
-function getBasePath() {
-  // Use PUBLIC_URL if available
-  if (typeof process !== 'undefined' && process.env.PUBLIC_URL) {
-    return process.env.PUBLIC_URL;
-  }
-  // Extract base path from worker location
-  if (typeof self !== 'undefined' && (self as any).location) {
-    const { origin, pathname } = (self as any).location;
-    // Remove "/static/..." if present
-    const staticIndex = pathname.indexOf('/static/');
-    const base = staticIndex > 0 ? pathname.substring(0, staticIndex) : '';
-    return `${origin}${base}`;
-  }
-  return '';
-}
-
-const basePath = getBasePath();
-const openjscadPath = `${basePath}/dependencies/openjscad.js`;
-
 try {
-  importScripts(openjscadPath);
   const module = workerScope.JscadConvert;
   if (!module || typeof module.convert !== 'function') {
     throw new Error('openjscad.js did not expose a convert function.');

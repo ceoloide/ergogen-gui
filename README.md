@@ -29,8 +29,8 @@ To run the Ergogen GUI on your local machine, please follow these steps.
 - **Node.js**: You must have Node.js v20 installed. We recommend using a version manager like [nvm](https://github.com/nvm-sh/nvm) to easily switch between Node versions.
   - `nvm install 20`
   - `nvm use 20`
-- **Yarn**: This project uses Yarn for package management.
-  - `npm install -g yarn`
+- **pnpm**: This project uses pnpm for package management.
+  - `npm install -g pnpm`
 
 ### Installation and Setup
 
@@ -44,7 +44,7 @@ To run the Ergogen GUI on your local machine, please follow these steps.
 2. **Install dependencies:**
 
    ```shell
-   yarn install
+    pnpm install
    ```
 
    This command will also build a local copy of Ergogen from the patched source in the `patch/` directory.
@@ -52,7 +52,7 @@ To run the Ergogen GUI on your local machine, please follow these steps.
 3. **Start the development server:**
 
    ```shell
-   yarn start
+    pnpm run dev
    ```
 
    This will start a development server and open the application in your default browser at `http://localhost:3000`.
@@ -218,7 +218,8 @@ If you are having issues deploying after forking this repository, try renaming t
 
 The codebase is organized into the following main directories:
 
-- `public/`: Contains the main `index.html` file and static assets, including the Ergogen and KiCanvas libraries.
+- `index.html`: The main entry point file.
+- `public/`: Contains static assets, including the Ergogen and KiCanvas libraries.
 - `src/`: Contains the main React application source code.
   - `atoms/`: Individual, reusable UI components (e.g., `Button`, `Input`).
   - `molecules/`: More complex components composed of atoms (e.g., `ConfigEditor`, `FilePreview`).
@@ -238,13 +239,13 @@ To use a custom version locally, set the `ERGOGEN_VERSION` variable before runni
 
 ```shell
 # Using a specific npm version
-ERGOGEN_VERSION=ergogen@4.2.0 yarn install
+ERGOGEN_VERSION=ergogen@4.2.0 pnpm install
 
 # Using a GitHub branch
-ERGOGEN_VERSION=github:mrzealot/ergogen#develop yarn install
+ERGOGEN_VERSION=github:mrzealot/ergogen#develop pnpm install
 
 # After installation, start as usual
-yarn start
+pnpm run dev
 ```
 
 ### GitHub Pages Deployment
@@ -271,7 +272,7 @@ Alternatively, you can still manually modify `package.json`:
    "ergogen": "ergogen/ergogen#develop",
    ```
 
-3. Run `yarn install && yarn start`.
+3. Run `pnpm install && pnpm run dev`.
 
 ## Contributing
 

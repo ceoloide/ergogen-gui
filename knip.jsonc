@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "src/index.tsx",
     "src/service-worker.ts",
     "**/*.test.{ts,tsx}",
     "src/workers/*.worker.{ts,tsx}"
@@ -13,22 +12,13 @@
     "src/ergogen.d.ts"
   ],
   "ignoreDependencies": [
-    "@babel/plugin-proposal-private-property-in-object",
     "@jscad/csg",
     "@jscad/stl-serializer",
-    "@testing-library/jest-dom",
     "@testing-library/user-event",
     "@types/styled-components",
     "@typescript-eslint/parser",
     "eslint-plugin-prettier",
     "makerjs",
-    "markdownlint",
-    "workbox-cacheable-response",
-    "workbox-core",
-    "workbox-expiration",
-    "workbox-google-analytics",
-    "workbox-precaching",
-    "workbox-routing",
-    "workbox-strategies"
+    "markdownlint"
   ]
 }

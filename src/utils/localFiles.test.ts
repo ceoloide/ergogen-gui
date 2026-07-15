@@ -1,8 +1,8 @@
-import { loadLocalFile, LocalFileLoadResult } from './localFiles';
+import { loadLocalFile } from './localFiles';
 import JSZip from 'jszip';
 import { isFeatureEnabled } from './featureFlags';
 
-jest.mock('./featureFlags', () => ({
+vi.mock('./featureFlags', () => ({
   isFeatureEnabled: jest.fn(() => true),
 }));
 
@@ -160,7 +160,6 @@ describe('localFiles utilities', () => {
 
         // Act & Assert
         const resultPromise = loadLocalFile(file);
-        await flushPromises();
         await expect(resultPromise).rejects.toThrow('Failed to read file');
       });
     });

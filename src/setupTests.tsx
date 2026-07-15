@@ -2,13 +2,14 @@
  * @jest-environment jsdom
  */
 
-// jest-dom adds custom jest matchers for asserting on DOM nodes.
-// allows you to do things like:
-// expect(element).toHaveTextContent(/react/i)
-// learn more: https://github.com/testing-library/jest-dom
+/* eslint-disable react/prop-types */
 import '@testing-library/jest-dom';
+import { vi } from 'vitest';
 
-window.URL.createObjectURL = jest.fn();
+// Global alias for compatibility with Jest-centric test files
+globalThis.jest = vi as any;
+
+window.URL.createObjectURL = vi.fn();
 
 // Polyfill for TextEncoder and TextDecoder
 if (typeof global.TextEncoder === 'undefined') {
@@ -18,20 +19,22 @@ if (typeof global.TextEncoder === 'undefined') {
 }
 
 // Global mock for react-router-dom
-jest.mock('react-router-dom', () => ({
-  Link: ({ children, to, onClick, ...props }) => (
-    <a href={to} onClick={onClick} {...props}>
-      {children}
-    </a>
-  ),
-  useNavigate: () => jest.fn(),
+vi.mock('react-router-dom', () => ({
+  Link: ({ children, to, onClick, ...props }) => {
+    return (
+      <a href={to} onClick={onClick} {...props}>
+        {children}
+      </a>
+    );
+  },
+  useNavigate: () => vi.fn(),
   Navigate: () => null,
   Routes: ({ children }) => children,
   Route: () => null,
 }));
 
 // Global mock for workers to avoid import.meta syntax issues in Jest
-jest.mock('./workers/workerFactory', () => ({
+vi.mock('./workers/workerFactory', () => ({
   createErgogenWorker: () => null,
   createJscadWorker: () => null,
 }));

@@ -1,7 +1,7 @@
 import { fetchConfigFromUrl, checkRateLimit, parseGitmodules } from './github';
 import { isFeatureEnabled } from './featureFlags';
 
-jest.mock('./featureFlags', () => ({
+vi.mock('./featureFlags', () => ({
   isFeatureEnabled: jest.fn(() => true),
 }));
 

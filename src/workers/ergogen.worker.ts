@@ -1,6 +1,3 @@
-/* eslint-env worker */
-/* global self */
-
 import * as ergogen from 'ergogen';
 import { WorkerRequest } from './ergogen.worker.types';
 import { createInjectionModule } from '../utils/injectionEvaluator';

@@ -11,7 +11,9 @@ export const createErgogenWorker = (): Worker | null => {
 
   try {
     // Use the new URL syntax to let Webpack bundle the worker
-    return new Worker(new URL('./ergogen.worker.ts', import.meta.url));
+    return new Worker(new URL('./ergogen.worker.ts', import.meta.url), {
+      type: 'module',
+    });
   } catch (e) {
     console.error('Failed to create worker:', e);
     return null;
@@ -29,7 +31,9 @@ export const createJscadWorker = (): Worker | null => {
 
   try {
     // Use the new URL syntax to let Webpack bundle the worker
-    return new Worker(new URL('./jscad.worker.ts', import.meta.url));
+    return new Worker(new URL('./jscad.worker.ts', import.meta.url), {
+      type: 'module',
+    });
   } catch (e) {
     console.error('Failed to create JSCAD worker:', e);
     return null;

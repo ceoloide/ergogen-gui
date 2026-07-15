@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import BulkDownloadDialog from './BulkDownloadDialog';
 import { exportConfigsProgressively } from '../utils/zip';
 
-jest.mock('../utils/zip', () => ({
+vi.mock('../utils/zip', () => ({
   exportConfigsProgressively: jest.fn(),
 }));
 

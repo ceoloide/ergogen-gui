@@ -21,6 +21,7 @@ import {
   trackEvent,
   initAnalytics,
   getSendUsageMetricsEnabled,
+  trackError,
 } from '../utils/analytics';
 import {
   analyzeConfiguration,
@@ -904,6 +905,10 @@ const ConfigContextProvider = ({
       ergogenWorkerRef.current = createErgogenWorker();
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
+        ergogenWorkerRef.current.onerror = (e) => {
+          console.error('Ergogen worker error:', e);
+          trackError(e.message || 'Worker crash', false, 'ergogen_worker');
+        };
         setWorkerReady(true);
       } else {
         console.warn('Failed to initialize Ergogen worker.');
@@ -914,6 +919,10 @@ const ConfigContextProvider = ({
       jscadWorkerRef.current = createJscadWorker();
       if (jscadWorkerRef.current) {
         jscadWorkerRef.current.onmessage = handleJscadWorkerMessage;
+        jscadWorkerRef.current.onerror = (e) => {
+          console.error('JSCAD worker error:', e);
+          trackError(e.message || 'Worker crash', false, 'jscad_worker');
+        };
       } else {
         console.warn('Failed to initialize JSCAD worker.');
       }
@@ -1483,6 +1492,10 @@ const ConfigContextProvider = ({
       ergogenWorkerRef.current = createErgogenWorker();
       if (ergogenWorkerRef.current) {
         ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
+        ergogenWorkerRef.current.onerror = (e) => {
+          console.error('Ergogen worker error:', e);
+          trackError(e.message || 'Worker crash', false, 'ergogen_worker');
+        };
         setWorkerReady(true);
         console.log('Ergogen worker initialized.');
       } else {

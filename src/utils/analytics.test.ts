@@ -3,6 +3,9 @@ import {
   initAnalytics,
   getSendUsageMetricsEnabled,
   checkIsPWA,
+  trackError,
+  setupGlobalErrorTracking,
+  removeGlobalErrorTracking,
 } from './analytics';
 import guiPkg from '../../package.json';
 import ergogenPkg from 'ergogen/package.json';
@@ -217,6 +220,125 @@ describe('Analytics Utility', () => {
       (window as any).gtag = undefined;
 
       expect(() => trackEvent('test_event')).not.toThrow();
+    });
+  });
+
+  describe('trackError', () => {
+    it('should call window.gtag with exception event and string message', () => {
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      trackError('test error message', true, 'test_context');
+
+      expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
+        event_category: 'user_action',
+        gui_version: guiPkg.version,
+        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        is_pwa: false,
+        description: '[test_context] test error message',
+        fatal: true,
+        error_stack: undefined,
+      });
+    });
+
+    it('should extract error message and stack from Error object', () => {
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      const err = new Error('nested failure');
+      trackError(err, false);
+
+      expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
+        event_category: 'user_action',
+        gui_version: guiPkg.version,
+        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
+        is_pwa: false,
+        description: 'nested failure',
+        fatal: false,
+        error_stack: expect.any(String),
+      });
+    });
+  });
+
+  describe('global error listeners', () => {
+    let mockAddListener: any;
+    let mockRemoveListener: any;
+    let listeners: Record<string, (...args: any[]) => void>;
+
+    beforeEach(() => {
+      listeners = {};
+      mockAddListener = vi
+        .spyOn(window, 'addEventListener')
+        .mockImplementation((event, callback) => {
+          listeners[event] = callback as (...args: any[]) => void;
+        });
+      mockRemoveListener = vi
+        .spyOn(window, 'removeEventListener')
+        .mockImplementation((event) => {
+          delete listeners[event];
+        });
+    });
+
+    afterEach(() => {
+      mockAddListener.mockRestore();
+      mockRemoveListener.mockRestore();
+      removeGlobalErrorTracking();
+    });
+
+    it('should register and deregister global error handlers', () => {
+      setupGlobalErrorTracking();
+      expect(window.addEventListener).toHaveBeenCalledWith(
+        'error',
+        expect.any(Function)
+      );
+      expect(window.addEventListener).toHaveBeenCalledWith(
+        'unhandledrejection',
+        expect.any(Function)
+      );
+
+      removeGlobalErrorTracking();
+      expect(window.removeEventListener).toHaveBeenCalledWith(
+        'error',
+        expect.any(Function)
+      );
+      expect(window.removeEventListener).toHaveBeenCalledWith(
+        'unhandledrejection',
+        expect.any(Function)
+      );
+    });
+
+    it('should track global errors and unhandled rejections', () => {
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setupGlobalErrorTracking();
+
+      // Trigger error event
+      if (listeners['error']) {
+        listeners['error']({
+          error: new Error('unhandled crash'),
+          message: 'unhandled crash',
+        });
+      }
+
+      expect(window.gtag).toHaveBeenCalledWith(
+        'event',
+        'exception',
+        expect.objectContaining({
+          description: '[unhandled_error] unhandled crash',
+          fatal: false,
+        })
+      );
+
+      // Trigger promise rejection event
+      if (listeners['unhandledrejection']) {
+        listeners['unhandledrejection']({
+          reason: new Error('promise failure'),
+        });
+      }
+
+      expect(window.gtag).toHaveBeenCalledWith(
+        'event',
+        'exception',
+        expect.objectContaining({
+          description: '[unhandled_rejection] promise failure',
+          fatal: false,
+        })
+      );
     });
   });
 });

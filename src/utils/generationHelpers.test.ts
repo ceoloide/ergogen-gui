@@ -5,7 +5,7 @@ import {
 } from './generationHelpers';
 import { isFeatureEnabled } from './featureFlags';
 
-jest.mock('./featureFlags', () => ({
+vi.mock('./featureFlags', () => ({
   isFeatureEnabled: jest.fn(() => true),
 }));
 

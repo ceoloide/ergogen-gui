@@ -28,10 +28,10 @@ git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
 if [ -n "$ERGOGEN_VERSION" ]; then
   echo "Installing Ergogen version $ERGOGEN_VERSION..."
-  npm install "$ERGOGEN_VERSION" --no-save --legacy-peer-deps
+  PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm add "$ERGOGEN_VERSION" --registry=https://registry.npmjs.org
 elif [ ! -d node_modules/ergogen ]; then
   echo "Installing Ergogen..."
-  npm install ergogen --legacy-peer-deps
+  PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm add ergogen --registry=https://registry.npmjs.org
 fi
 
 if [ -d node_modules/ergogen ]; then
@@ -57,14 +57,41 @@ if [ -d node_modules/ergogen ]; then
     rm -rf node_modules/.cache
   fi
 
+  # Store project root to handle pnpm virtual store paths correctly
+  PROJECT_ROOT=$(pwd)
+
+  # Patch package.json requires in ergogen files to prevent bundler resolution warnings/errors in worker context
+  if [ -f node_modules/ergogen/src/ergogen.js ]; then
+    echo "Patching package.json require in ergogen.js..."
+    ERG_VERSION=$(node -p "require('./node_modules/ergogen/package.json').version")
+    node -e "
+      const fs = require('fs');
+      let content = fs.readFileSync('node_modules/ergogen/src/ergogen.js', 'utf8');
+      content = content.replace(/const version = require\('\\.\\.\\/package\\.json'\\)\\.version/, 'const version = \"' + '$ERG_VERSION' + '\"');
+      fs.writeFileSync('node_modules/ergogen/src/ergogen.js', content, 'utf8');
+    "
+  fi
+
+  if [ -f node_modules/ergogen/src/io.js ]; then
+    echo "Patching package.json require in io.js..."
+    node -e "
+      const fs = require('fs');
+      const pkg = require('./node_modules/ergogen/package.json');
+      let content = fs.readFileSync('node_modules/ergogen/src/io.js', 'utf8');
+      content = content.replace(/const package_json = require\('\\.\\.\\/package\\.json'\\)/, 'const package_json = ' + JSON.stringify(pkg));
+      fs.writeFileSync('node_modules/ergogen/src/io.js', content, 'utf8');
+    "
+  fi
+
   # Build and copy built ergogen
   echo "Building Ergogen..."
   (
     cd node_modules/ergogen
-    npm install --legacy-peer-deps
-    npm run build
-    cp dist/ergogen.js ../../public/dependencies/ergogen.js
+    PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --ignore-workspace --registry=https://registry.npmjs.org
+    pnpm run build
+    cp dist/ergogen.js "$PROJECT_ROOT/public/dependencies/ergogen.js"
   )
 else
   echo "Directory node_modules/ergogen not found."
 fi
+

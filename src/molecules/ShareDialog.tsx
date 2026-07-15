@@ -76,7 +76,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
   onClose,
   'data-testid': dataTestId,
 }) => {
-  const safeInjections = injections || [];
+  const safeInjections = React.useMemo(() => injections || [], [injections]);
   const [step, setStep] = useState<1 | 2>(1);
   const [includeCustom, setIncludeCustom] = useState(true);
   const [loading, setLoading] = useState(false);

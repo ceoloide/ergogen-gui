@@ -63,7 +63,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.js'],
+    files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.tsx'],
     ...jest.configs['flat/recommended'],
     languageOptions: {
       globals: {
@@ -93,6 +93,11 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',
+    },
+    languageOptions: {
+      globals: {
+        ...globals.worker,
+      },
     },
   }
 );

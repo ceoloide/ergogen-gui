@@ -5,6 +5,7 @@ import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import * as THREE from 'three';
+import { trackError } from '../utils/analytics';
 
 /**
  * Props for the StlPreview component.
@@ -46,6 +47,7 @@ class CanvasErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Canvas error:', error, errorInfo);
+    trackError(error, false, 'canvas_renderer');
   }
 
   render() {

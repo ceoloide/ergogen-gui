@@ -31,39 +31,44 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-          cache: yarn
+          cache: pnpm
       - name: Configure Git to use HTTPS for GitHub
         run: |
           git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
           git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
           git config --global --add url."https://github.com/".insteadOf "git+ssh://git@github.com/"
           git config --global --add url."https://github.com/".insteadOf "git@github.com:"
-      - name: Yarn install
+      - name: pnpm install
         run: |
           if [ -n "$ERGOGEN_VERSION" ]; then
-            echo "ERGOGEN_VERSION is set, running yarn install"
-            yarn install
+            echo "ERGOGEN_VERSION is set, running preinstall patch"
+            node scripts/preinstall.js
+            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install
           else
-            echo "ERGOGEN_VERSION is not set, running yarn install --frozen-lockfile"
-            yarn install --frozen-lockfile
+            echo "ERGOGEN_VERSION is not set, running pnpm install --frozen-lockfile"
+            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
           fi
         env:
           ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: Yarn build
-        run: yarn build
+      - name: pnpm build
+        run: pnpm run build
         env:
           REACT_APP_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Create 404.html for SPA routing
-        run: cp ./build/index.html ./build/404.html
+        run: cp ./dist/index.html ./dist/404.html
       - name: Conditionally create CNAME
         if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
-        run: echo "${{ vars.CNAME_DOMAIN }}" > ./build/CNAME
+        run: echo "${{ vars.CNAME_DOMAIN }}" > ./dist/CNAME
         env:
           CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
       - name: Deploy
@@ -71,7 +76,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
+          publish_dir: ./dist
           allow_empty_commit: true
           full_commit_message: ${{ github.event.head_commit.message }}
           force_orphan: true

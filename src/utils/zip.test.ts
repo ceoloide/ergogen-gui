@@ -1,10 +1,13 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { createZip, downloadAllConfigs } from './zip';
-
-jest.mock('jszip');
-jest.mock('file-saver');
-jest.mock('../workers/workerFactory', () => ({
+vi.mock('jszip', () => ({
+  default: vi.fn(),
+}));
+vi.mock('file-saver', () => ({
+  saveAs: vi.fn(),
+}));
+vi.mock('../workers/workerFactory', () => ({
   createErgogenWorker: () => null,
   createJscadWorker: () => null,
 }));

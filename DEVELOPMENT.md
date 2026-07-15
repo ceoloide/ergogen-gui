@@ -56,21 +56,13 @@ The application offloads long-running, computationally intensive tasks to Web Wo
 
 Communication with the workers is managed through a standard message-passing system (`postMessage` and `onmessage`), with the main application thread and workers exchanging data as needed.
 
-### Worker Factory & Jest Testing
+### Worker Factory & Vitest Testing
 
 To handle Web Worker instantiation in a centralized and testable way, the application uses `src/workers/workerFactory.ts`. This module exports `createErgogenWorker` and `createJscadWorker`.
 
-Since these factory functions utilize ESM-native `import.meta.url` for locating the worker scripts in Webpack 5, executing them directly in Jest's Node/CommonJS runner would throw a syntax error (`SyntaxError: Cannot use 'import.meta' outside a module`).
+Since we use Vitest and native ESM, the native worker instantiation using `new Worker(new URL('./jscad.worker', import.meta.url))` runs natively and seamlessly in both development/production builds and the Vitest test runner.
 
-To resolve this during testing without sacrificing production bundle safety:
-
-1. The test runner dynamically reads `src/workers/workerFactory.ts` at execution time.
-2. It replaces `import.meta.url` with a mockup URL string (`"http://localhost"`).
-3. It writes a temporary file `src/workers/workerFactory.tmp.ts`.
-4. It requires this temporary file dynamically to perform the assertions (e.g. mock environment checks, instantiation, and error recovery handling).
-5. It cleans up the temporary file immediately after tests complete.
-
-The temporary file pattern is registered in `.gitignore` and required dynamically to bypass Knip's unused-import checks.
+To verify worker instantiation and error boundaries inside `src/workers/workerFactory.test.ts`, we mock `window.Worker` and clean it up inside `finally` blocks to guarantee test run isolation without requiring any temporary file generation hacks.
 
 ## Local File Loading
 
@@ -332,7 +324,7 @@ Several potential improvements could enhance the sharing feature:
 
 ## Ergogen Version Override Lifecycle
 
-To allow developers and CI to override the default Ergogen version using the `ERGOGEN_VERSION` environment variable without permanently modifying `package.json` (or breaking the build due to `yarn.lock` mismatch in CI), the project implements a temporary package.json patching workflow:
+To allow developers and CI to override the default Ergogen version using the `ERGOGEN_VERSION` environment variable without permanently modifying `package.json` (or breaking the build due to `pnpm-lock.yaml` mismatch in CI), the project implements a temporary package.json patching workflow:
 
 1. **Pre-install (`scripts/preinstall.js`)**:
    - Executes before dependencies are resolved and installed.
@@ -340,7 +332,7 @@ To allow developers and CI to override the default Ergogen version using the `ER
    - If the version matches or is not set, it does nothing (and cleans up any stale `packages.json.bak` backups).
 
 2. **Installation**:
-   - In CI, if `ERGOGEN_VERSION` is set, `yarn install` is run without `--frozen-lockfile` to allow the package manager to dynamically update the lockfile in memory for the custom Ergogen dependency. If `ERGOGEN_VERSION` is not set, `yarn install --frozen-lockfile` is used to guarantee consistent builds.
+   - In CI, if `ERGOGEN_VERSION` is set, `pnpm install` is run without `--frozen-lockfile` to allow the package manager to dynamically update the lockfile in memory for the custom Ergogen dependency. If `ERGOGEN_VERSION` is not set, `pnpm install --frozen-lockfile` is used to guarantee consistent builds.
 
 3. **Post-install (`scripts/postinstall.js`)**:
    - Executes after dependencies are successfully installed.
@@ -422,17 +414,17 @@ To prevent editing lag and cursor jumping in the Monaco editor when working with
 
 ## Progressive Web App (PWA)
 
-The application is configured as a fully offline-capable PWA using CRA's built-in Workbox integration.
+The application is configured as a fully offline-capable PWA using Vite's built-in Workbox integration (`vite-plugin-pwa`).
 
 ### Service Worker Architecture
 
-CRA's Workbox plugin detects `src/service-worker.ts` and automatically uses `InjectManifest` mode (instead of `GenerateSW`), giving full control over the service worker logic. The plugin injects the precache manifest into `self.__WB_MANIFEST` at build time.
+The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically uses `InjectManifest` mode (instead of `GenerateSW`), giving full control over the service worker logic. The plugin injects the precache manifest into `self.__WB_MANIFEST` at build time.
 
 ### Caching Strategies
 
 | Asset type                         | Strategy                      | Cache name                 |
 | ---------------------------------- | ----------------------------- | -------------------------- |
-| Webpack-bundled JS/CSS/HTML        | **Precache** (install-time)   | Workbox default            |
+| Vite-bundled JS/CSS/HTML           | **Precache** (install-time)   | Workbox default            |
 | `public/dependencies/*.js` scripts | **CacheFirst** (runtime)      | `public-dependencies-v1`   |
 | Google Fonts CSS                   | **StaleWhileRevalidate**      | `google-fonts-stylesheets` |
 | Google Fonts binaries              | **CacheFirst**                | `google-fonts-webfonts`    |
@@ -492,7 +484,7 @@ To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 
 ### PWA Implementation Files
 
-- **`src/service-worker.ts`**: Workbox service worker source (compiled by CRA's InjectManifest plugin)
+- **`src/service-worker.ts`**: Workbox service worker source (compiled by `vite-plugin-pwa`'s InjectManifest mode)
 - **`src/serviceWorkerRegistration.ts`**: SW registration utility with `onUpdate` callback
 - **`src/atoms/UpdateChip.tsx`**: Pulsing chip rendered in Header when an update is waiting
 - **`public/manifest.json`**: Full PWA web app manifest

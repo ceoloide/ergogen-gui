@@ -4,14 +4,17 @@ import ShareDialog from './ShareDialog';
 import { createShareableUri } from '../utils/share';
 import { createErgogenWorker } from '../workers/workerFactory';
 
-// Mock the share utility
-jest.mock('../utils/share', () => ({
-  ...jest.requireActual('../utils/share'),
-  createShareableUri: jest.fn(),
-}));
+vi.mock('../utils/share', async () => {
+  const original =
+    await vi.importActual<typeof import('../utils/share')>('../utils/share');
+  return {
+    ...original,
+    createShareableUri: vi.fn(),
+  };
+});
 
 // Mock the worker factory
-jest.mock('../workers/workerFactory', () => ({
+vi.mock('../workers/workerFactory', () => ({
   createErgogenWorker: jest.fn(),
 }));
 

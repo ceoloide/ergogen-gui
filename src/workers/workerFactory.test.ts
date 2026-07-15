@@ -1,59 +1,42 @@
-const fs = require('fs');
-const path = require('path');
-
-const srcPath = path.resolve(__dirname, 'workerFactory.ts');
-const tmpPath = path.resolve(__dirname, 'workerFactory.tmp.ts');
-
-const content = fs
-  .readFileSync(srcPath, 'utf8')
-  .replace(/import\.meta\.url/g, '"http://localhost"');
-
-fs.writeFileSync(tmpPath, content);
-
-// Use dynamic require to prevent static analysis by Knip
-const { createErgogenWorker, createJscadWorker } = require(
-  './' + 'workerFactory.tmp'
-);
+vi.unmock('./workerFactory');
+import { createErgogenWorker, createJscadWorker } from './workerFactory';
 
 describe('workerFactory', () => {
-  let originalWindow: any;
-  let originalGlobalWorker: any;
-  let consoleErrorSpy: jest.SpyInstance;
+  let consoleErrorSpy: any;
 
   beforeEach(() => {
-    originalWindow = (global as any).window;
-    originalGlobalWorker = (global as any).Worker;
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    (global as any).window = originalWindow;
-    (global as any).Worker = originalGlobalWorker;
     consoleErrorSpy.mockRestore();
-  });
-
-  afterAll(() => {
-    if (fs.existsSync(tmpPath)) {
-      fs.unlinkSync(tmpPath);
-    }
   });
 
   describe('createErgogenWorker', () => {
     it('should return null when window is undefined', () => {
       // Arrange
-      delete (global as any).window;
+      const originalWindow = (globalThis as any).window;
+      Object.defineProperty(globalThis, 'window', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
 
-      // Act
-      const result = createErgogenWorker();
-
-      // Assert
-      expect(result).toBeNull();
+      try {
+        // Act
+        const result = createErgogenWorker();
+        // Assert
+        expect(result).toBeNull();
+      } finally {
+        Object.defineProperty(globalThis, 'window', {
+          value: originalWindow,
+          writable: true,
+          configurable: true,
+        });
+      }
     });
 
     it('should return null when window.Worker is not defined', () => {
-      // Arrange
-      (global as any).window = {};
-
       // Act
       const result = createErgogenWorker();
 
@@ -64,65 +47,85 @@ describe('workerFactory', () => {
     it('should create and return a worker when window.Worker is defined', () => {
       // Arrange
       const mockWorkerInstance = {};
-      const mockWorkerConstructor = jest
+      const mockWorkerConstructor = vi
         .fn()
         .mockImplementation(() => mockWorkerInstance);
-      (global as any).window = {
-        Worker: mockWorkerConstructor,
-      };
-      (global as any).Worker = mockWorkerConstructor;
 
-      // Act
-      const result = createErgogenWorker();
+      (globalThis as any).window.Worker = mockWorkerConstructor;
+      (globalThis as any).Worker = mockWorkerConstructor;
 
-      // Assert
-      expect(result).toBe(mockWorkerInstance);
-      expect(mockWorkerConstructor).toHaveBeenCalledTimes(1);
+      try {
+        // Act
+        const result = createErgogenWorker();
 
-      const instantiatedUrl = mockWorkerConstructor.mock.calls[0][0];
-      expect(instantiatedUrl).toBeInstanceOf(URL);
-      expect(instantiatedUrl.pathname).toContain('ergogen.worker.ts');
+        // Assert
+        expect(result).toBe(mockWorkerInstance);
+        expect(mockWorkerConstructor).toHaveBeenCalledTimes(1);
+        expect(mockWorkerConstructor.mock.calls[0][1]).toEqual({
+          type: 'module',
+        });
+
+        const instantiatedUrl = mockWorkerConstructor.mock.calls[0][0];
+        expect(instantiatedUrl).toBeInstanceOf(URL);
+        expect(instantiatedUrl.pathname).toContain('ergogen.worker.ts');
+      } finally {
+        delete (globalThis as any).window.Worker;
+        delete (globalThis as any).Worker;
+      }
     });
 
     it('should handle constructor errors and log them to console.error', () => {
       // Arrange
       const mockError = new Error('Failed to instantiate Worker');
-      const mockWorkerConstructor = jest.fn().mockImplementation(() => {
+      const mockWorkerConstructor = vi.fn().mockImplementation(() => {
         throw mockError;
       });
-      (global as any).window = {
-        Worker: mockWorkerConstructor,
-      };
-      (global as any).Worker = mockWorkerConstructor;
 
-      // Act
-      const result = createErgogenWorker();
+      (globalThis as any).window.Worker = mockWorkerConstructor;
+      (globalThis as any).Worker = mockWorkerConstructor;
 
-      // Assert
-      expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to create worker:',
-        mockError
-      );
+      try {
+        // Act
+        const result = createErgogenWorker();
+
+        // Assert
+        expect(result).toBeNull();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Failed to create worker:',
+          mockError
+        );
+      } finally {
+        delete (globalThis as any).window.Worker;
+        delete (globalThis as any).Worker;
+      }
     });
   });
 
   describe('createJscadWorker', () => {
     it('should return null when window is undefined', () => {
       // Arrange
-      delete (global as any).window;
+      const originalWindow = (globalThis as any).window;
+      Object.defineProperty(globalThis, 'window', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
 
-      // Act
-      const result = createJscadWorker();
-
-      // Assert
-      expect(result).toBeNull();
+      try {
+        // Act
+        const result = createJscadWorker();
+        // Assert
+        expect(result).toBeNull();
+      } finally {
+        Object.defineProperty(globalThis, 'window', {
+          value: originalWindow,
+          writable: true,
+          configurable: true,
+        });
+      }
     });
 
     it('should return null when window.Worker is not defined', () => {
-      // Arrange
-      (global as any).window = {};
-
       // Act
       const result = createJscadWorker();
 
@@ -133,46 +136,57 @@ describe('workerFactory', () => {
     it('should create and return a worker when window.Worker is defined', () => {
       // Arrange
       const mockWorkerInstance = {};
-      const mockWorkerConstructor = jest
+      const mockWorkerConstructor = vi
         .fn()
         .mockImplementation(() => mockWorkerInstance);
-      (global as any).window = {
-        Worker: mockWorkerConstructor,
-      };
-      (global as any).Worker = mockWorkerConstructor;
 
-      // Act
-      const result = createJscadWorker();
+      (globalThis as any).window.Worker = mockWorkerConstructor;
+      (globalThis as any).Worker = mockWorkerConstructor;
 
-      // Assert
-      expect(result).toBe(mockWorkerInstance);
-      expect(mockWorkerConstructor).toHaveBeenCalledTimes(1);
+      try {
+        // Act
+        const result = createJscadWorker();
 
-      const instantiatedUrl = mockWorkerConstructor.mock.calls[0][0];
-      expect(instantiatedUrl).toBeInstanceOf(URL);
-      expect(instantiatedUrl.pathname).toContain('jscad.worker.ts');
+        // Assert
+        expect(result).toBe(mockWorkerInstance);
+        expect(mockWorkerConstructor).toHaveBeenCalledTimes(1);
+        expect(mockWorkerConstructor.mock.calls[0][1]).toEqual({
+          type: 'module',
+        });
+
+        const instantiatedUrl = mockWorkerConstructor.mock.calls[0][0];
+        expect(instantiatedUrl).toBeInstanceOf(URL);
+        expect(instantiatedUrl.pathname).toContain('jscad.worker.ts');
+      } finally {
+        delete (globalThis as any).window.Worker;
+        delete (globalThis as any).Worker;
+      }
     });
 
     it('should handle constructor errors and log them to console.error', () => {
       // Arrange
       const mockError = new Error('Failed to instantiate JSCAD Worker');
-      const mockWorkerConstructor = jest.fn().mockImplementation(() => {
+      const mockWorkerConstructor = vi.fn().mockImplementation(() => {
         throw mockError;
       });
-      (global as any).window = {
-        Worker: mockWorkerConstructor,
-      };
-      (global as any).Worker = mockWorkerConstructor;
 
-      // Act
-      const result = createJscadWorker();
+      (globalThis as any).window.Worker = mockWorkerConstructor;
+      (globalThis as any).Worker = mockWorkerConstructor;
 
-      // Assert
-      expect(result).toBeNull();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to create JSCAD worker:',
-        mockError
-      );
+      try {
+        // Act
+        const result = createJscadWorker();
+
+        // Assert
+        expect(result).toBeNull();
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Failed to create JSCAD worker:',
+          mockError
+        );
+      } finally {
+        delete (globalThis as any).window.Worker;
+        delete (globalThis as any).Worker;
+      }
     });
   });
 });

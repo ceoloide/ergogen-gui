@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 
 // Mock the worker factory to prevent worker creation in tests
-jest.mock('../workers/workerFactory', () => ({
+vi.mock('../workers/workerFactory', () => ({
   createErgogenWorker: () => ({
     postMessage: jest.fn(),
     terminate: jest.fn(),
@@ -15,31 +15,35 @@ jest.mock('../workers/workerFactory', () => ({
 }));
 
 // Mock the DownloadRow component
-jest.mock('../atoms/DownloadRow', () => {
-  return function MockDownloadRow({
-    fileName,
-    extension,
-    'data-testid': dataTestId,
-  }: {
-    fileName: string;
-    extension: string;
-    'data-testid'?: string;
-  }) {
-    return (
-      <div data-testid={dataTestId} data-extension={extension}>
-        {fileName}.{extension}
-      </div>
-    );
+vi.mock('../atoms/DownloadRow', () => {
+  return {
+    default: function MockDownloadRow({
+      fileName,
+      extension,
+      'data-testid': dataTestId,
+    }: {
+      fileName: string;
+      extension: string;
+      'data-testid'?: string;
+    }) {
+      return (
+        <div data-testid={dataTestId} data-extension={extension}>
+          {fileName}.{extension}
+        </div>
+      );
+    },
   };
 });
 
 // Mock useConfigContext
-let mockContext: any = null;
-jest.mock('../context/ConfigContext', () => {
-  const original = jest.requireActual('../context/ConfigContext');
+const mockState = vi.hoisted(() => ({ mockContext: null as any }));
+vi.mock('../context/ConfigContext', async () => {
+  const original = await vi.importActual<
+    typeof import('../context/ConfigContext')
+  >('../context/ConfigContext');
   return {
     ...original,
-    useConfigContext: () => mockContext,
+    useConfigContext: () => mockState.mockContext,
   };
 });
 
@@ -107,7 +111,7 @@ describe('Downloads', () => {
 
     it('should hide JSCAD files when stlPreview is true and debug is false', () => {
       // Arrange
-      mockContext = createMockContext(false, true);
+      mockState.mockContext = createMockContext(false, true);
 
       // Act
       render(
@@ -128,7 +132,7 @@ describe('Downloads', () => {
 
     it('should show JSCAD files when stlPreview is false and debug is false', () => {
       // Arrange
-      mockContext = createMockContext(false, false);
+      mockState.mockContext = createMockContext(false, false);
 
       // Act
       render(
@@ -153,7 +157,7 @@ describe('Downloads', () => {
 
     it('should show JSCAD files when stlPreview is true and debug is true', () => {
       // Arrange
-      mockContext = createMockContext(true, true);
+      mockState.mockContext = createMockContext(true, true);
 
       // Act
       render(
@@ -175,7 +179,7 @@ describe('Downloads', () => {
 
     it('should show JSCAD files when stlPreview is false and debug is true', () => {
       // Arrange
-      mockContext = createMockContext(true, false);
+      mockState.mockContext = createMockContext(true, false);
 
       // Act
       render(

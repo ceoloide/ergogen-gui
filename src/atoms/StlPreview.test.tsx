@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react';
 import StlPreview from './StlPreview';
 
 // Mock react-three-fiber and drei
-jest.mock('@react-three/fiber', () => {
-  const THREE = jest.requireActual('three');
+vi.mock('@react-three/fiber', async () => {
+  const THREE = await vi.importActual<typeof import('three')>('three');
   return {
     Canvas: ({ children }: { children: React.ReactNode }) => (
       <div data-testid="mock-canvas">{children}</div>
@@ -12,14 +12,14 @@ jest.mock('@react-three/fiber', () => {
       camera: new THREE.PerspectiveCamera(),
       size: { width: 100, height: 100 },
       controls: {
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       },
     }),
   };
 });
 
-jest.mock('@react-three/drei', () => ({
+vi.mock('@react-three/drei', () => ({
   OrbitControls: () => <div data-testid="mock-orbit-controls" />,
   Html: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="mock-html">{children}</div>
