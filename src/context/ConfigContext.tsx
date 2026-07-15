@@ -1182,6 +1182,7 @@ const ConfigContextProvider = ({
   const selectConfig = useCallback(
     (id: string | null) => {
       resetLineage();
+      setResults(null);
       if (id === null) {
         setActiveConfigId(null);
         activeConfigIdRef.current = null;
@@ -1212,6 +1213,7 @@ const ConfigContextProvider = ({
   const createNewConfig = useCallback(
     (content: string, name?: string) => {
       resetLineage();
+      setResults(null);
       const nextUntitledNum = getNextIndexForPattern(
         configsRef.current,
         /^Untitled\s+(\d+)$/
@@ -1287,6 +1289,7 @@ const ConfigContextProvider = ({
   const duplicateConfig = useCallback(
     (id: string) => {
       resetLineage();
+      setResults(null);
       const found = configsRef.current.find((c) => c.id === id);
       if (found) {
         const newId = generateUUID();
@@ -1333,6 +1336,7 @@ const ConfigContextProvider = ({
       const isLastConfig = configsRef.current.length <= 1;
 
       if (isLastConfig || isDeletingActive) {
+        setResults(null);
         setActiveConfigId(null);
         activeConfigIdRef.current = null;
         setConfigInputState('');
@@ -1356,6 +1360,7 @@ const ConfigContextProvider = ({
   const loadPreview = useCallback(
     (config: string) => {
       resetLineage();
+      setResults(null);
       setIsPreview(true);
       setPreviewConfig(config);
       setConfigInputState(config);
