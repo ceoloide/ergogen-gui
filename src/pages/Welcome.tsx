@@ -242,6 +242,22 @@ const GitHubInput = styled.input`
   }
 `;
 
+const LoadButton = styled(Button)`
+  aspect-ratio: 1 / 1;
+  padding: 0.75rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  svg,
+  .material-symbols-outlined {
+    display: block;
+    font-size: 18px;
+  }
+`;
+
 const HiddenFileInput = styled.input`
   display: none;
 `;
@@ -804,7 +820,7 @@ const Welcome = () => {
                 aria-label="Repository URL or path"
                 data-testid="github-input"
               />
-              <Button
+              <LoadButton
                 onClick={handleGitHub}
                 disabled={isLoading || !githubInput}
                 aria-label="Load configuration from repository"
@@ -822,7 +838,7 @@ const Welcome = () => {
                     cloud_download
                   </span>
                 )}
-              </Button>
+              </LoadButton>
             </GitHubInputContainer>
           </OptionBox>
         </OptionsContainer>
