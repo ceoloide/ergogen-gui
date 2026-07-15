@@ -956,7 +956,7 @@ const ConfigContextProvider = ({
    * Parses a string as either JSON or YAML.
    */
   const parseConfig = useCallback(
-    (inputString: string): [string, { [key: string]: unknown[] } | null] => {
+    (inputString: string): [string, Record<string, unknown> | null] => {
       let type = 'UNKNOWN';
       let parsedConfig = null;
 

@@ -28,10 +28,10 @@ git config --global --add url."https://github.com/".insteadOf "git@github.com:"
 
 if [ -n "$ERGOGEN_VERSION" ]; then
   echo "Installing Ergogen version $ERGOGEN_VERSION..."
-  npm install "$ERGOGEN_VERSION" --no-save --legacy-peer-deps
+  npm install "$ERGOGEN_VERSION" --no-save --legacy-peer-deps --registry=https://registry.npmjs.org
 elif [ ! -d node_modules/ergogen ]; then
   echo "Installing Ergogen..."
-  npm install ergogen --legacy-peer-deps
+  npm install ergogen --legacy-peer-deps --registry=https://registry.npmjs.org
 fi
 
 if [ -d node_modules/ergogen ]; then
@@ -61,7 +61,7 @@ if [ -d node_modules/ergogen ]; then
   echo "Building Ergogen..."
   (
     cd node_modules/ergogen
-    npm install --legacy-peer-deps
+    npm install --legacy-peer-deps --registry=https://registry.npmjs.org
     npm run build
     cp dist/ergogen.js ../../public/dependencies/ergogen.js
   )
