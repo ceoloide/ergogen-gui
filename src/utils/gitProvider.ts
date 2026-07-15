@@ -2,16 +2,16 @@ import { isFeatureEnabled } from './featureFlags';
 import { enforceFileSizeLimit } from './ergogenBundleLoader';
 import { GIT_BFS_MAX_REQUESTS, GIT_BFS_MAX_DEPTH } from '../context/constants';
 
-export interface GitHubFootprint {
+export interface GitInjection {
   name: string;
   content: string;
 }
 
 export interface ErgogenWorkspaceBundle {
   config: string;
-  footprints: GitHubFootprint[];
-  outlines: GitHubFootprint[];
-  templates: GitHubFootprint[];
+  footprints: GitInjection[];
+  outlines: GitInjection[];
+  templates: GitInjection[];
   configPath: string;
   rateLimitWarning?: string;
 }
@@ -136,9 +136,9 @@ export abstract class BaseGitProvider implements GitProvider {
     const parsed = this.parseUrl(url);
     const { owner, repo, branch, filePath, isRepoRoot } = parsed;
 
-    const footprints: GitHubFootprint[] = [];
-    const outlines: GitHubFootprint[] = [];
-    const templates: GitHubFootprint[] = [];
+    const footprints: GitInjection[] = [];
+    const outlines: GitInjection[] = [];
+    const templates: GitInjection[] = [];
 
     // Helper to process submodules recursively
     const processSubmodules = async (
@@ -186,7 +186,7 @@ export abstract class BaseGitProvider implements GitProvider {
             const subProvider = gitProviderRegistry.resolve(submodule.url);
             if (subProvider instanceof BaseGitProvider) {
               const subParsed = subProvider.parseUrl(submodule.url);
-              let submoduleFootprints: GitHubFootprint[] = [];
+              let submoduleFootprints: GitInjection[] = [];
 
               try {
                 submoduleFootprints =
@@ -536,8 +536,8 @@ export abstract class BaseGitProvider implements GitProvider {
     dirPath: string,
     branch: string,
     allowedExtensions: string[]
-  ): Promise<GitHubFootprint[]> {
-    const result: GitHubFootprint[] = [];
+  ): Promise<GitInjection[]> {
+    const result: GitInjection[] = [];
     const fetchRec = async (p: string) => {
       try {
         const items = await this.listDirectory(owner, repo, p, branch);

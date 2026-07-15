@@ -5,7 +5,7 @@ import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
-import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
+import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
@@ -455,12 +455,12 @@ const Welcome = () => {
 
   /**
    * Processes footprints (or any injections) with conflict resolution.
-   * Converts GitHubFootprint[] to string[][] and uses the conflict resolution hook.
+   * Converts GitInjection[] to string[][] and uses the conflict resolution hook.
    */
   const processInjections = async (
-    footprints: GitHubFootprint[],
-    outlines: GitHubFootprint[],
-    templates: GitHubFootprint[],
+    footprints: GitInjection[],
+    outlines: GitInjection[],
+    templates: GitInjection[],
     config: string,
     resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]

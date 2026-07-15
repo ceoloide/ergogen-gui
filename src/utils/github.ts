@@ -5,7 +5,7 @@ import {
   GitFileItem,
 } from './gitProvider';
 
-export type { GitHubFootprint } from './gitProvider';
+export type { GitInjection } from './gitProvider';
 
 /**
  * Checks GitHub API rate limit headers and logs usage information.
