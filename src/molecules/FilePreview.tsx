@@ -1,7 +1,28 @@
+import styled from 'styled-components';
 import PcbPreview from '../atoms/PcbPreview';
 import StlPreview from '../atoms/StlPreview';
 import SvgPreview from '../atoms/SvgPreview';
 import TextPreview from '../atoms/TextPreview';
+import { theme } from '../theme/theme';
+
+const PlaceholderContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  background-color: ${theme.colors.background};
+`;
+
+const PlaceholderLogo = styled.img`
+  width: 96px;
+  height: 96px;
+  opacity: 0.12;
+  filter: grayscale(100%);
+  -webkit-user-drag: none;
+  user-drag: none;
+`;
 
 /**
  * Props for the FilePreview component.
@@ -42,6 +63,28 @@ const FilePreview = ({
   'data-testid': dataTestId,
   'aria-label': ariaLabel,
 }: Props) => {
+  const isEmpty =
+    !previewContent ||
+    (typeof previewContent === 'string' && previewContent === '') ||
+    (previewContent instanceof ArrayBuffer &&
+      previewContent.byteLength === 0) ||
+    (ArrayBuffer.isView(previewContent) && previewContent.byteLength === 0);
+
+  if (isEmpty) {
+    return (
+      <PlaceholderContainer
+        className={className}
+        data-testid={dataTestId}
+        aria-label={ariaLabel}
+      >
+        <PlaceholderLogo
+          src={`${process.env.PUBLIC_URL}/ergogen.png`}
+          alt="Ergogen Logo"
+          draggable="false"
+        />
+      </PlaceholderContainer>
+    );
+  }
   /**
    * Renders the correct preview component based on the file extension.
    * @param {string} extension - The file extension.

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchConfigFromUrl } from '../utils/github';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
+import '../utils/codeberg';
+import '../utils/forgejo';
 
 interface UseConfigLoaderProps {
   processInjectionsWithConflictResolution: (
@@ -15,24 +17,31 @@ export const useConfigLoader = ({
   setError,
 }: UseConfigLoaderProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     const loadInitialConfig = async () => {
-      // Check for GitHub URL parameter
+      // Check for GitHub/Codeberg URL parameter
       const queryParameters = new URLSearchParams(window.location.search);
       const githubUrl = queryParameters.get('github');
+      const codebergUrl = queryParameters.get('codeberg');
+      const forgejoUrl = queryParameters.get('forgejo');
+      const giteaUrl = queryParameters.get('gitea');
 
-      // Check for hash error (passed via props or context usually, but here we check URL hash if needed,
-      // though typically hash parsing happens before this hook runs in the main App)
-      // For this hook, we'll assume hash handling is done elsewhere or we can add it if needed.
-      // The original code had `hashError` prop. We might need to pass it in if we want to respect it.
+      let remoteUrl = githubUrl || codebergUrl || forgejoUrl || giteaUrl;
 
-      if (githubUrl) {
+      if (remoteUrl) {
+        if (codebergUrl && !codebergUrl.includes('codeberg.org')) {
+          remoteUrl = `https://codeberg.org/${codebergUrl}`;
+        } else if (githubUrl && !githubUrl.includes('github.com')) {
+          remoteUrl = `https://github.com/${githubUrl}`;
+        }
+
         setIsLoading(true);
-        console.log('[useConfigLoader] Loading from URL parameter:', githubUrl);
+        console.log('[useConfigLoader] Loading from URL parameter:', remoteUrl);
 
         try {
-          const result = await fetchConfigFromUrl(githubUrl);
+          const result = await fetchConfigFromUrl(remoteUrl);
           console.log('[useConfigLoader] Fetch result:', {
             configLength: result.config.length,
             footprintsCount: result.footprints.length,
@@ -59,9 +68,12 @@ export const useConfigLoader = ({
             result.config
           );
         } catch (e) {
-          console.error('[useConfigLoader] Failed to load from GitHub:', e);
+          console.error(
+            '[useConfigLoader] Failed to load from remote repository:',
+            e
+          );
           setError(
-            `Failed to load from GitHub: ${e instanceof Error ? e.message : String(e)}`
+            `Failed to load from remote repository: ${e instanceof Error ? e.message : String(e)}`
           );
         } finally {
           setIsLoading(false);
@@ -69,7 +81,10 @@ export const useConfigLoader = ({
       }
     };
 
-    loadInitialConfig();
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      loadInitialConfig();
+    }
   }, [processInjectionsWithConflictResolution, setError]); // Run once on mount
 
   return { isLoading };

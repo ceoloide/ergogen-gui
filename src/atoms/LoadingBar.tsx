@@ -24,7 +24,7 @@ const LoadingBarContainer = styled.div`
   right: 0;
   width: 100%;
   height: 3px;
-  background-color: ${theme.colors.background};
+  background-color: transparent;
   overflow: hidden;
   z-index: 1000;
 `;

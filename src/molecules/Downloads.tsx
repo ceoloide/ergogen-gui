@@ -33,6 +33,13 @@ const DownloadsContainer = styled.div`
   }
 `;
 
+const NoOutputs = styled.div`
+  font-size: ${theme.fontSizes.sm};
+  color: ${theme.colors.textDarkest};
+  font-style: italic;
+  padding: 0.5rem 0;
+`;
+
 /**
  * Props for the Downloads component.
  * @typedef {object} Props
@@ -219,29 +226,32 @@ const Downloads = ({
     }
   }
 
+  const visibleDownloads = downloads.filter((download) => {
+    if (!configContext.debug) {
+      if (download.fileName.startsWith('_')) return false;
+
+      // Ignore the following combinations of file names and extensions:
+      const ignore: { [key: string]: string } = {
+        units: 'yaml',
+        points: 'yaml',
+        canonical: 'yaml',
+        raw: 'txt',
+      };
+      if (ignore[download.fileName] === download.extension) return false;
+
+      // Hide JSCAD files when stlPreview is true and debug is false
+      if (configContext.stlPreview && download.extension === 'jscad') {
+        return false;
+      }
+    }
+    return true;
+  });
+
   return (
     <DownloadsContainer data-testid={dataTestId}>
       <Title>Outputs</Title>
-      {downloads.map((download, i) => {
-        if (!configContext.debug) {
-          if (download.fileName.startsWith('_')) return false;
-
-          // Ignore the following combinations of file names and extensions:
-          const ignore: { [key: string]: string } = {
-            units: 'yaml',
-            points: 'yaml',
-            canonical: 'yaml',
-            raw: 'txt',
-          };
-          if (ignore[download.fileName] === download.extension) return false;
-
-          // Hide JSCAD files when stlPreview is true and debug is false
-          if (configContext.stlPreview && download.extension === 'jscad') {
-            return false;
-          }
-        }
-
-        return (
+      {visibleDownloads.length > 0 ? (
+        visibleDownloads.map((download, i) => (
           <DownloadRow
             key={i}
             {...download}
@@ -249,8 +259,10 @@ const Downloads = ({
             previewKey={previewKey}
             data-testid={dataTestId && `${dataTestId}-${download.fileName}`}
           />
-        );
-      })}
+        ))
+      ) : (
+        <NoOutputs>No outputs</NoOutputs>
+      )}
     </DownloadsContainer>
   );
 };

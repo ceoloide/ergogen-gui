@@ -1,5 +1,24 @@
 # Changelog
 
+## Concurrent Bulk Export & Abstract Git Provider Architecture
+
+July 15, 2026
+
+![A diagram representing the concurrent compilation worker pool and abstract git provider registry.](./public/images/changelog/placeholder.png)
+
+Previously, exporting multiple keyboard configurations progressively occurred sequentially, which blocked compilation speed and underutilized multi-core CPU architectures. In addition, importing custom layouts from remote repositories was locked to GitHub, making it difficult to host and load configurations from alternative git providers like Codeberg.
+
+To resolve this, we implemented a concurrent compilation worker pool that compiles configurations in parallel up to hardware limits, listing active builds dynamically as they complete. We also introduced an abstract Git Provider registry, supporting both GitHub and Codeberg repositories with a unified input that auto-detects the provider from the pasted URL.
+
+**What changed:**
+
+- **Concurrent Compilation Pool**: Refactored the bulk zip exporter to compile configurations in parallel using a pool of Web Workers up to CPU concurrency limits
+- **Active Compiling List**: Updated the bulk download dialog to display a bulleted, dynamic list of active configurations compiling in parallel
+- **Abstract Git Registry**: Created `GitProvider`, registering `GitHubProvider` and `CodebergProvider` to modularize remote configuration fetching
+- **Codeberg URL Parameter Support**: Accepted `?codeberg=` URL parameters to load remote configurations from Codeberg
+- **Auto-Detect Dropdown UI**: Renamed the Welcome page loader to "From Repo" and added a source selector dropdown that auto-detects pasted provider URLs
+- **Version Bump**: Updates the application version to 0.16.0
+
 ## Unified Ergogen Bundle Loader and REST Directory Restructuring
 
 July 15, 2026
