@@ -28,7 +28,7 @@ export const GithubVersionButton: React.FC<GithubVersionButtonProps> = ({
     <VersionButton
       onClick={handleClick}
       $hasDevBadge={isCustom}
-      aria-label={`View ${label === 'GUI' ? 'Ergogen GUI' : 'Ergogen'} ${version} on GitHub`}
+      aria-label={`View ${label === 'Ergogen' ? 'Ergogen' : `Ergogen ${label}`} ${version} on GitHub`}
       data-testid={dataTestId}
     >
       <GithubIcon />

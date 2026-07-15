@@ -30,10 +30,10 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
 }) => {
   const prevIsOpenRef = useRef(isOpen);
   const [isOpening, setIsOpening] = useState(isOpen);
-  const [panelWidth, setPanelWidth] = useState(345);
+  const [panelWidth, setPanelWidth] = useState(360);
   const isResizingRef = useRef(false);
   const startXRef = useRef(0);
-  const startWidthRef = useRef(345);
+  const startWidthRef = useRef(360);
 
   const configContext = useConfigContext();
   const navigate = useNavigate();
@@ -180,7 +180,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
       const deltaX = e.clientX - startXRef.current;
       const newWidth = startWidthRef.current + deltaX;
       const maxWidth = Math.min(600, window.innerWidth * 0.9);
-      const constrainedWidth = Math.max(345, Math.min(newWidth, maxWidth));
+      const constrainedWidth = Math.max(360, Math.min(newWidth, maxWidth));
       setPanelWidth(constrainedWidth);
     };
 
@@ -199,7 +199,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
       const deltaX = touch.clientX - startXRef.current;
       const newWidth = startWidthRef.current + deltaX;
       const maxWidth = Math.min(600, window.innerWidth * 0.9);
-      const constrainedWidth = Math.max(345, Math.min(newWidth, maxWidth));
+      const constrainedWidth = Math.max(360, Math.min(newWidth, maxWidth));
       setPanelWidth(constrainedWidth);
     };
 
@@ -484,7 +484,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               <DiscordIcon />
             </OutlineButton>
             <GithubVersionButton
-              label="GUI"
+              label="Web UI"
               version={guiVersion}
               url="https://github.com/ceoloide/ergogen-gui"
               data-testid="side-nav-gui-version-button"
