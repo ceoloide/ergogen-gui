@@ -3,7 +3,6 @@ import { enforceFileSizeLimit } from './ergogenBundleLoader';
 import {
   GitProvider,
   gitProviderRegistry,
-  GitHubFootprint,
   ErgogenWorkspaceBundle,
 } from './gitProvider';
 
