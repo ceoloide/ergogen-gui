@@ -670,11 +670,11 @@ const fetchGitHubConfig = async (
     branch: string,
     rateLimitTracker: { warning: string | null } = { warning: null }
   ): Promise<{
-    configYamls: { path: string; content: string }[];
-    anyYamls: { path: string; content: string }[];
+    configYamls: string[];
+    anyYamls: string[];
   }> => {
-    const configYamls: { path: string; content: string }[] = [];
-    const anyYamls: { path: string; content: string }[] = [];
+    const configYamls: string[] = [];
+    const anyYamls: string[] = [];
     const queue: string[] = [''];
     const visited = new Set<string>();
 
@@ -683,7 +683,8 @@ const fetchGitHubConfig = async (
       if (visited.has(currentPath)) continue;
       visited.add(currentPath);
 
-      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${currentPath}?ref=${branch}`;
+      const pathPart = currentPath ? `/${currentPath}` : '';
+      const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents${pathPart}?ref=${branch}`;
 
       try {
         const response = await fetch(apiUrl);
@@ -700,47 +701,23 @@ const fetchGitHubConfig = async (
         if (!response.ok) continue;
 
         const items = await response.json();
-        await Promise.all(
-          items.map(
-            async (item: {
-              type: string;
-              name: string;
-              download_url: string;
-              path: string;
-            }) => {
-              if (item.type === 'file' && item.name.endsWith('.yaml')) {
-                const fileResponse = await fetch(item.download_url);
-
-                // Check rate limit for YAML file download
-                const yamlRateLimitCheck = checkRateLimit(
-                  fileResponse,
-                  item.download_url
-                );
-                if (yamlRateLimitCheck.error && !rateLimitTracker.warning) {
-                  rateLimitTracker.warning = yamlRateLimitCheck.error;
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (item.type === 'file') {
+              const isYaml =
+                item.name.endsWith('.yaml') || item.name.endsWith('.yml');
+              if (isYaml) {
+                if (item.name === 'config.yaml' || item.name === 'config.yml') {
+                  configYamls.push(item.path);
+                } else {
+                  anyYamls.push(item.path);
                 }
-                if (yamlRateLimitCheck.isLimitExceeded) {
-                  throw new Error(
-                    yamlRateLimitCheck.error || 'Rate limit exceeded'
-                  );
-                }
-
-                if (fileResponse.ok) {
-                  const content = await fileResponse.text();
-                  const filePath = item.path;
-
-                  if (item.name === 'config.yaml') {
-                    configYamls.push({ path: filePath, content });
-                  } else {
-                    anyYamls.push({ path: filePath, content });
-                  }
-                }
-              } else if (item.type === 'dir') {
-                queue.push(item.path);
               }
+            } else if (item.type === 'dir') {
+              queue.push(item.path);
             }
-          )
-        );
+          }
+        }
       } catch (_error) {
         // Continue searching other directories
         continue;
@@ -816,31 +793,45 @@ const fetchGitHubConfig = async (
 
         if (configYamls.length > 0) {
           // Use the first config.yaml found
-          const firstConfig = configYamls[0];
-          config = firstConfig.content;
-          configPath = firstConfig.path.substring(
-            0,
-            firstConfig.path.lastIndexOf('/')
+          const selectedPath = configYamls[0];
+          const fileUrl = getRawUrl(
+            `${baseUrl}/blob/${branch}/${selectedPath}`
           );
-          console.log(`[GitHub] Found config.yaml at: ${firstConfig.path}`);
+          const fileResponse = await fetch(fileUrl);
+          if (!fileResponse.ok) {
+            throw new Error(
+              `Failed to fetch config content from GitHub: ${fileResponse.status}`
+            );
+          }
+          config = await fileResponse.text();
+          configPath = selectedPath.includes('/')
+            ? selectedPath.substring(0, selectedPath.lastIndexOf('/'))
+            : '';
+          console.log(`[GitHub] Found config.yaml at: ${selectedPath}`);
 
           if (configYamls.length > 1) {
             console.log(
-              `[GitHub] Multiple config.yaml files found, using first: ${firstConfig.path}`
+              `[GitHub] Multiple config.yaml files found, using first: ${selectedPath}`
             );
           }
         } else if (anyYamls.length > 0) {
           // No config.yaml found, use first .yaml file
-          const firstYaml = anyYamls[0];
-          config = firstYaml.content;
-          configPath = firstYaml.path.substring(
-            0,
-            firstYaml.path.lastIndexOf('/')
+          const selectedPath = anyYamls[0];
+          const fileUrl = getRawUrl(
+            `${baseUrl}/blob/${branch}/${selectedPath}`
           );
+          const fileResponse = await fetch(fileUrl);
+          if (!fileResponse.ok) {
+            throw new Error(
+              `Failed to fetch config content from GitHub: ${fileResponse.status}`
+            );
+          }
+          config = await fileResponse.text();
+          configPath = selectedPath.includes('/')
+            ? selectedPath.substring(0, selectedPath.lastIndexOf('/'))
+            : '';
           shouldLoadFootprints = false;
-          console.log(
-            `[GitHub] No config.yaml found, using: ${firstYaml.path}`
-          );
+          console.log(`[GitHub] No config.yaml found, using: ${selectedPath}`);
         } else {
           // No YAML files found at all
           throw new Error('No YAML configuration files found in repository');
