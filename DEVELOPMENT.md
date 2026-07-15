@@ -60,9 +60,10 @@ Communication with the workers is managed through a standard message-passing sys
 
 To handle Web Worker instantiation in a centralized and testable way, the application uses `src/workers/workerFactory.ts`. This module exports `createErgogenWorker` and `createJscadWorker`.
 
-Since these factory functions utilize ESM-native `import.meta.url` for locating the worker scripts in Webpack 5, executing them directly in Jest's Node/CommonJS runner would throw a syntax error (`SyntaxError: Cannot use 'import.meta' outside a module`). 
+Since these factory functions utilize ESM-native `import.meta.url` for locating the worker scripts in Webpack 5, executing them directly in Jest's Node/CommonJS runner would throw a syntax error (`SyntaxError: Cannot use 'import.meta' outside a module`).
 
 To resolve this during testing without sacrificing production bundle safety:
+
 1. The test runner dynamically reads `src/workers/workerFactory.ts` at execution time.
 2. It replaces `import.meta.url` with a mockup URL string (`"http://localhost"`).
 3. It writes a temporary file `src/workers/workerFactory.tmp.ts`.
@@ -70,7 +71,6 @@ To resolve this during testing without sacrificing production bundle safety:
 5. It cleans up the temporary file immediately after tests complete.
 
 The temporary file pattern is registered in `.gitignore` and required dynamically to bypass Knip's unused-import checks.
-
 
 ## Local File Loading
 
@@ -685,3 +685,9 @@ Proposed Fix: I will break down the runGeneration function into several smaller,
 **Context:** We implemented a 5-second tracking debounce delay in `ConfigContext.tsx` to prevent intermediate typing states from firing GA4 events. While 5 seconds works well, it is hardcoded inside `ConfigContext.tsx`.
 
 **Task:** Extract the 5-second debounce delay value into a central constants file (e.g. `src/context/constants.ts`) or make it a setting parameter, so developers can easily tune the debounce sensitivity.
+
+### [TASK-021] Pass STL Data as ArrayBuffer / Typed Array End-to-End
+
+**Context:** During binary STL parsing optimization in `StlPreview.tsx`, we identified that binary STL data is round-tripped through UTF-16 string conversion on the client side (`new TextEncoder().encode(stlString).buffer`) because the application preview/download pipelines pass file content strictly as strings. This conversion causes high memory allocation overhead and risks character corruption for bytes >= 128.
+
+**Task:** Refactor the file preview, case generation, and local file loading systems to accept and pass `ArrayBuffer` or `Uint8Array` directly for binary formats (such as STL), completely bypassing UTF-8 text serialization and `TextEncoder` decoding overhead.

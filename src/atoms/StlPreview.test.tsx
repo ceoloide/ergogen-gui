@@ -68,4 +68,33 @@ endsolid test`;
     // Assert
     expect(screen.getByTestId('mock-canvas')).toBeInTheDocument();
   });
+
+  it('renders a binary STL preview', () => {
+    // Generate an ASCII-safe 1-triangle binary STL buffer (all byte values < 128)
+    const buffer = new ArrayBuffer(84 + 50);
+    const view = new DataView(buffer);
+    for (let i = 0; i < 80; i++) {
+      view.setUint8(i, 0x41);
+    }
+    view.setUint32(80, 1, true); // 1 triangle
+
+    // Normal vector (0.0, 0.5, 0.0) -> IEEE 754: 0.5 is 0x3f000000. All bytes < 128
+    view.setFloat32(84, 0.0, true);
+    view.setFloat32(88, 0.5, true);
+    view.setFloat32(92, 0.0, true);
+
+    // Vertices: 3 vertices, each (0.5, 0.0, 0.5)
+    for (let j = 0; j < 9; j++) {
+      view.setFloat32(96 + j * 4, 0.5, true);
+    }
+    view.setUint16(132, 0, true); // attribute count
+
+    const stlString = new TextDecoder('utf-8').decode(new Uint8Array(buffer));
+
+    // Act
+    render(<StlPreview stl={stlString} data-testid="stl-binary-preview" />);
+
+    // Assert
+    expect(screen.getByTestId('stl-binary-preview')).toBeInTheDocument();
+  });
 });
