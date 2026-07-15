@@ -544,18 +544,6 @@ const Welcome = () => {
           try {
             configContext.createNewConfig(result.config);
 
-            const footprintCount = result.footprints.length;
-            const outlineCount = result.outlines.length;
-            const templateCount = result.templates.length;
-
-            if (footprintCount || outlineCount || templateCount) {
-              configContext.setInfo(
-                `Config loaded successfully from GitHub. Found ${footprintCount} footprints, ${outlineCount} outlines, and ${templateCount} templates.`
-              );
-            } else {
-              configContext.setInfo('Config loaded successfully from GitHub.');
-            }
-
             // Process footprints with conflict resolution
             await processInjections(
               result.footprints,
@@ -613,18 +601,6 @@ const Welcome = () => {
       const result = await loadLocalFile(file);
 
       configContext.createNewConfig(result.config);
-
-      const footprintCount = result.footprints.length;
-      const outlineCount = result.outlines.length;
-      const templateCount = result.templates.length;
-
-      if (footprintCount || outlineCount || templateCount) {
-        configContext.setInfo(
-          `Config loaded successfully. Found ${footprintCount} footprints, ${outlineCount} outlines, and ${templateCount} templates.`
-        );
-      } else {
-        configContext.setInfo('Config loaded successfully.');
-      }
 
       // Process footprints with conflict resolution
       await processInjections(
