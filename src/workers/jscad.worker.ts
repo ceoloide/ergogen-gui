@@ -168,7 +168,11 @@ self.onmessage = async (event: MessageEvent<JscadWorkerRequest>) => {
             } else if (part && typeof part === 'object' && 'buffer' in part) {
               const view = part as any;
               totalLength += view.byteLength;
-              return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+              return new Uint8Array(
+                view.buffer,
+                view.byteOffset,
+                view.byteLength
+              );
             } else if (typeof part === 'string') {
               const buf = new TextEncoder().encode(part);
               totalLength += buf.byteLength;
