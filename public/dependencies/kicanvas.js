@@ -9659,6 +9659,7 @@ var ge = class extends Me {
   , Ct = class extends ge {
     static{c(this, "NetNameItemPainter")
     }draw_net_name(e, t, r, i, n) {
+        e = e || "";
         let o = new Jt
           , l = t.copy().multiply(1e4)
           , p = r / Math.max(e.length, 3)
