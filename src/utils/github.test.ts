@@ -1,4 +1,4 @@
-import { fetchConfigFromUrl, checkRateLimit } from './github';
+import { fetchConfigFromUrl, checkRateLimit, parseGitmodules } from './github';
 import { isFeatureEnabled } from './featureFlags';
 
 jest.mock('./featureFlags', () => ({
@@ -389,6 +389,125 @@ describe('github utilities', () => {
       expect(result.rateLimitWarning).toContain(
         'Loading from GitHub may become unavailable soon'
       );
+    });
+  });
+
+  describe('parseGitmodules', () => {
+    it('should parse standard .gitmodules with multiple submodules correctly', () => {
+      // Arrange
+      const content = `
+[submodule "ergogen/footprints/ceoloide"]
+\tpath = ergogen/footprints/ceoloide
+\turl = https://github.com/ceoloide/ergogen-footprints.git
+[submodule "ergogen/footprints/infused-kim"]
+\tpath = ergogen/footprints/infused-kim
+\turl = https://github.com/infused-kim/kb_footprints.git
+      `;
+
+      // Act
+      const result = parseGitmodules(content);
+
+      // Assert
+      expect(result).toEqual([
+        {
+          path: 'ergogen/footprints/ceoloide',
+          url: 'https://github.com/ceoloide/ergogen-footprints.git',
+        },
+        {
+          path: 'ergogen/footprints/infused-kim',
+          url: 'https://github.com/infused-kim/kb_footprints.git',
+        },
+      ]);
+    });
+
+    it('should handle empty or whitespace-only content', () => {
+      // Arrange
+      const content = '   \n  \n\t  ';
+
+      // Act
+      const result = parseGitmodules(content);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should handle content with no submodules', () => {
+      // Arrange
+      const content = 'some random text\nfoo = bar\nbaz = qux';
+
+      // Act
+      const result = parseGitmodules(content);
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('should ignore submodules missing a path or url', () => {
+      // Arrange
+      const content = `
+[submodule "missing-url"]
+\tpath = some/path
+[submodule "missing-path"]
+\turl = https://github.com/some/url.git
+[submodule "valid"]
+\tpath = valid/path
+\turl = https://github.com/valid/url.git
+      `;
+
+      // Act
+      const result = parseGitmodules(content);
+
+      // Assert
+      expect(result).toEqual([
+        {
+          path: 'valid/path',
+          url: 'https://github.com/valid/url.git',
+        },
+      ]);
+    });
+
+    it('should handle variations in whitespace, spacing and newlines', () => {
+      // Arrange
+      const content = `
+[submodule "spaces"]
+    path   =   spaced/path
+   url=https://github.com/spaced/url.git
+[submodule "carriage-returns"]\r
+\tpath = cr/path\r
+\turl = https://github.com/cr/url.git\r
+      `;
+
+      // Act
+      const result = parseGitmodules(content);
+
+      // Assert
+      expect(result).toEqual([
+        {
+          path: 'spaced/path',
+          url: 'https://github.com/spaced/url.git',
+        },
+        {
+          path: 'cr/path',
+          url: 'https://github.com/cr/url.git',
+        },
+      ]);
+    });
+
+    it('should parse the last submodule correctly even if not followed by a newline', () => {
+      // Arrange
+      const content =
+        '[submodule "last"]\n\tpath = last/path\n\turl = https://github.com/last/url.git';
+
+      // Act
+      const result = parseGitmodules(content);
+
+      // Assert
+      expect(result).toEqual([
+        {
+          path: 'last/path',
+          url: 'https://github.com/last/url.git',
+        },
+      ]);
     });
   });
 });

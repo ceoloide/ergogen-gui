@@ -112,7 +112,7 @@ type GitHubLoadResult = {
  * @param {string} content - The content of the .gitmodules file.
  * @returns {Array<{path: string, url: string}>} Array of submodule objects.
  */
-const parseGitmodules = (
+export const parseGitmodules = (
   content: string
 ): Array<{ path: string; url: string }> => {
   const submodules: Array<{ path: string; url: string }> = [];
@@ -130,10 +130,17 @@ const parseGitmodules = (
         });
       }
       currentSubmodule = {};
-    } else if (trimmed.startsWith('path =')) {
-      currentSubmodule.path = trimmed.substring(7).trim();
-    } else if (trimmed.startsWith('url =')) {
-      currentSubmodule.url = trimmed.substring(6).trim();
+    } else {
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex !== -1) {
+        const key = trimmed.substring(0, eqIndex).trim();
+        const value = trimmed.substring(eqIndex + 1).trim();
+        if (key === 'path') {
+          currentSubmodule.path = value;
+        } else if (key === 'url') {
+          currentSubmodule.url = value;
+        }
+      }
     }
   }
 
