@@ -168,7 +168,7 @@ const RepoSelectContainer = styled.div`
   background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
-  padding: 0.75rem 0.5rem 0.75rem 0.75rem;
+  padding: 1rem 0.5rem 1rem 0.75rem;
   box-sizing: border-box;
   flex-shrink: 0;
   cursor: pointer;
@@ -220,7 +220,7 @@ const GitHubInput = styled.input`
   background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
-  padding: 0.75rem 1rem;
+  padding: 1rem 1rem;
   color: ${theme.colors.text};
   font-family: ${theme.fonts.body};
   font-size: ${theme.fontSizes.base};
@@ -244,7 +244,7 @@ const GitHubInput = styled.input`
 
 const LoadButton = styled(Button)`
   aspect-ratio: 1 / 1;
-  padding: 0.75rem;
+  padding: 1rem;
   box-sizing: border-box;
   display: flex;
   align-items: center;
