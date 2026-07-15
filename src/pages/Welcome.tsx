@@ -815,7 +815,12 @@ const Welcome = () => {
                     <Spinner /> Loading...
                   </>
                 ) : (
-                  'Load'
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ display: 'block' }}
+                  >
+                    cloud_download
+                  </span>
                 )}
               </Button>
             </GitHubInputContainer>
