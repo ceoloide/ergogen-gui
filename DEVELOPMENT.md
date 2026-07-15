@@ -124,7 +124,7 @@ The application supports loading Ergogen configurations directly from GitHub rep
 GitHub configurations can be loaded in two ways:
 
 1. **Via Welcome Page Input**: User enters a GitHub URL in the input field on the Welcome page
-2. **Via URL Parameter**: User navigates to a URL with `?github=user/repo` parameter (e.g., `https://ergogen.io/?github=ceoloide/corney-island`)
+2. **Via URL Parameter**: User navigates to a URL with `?github=user/repo` parameter (e.g., `https://ceoloide.github.io/ergogen-gui/?github=ceoloide/corney-island`)
 
 When a user provides a GitHub repository URL (e.g., `user/repo` or `https://github.com/user/repo`), the application:
 
@@ -229,7 +229,7 @@ The application supports sharing keyboard configurations via URL hash fragments.
 
 ### Share Link Format
 
-Shareable links use the format: `https://ergogen.io/#<encoded-config>` where the hash fragment contains:
+Shareable links use the format: `<baseUrl>#<encoded-config>` (resolving to the deployment domain, e.g. `https://ceoloide.github.io/ergogen-gui/#<encoded-config>`) where the hash fragment contains:
 
 - The keyboard configuration (YAML/JSON string)
 - Only the footprint injections that were selected by the user in the Share dialog (filtered to those actually used in the design)
@@ -463,7 +463,7 @@ When enabled:
 
 #### Keyboard Generation Tracking
 
-Upon successful keyboard generation, the layout is analyzed using [configAnalyzer.ts](file:///Users/mmassarelli/Documents/GitHub/ergogen-gui/src/utils/configAnalyzer.ts).
+Upon successful keyboard generation, the layout is analyzed using `configAnalyzer.ts`.
 
 This parses and extracts:
 
@@ -497,197 +497,3 @@ To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 - **`src/atoms/UpdateChip.tsx`**: Pulsing chip rendered in Header when an update is waiting
 - **`public/manifest.json`**: Full PWA web app manifest
 - **`public/icons/`**: PWA icon set (192×192 and 512×512)
-
-## Future Tasks
-
-When adding a new future task, always structure them with a unique ID, a brief title, the context, and the task, for example:
-
-```md
-### TASK-001: Eliminate Magic Values in Tests
-
-**Context:** During a refactoring of the `InjectionRow.tsx` component, the test suite was improved to check for the presence of a green highlight when a row is active. The test currently asserts that the border color is a hardcoded hex value (`#28a745`).
-
-**Task:** Refactor the test to remove this "magic value." This can be achieved by defining theme colors in a central location (e.g., a `theme.ts` file), exporting them, and importing the color variable into both the `InjectionRow.tsx` component and its test file, `InjectionRow.test.tsx`.
-```
-
-### [TASK-001] Redundant State in ConfigContextProvider
-
-Description: The ConfigContextProvider component uses multiple individual useState hooks for settings like debug, autoGen, autoGen3D, kicanvasPreview, and jscadPreview. It then manually saves each of these to localStorage in a useEffect hook. This approach is verbose and leads to a lot of boilerplate code.
-
-Proposed Fix: I will refactor this by consolidating all these settings into a single settings object, managed by a single useState hook. I can then use the useLocalStorage hook to automatically persist this entire settings object to local storage. This will significantly reduce the amount of code, eliminate the manual useEffect, and make the component cleaner and less error-prone.
-
-### [TASK-002] Unnecessary Prop Drilling
-
-Description: Currently, the main App.tsx component initializes the configInput state and then passes both the state and its setter function (setConfigInput) as props to the ConfigContextProvider. However, ConfigContextProvider is the component that actually uses and manages this state. This is a classic case of unnecessary prop drilling.
-
-Proposed Fix: I will move the useState hook for configInput directly into the ConfigContextProvider. This will make the context provider the single source of truth for the configuration, which is more aligned with its purpose. It will also simplify App.tsx and make the overall data flow of the application more logical and easier to follow.
-
-### [TASK-003] Complex runGeneration Function
-
-Description: The runGeneration function is a critical part of the application, but it has grown to be very long and complex. It currently handles multiple distinct responsibilities: parsing the configuration, checking for deprecation warnings, preparing a simplified config for previews, and finally executing the generation process. This makes the function difficult to read, test, and debug.
-
-Proposed Fix: I will break down the runGeneration function into several smaller, more focused functions. For example, I can create separate utility functions for parseConfig, checkForDeprecationWarnings, preparePreviewConfig, and executeGeneration. This will make the main runGeneration function a much simpler coordinator of these smaller functions, improving readability, maintainability, and making it much easier to write targeted unit tests.
-
-### [TASK-004] Replace Resizable Panel Library
-
-**Context:** The application currently uses a custom `ResizablePanel` component (`src/molecules/ResizablePanel.tsx`) that replaced `react-split`. The user previously expressed interest in switching to `react-resizable-panels` for a more robust solution, but the custom implementation has been working well and provides good control over styling and behavior.
-
-**Status:** The custom `ResizablePanel` component is currently in use and documented in DEVELOPMENT.md. This task can be considered low priority unless specific limitations are encountered.
-
-**Task (if needed):** If migration to `react-resizable-panels` is desired, this would involve:
-
-1. Adding `react-resizable-panels` as a project dependency.
-2. Identifying all components that use the current `ResizablePanel` component.
-3. Refactoring these components to use the `PanelGroup`, `Panel`, and `PanelResizeHandle` components from the new library.
-4. Ensuring that the new implementation is styled consistently with the application's theme and provides a smooth, VS Code-like user experience.
-5. Verifying that all related functionality, including E2E tests, remains intact after the migration.
-
-### [TASK-005] Unify Results Types Between Main and Worker
-
-**Context:** After updating the JSCAD pipeline to send and receive the entire `results` object, we introduced a lightweight `ResultsLike` type for worker messaging. The UI has a separate `Results` shape in `ConfigContext.tsx`. Maintaining two parallel shapes risks drift.
-
-**Task:** Extract a shared results type definition used by both the main thread and workers. Consider placing it under `src/types/results.ts` and importing it in `ConfigContext.tsx` and `src/workers/jscad.worker.types.ts` to ensure a single source of truth and stronger type safety.
-
-### [TASK-006] Modernize React act Usage In Tests
-
-**Context:** Some tests use `react-dom/test-utils` for `act`, which emits deprecation warnings. The recommended approach in React 18+ is to use `import { act } from 'react'`.
-
-**Task:** Update test files to import `act` from `react` instead of `react-dom/test-utils`, and adjust usage where needed. Verify no deprecation warnings remain during unit test runs.
-
-### [TASK-007] Optimize STL Handling in Worker
-
-**Context:** After migrating the JSCAD worker to use the new `convert` API, we continue to request ASCII `stla` output and decode it into strings for compatibility. This maintains current behavior but increases payload size and requires extra decoding logic in the worker.
-
-**Task:** Investigate switching to binary `stlb` output with typed array handling end-to-end. Update the worker and download pipeline to support binary blobs without manual header replacement, ensuring previews and downloads still function as expected.
-
-### [TASK-008] Implement Authenticated GitHub API Requests
-
-**Context:** The GitHub loading functionality currently uses unauthenticated API requests, which are limited to 60 requests per hour. For repositories with many footprints or submodules, this rate limit can be easily exceeded, preventing users from loading configurations.
-
-**Task:** Implement authenticated GitHub API requests to increase the rate limit to 5,000 requests per hour. This will involve:
-
-1. Adding OAuth integration or personal access token support
-2. Implementing secure token storage (localStorage with encryption or browser's credential storage)
-3. Creating a UI for users to configure their GitHub token (Settings page)
-4. Updating all fetch calls in `src/utils/github.ts` to include the Authorization header when a token is available
-5. Implementing fallback to unauthenticated requests if no token is provided
-6. Adding clear documentation on how to create a GitHub personal access token with appropriate permissions (public_repo scope)
-7. Handling token expiration and invalid token errors gracefully
-
-### [TASK-009] Add Template Folder Support to Local File Loading
-
-**Context:** The local file loading implementation currently supports extracting footprints from ZIP/EKB archives, but EKB archives can also contain a `template` folder with custom templates. The user mentioned this in the requirements, but it was not implemented.
-
-**Task:** Extend `loadLocalFile` in `src/utils/localFiles.ts` to extract and load template files from the `template` folder in archives, similar to how footprints are handled. This should:
-
-1. Extract all `.js` files from the `template` folder recursively
-2. Generate template names from relative paths (e.g., `template/custom/case.js` becomes `custom/case`)
-3. Add templates as injections with type `'template'` instead of `'footprint'`
-4. Integrate with the existing conflict resolution system
-5. Update tests to cover template extraction
-6. Update documentation in DEVELOPMENT.md
-
-### [TASK-010] Improve Local File Loading User Feedback
-
-**Context:** When users select a file via the button or drag-and-drop, there's no immediate feedback showing which file was selected before it starts loading. This can be confusing, especially if the file name is long or if the user wants to confirm their selection.
-
-**Task:** Enhance the local file loading UI to provide better feedback:
-
-1. Display the selected file name next to or below the "Choose File" button after selection
-2. Show file size and type information for selected files
-3. Add a visual indicator when a file is being processed (e.g., disable button, show spinner)
-4. Consider showing a preview of archive contents (number of footprints, templates) before loading
-5. Add E2E tests for the drag-and-drop functionality to ensure it works correctly in different browsers
-
-### [TASK-011] Add File Size Limits and Better Error Handling for Archives
-
-**Context:** The current implementation doesn't enforce any file size limits, which could lead to performance issues or browser crashes with very large archives. Additionally, error messages for corrupted or invalid archives could be more specific.
-
-**Task:** Improve robustness of local file loading:
-
-1. Add configurable file size limits (e.g., 50MB for archives, 10MB for text files) with clear error messages
-2. Implement better error handling for corrupted ZIP files (catch JSZip errors and provide user-friendly messages)
-3. Add validation for archive structure before processing (check if it's a valid ZIP, has required files)
-4. Handle edge cases like empty archives, archives with only footprints but no config.yaml (currently throws error, could be more graceful)
-5. Add timeout handling for very large files
-6. Update error messages to be more actionable (e.g., "The archive appears to be corrupted. Please verify the file and try again.")
-
-### [TASK-012] Unify File Loading Logic Between GitHub and Local Sources
-
-**Context:** Currently, GitHub loading (`src/utils/github.ts`) and local file loading (`src/utils/localFiles.ts`) have similar concerns (extracting config, footprints, handling conflicts) but separate implementations. The conflict resolution and footprint processing logic is shared, but the extraction logic could potentially be unified.
-
-**Task:** Refactor to reduce duplication and create a more maintainable architecture:
-
-1. Extract common footprint/template extraction logic into shared utilities
-2. Create a unified interface for file loading results that both GitHub and local loading can use
-3. Consider creating an abstraction layer that handles the common flow: extract -> validate -> resolve conflicts -> merge
-4. Ensure both loading methods use the same validation and error handling patterns
-5. Update tests to verify both paths work consistently
-
-### [TASK-013] Optimize Bulk Export with Concurrent Worker Pools
-
-**Context:** The "Export All" functionality compiles configurations sequentially using the background Ergogen worker. While this works perfectly and keeps the UI responsive, compiling many configurations sequentially can be slow for users with large collections.
-
-**Task:** Refactor the bulk export compiler in `src/utils/zip.ts` to support concurrent compilation pools. Instead of awaiting compilations one-by-one, spawn up to `navigator.hardwareConcurrency || 4` workers to compile configurations concurrently. Ensure the UI export progress bar dynamically calculates overall completion status and handles worker failures gracefully.
-
-### [TASK-014] Dynamic Google Tag Script Loading in JS
-
-**Context:** The Google Tag (`gtag.js`) script tag is currently hardcoded in `public/index.html`. In environments where `REACT_APP_GTAG_ID` is not defined (such as local development or forks), the browser still attempts to download the library from Google with the literal string `%REACT_APP_GTAG_ID%`, causing a console network error.
-
-**Task:** Refactor Google Tag initialization. Remove the script tags from `public/index.html` and implement dynamic script injection inside `src/utils/analytics.ts`. The script should only inject standard DOM script elements if the `REACT_APP_GTAG_ID` is present, valid, and not the CRA replacement placeholder.
-
-### [TASK-015] Componentize and Abstract Version Button Layouts
-
-**Context:** The GUI and Ergogen version buttons inside the sidebar footer are currently built using locally defined styled-components inside `SideNavigation.tsx`. If other sidebars or footers are added in the future, these styling structures might need to be duplicated.
-
-**Task:** Refactor the double-line version buttons and the vertical DEV badges into a reusable atomic/molecular component (e.g. `src/molecules/GithubVersionButton.tsx`) to keep `SideNavigation.tsx` focused and improve design system consistency.
-
-### [TASK-016] Implement Custom PWA Install Prompt Button in UI
-
-**Context:** Android Chrome utilizes strict user-engagement heuristics (minimum session time, clicks) before it will automatically surface the native PWA install banner. This behavior makes PWA installation discoverability inconsistent for users. By capturing the browser's native `beforeinstallprompt` event and presenting a custom "Install App" button within the UI, we can provide a persistent and reliable install experience on demand.
-
-**Task:** Implement a custom install flow for PWA:
-
-1. Create a custom hook or global context state to listen to the `beforeinstallprompt` window event, prevent the default browser banner, and capture the event payload.
-2. Expose the captured event and an install trigger function.
-3. Design and implement a subtle "Install App" button/chip in the sidebar, header, or settings menu that is conditionally displayed when the captured installation event is available.
-4. When clicked, trigger the installation prompt (`event.prompt()`) and handle the user's choice (accepted/dismissed) to update the UI state.
-5. Add appropriate analytics tracking events for PWA installation prompts and clicks.
-
-### [TASK-017] UI Notifications for Skipped Injections due to Feature Flags
-
-**Context:** When a user loads a configuration containing outlines or templates in an environment running an older Ergogen version (like the production site running `v4.2.1`), these injection types are filtered out silently on the main thread to prevent compilation errors inside the worker. However, because this filtering happens silently, the user receives no feedback explaining why their templates or outlines did not load.
-
-**Task:** Improve user feedback when feature flags gate features during load:
-
-1. When filtering out outlines or templates during ZIP/EKB loads, GitHub loads, or URL hash fragment loads, collect the names of any skipped files.
-2. If any files were skipped, display a non-intrusive warning notification or banner (e.g. using `src/organisms/Banners.tsx`) informing the user that some outlines or templates were skipped because the running Ergogen version doesn't support them, recommending that they run the version of the app supporting Ergogen `v4.3.0` or higher to use these libraries.
-
-### [TASK-018] Enhance Share Compatibility Dialog with Badges and Analytics
-
-**Context:** The `ShareVersionCompatibilityDialog` warning dialog displays simple warning text sections for version mismatches. It does not track acceptance or cancellation events, nor does it display prominent visual icons/badges.
-
-**Task:** Enhance the version compatibility check workflow:
-
-1. Add visually prominent warning icons or status badges (e.g., using curated SVG icons matching the theme warning state color) inside each mismatch block in `ShareVersionCompatibilityDialog`.
-2. Add a GitHub icon or pill badge for custom repository references to make links stand out.
-3. Integrate analytics event tracking when compatibility dialog decisions are made, logging `share_compatibility_accept` and `share_compatibility_cancel` events with metadata detailing the current and shared version parameters.
-4. Add corresponding unit tests to verify the events are sent and icons render properly.
-
-### [TASK-019] Extract Settings Layout Components to Reusable Atomic Styles
-
-**Context:** During the settings pane layout restructuring, we defined `SettingsCard` and `SettingsGroupTitle` styled components inside `Ergogen.tsx`. These layout components are currently settings-specific but could be reused if more options screens or side sheets are added in the future.
-
-**Task:** If other options tabs, popup submenus, or settings configurations are introduced, extract `SettingsCard` and `SettingsGroupTitle` into a unified settings layout file (e.g. under `src/atoms/SettingsLayout.tsx`) to maintain clean division of concerns and prevent code duplication.
-
-### [TASK-020] Make GA4 Tracking Debounce Delay Configurable
-
-**Context:** We implemented a 5-second tracking debounce delay in `ConfigContext.tsx` to prevent intermediate typing states from firing GA4 events. While 5 seconds works well, it is hardcoded inside `ConfigContext.tsx`.
-
-**Task:** Extract the 5-second debounce delay value into a central constants file (e.g. `src/context/constants.ts`) or make it a setting parameter, so developers can easily tune the debounce sensitivity.
-
-### [TASK-021] Pass STL Data as ArrayBuffer / Typed Array End-to-End
-
-**Context:** During binary STL parsing optimization in `StlPreview.tsx`, we identified that binary STL data is round-tripped through UTF-16 string conversion on the client side (`new TextEncoder().encode(stlString).buffer`) because the application preview/download pipelines pass file content strictly as strings. This conversion causes high memory allocation overhead and risks character corruption for bytes >= 128.
-
-**Task:** Refactor the file preview, case generation, and local file loading systems to accept and pass `ArrayBuffer` or `Uint8Array` directly for binary formats (such as STL), completely bypassing UTF-8 text serialization and `TextEncoder` decoding overhead.
