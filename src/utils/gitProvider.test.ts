@@ -37,7 +37,11 @@ describe('gitProviderRegistry', () => {
     const originalFetch = global.fetch;
     const mockFetch = jest.fn().mockResolvedValue({
       ok: true,
-      text: () => Promise.resolve('test config content'),
+      json: () =>
+        Promise.resolve({
+          type: 'file',
+          content: btoa('test config content'),
+        }),
     });
     global.fetch = mockFetch;
 
@@ -47,7 +51,7 @@ describe('gitProviderRegistry', () => {
       );
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://codeberg.org/cerement/cinereus-pe/raw/branch/main/cinereus-pe/cinereus-pe.yaml'
+        'https://codeberg.org/api/v1/repos/cerement/cinereus-pe/contents/cinereus-pe/cinereus-pe.yaml?ref=main'
       );
       expect(result?.config).toBe('test config content');
       expect(result?.footprints).toEqual([]);

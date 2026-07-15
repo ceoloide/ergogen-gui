@@ -6,6 +6,35 @@ import {
 } from './gitProvider';
 import { isFeatureEnabled } from './featureFlags';
 import { parseGitmodules, fetchFootprintsFromRepo } from './github';
+import { enforceFileSizeLimit } from './ergogenBundleLoader';
+
+// Helper to fetch file content CORS-safely using the Gitea contents API and decoding Base64
+const fetchFileContentCodeberg = async (
+  owner: string,
+  repo: string,
+  path: string,
+  ref: string
+): Promise<string> => {
+  const apiUrl = `https://codeberg.org/api/v1/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
+  const res = await fetch(apiUrl);
+  if (!res.ok) {
+    throw new Error(
+      `Failed to fetch file content from Codeberg API: ${res.status}`
+    );
+  }
+  const data = await res.json();
+  if (data.type !== 'file' || !data.content) {
+    throw new Error('Target path is not a file or has no content');
+  }
+  // Decode Base64 content safely supporting UTF-8
+  const cleaned = data.content.replace(/\s/g, '');
+  return decodeURIComponent(
+    atob(cleaned)
+      .split('')
+      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+      .join('')
+  );
+};
 
 class CodebergProvider implements GitProvider {
   canHandle(url: string): boolean {
@@ -75,140 +104,150 @@ class CodebergProvider implements GitProvider {
     ) => {
       console.log('[Codeberg] Checking for .gitmodules file');
       try {
-        const gitmodulesUrl = `https://codeberg.org/${owner}/${repo}/raw/branch/${branch}/.gitmodules`;
-        const gitmodulesResponse = await fetch(gitmodulesUrl);
-        if (gitmodulesResponse && gitmodulesResponse.ok) {
-          console.log('[Codeberg] .gitmodules found, parsing submodules');
-          const gitmodulesContent = await gitmodulesResponse.text();
-          const submodules = parseGitmodules(gitmodulesContent);
+        const gitmodulesContent = await fetchFileContentCodeberg(
+          owner,
+          repo,
+          '.gitmodules',
+          branch
+        );
+        console.log('[Codeberg] .gitmodules found, parsing submodules');
+        const submodules = parseGitmodules(gitmodulesContent);
 
-          for (const submodule of submodules) {
-            if (
-              submodule.path.startsWith(footprintsPath) ||
-              (submodule.path.startsWith(outlinesPath) &&
-                isFeatureEnabled('outlines')) ||
-              (submodule.path.startsWith(templatesPath) &&
-                isFeatureEnabled('templates'))
-            ) {
-              const isOutline = submodule.path.startsWith(outlinesPath);
-              const isTemplate = submodule.path.startsWith(templatesPath);
-              const currentPath = isOutline
-                ? outlinesPath
-                : isTemplate
-                  ? templatesPath
-                  : footprintsPath;
-              const currentCollection = isOutline
-                ? outlines
-                : isTemplate
-                  ? templates
-                  : footprints;
+        for (const submodule of submodules) {
+          if (
+            submodule.path.startsWith(footprintsPath) ||
+            (submodule.path.startsWith(outlinesPath) &&
+              isFeatureEnabled('outlines')) ||
+            (submodule.path.startsWith(templatesPath) &&
+              isFeatureEnabled('templates'))
+          ) {
+            const isOutline = submodule.path.startsWith(outlinesPath);
+            const isTemplate = submodule.path.startsWith(templatesPath);
+            const currentPath = isOutline
+              ? outlinesPath
+              : isTemplate
+                ? templatesPath
+                : footprintsPath;
+            const currentCollection = isOutline
+              ? outlines
+              : isTemplate
+                ? templates
+                : footprints;
 
+            console.log(
+              `[Codeberg] Processing submodule: ${submodule.path} -> ${submodule.url}`
+            );
+
+            const submoduleMatch = submodule.url.match(
+              /(?:github\.com|codeberg\.org)[/:]([^/]+)\/([^/.]+)/
+            );
+            if (submoduleMatch) {
+              const [, subOwner, subRepo] = submoduleMatch;
+              const relativePath = submodule.path.substring(
+                currentPath.length + 1
+              );
               console.log(
-                `[Codeberg] Processing submodule: ${submodule.path} -> ${submodule.url}`
+                `[Codeberg] Submodule relative path: ${relativePath}`
               );
 
-              const submoduleMatch = submodule.url.match(
-                /(?:github\.com|codeberg\.org)[/:]([^/]+)\/([^/.]+)/
-              );
-              if (submoduleMatch) {
-                const [, subOwner, subRepo] = submoduleMatch;
-                const relativePath = submodule.path.substring(
-                  currentPath.length + 1
-                );
-                console.log(
-                  `[Codeberg] Submodule relative path: ${relativePath}`
-                );
+              const isSubmoduleCodeberg =
+                submodule.url.includes('codeberg.org');
+              let submoduleFootprints: GitHubFootprint[] = [];
 
-                const isSubmoduleCodeberg =
-                  submodule.url.includes('codeberg.org');
-                let submoduleFootprints: GitHubFootprint[] = [];
-
-                if (isSubmoduleCodeberg) {
-                  const fetchSubmoduleFilesCodeberg = async (
-                    subOwnerName: string,
-                    subRepoName: string,
-                    subBranch: string
-                  ): Promise<GitHubFootprint[]> => {
-                    const resultFps: GitHubFootprint[] = [];
-                    const fetchRec = async (p: string) => {
-                      const api = `https://codeberg.org/api/v1/repos/${subOwnerName}/${subRepoName}/contents/${p}?ref=${subBranch}`;
-                      const r = await fetch(api);
-                      if (!r.ok) return;
-                      const items = await r.json();
-                      if (Array.isArray(items)) {
-                        for (const item of items) {
-                          if (item.type === 'file' && item.download_url) {
-                            const fileRes = await fetch(item.download_url);
-                            if (fileRes.ok) {
-                              const content = await fileRes.text();
-                              const cleanName = item.path.replace(
-                                /\.[^/.]+$/,
-                                ''
-                              );
-                              resultFps.push({ name: cleanName, content });
-                            }
-                          } else if (item.type === 'dir') {
-                            await fetchRec(item.path);
+              if (isSubmoduleCodeberg) {
+                const fetchSubmoduleFilesCodeberg = async (
+                  subOwnerName: string,
+                  subRepoName: string,
+                  subBranch: string
+                ): Promise<GitHubFootprint[]> => {
+                  const resultFps: GitHubFootprint[] = [];
+                  const fetchRec = async (p: string) => {
+                    const api = `https://codeberg.org/api/v1/repos/${subOwnerName}/${subRepoName}/contents/${p}?ref=${subBranch}`;
+                    const r = await fetch(api);
+                    if (!r.ok) return;
+                    const items = await r.json();
+                    if (Array.isArray(items)) {
+                      for (const item of items) {
+                        if (item.type === 'file') {
+                          try {
+                            const content = await fetchFileContentCodeberg(
+                              subOwnerName,
+                              subRepoName,
+                              item.path,
+                              subBranch
+                            );
+                            const cleanName = item.path.replace(
+                              /\.[^/.]+$/,
+                              ''
+                            );
+                            resultFps.push({ name: cleanName, content });
+                          } catch (err) {
+                            console.warn(
+                              `Failed to fetch file: ${item.path}`,
+                              err
+                            );
                           }
+                        } else if (item.type === 'dir') {
+                          await fetchRec(item.path);
                         }
                       }
-                    };
-                    await fetchRec('');
-                    return resultFps;
+                    }
                   };
+                  await fetchRec('');
+                  return resultFps;
+                };
 
+                try {
+                  submoduleFootprints = await fetchSubmoduleFilesCodeberg(
+                    subOwner,
+                    subRepo,
+                    'main'
+                  );
+                } catch (_e) {
                   try {
                     submoduleFootprints = await fetchSubmoduleFilesCodeberg(
                       subOwner,
                       subRepo,
-                      'main'
+                      'master'
                     );
-                  } catch (_e) {
-                    try {
-                      submoduleFootprints = await fetchSubmoduleFilesCodeberg(
-                        subOwner,
-                        subRepo,
-                        'master'
-                      );
-                    } catch (_e2) {
-                      console.warn(
-                        `Failed to fetch Codeberg submodule footprints from ${submodule.url}`
-                      );
-                    }
+                  } catch (_e2) {
+                    console.warn(
+                      `Failed to fetch Codeberg submodule footprints from ${submodule.url}`
+                    );
                   }
-                } else {
+                }
+              } else {
+                try {
+                  submoduleFootprints = await fetchFootprintsFromRepo(
+                    subOwner,
+                    subRepo,
+                    'main',
+                    ''
+                  );
+                } catch (_e) {
                   try {
                     submoduleFootprints = await fetchFootprintsFromRepo(
                       subOwner,
                       subRepo,
-                      'main',
+                      'master',
                       ''
                     );
-                  } catch (_e) {
-                    try {
-                      submoduleFootprints = await fetchFootprintsFromRepo(
-                        subOwner,
-                        subRepo,
-                        'master',
-                        ''
-                      );
-                    } catch (_e2) {
-                      console.warn(
-                        `Failed to fetch GitHub submodule footprints from ${submodule.url}`
-                      );
-                    }
+                  } catch (_e2) {
+                    console.warn(
+                      `Failed to fetch GitHub submodule footprints from ${submodule.url}`
+                    );
                   }
                 }
-
-                const prefixedFootprints = submoduleFootprints.map((fp) => ({
-                  name: relativePath ? `${relativePath}/${fp.name}` : fp.name,
-                  content: fp.content,
-                }));
-                console.log(
-                  `[Codeberg] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
-                );
-                currentCollection.push(...prefixedFootprints);
               }
+
+              const prefixedFootprints = submoduleFootprints.map((fp) => ({
+                name: relativePath ? `${relativePath}/${fp.name}` : fp.name,
+                content: fp.content,
+              }));
+              console.log(
+                `[Codeberg] Added ${prefixedFootprints.length} footprints from submodule ${submodule.path}`
+              );
+              currentCollection.push(...prefixedFootprints);
             }
           }
         }
@@ -222,25 +261,22 @@ class CodebergProvider implements GitProvider {
 
     // If it's a direct file URL, download it directly without searching repository root
     if (!isRepoRoot(baseUrl)) {
-      const rawUrl = baseUrl
-        .replace('/src/branch/', '/raw/branch/')
-        .replace('/src/commit/', '/raw/commit/');
+      const branch = pathSegments[4] || 'main';
+      const filePath = pathSegments.slice(5).join('/');
+      if (!filePath) {
+        throw new Error('Invalid Codeberg file URL. File path not specified.');
+      }
 
       console.log(
-        `[Codeberg] Direct file link detected, fetching raw content from: ${rawUrl}`
+        `[Codeberg] Direct file link detected, fetching content via API: ${owner}/${repo}/${filePath} (ref: ${branch})`
       );
-      const response = await fetch(rawUrl);
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch file from Codeberg: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const config = await response.text();
-      // Enforce file size limit of 10MB for config
-      if (config.length > 10 * 1024 * 1024) {
-        throw new Error('Remote configuration file exceeds the 10MB limit.');
-      }
+      const config = await fetchFileContentCodeberg(
+        owner,
+        repo,
+        filePath,
+        branch
+      );
+      enforceFileSizeLimit(config.length, false);
 
       const filename = pathSegments[pathSegments.length - 1];
       const shouldLoadFootprints =
@@ -260,7 +296,6 @@ class CodebergProvider implements GitProvider {
       }
 
       // If it is config.yaml/config.yml, load footprints from its containing folder
-      const branch = pathSegments[4] || 'main';
       const dirSegments = pathSegments.slice(5, -1);
       const dirPath = dirSegments.join('/');
 
@@ -290,14 +325,20 @@ class CodebergProvider implements GitProvider {
                 const hasAllowedExt = allowedExtensions.some((ext) =>
                   item.name.endsWith(ext)
                 );
-                if (hasAllowedExt && item.download_url) {
-                  const fileRes = await fetch(item.download_url);
-                  if (fileRes.ok) {
-                    const content = await fileRes.text();
+                if (hasAllowedExt) {
+                  try {
+                    const content = await fetchFileContentCodeberg(
+                      owner,
+                      repo,
+                      item.path,
+                      branch
+                    );
                     const cleanName = item.path
                       .slice(fullPath.length + 1)
                       .replace(/\.[^/.]+$/, '');
                     targetCollection.push({ name: cleanName, content });
+                  } catch (err) {
+                    console.warn(`Failed to fetch file ${item.path}:`, err);
                   }
                 }
               } else if (item.type === 'dir') {
@@ -364,30 +405,25 @@ class CodebergProvider implements GitProvider {
       // Try fetching config.yaml first
       let configText = '';
       let configPath = 'config.yaml';
-      let response = await fetch(
-        `https://codeberg.org/${owner}/${repo}/raw/branch/${targetBranch}/config.yaml`
-      );
-
-      if (!response.ok) {
-        // Fall back to config.yml
-        response = await fetch(
-          `https://codeberg.org/${owner}/${repo}/raw/branch/${targetBranch}/config.yml`
+      try {
+        configText = await fetchFileContentCodeberg(
+          owner,
+          repo,
+          'config.yaml',
+          targetBranch
+        );
+      } catch (_e) {
+        configText = await fetchFileContentCodeberg(
+          owner,
+          repo,
+          'config.yml',
+          targetBranch
         );
         configPath = 'config.yml';
       }
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch config.yaml or config.yml from branch: ${targetBranch}`
-        );
-      }
-
-      configText = await response.text();
-
       // Enforce file size limit of 10MB for config
-      if (configText.length > 10 * 1024 * 1024) {
-        throw new Error('Remote configuration file exceeds the 10MB limit.');
-      }
+      enforceFileSizeLimit(configText.length, false);
 
       const footprints: GitHubFootprint[] = [];
       const outlines: GitHubFootprint[] = [];
@@ -411,14 +447,20 @@ class CodebergProvider implements GitProvider {
                 const hasAllowedExt = allowedExtensions.some((ext) =>
                   item.name.endsWith(ext)
                 );
-                if (hasAllowedExt && item.download_url) {
-                  const fileRes = await fetch(item.download_url);
-                  if (fileRes.ok) {
-                    const content = await fileRes.text();
+                if (hasAllowedExt) {
+                  try {
+                    const content = await fetchFileContentCodeberg(
+                      owner,
+                      repo,
+                      item.path,
+                      targetBranch
+                    );
                     const cleanName = item.path
                       .slice(dirPath.length + 1)
                       .replace(/\.[^/.]+$/, '');
                     targetCollection.push({ name: cleanName, content });
+                  } catch (err) {
+                    console.warn(`Failed to fetch file ${item.path}:`, err);
                   }
                 }
               } else if (item.type === 'dir') {
