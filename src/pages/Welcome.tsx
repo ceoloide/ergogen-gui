@@ -597,7 +597,7 @@ const Welcome = () => {
     configContext?.setIsGenerating(false);
   };
 
-  const handleGitHub = () => {
+  const handleGitProvider = () => {
     if (!githubInput || !configContext) return;
     const { setError, clearError, setIsGenerating } = configContext;
     setIsRepoLoading(true);
@@ -946,7 +946,7 @@ const Welcome = () => {
                       githubInput.trim() !== ''
                     ) {
                       e.preventDefault();
-                      handleGitHub();
+                      handleGitProvider();
                     }
                   }}
                   disabled={isLoading}
@@ -954,7 +954,7 @@ const Welcome = () => {
                   data-testid="github-input"
                 />
                 <LoadButton
-                  onClick={handleGitHub}
+                  onClick={handleGitProvider}
                   disabled={isLoading || !githubInput}
                   aria-label="Load configuration from repository"
                   data-testid="github-load-button"
