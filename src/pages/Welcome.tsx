@@ -560,7 +560,10 @@ const Welcome = () => {
         }
       })
       .catch((e) => {
-        setError(`Failed to load from remote repository: ${e.message}`);
+        const providerName = provider === 'github' ? 'GitHub' : 'Codeberg';
+        setError(
+          `Failed to load from ${providerName} repository: ${e.message}`
+        );
         configContext?.setInfo(null);
         // Ensure we reset loading state and don't navigate
         setIsRepoLoading(false);
