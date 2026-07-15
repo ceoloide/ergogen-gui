@@ -57,4 +57,56 @@ describe('gitProviderRegistry', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('should find quokka.yaml in root via BFS on Codeberg', async () => {
+    const provider = gitProviderRegistry.resolve(
+      'https://codeberg.org/dlford/quokka'
+    );
+    expect(provider).toBeDefined();
+
+    const originalFetch = global.fetch;
+    const mockFetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/raw/quokka.yaml')) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('quokka config content'),
+        });
+      }
+      if (
+        url.includes('/contents/config.yaml') ||
+        url.includes('/contents/config.yml') ||
+        url.includes('/contents/ergogen/')
+      ) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+        });
+      }
+      if (url.includes('/contents?ref=main')) {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve([
+              { name: 'quokka.yaml', type: 'file', path: 'quokka.yaml' },
+              { name: 'src', type: 'dir', path: 'src' },
+            ]),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 404,
+      });
+    });
+    global.fetch = mockFetch;
+
+    try {
+      const result = await provider?.fetchConfig(
+        'https://codeberg.org/dlford/quokka'
+      );
+      expect(result?.config).toBe('quokka config content');
+      expect(result?.configPath).toBe('');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

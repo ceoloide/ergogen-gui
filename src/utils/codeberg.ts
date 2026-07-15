@@ -252,11 +252,11 @@ class CodebergProvider implements GitProvider {
     const bfsForYamlFilesCodeberg = async (
       targetBranch: string
     ): Promise<{
-      configYamls: { path: string; content: string }[];
-      anyYamls: { path: string; content: string }[];
+      configYamls: string[];
+      anyYamls: string[];
     }> => {
-      const configYamls: { path: string; content: string }[] = [];
-      const anyYamls: { path: string; content: string }[] = [];
+      const configYamls: string[] = [];
+      const anyYamls: string[] = [];
       const queue: string[] = [''];
       const visited = new Set<string>();
 
@@ -265,48 +265,32 @@ class CodebergProvider implements GitProvider {
         if (visited.has(currentPath)) continue;
         visited.add(currentPath);
 
-        const apiUrl = `https://codeberg.org/api/v1/repos/${owner}/${repo}/contents/${currentPath}?ref=${targetBranch}`;
+        const pathPart = currentPath ? `/${currentPath}` : '';
+        const apiUrl = `https://codeberg.org/api/v1/repos/${owner}/${repo}/contents${pathPart}?ref=${targetBranch}`;
         try {
           const response = await fetch(apiUrl);
           if (!response.ok) continue;
 
           const items = await response.json();
           if (Array.isArray(items)) {
-            await Promise.all(
-              items.map(
-                async (item: { type: string; name: string; path: string }) => {
-                  const isYaml =
-                    item.name.endsWith('.yaml') || item.name.endsWith('.yml');
-                  if (item.type === 'file' && isYaml) {
-                    try {
-                      const content = await fetchFileContentCodeberg(
-                        owner,
-                        repo,
-                        item.path,
-                        targetBranch
-                      );
-                      const filePath = item.path;
-
-                      if (
-                        item.name === 'config.yaml' ||
-                        item.name === 'config.yml'
-                      ) {
-                        configYamls.push({ path: filePath, content });
-                      } else {
-                        anyYamls.push({ path: filePath, content });
-                      }
-                    } catch (err) {
-                      console.warn(
-                        `Failed to fetch file content in BFS: ${item.path}`,
-                        err
-                      );
-                    }
-                  } else if (item.type === 'dir') {
-                    queue.push(item.path);
+            for (const item of items) {
+              if (item.type === 'file') {
+                const isYaml =
+                  item.name.endsWith('.yaml') || item.name.endsWith('.yml');
+                if (isYaml) {
+                  if (
+                    item.name === 'config.yaml' ||
+                    item.name === 'config.yml'
+                  ) {
+                    configYamls.push(item.path);
+                  } else {
+                    anyYamls.push(item.path);
                   }
                 }
-              )
-            );
+              } else if (item.type === 'dir') {
+                queue.push(item.path);
+              }
+            }
           }
         } catch (_error) {
           continue;
@@ -519,25 +503,31 @@ class CodebergProvider implements GitProvider {
                 await bfsForYamlFilesCodeberg(targetBranch);
 
               if (configYamls.length > 0) {
-                const firstConfig = configYamls[0];
-                configText = firstConfig.content;
-                configPath = firstConfig.path.substring(
-                  0,
-                  firstConfig.path.lastIndexOf('/')
+                const selectedPath = configYamls[0];
+                configText = await fetchFileContentCodeberg(
+                  owner,
+                  repo,
+                  selectedPath,
+                  targetBranch
                 );
-                console.log(
-                  `[Codeberg] Found config file at: ${firstConfig.path}`
-                );
+                configPath = selectedPath.includes('/')
+                  ? selectedPath.substring(0, selectedPath.lastIndexOf('/'))
+                  : '';
+                console.log(`[Codeberg] Found config file at: ${selectedPath}`);
               } else if (anyYamls.length > 0) {
-                const firstYaml = anyYamls[0];
-                configText = firstYaml.content;
-                configPath = firstYaml.path.substring(
-                  0,
-                  firstYaml.path.lastIndexOf('/')
+                const selectedPath = anyYamls[0];
+                configText = await fetchFileContentCodeberg(
+                  owner,
+                  repo,
+                  selectedPath,
+                  targetBranch
                 );
+                configPath = selectedPath.includes('/')
+                  ? selectedPath.substring(0, selectedPath.lastIndexOf('/'))
+                  : '';
                 shouldLoadFootprints = false;
                 console.log(
-                  `[Codeberg] No default config file found, using: ${firstYaml.path}`
+                  `[Codeberg] No default config file found, using: ${selectedPath}`
                 );
               } else {
                 throw new Error(
