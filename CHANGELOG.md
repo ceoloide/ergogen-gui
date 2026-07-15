@@ -1,5 +1,21 @@
 # Changelog
 
+## Upgraded Ergogen Compiler to v4.3.0
+
+July 15, 2026
+
+![A diagram illustrating the upgrade of the Ergogen compiler dependency to v4.3.0 along with type checks.](./public/images/changelog/placeholder.png)
+
+Previously, the application was using an older version of Ergogen (`^4.2.1`), missing the latest upstream compiler enhancements and bug fixes. Furthermore, attempting to upgrade the Ergogen compiler version encountered TypeScript type conflicts.
+
+To address these limitations, we updated the underlying Ergogen package to `github:ceoloide/ergogen#v4.3.0` and rebuilt the corresponding compiled Web Worker artifacts. We resolved TypeScript compilation errors by correcting the return type signature of `parseConfig` inside the configuration context from an array-oriented type to a generic record.
+
+**What changed:**
+
+- **Upgraded Ergogen Compiler**: Bumps the Ergogen compiler dependency to `v4.3.0`
+- **TypeScript Type Resolution**: Refactors the parsed configuration parser types to allow safe type casting of configuration sections
+- **Version Bump**: Bumps the project version to `0.11.13`
+
 ## Optimized STL Parsing Performance
 
 July 15, 2026
