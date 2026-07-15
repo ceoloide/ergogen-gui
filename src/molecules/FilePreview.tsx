@@ -3,6 +3,7 @@ import PcbPreview from '../atoms/PcbPreview';
 import StlPreview from '../atoms/StlPreview';
 import SvgPreview from '../atoms/SvgPreview';
 import TextPreview from '../atoms/TextPreview';
+import { theme } from '../theme/theme';
 
 const PlaceholderContainer = styled.div`
   display: flex;
@@ -11,7 +12,7 @@ const PlaceholderContainer = styled.div`
   justify-content: center;
   height: 100%;
   width: 100%;
-  background-color: ${({ theme }) => theme.colors.background};
+  background-color: ${theme.colors.background};
 `;
 
 const PlaceholderLogo = styled.img`
