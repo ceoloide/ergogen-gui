@@ -1,21 +1,21 @@
 # Changelog
 
-## SVG Outlines & Custom PWA Install Integration
+## SVG Outlines & Offline PWA Settings Integration
 
 July 16, 2026
 
-![Visual preview of SVG outlines rendering and PWA install sidebar integration.](./public/images/changelog/placeholder.png)
+![Visual preview of SVG outlines rendering and PWA install settings integration.](./public/images/changelog/placeholder.png)
 
 Previously, custom outline injections were restricted only to JavaScript files, preventing designers from dropping vector SVG files directly into their keyboard configuration folder. Additionally, discovering and trigger-promoting PWA installation on Android and desktop devices depended on browser-specific heuristics, resulting in poor user engagement.
 
-To improve custom drawing support and PWA usability, we implemented native SVG file outline parsing that dynamically wraps vector path definitions in a JS Maker.js model, allowing `.svg` outlines to load seamlessly alongside other assets. We also added an "Install App" button in the sidebar header to the left of the close button, utilizing the captured `beforeinstallprompt` event to enable on-demand installation.
+To improve custom drawing support and PWA usability, we implemented native SVG file outline parsing that dynamically wraps vector path definitions in the native `svg_paths_to_outline` helper, allowing `.svg` outlines to load seamlessly alongside other assets. We also added a dedicated **"Offline"** settings group inside the settings panel with an interactive **"Offline App"** button option, utilizing the captured `beforeinstallprompt` event to enable on-demand installation.
 
 **What changed:**
 
-- **Native SVG Outlines**: Dropping or loading ZIPs containing `.svg` outline files now parses them dynamically and integrates them into standard Maker.js outlines.
-- **Sidebar PWA Install Button**: A subtle install chip appears in the sidebar header to trigger PWA installation, backed by GA4 analytics events.
+- **Native SVG Outlines**: Dropping or loading ZIPs containing `.svg` outline files now parses them dynamically and integrates them into standard outlines utilizing the `svg_paths_to_outline` wrapper.
+- **Offline Settings Group**: Added an interactive "Offline App" button option under a dedicated Offline settings group, displaying custom states ("Install App", "Installing...", "Installed", "Unavailable") depending on browser and installation status.
 - **Dynamic Require Resolvers**: The worker's custom require resolution now handles relative template requires like `../../packages.json` to prevent runtime crashes.
-- **Thematic Warning Badges**: The share compatibility warning dialog has been enhanced with warnings badges, and floating alerts notify users if outline features are gated.
+- **Thematic Warning Badges**: The share compatibility warning dialog has been enhanced with warning badges, and floating alerts notify users if outline features are gated.
 
 ## Build Stack Modernization Benchmark Report
 
