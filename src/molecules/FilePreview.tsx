@@ -4,6 +4,7 @@ const PcbPreview = lazy(() => import('../atoms/PcbPreview'));
 const StlPreview = lazy(() => import('../atoms/StlPreview'));
 import SvgPreview from '../atoms/SvgPreview';
 import TextPreview from '../atoms/TextPreview';
+import PreviewLoader from '../atoms/PreviewLoader';
 import { theme } from '../theme/theme';
 
 const PlaceholderContainer = styled.div`
@@ -147,7 +148,9 @@ const FilePreview = ({
         );
       case 'kicad_pcb':
         return (
-          <Suspense fallback={<div>Loading preview...</div>}>
+          <Suspense
+            fallback={<PreviewLoader text="Loading layout preview..." />}
+          >
             <PcbPreview
               pcb={previewContent as string}
               previewKey={previewKey}
@@ -159,7 +162,9 @@ const FilePreview = ({
         );
       case 'stl':
         return (
-          <Suspense fallback={<div>Loading preview...</div>}>
+          <Suspense
+            fallback={<PreviewLoader text="Loading 3D STL preview..." />}
+          >
             <StlPreview
               stl={previewContent}
               aria-label={ariaLabel || `STL preview for ${previewKey}`}
