@@ -17,8 +17,8 @@
     "@testing-library/user-event",
     "@types/styled-components",
     "@typescript-eslint/parser",
+    "baseline-browser-mapping",
     "eslint-plugin-prettier",
-    "makerjs",
     "markdownlint"
   ]
 }
