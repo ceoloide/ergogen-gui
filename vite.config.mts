@@ -45,6 +45,27 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('three') || id.includes('@react-three') || id.includes('three-stdlib') || id.includes('three-mesh-bvh')) {
+                return 'three';
+              }
+              if (id.includes('makerjs')) {
+                return 'makerjs';
+              }
+              if (id.includes('jszip')) {
+                return 'jszip';
+              }
+              if (id.includes('js-yaml')) {
+                return 'js-yaml';
+              }
+              return 'vendor';
+            }
+          }
+        }
+      }
     },
     worker: {
       format: 'iife',

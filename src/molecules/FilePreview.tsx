@@ -1,6 +1,7 @@
+import { lazy, Suspense } from 'react';
 import styled from 'styled-components';
-import PcbPreview from '../atoms/PcbPreview';
-import StlPreview from '../atoms/StlPreview';
+const PcbPreview = lazy(() => import('../atoms/PcbPreview'));
+const StlPreview = lazy(() => import('../atoms/StlPreview'));
 import SvgPreview from '../atoms/SvgPreview';
 import TextPreview from '../atoms/TextPreview';
 import { theme } from '../theme/theme';
@@ -131,21 +132,25 @@ const FilePreview = ({
         );
       case 'kicad_pcb':
         return (
-          <PcbPreview
-            pcb={previewContent as string}
-            previewKey={previewKey}
-            key={previewKey}
-            aria-label={ariaLabel || `PCB preview for ${previewKey}`}
-            data-testid={dataTestId && `${dataTestId}-pcb`}
-          />
+          <Suspense fallback={<div>Loading preview...</div>}>
+            <PcbPreview
+              pcb={previewContent as string}
+              previewKey={previewKey}
+              key={previewKey}
+              aria-label={ariaLabel || `PCB preview for ${previewKey}`}
+              data-testid={dataTestId && `${dataTestId}-pcb`}
+            />
+          </Suspense>
         );
       case 'stl':
         return (
-          <StlPreview
-            stl={previewContent}
-            aria-label={ariaLabel || `STL preview for ${previewKey}`}
-            data-testid={dataTestId && `${dataTestId}-stl`}
-          />
+          <Suspense fallback={<div>Loading preview...</div>}>
+            <StlPreview
+              stl={previewContent}
+              aria-label={ariaLabel || `STL preview for ${previewKey}`}
+              data-testid={dataTestId && `${dataTestId}-stl`}
+            />
+          </Suspense>
         );
       default:
         return 'No preview available';
