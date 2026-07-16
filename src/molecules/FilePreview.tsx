@@ -4,7 +4,6 @@ const PcbPreview = lazy(() => import('../atoms/PcbPreview'));
 const StlPreview = lazy(() => import('../atoms/StlPreview'));
 import SvgPreview from '../atoms/SvgPreview';
 import TextPreview from '../atoms/TextPreview';
-import PreviewLoader from '../atoms/PreviewLoader';
 import { theme } from '../theme/theme';
 
 const PlaceholderContainer = styled.div`
@@ -25,6 +24,25 @@ const PlaceholderLogo = styled.img`
   -webkit-user-drag: none;
   user-drag: none;
 `;
+
+const LoaderText = styled.span`
+  color: ${theme.colors.textDarkest};
+  font-size: ${theme.fontSizes.sm};
+  margin-top: 1rem;
+  font-family: ${theme.fonts.body};
+  user-select: none;
+`;
+
+const PreviewLoader = () => (
+  <PlaceholderContainer>
+    <PlaceholderLogo
+      src={`${import.meta.env.BASE_URL}ergogen.png`}
+      alt="Ergogen Logo"
+      draggable="false"
+    />
+    <LoaderText>Loading preview...</LoaderText>
+  </PlaceholderContainer>
+);
 
 /**
  * Props for the FilePreview component.
@@ -148,9 +166,7 @@ const FilePreview = ({
         );
       case 'kicad_pcb':
         return (
-          <Suspense
-            fallback={<PreviewLoader text="Loading layout preview..." />}
-          >
+          <Suspense fallback={<PreviewLoader />}>
             <PcbPreview
               pcb={previewContent as string}
               previewKey={previewKey}
@@ -162,9 +178,7 @@ const FilePreview = ({
         );
       case 'stl':
         return (
-          <Suspense
-            fallback={<PreviewLoader text="Loading 3D STL preview..." />}
-          >
+          <Suspense fallback={<PreviewLoader />}>
             <StlPreview
               stl={previewContent}
               aria-label={ariaLabel || `STL preview for ${previewKey}`}
