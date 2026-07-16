@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
@@ -23,6 +23,34 @@ export default defineConfig(({ mode }) => {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         },
       }),
+
+      // Prefetch plugin for dynamic build chunks
+      {
+        name: 'vite-plugin-prefetch',
+        transformIndexHtml(html, ctx) {
+          if (!ctx.bundle) return html;
+          const baseUrl = env.VITE_PUBLIC_URL || env.PUBLIC_URL || '/';
+          const normalizeUrl = (path: string) => {
+            const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+            const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+            return `${cleanBase}${cleanPath}`;
+          };
+
+          const prefetchLinks = Object.values(ctx.bundle)
+            .filter(
+              (chunk) =>
+                chunk.type === 'chunk' &&
+                (chunk.fileName.includes('three-') || chunk.fileName.includes('PcbPreview-'))
+            )
+            .map(
+              (chunk) =>
+                `  <link rel="prefetch" href="${normalizeUrl(chunk.fileName)}" as="script">`
+            )
+            .join('\n');
+
+          return html.replace('</head>', `${prefetchLinks}\n</head>`);
+        },
+      } as Plugin,
     ],
     base: env.VITE_PUBLIC_URL || env.PUBLIC_URL || '/',
     define: {

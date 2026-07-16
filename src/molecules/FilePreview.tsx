@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense } from 'react';
 import styled from 'styled-components';
 const PcbPreview = lazy(() => import('../atoms/PcbPreview'));
 const StlPreview = lazy(() => import('../atoms/StlPreview'));
@@ -84,20 +84,6 @@ const FilePreview = ({
   'data-testid': dataTestId,
   'aria-label': ariaLabel,
 }: Props) => {
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      window.requestIdleCallback(() => {
-        void import('../atoms/StlPreview');
-        void import('../atoms/PcbPreview');
-      });
-    } else {
-      const id = setTimeout(() => {
-        void import('../atoms/StlPreview');
-        void import('../atoms/PcbPreview');
-      }, 2000);
-      return () => clearTimeout(id);
-    }
-  }, []);
   const isEmpty =
     !previewContent ||
     (typeof previewContent === 'string' && previewContent === '') ||
