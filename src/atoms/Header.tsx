@@ -312,7 +312,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
   };
 
   const versionInfo = useMemo(
-    () => getErgogenVersionInfo(process.env.REACT_APP_ERGOGEN_VERSION),
+    () => getErgogenVersionInfo(import.meta.env.VITE_ERGOGEN_VERSION),
     []
   );
 
@@ -346,7 +346,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
               data-testid="logo-button"
             >
               <LogoImage
-                src={`${process.env.PUBLIC_URL}/ergogen.png`}
+                src={`${import.meta.env.BASE_URL}/ergogen.png`}
                 alt="Ergogen logo"
               />
             </LogoButton>

@@ -1,0 +1,11 @@
+{
+  "src/**/*.{ts,tsx}": [
+    "eslint --fix",
+    "prettier --write",
+    "vitest related --run --passWithNoTests"
+  ],
+  "e2e/**/*.ts": ["eslint --fix", "prettier --write"],
+  "patch/**/*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
+  "**/*.json": ["prettier --write"],
+  "**/*.md": ["markdownlint --fix", "prettier --write"]
+}

@@ -817,7 +817,7 @@ const Welcome = () => {
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
+          data-testid="conflict-dialog"
         />
       )}
       <WelcomeContainer>

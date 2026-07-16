@@ -39,7 +39,7 @@ export const encodeConfig = (
     guiVersion: guiVersion || guiPkg.version,
     ergogenVersion:
       ergogenVersion ||
-      getFullErgogenVersion(process.env.REACT_APP_ERGOGEN_VERSION),
+      getFullErgogenVersion(import.meta.env.VITE_ERGOGEN_VERSION),
   };
 
   const jsonString = JSON.stringify(shareableConfig);

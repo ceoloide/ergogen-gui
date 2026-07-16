@@ -34,14 +34,18 @@ export const isFeatureEnabled = (feature: FeatureName): boolean => {
   }
 
   // --- Step 2: Build-Time Environment Variable Check ---
-  const envVarName = `REACT_APP_FEATURE_${feature.toUpperCase()}`;
-  const envVal = process.env[envVarName];
+  let envVal: string | undefined;
+  if (feature === 'templates') {
+    envVal = import.meta.env.VITE_FEATURE_TEMPLATES;
+  } else if (feature === 'outlines') {
+    envVal = import.meta.env.VITE_FEATURE_OUTLINES;
+  }
   if (envVal === 'true') return true;
   if (envVal === 'false') return false;
 
   // --- Step 3: Runtime Capability Check ---
   const versionInfo = getErgogenVersionInfo(
-    process.env.REACT_APP_ERGOGEN_VERSION
+    import.meta.env.VITE_ERGOGEN_VERSION
   );
   let currentVersion = versionInfo.displayText;
 

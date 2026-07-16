@@ -12,15 +12,13 @@ import ergogenPkg from 'ergogen/package.json';
 
 describe('Analytics Utility', () => {
   const originalGtag = window.gtag;
-  const originalEnv = process.env.REACT_APP_ERGOGEN_VERSION;
-  const originalGtagId = process.env.REACT_APP_GTAG_ID;
 
   beforeEach(() => {
     // Reset window.gtag before each test
     window.gtag = jest.fn();
     // Reset environment variable before each test
-    process.env.REACT_APP_ERGOGEN_VERSION = originalEnv;
-    process.env.REACT_APP_GTAG_ID = 'G-TEST12345';
+    vi.stubEnv('VITE_ERGOGEN_VERSION', '');
+    vi.stubEnv('VITE_GTAG_ID', 'G-TEST12345');
     // Clear localStorage
     localStorage.clear();
     // Clean up dynamic script tag if present
@@ -30,11 +28,13 @@ describe('Analytics Utility', () => {
     }
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   afterAll(() => {
     // Restore original globals and environment variables
     window.gtag = originalGtag;
-    process.env.REACT_APP_ERGOGEN_VERSION = originalEnv;
-    process.env.REACT_APP_GTAG_ID = originalGtagId;
     localStorage.clear();
   });
 
@@ -169,7 +169,7 @@ describe('Analytics Utility', () => {
 
     it('should reflect custom Ergogen versions from environment variables', () => {
       localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
-      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#v4.3.0';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.3.0');
       const eventName = 'test_event';
 
       trackEvent(eventName);

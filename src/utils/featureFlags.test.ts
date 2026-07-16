@@ -40,16 +40,11 @@ describe('featureFlags utilities', () => {
   });
 
   describe('isFeatureEnabled', () => {
-    const originalEnv = process.env;
-
     beforeEach(() => {
-      jest.resetModules();
-      process.env = { ...originalEnv };
+      vi.stubEnv('VITE_FEATURE_TEMPLATES', '');
+      vi.stubEnv('VITE_FEATURE_OUTLINES', '');
+      vi.stubEnv('VITE_ERGOGEN_VERSION', '');
       mockState.version = '4.2.1';
-      // Delete any specific feature env vars to keep test sandbox clean
-      delete process.env.REACT_APP_FEATURE_TEMPLATES;
-      delete process.env.REACT_APP_FEATURE_OUTLINES;
-      delete process.env.REACT_APP_ERGOGEN_VERSION;
 
       // Mock window location search
       delete (window as any).location;
@@ -58,33 +53,33 @@ describe('featureFlags utilities', () => {
       } as any;
     });
 
-    afterAll(() => {
-      process.env = originalEnv;
+    afterEach(() => {
+      vi.unstubAllEnvs();
     });
 
     it('should prioritize URL query overrides if present', () => {
       window.location.search = '?ff_templates=true';
-      process.env.REACT_APP_FEATURE_TEMPLATES = 'false';
-      process.env.REACT_APP_ERGOGEN_VERSION = '4.2.1'; // would normally disable it
+      vi.stubEnv('VITE_FEATURE_TEMPLATES', 'false');
+      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.2.1'); // would normally disable it
 
       expect(isFeatureEnabled('templates')).toBe(true);
 
       window.location.search = '?ff_templates=false';
-      process.env.REACT_APP_FEATURE_TEMPLATES = 'true';
-      process.env.REACT_APP_ERGOGEN_VERSION = '4.3.0'; // would normally enable it
+      vi.stubEnv('VITE_FEATURE_TEMPLATES', 'true');
+      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.3.0'); // would normally enable it
 
       expect(isFeatureEnabled('templates')).toBe(false);
     });
 
     it('should fall back to environment variable if no query override', () => {
       window.location.search = '';
-      process.env.REACT_APP_FEATURE_TEMPLATES = 'true';
-      process.env.REACT_APP_ERGOGEN_VERSION = '4.2.1'; // would normally disable it
+      vi.stubEnv('VITE_FEATURE_TEMPLATES', 'true');
+      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.2.1'); // would normally disable it
 
       expect(isFeatureEnabled('templates')).toBe(true);
 
-      process.env.REACT_APP_FEATURE_TEMPLATES = 'false';
-      process.env.REACT_APP_ERGOGEN_VERSION = '4.3.0'; // would normally enable it
+      vi.stubEnv('VITE_FEATURE_TEMPLATES', 'false');
+      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.3.0'); // would normally enable it
 
       expect(isFeatureEnabled('templates')).toBe(false);
     });
@@ -93,17 +88,17 @@ describe('featureFlags utilities', () => {
       window.location.search = '';
 
       // Under minimum version (4.2.1 < 4.3.0)
-      process.env.REACT_APP_ERGOGEN_VERSION = 'ergogen@4.2.1';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'ergogen@4.2.1');
       expect(isFeatureEnabled('templates')).toBe(false);
       expect(isFeatureEnabled('outlines')).toBe(false);
 
       // At minimum version
-      process.env.REACT_APP_ERGOGEN_VERSION = 'ergogen@4.3.0';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'ergogen@4.3.0');
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);
 
       // Higher version
-      process.env.REACT_APP_ERGOGEN_VERSION = 'ergogen@4.4.0';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'ergogen@4.4.0');
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);
     });
@@ -113,13 +108,13 @@ describe('featureFlags utilities', () => {
 
       // Defer to package version when version in package.json is < 4.3.0
       mockState.version = '4.2.1';
-      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#develop';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#develop');
       expect(isFeatureEnabled('templates')).toBe(false);
       expect(isFeatureEnabled('outlines')).toBe(false);
 
       // Defer to package version when version in package.json is >= 4.3.0
       mockState.version = '4.3.0';
-      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#develop';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#develop');
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);
     });
@@ -128,11 +123,11 @@ describe('featureFlags utilities', () => {
       window.location.search = '';
 
       // Custom release with tag < 4.3.0
-      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#v4.2.1';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.2.1');
       expect(isFeatureEnabled('templates')).toBe(false);
 
       // Custom release with tag >= 4.3.0
-      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#v4.3.0';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.3.0');
       expect(isFeatureEnabled('templates')).toBe(true);
     });
   });

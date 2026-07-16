@@ -64,6 +64,7 @@ describe('github utilities', () => {
             {
               type: 'file',
               name: 'test_footprint.js',
+              path: 'test_footprint.js',
               download_url:
                 'https://raw.githubusercontent.com/ceoloide/ergogen-footprints/main/test_footprint.js',
             },
@@ -132,6 +133,7 @@ describe('github utilities', () => {
             {
               type: 'dir',
               name: 'switches',
+              path: 'switches',
               url: 'https://api.github.com/repos/test/footprints/contents/switches',
             },
           ]),
@@ -146,6 +148,7 @@ describe('github utilities', () => {
             {
               type: 'file',
               name: 'mx.js',
+              path: 'switches/mx.js',
               download_url:
                 'https://raw.githubusercontent.com/test/footprints/main/switches/mx.js',
             },

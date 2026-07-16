@@ -231,14 +231,12 @@ describe('SideNavigation', () => {
   });
 
   describe('with custom Ergogen version', () => {
-    const originalEnv = process.env.REACT_APP_ERGOGEN_VERSION;
-
     beforeEach(() => {
-      process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#v4.3.0';
+      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.3.0');
     });
 
     afterEach(() => {
-      process.env.REACT_APP_ERGOGEN_VERSION = originalEnv;
+      vi.unstubAllEnvs();
     });
 
     it('renders the custom version green and displays the DEV marker and DEV chip', () => {

@@ -50,7 +50,7 @@ export const initAnalytics = (): void => {
   if (typeof window === 'undefined') return;
 
   const enabled = getSendUsageMetricsEnabled();
-  const trackingId = process.env.REACT_APP_GTAG_ID;
+  const trackingId = import.meta.env.VITE_GTAG_ID;
 
   if (enabled && trackingId) {
     if (!document.getElementById('gtag-script')) {
@@ -101,7 +101,7 @@ export const trackEvent = (
       event_category: 'user_action',
       gui_version: guiPkg.version,
       ergogen_version: getFullErgogenVersion(
-        process.env.REACT_APP_ERGOGEN_VERSION
+        import.meta.env.VITE_ERGOGEN_VERSION
       ),
       is_pwa: checkIsPWA(),
       ...eventParams,

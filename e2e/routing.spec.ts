@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { makeShooter } from './utils/screenshots';
 import Absolem from '../src/examples/absolem';
-import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
+import { MULTI_CONFIG_STORAGE_KEY } from '../src/context/constants';
 
 test.describe('Routing and Welcome Page', () => {
   test('new user is redirected to /new', async ({ page }) => {
@@ -16,12 +16,22 @@ test.describe('Routing and Welcome Page', () => {
   test('existing user is routed to /', async ({ page }) => {
     const shoot = makeShooter(page, test.info());
     // Simulate existing user by setting a value in local storage
-    await page.addInitScript((CONFIG_LOCAL_STORAGE_KEY) => {
+    await page.addInitScript((MULTI_CONFIG_STORAGE_KEY) => {
       localStorage.setItem(
-        CONFIG_LOCAL_STORAGE_KEY,
-        JSON.stringify('some config')
+        MULTI_CONFIG_STORAGE_KEY,
+        JSON.stringify({
+          version: 2,
+          activeConfigId: 'config-1',
+          configs: [
+            {
+              id: 'config-1',
+              name: 'My Layout',
+              config: 'points: {}',
+            },
+          ],
+        })
       );
-    }, CONFIG_LOCAL_STORAGE_KEY);
+    }, MULTI_CONFIG_STORAGE_KEY);
     await page.goto('/');
     await shoot('before-existing-user-routed-home');
     await expect(page).toHaveURL(/.*\/$/);
@@ -49,9 +59,22 @@ test.describe('Routing and Welcome Page', () => {
     // 1. Set a valid config in local storage
     await page.addInitScript(
       ({ config, key }) => {
-        localStorage.setItem(key, JSON.stringify(config));
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            version: 2,
+            activeConfigId: 'config-1',
+            configs: [
+              {
+                id: 'config-1',
+                name: 'Absolem',
+                config: config,
+              },
+            ],
+          })
+        );
       },
-      { config: Absolem.value, key: CONFIG_LOCAL_STORAGE_KEY }
+      { config: Absolem.value, key: MULTI_CONFIG_STORAGE_KEY }
     );
     await page.goto('/');
 
@@ -101,13 +124,18 @@ test.describe('Routing and Welcome Page', () => {
     await expect(async () => {
       const stored = await page.evaluate(
         (key) => localStorage.getItem(key),
-        CONFIG_LOCAL_STORAGE_KEY
+        MULTI_CONFIG_STORAGE_KEY
       );
       expect(stored).not.toBeNull();
-      // react-use stores raw strings JSON-encoded in localStorage
-      const parsed = JSON.parse(stored as string) as string;
-      expect(parsed).toContain('meta:');
-      expect(parsed).toContain('points:');
+      const parsed = JSON.parse(stored as string);
+      expect(parsed.version).toBe(2);
+      expect(parsed.configs.length).toBeGreaterThan(0);
+      const activeConfig = parsed.configs.find(
+        (c: { id: string; config: string }) => c.id === parsed.activeConfigId
+      );
+      expect(activeConfig).toBeDefined();
+      expect(activeConfig.config).toContain('meta:');
+      expect(activeConfig.config).toContain('points:');
     }).toPass();
   });
 });

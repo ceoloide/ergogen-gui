@@ -1,27 +1,10 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // We will use standard React plugin and PWA plugin in injectManifest mode
 export default defineConfig(({ mode }) => {
-  // Collect all REACT_APP_* environment variables to inject them into the client bundle
-  const envDefines: Record<string, any> = {
-    'process.env.NODE_ENV': JSON.stringify(mode),
-    'process.env.PUBLIC_URL': JSON.stringify(''),
-  };
-
-  for (const key in process.env) {
-    if (key.startsWith('REACT_APP_')) {
-      envDefines[`process.env.${key}`] = JSON.stringify(process.env[key]);
-    }
-  }
-
-  // Ensure REACT_APP_ERGOGEN_VERSION is always defined, checking both variables
-  if (!envDefines['process.env.REACT_APP_ERGOGEN_VERSION']) {
-    envDefines['process.env.REACT_APP_ERGOGEN_VERSION'] = JSON.stringify(
-      process.env.REACT_APP_ERGOGEN_VERSION || process.env.ERGOGEN_VERSION || ''
-    );
-  }
+  const env = loadEnv(mode, process.cwd(), '');
 
   return {
     plugins: [
@@ -41,8 +24,21 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    base: './',
-    define: envDefines,
+    base: env.VITE_PUBLIC_URL || env.PUBLIC_URL || './',
+    define: {
+      'import.meta.env.VITE_ERGOGEN_VERSION': JSON.stringify(
+        env.VITE_ERGOGEN_VERSION || env.ERGOGEN_VERSION || env.REACT_APP_ERGOGEN_VERSION || ''
+      ),
+      'import.meta.env.VITE_GTAG_ID': JSON.stringify(
+        env.VITE_GTAG_ID || env.REACT_APP_GTAG_ID || ''
+      ),
+      'import.meta.env.VITE_FEATURE_TEMPLATES': JSON.stringify(
+        env.VITE_FEATURE_TEMPLATES || env.REACT_APP_FEATURE_TEMPLATES || ''
+      ),
+      'import.meta.env.VITE_FEATURE_OUTLINES': JSON.stringify(
+        env.VITE_FEATURE_OUTLINES || env.REACT_APP_FEATURE_OUTLINES || ''
+      ),
+    },
     server: {
       port: 3000,
       open: true,

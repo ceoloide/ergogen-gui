@@ -190,28 +190,46 @@ class GitHubProvider extends BaseGitProvider {
     return await res.text();
   }
 
-  public async listDirectory(
+  protected async listDirectory(
     owner: string,
     repo: string,
     path: string,
     ref: string
   ): Promise<GitFileItem[]> {
-    const pathPart = path ? `/${path}` : '';
-    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents${pathPart}?ref=${ref}`;
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
     const res = await fetch(apiUrl);
     this.checkRateLimits(res, apiUrl);
     if (!res.ok) {
       throw new Error(`Failed to list directory from GitHub: ${res.status}`);
     }
     const data = await res.json();
-    if (!Array.isArray(data)) {
+    let itemsArray: { name?: string; path: string; type: string }[] = [];
+    if (Array.isArray(data)) {
+      itemsArray = data as { name?: string; path: string; type: string }[];
+    } else if (
+      data &&
+      typeof data === 'object' &&
+      'tree' in data &&
+      Array.isArray((data as { tree: unknown }).tree)
+    ) {
+      itemsArray = (
+        data as { tree: { name?: string; path: string; type: string }[] }
+      ).tree;
+    } else {
       throw new Error('Target path is not a directory');
     }
-    return data.map((item: { name: string; path?: string; type: string }) => ({
-      name: item.name,
-      path: item.path || item.name,
-      type: item.type as 'file' | 'dir',
-    }));
+    return itemsArray.map(
+      (item: { name?: string; path: string; type: string }) => ({
+        name: item.name || item.path.split('/').pop() || '',
+        path: item.path,
+        type:
+          item.type === 'tree'
+            ? 'dir'
+            : item.type === 'blob'
+              ? 'file'
+              : (item.type as 'file' | 'dir'),
+      })
+    );
   }
 
   private checkRateLimits(response: Response, url: string) {

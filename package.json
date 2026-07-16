@@ -35,6 +35,7 @@
     "workbox-strategies": "^7.4.1"
   },
   "scripts": {
+    "prepare": "husky",
     "preinstall": "node scripts/preinstall.js",
     "build-ergogen": "./patch/patch_ergogen.sh",
     "generate-previews": "ts-node --project scripts/tsconfig.json scripts/generate-previews.js",
@@ -94,8 +95,10 @@
     "eslint-plugin-react-hooks": "^6.2.0-canary-4fdf7cf2-20251003",
     "gh-pages": "^6.1.1",
     "globals": "^16.4.0",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "knip": "^5.64.1",
+    "lint-staged": "^17.0.8",
     "markdownlint": "^0.38.0",
     "markdownlint-cli": "^0.45.0",
     "prettier": "^3.6.2",

@@ -256,7 +256,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
   }, [isOpen, onClose]);
 
   const versionInfo = useMemo(
-    () => getErgogenVersionInfo(process.env.REACT_APP_ERGOGEN_VERSION),
+    () => getErgogenVersionInfo(import.meta.env.VITE_ERGOGEN_VERSION),
     []
   );
 
@@ -302,7 +302,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               data-testid="side-nav-logo-button"
             >
               <LogoImage
-                src={`${process.env.PUBLIC_URL}/ergogen.png`}
+                src={`${import.meta.env.BASE_URL}/ergogen.png`}
                 alt="Ergogen logo"
               />
             </LogoButton>
