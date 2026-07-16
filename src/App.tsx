@@ -235,10 +235,11 @@ function usePwaInstallPrompt(): (() => void) | undefined {
     };
   }, []);
 
-  // Show the chip ONLY if the ?force_install query parameter is provided
-  if (!isForceInstall) return undefined;
+  // Return the install handler callback whenever installation is available (deferredPrompt or isForceInstall)
+  if (!deferredPrompt && !isForceInstall) return undefined;
 
   return () => {
+    trackEvent('pwa_install_click');
     if (deferredPrompt) {
       // Show the install prompt
       void deferredPrompt.prompt();
@@ -247,8 +248,10 @@ function usePwaInstallPrompt(): (() => void) | undefined {
         (choiceResult: { outcome: string }) => {
           if (choiceResult.outcome === 'accepted') {
             console.log('[PWA] User accepted the install prompt');
+            trackEvent('pwa_install_accepted');
           } else {
             console.log('[PWA] User dismissed the install prompt');
+            trackEvent('pwa_install_dismissed');
           }
           // Clear the saved prompt since it can only be used once
           setDeferredPrompt(null);
@@ -595,6 +598,7 @@ const AppContent = ({
       <SideNavigation
         isOpen={configContext?.showSideNav ?? false}
         onClose={() => configContext?.setShowSideNav(false)}
+        onInstall={onInstall}
         data-testid="side-navigation"
       />
       <PageWrapper>

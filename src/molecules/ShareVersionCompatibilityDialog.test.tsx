@@ -35,6 +35,10 @@ describe('ShareVersionCompatibilityDialog', () => {
       screen.getByText('Version Compatibility Warning')
     ).toBeInTheDocument();
     expect(screen.getByText('GUI Version Mismatch')).toBeInTheDocument();
+    expect(screen.getByTestId('gui-mismatch-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('gui-mismatch-badge')).toHaveTextContent(
+      'Mismatch'
+    );
     expect(screen.getByText(/newer version of the GUI/)).toBeInTheDocument();
     expect(screen.getByText('v0.9.0')).toBeInTheDocument();
     expect(screen.getByText('v0.8.9')).toBeInTheDocument();
@@ -59,6 +63,10 @@ describe('ShareVersionCompatibilityDialog', () => {
     );
 
     expect(screen.getByText('Ergogen Version Mismatch')).toBeInTheDocument();
+    expect(screen.getByTestId('ergogen-mismatch-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('ergogen-mismatch-badge')).toHaveTextContent(
+      'Mismatch'
+    );
     expect(screen.getByText(/newer version of Ergogen/)).toBeInTheDocument();
     expect(screen.getByText('4.3.0')).toBeInTheDocument();
     expect(screen.getByText('4.2.1')).toBeInTheDocument();
@@ -84,6 +92,10 @@ describe('ShareVersionCompatibilityDialog', () => {
     );
 
     expect(screen.getByText('Custom Ergogen Version Used')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-version-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-version-badge')).toHaveTextContent(
+      'Custom'
+    );
     expect(screen.getByText(/custom version of Ergogen:/)).toBeInTheDocument();
     expect(
       screen.getByText('github:ceoloide/ergogen#v4.3.0')

@@ -254,4 +254,28 @@ describe('SideNavigation', () => {
       ).toBeInTheDocument();
     });
   });
+
+  it('renders install button when onInstall is supplied and calls the handler when clicked', () => {
+    const mockOnInstall = vi.fn();
+    render(
+      <SideNavigation
+        isOpen={true}
+        onClose={vi.fn()}
+        onInstall={mockOnInstall}
+      />
+    );
+
+    const installBtn = screen.getByTestId('side-nav-install-button');
+    expect(installBtn).toBeInTheDocument();
+
+    fireEvent.click(installBtn);
+    expect(mockOnInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render install button when onInstall is not supplied', () => {
+    render(<SideNavigation isOpen={true} onClose={vi.fn()} />);
+    expect(
+      screen.queryByTestId('side-nav-install-button')
+    ).not.toBeInTheDocument();
+  });
 });
