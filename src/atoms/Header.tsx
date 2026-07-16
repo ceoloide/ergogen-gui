@@ -346,7 +346,7 @@ const Header = ({ onUpdate, onInstall }: HeaderProps): JSX.Element => {
               data-testid="logo-button"
             >
               <LogoImage
-                src={`${import.meta.env.BASE_URL}/ergogen.png`}
+                src={`${import.meta.env.BASE_URL}ergogen.png`}
                 alt="Ergogen logo"
               />
             </LogoButton>

@@ -302,7 +302,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               data-testid="side-nav-logo-button"
             >
               <LogoImage
-                src={`${import.meta.env.BASE_URL}/ergogen.png`}
+                src={`${import.meta.env.BASE_URL}ergogen.png`}
                 alt="Ergogen logo"
               />
             </LogoButton>
