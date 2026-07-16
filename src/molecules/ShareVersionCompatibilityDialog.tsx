@@ -42,7 +42,10 @@ const ShareVersionCompatibilityDialog: React.FC<
         <WarningContainer>
           {report.guiWarning && (
             <WarningBox data-testid={dataTestId && `${dataTestId}-gui-warning`}>
-              <WarningLabel>GUI Version Mismatch</WarningLabel>
+              <WarningLabel>
+                GUI Version Mismatch
+                <Badge data-testid="gui-mismatch-badge">Mismatch</Badge>
+              </WarningLabel>
               <WarningDescription>
                 The shared link was created with a newer version of the GUI (
                 <strong>v{report.guiWarning.shared}</strong>) than your current
@@ -56,7 +59,10 @@ const ShareVersionCompatibilityDialog: React.FC<
             <WarningBox
               data-testid={dataTestId && `${dataTestId}-ergogen-warning`}
             >
-              <WarningLabel>Ergogen Version Mismatch</WarningLabel>
+              <WarningLabel>
+                Ergogen Version Mismatch
+                <Badge data-testid="ergogen-mismatch-badge">Mismatch</Badge>
+              </WarningLabel>
               <WarningDescription>
                 The shared link was created with a newer version of Ergogen (
                 <strong>{report.ergogenWarning.shared}</strong>) than your
@@ -71,7 +77,10 @@ const ShareVersionCompatibilityDialog: React.FC<
             <WarningBox
               data-testid={dataTestId && `${dataTestId}-custom-ergogen-warning`}
             >
-              <WarningLabel>Custom Ergogen Version Used</WarningLabel>
+              <WarningLabel>
+                Custom Ergogen Version Used
+                <Badge data-testid="custom-version-badge">Custom</Badge>
+              </WarningLabel>
               <WarningDescription>
                 The shared link was created using a custom version of Ergogen:{' '}
                 <strong>{report.customErgogenWarning.shared}</strong>.
@@ -171,6 +180,19 @@ const WarningLabel = styled.div`
   font-weight: ${theme.fontWeights.bold};
   color: ${theme.colors.warningDark};
   margin-bottom: 0.25rem;
+`;
+
+const Badge = styled.span`
+  background-color: ${theme.colors.warningDark};
+  color: ${theme.colors.white};
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-weight: ${theme.fontWeights.semiBold};
+  text-transform: uppercase;
+  display: inline-block;
+  vertical-align: middle;
 `;
 
 const WarningDescription = styled.div`

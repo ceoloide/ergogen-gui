@@ -28,6 +28,8 @@ import GrowButton from './atoms/GrowButton';
 import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { SettingsCard, SettingsGroupTitle } from './atoms/SettingsLayout';
+import OfflineOption from './atoms/OfflineOption';
+import { PwaState } from './App';
 
 import { trackEvent } from './utils/analytics';
 import ShareDialog from './molecules/ShareDialog';
@@ -278,7 +280,11 @@ const FlexContainer = styled.div`
  *
  * @returns {JSX.Element | null} The rendered Ergogen application UI, or null if the config context is not available.
  */
-const Ergogen = () => {
+type ErgogenProps = {
+  pwaState?: PwaState;
+};
+
+const Ergogen = ({ pwaState }: ErgogenProps) => {
   // Calculate initial widths based on viewport
   const getInitialLeftWidth = () => Math.max(200, window.innerWidth * 0.33);
   const getInitialRightWidth = () => Math.max(150, window.innerWidth * 0.15);
@@ -817,6 +823,20 @@ const Ergogen = () => {
                         aria-label="Send usage metrics"
                       />
                     </SettingsCard>
+
+                    {pwaState && (
+                      <>
+                        <SettingsGroupTitle>Offline</SettingsGroupTitle>
+                        <SettingsCard>
+                          <OfflineOption
+                            isAvailable={pwaState.isAvailable}
+                            isInstalled={pwaState.isInstalled}
+                            isInstalling={pwaState.isInstalling}
+                            onInstall={pwaState.onInstall}
+                          />
+                        </SettingsCard>
+                      </>
+                    )}
                   </OptionContainer>
                   <Injections
                     setInjectionToEdit={setInjectionToEdit}

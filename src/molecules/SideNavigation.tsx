@@ -316,6 +316,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               )}
             </AppName>
           </LogoSection>
+
           <CloseButton
             onClick={onClose}
             data-testid={dataTestId && `${dataTestId}-close`}

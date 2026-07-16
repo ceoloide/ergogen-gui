@@ -83,4 +83,34 @@ describe('injectionEvaluator', () => {
     expect(typeof fn).toBe('function');
     expect(typeof fn()).toBe('string');
   });
+
+  it('should resolve packages.json in worker context', () => {
+    // Arrange
+    const injectionCode = `
+      const pkg = require('../../packages.json');
+      module.exports = () => pkg.version;
+    `;
+
+    // Act
+    const fn = createInjectionModule(injectionCode) as () => string;
+
+    // Assert
+    expect(typeof fn).toBe('function');
+    expect(typeof fn()).toBe('string');
+  });
+
+  it('should resolve deeply nested relative package requirements', () => {
+    // Arrange
+    const injectionCode = `
+      const pkg = require('../../../../../packages.json');
+      module.exports = () => pkg.version;
+    `;
+
+    // Act
+    const fn = createInjectionModule(injectionCode) as () => string;
+
+    // Assert
+    expect(typeof fn).toBe('function');
+    expect(typeof fn()).toBe('string');
+  });
 });

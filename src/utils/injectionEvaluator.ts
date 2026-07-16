@@ -13,7 +13,7 @@ import ergogenPkg from 'ergogen/package.json';
  * It resolves required modules to their pre-bundled or local references.
  */
 const customRequire = (moduleName: string): unknown => {
-  const cleanName = moduleName.replace(/^(\.\.\/|\.\/)/, ''); // Remove leading '../' or './'
+  const cleanName = moduleName.replace(/^(\.\.\/|\.\/)+/, ''); // Remove leading '../' or './'
 
   if (cleanName === 'makerjs') {
     return makerjs;
@@ -75,7 +75,12 @@ const customRequire = (moduleName: string): unknown => {
     return ergogenFilter;
   }
 
-  if (cleanName === 'package.json' || cleanName.endsWith('/package.json')) {
+  if (
+    cleanName === 'package.json' ||
+    cleanName.endsWith('/package.json') ||
+    cleanName === 'packages.json' ||
+    cleanName.endsWith('/packages.json')
+  ) {
     return ergogenPkg;
   }
 

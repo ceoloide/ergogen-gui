@@ -158,6 +158,8 @@ type ContextProps = {
   clearError: () => void;
   deprecationWarning: string | null;
   clearWarning: () => void;
+  skippedWarning: string | null;
+  clearSkippedWarning: () => void;
   info: string | null;
   setInfo: Dispatch<SetStateAction<string | null>>;
   clearInfo: () => void;
@@ -554,6 +556,7 @@ const ConfigContextProvider = ({
   const [deprecationWarning, setDeprecationWarning] = useState<string | null>(
     null
   );
+  const [skippedWarning, setSkippedWarning] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
@@ -692,6 +695,7 @@ const ConfigContextProvider = ({
 
   const clearError = useCallback(() => setError(null), []);
   const clearWarning = useCallback(() => setDeprecationWarning(null), []);
+  const clearSkippedWarning = useCallback(() => setSkippedWarning(null), []);
   const clearInfo = useCallback(() => setInfo(null), []);
 
   /**
@@ -1043,17 +1047,19 @@ const ConfigContextProvider = ({
 
       setError(null);
       setDeprecationWarning(null);
+      setSkippedWarning(null);
       setIsGenerating(true);
       generationStartTimeRef.current = performance.now();
       currentConfigVersion.current += 1;
 
       const warning = checkForDeprecationWarnings(parsedConfig);
-      const skippedWarning = getSkippedInjectionsWarning(injectionInput);
-      const combinedWarning = [warning, skippedWarning]
-        .filter(Boolean)
-        .join('\n');
-      if (combinedWarning) {
-        setDeprecationWarning(combinedWarning);
+      if (warning) {
+        setDeprecationWarning(warning);
+      }
+
+      const skippedWarningMsg = getSkippedInjectionsWarning(injectionInput);
+      if (skippedWarningMsg) {
+        setSkippedWarning(skippedWarningMsg);
       }
 
       const inputConfig =
@@ -1085,7 +1091,14 @@ const ConfigContextProvider = ({
         return;
       }
     },
-    [parseConfig, setError, setDeprecationWarning, setIsGenerating, debug]
+    [
+      parseConfig,
+      setError,
+      setDeprecationWarning,
+      setSkippedWarning,
+      setIsGenerating,
+      debug,
+    ]
   );
 
   /**
@@ -1612,6 +1625,8 @@ const ConfigContextProvider = ({
       clearError,
       deprecationWarning,
       clearWarning,
+      skippedWarning,
+      clearSkippedWarning,
       info,
       setInfo,
       clearInfo,
@@ -1673,6 +1688,8 @@ const ConfigContextProvider = ({
       clearError,
       deprecationWarning,
       clearWarning,
+      skippedWarning,
+      clearSkippedWarning,
       info,
       setInfo,
       clearInfo,
