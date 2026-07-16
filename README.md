@@ -6,9 +6,6 @@ With this GUI, you can write Ergogen configurations in YAML, see live 2D (SVG) p
 
 See the live demo at [ergogen.xyz](https://ergogen.xyz).
 
-> [!WARNING]
-> This repository currently relies on Node.js v20. It will not build with newer versions like Node v22 due to outdated dependencies. Please ensure you are using a compatible Node version for development.
-
 ## Features
 
 - **Live 2D Previews**: Instantly see your changes reflected in 2D (SVG) previews as you type.
@@ -26,9 +23,9 @@ To run the Ergogen GUI on your local machine, please follow these steps.
 
 ### Prerequisites
 
-- **Node.js**: You must have Node.js v20 installed. We recommend using a version manager like [nvm](https://github.com/nvm-sh/nvm) to easily switch between Node versions.
-  - `nvm install 20`
-  - `nvm use 20`
+- **Node.js**: You must have Node.js v20 or newer installed (e.g., Node.js v24). We recommend using a version manager like [nvm](https://github.com/nvm-sh/nvm) to easily switch between Node versions.
+  - `nvm install 24`
+  - `nvm use 24`
 - **pnpm**: This project uses pnpm for package management.
   - `npm install -g pnpm`
 
@@ -79,7 +76,9 @@ The encoded data is a JSON object compressed using [lz-string](https://github.co
 ```typescript
 interface ShareableConfig {
   config: string; // The YAML or JSON configuration (required)
-  injections?: string[][]; // Optional custom footprints: [type, name, code][]
+  injections?: string[][]; // Optional custom injections (footprints, templates, outlines): [type, name, code][]
+  guiVersion?: string; // Optional GUI version compatibility check
+  ergogenVersion?: string; // Optional Ergogen version compatibility check
 }
 ```
 
@@ -119,24 +118,24 @@ const shareLink = createErgogenShareLink(config);
 console.log(shareLink);
 ```
 
-### Including Custom Footprints
+### Including Custom Injections (Footprints, Templates, Outlines)
 
-If your configuration uses custom footprints, include them in the `injections` array. Each injection is a tuple of `[type, name, code]`:
+If your configuration uses custom footprints, templates, or outlines, include them in the `injections` array. Each injection is a tuple of `[type, name, code]`, where type can be `'footprint'`, `'template'`, or `'outline'`:
 
 ```javascript
 import { compressToEncodedURIComponent } from 'lz-string';
 
-function createErgogenShareLink(yamlConfig, footprints = []) {
+function createErgogenShareLink(yamlConfig, injections = []) {
   const shareableConfig = {
     config: yamlConfig,
   };
 
-  // Add footprints if provided
-  if (footprints.length > 0) {
-    shareableConfig.injections = footprints.map((fp) => [
-      'footprint', // type
-      fp.name, // e.g., 'my_custom_switch'
-      fp.code, // JavaScript footprint code
+  // Add custom injections if provided
+  if (injections.length > 0) {
+    shareableConfig.injections = injections.map((inj) => [
+      inj.type, // 'footprint', 'template', or 'outline'
+      inj.name, // e.g., 'my_custom_switch'
+      inj.code, // JavaScript footprint code, template code, or outline SVG
     ]);
   }
 
@@ -146,7 +145,7 @@ function createErgogenShareLink(yamlConfig, footprints = []) {
   return `https://ergogen.xyz/#${encoded}`;
 }
 
-// Usage with custom footprint
+// Usage with custom footprint injection
 const config = `
 points:
   zones:
@@ -165,6 +164,7 @@ pcbs:
 
 const footprints = [
   {
+    type: 'footprint',
     name: 'my_custom_footprint',
     code: `
 module.exports = {
