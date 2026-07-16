@@ -16,7 +16,6 @@ import { trackEvent } from '../utils/analytics';
 type SideNavigationProps = {
   isOpen: boolean;
   onClose: () => void;
-  onInstall?: () => void;
   'data-testid'?: string;
 };
 
@@ -27,7 +26,6 @@ type SideNavigationProps = {
 const SideNavigation: React.FC<SideNavigationProps> = ({
   isOpen,
   onClose,
-  onInstall,
   'data-testid': dataTestId,
 }) => {
   const prevIsOpenRef = useRef(isOpen);
@@ -318,18 +316,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
               )}
             </AppName>
           </LogoSection>
-          {onInstall && (
-            <SidebarInstallButton
-              onClick={onInstall}
-              data-testid="side-nav-install-button"
-              aria-label="Install App"
-              title="Install App"
-            >
-              <span className="material-symbols-outlined">
-                system_update_alt
-              </span>
-            </SidebarInstallButton>
-          )}
+
           <CloseButton
             onClick={onClose}
             data-testid={dataTestId && `${dataTestId}-close`}
@@ -601,31 +588,6 @@ const AppName = styled.div`
   cursor: pointer;
   display: flex;
   align-items: center;
-`;
-
-const SidebarInstallButton = styled.button`
-  background: none;
-  border: none;
-  color: ${theme.colors.textDark};
-  cursor: pointer;
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition:
-    background-color 0.15s ease-in-out,
-    color 0.15s ease-in-out;
-  flex-shrink: 0;
-
-  .material-symbols-outlined {
-    font-size: ${theme.fontSizes.iconLarge};
-  }
-
-  &:hover {
-    background-color: ${theme.colors.buttonHover};
-    color: ${theme.colors.text};
-  }
 `;
 
 const CloseButton = styled.button`
