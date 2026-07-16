@@ -80,7 +80,7 @@ loader.init().then((monaco) => {
   const root = createRoot(container!); // createRoot(container!) if you use TypeScript
   root.render(
     <React.StrictMode>
-      <BrowserRouter basename={process.env.PUBLIC_URL}>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <AppContainer>
           <GlobalStyle />
           <App />

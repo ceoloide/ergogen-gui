@@ -1,32 +1,11 @@
-# .github/workflows/deploy.yaml
-
-name: Build and deploy on GitHub Pages
+name: CI
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
+  pull_request:
     branches: ["main"]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-  repository_dispatch:
-  pull_request:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
-  build-and-deploy:
+  lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -64,19 +43,7 @@ jobs:
           VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           VITE_ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: Create 404.html for SPA routing
-        run: cp ./dist/index.html ./dist/404.html
-      - name: Conditionally create CNAME
-        if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
-        run: echo "${{ vars.CNAME_DOMAIN }}" > ./dist/CNAME
-        env:
-          CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          allow_empty_commit: true
-          full_commit_message: ${{ github.event.head_commit.message }}
-          force_orphan: true
+      - name: Lint
+        run: pnpm run lint
+      - name: Unit Tests
+        run: pnpm run test:unit

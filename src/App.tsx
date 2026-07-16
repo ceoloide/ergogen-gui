@@ -343,7 +343,7 @@ const AppContent = ({
   ): VersionCompatibilityReport => {
     const currentGui = guiPkg.version;
     const currentErgogen = getFullErgogenVersion(
-      process.env.REACT_APP_ERGOGEN_VERSION
+      import.meta.env.VITE_ERGOGEN_VERSION
     );
 
     let isCompatible = true;
@@ -572,7 +572,7 @@ const AppContent = ({
           injectionType={currentConflict.type}
           onResolve={handleConflictResolution}
           onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
+          data-testid="conflict-dialog"
         />
       )}
       {configContext?.isBulkDownloadOpen && (

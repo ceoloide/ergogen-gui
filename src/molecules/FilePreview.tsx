@@ -78,7 +78,7 @@ const FilePreview = ({
         aria-label={ariaLabel}
       >
         <PlaceholderLogo
-          src={`${process.env.PUBLIC_URL}/ergogen.png`}
+          src={`${import.meta.env.BASE_URL}ergogen.png`}
           alt="Ergogen Logo"
           draggable="false"
         />

@@ -30,8 +30,8 @@ test.describe('GitHub Loading', () => {
     await shoot('before-github-input');
 
     // Find the GitHub input and load button
-    const githubInput = page.getByTestId('github-input');
-    const loadButton = page.getByTestId('github-load-button');
+    const githubInput = page.getByTestId('repo-input');
+    const loadButton = page.getByTestId('repo-load-button');
 
     // Enter the repository URL
     await githubInput.fill('ceoloide/mr_useful');
@@ -181,8 +181,8 @@ test.describe('GitHub Loading', () => {
     await page.goto('/new');
 
     // Find the GitHub input and load button
-    const githubInput = page.getByTestId('github-input');
-    const loadButton = page.getByTestId('github-load-button');
+    const githubInput = page.getByTestId('repo-input');
+    const loadButton = page.getByTestId('repo-load-button');
 
     // Load first repository
     await githubInput.fill(
@@ -237,7 +237,7 @@ test.describe('GitHub Loading', () => {
     const conflictSkipButton = page.getByTestId('conflict-dialog-skip');
     await conflictSkipButton.click();
     const applyToAllCheckbox = page.getByTestId('conflict-dialog-apply-to-all');
-    await applyToAllCheckbox.click();
+    await applyToAllCheckbox.click({ force: true });
     const conflictOverwriteButton = page.getByTestId(
       'conflict-dialog-overwrite'
     );
@@ -259,7 +259,7 @@ test.describe('GitHub Loading', () => {
 
     // Both footprints should be present
     const logoFootprint = page.getByTestId(
-      'injections-container-logo_mr_useful'
+      'injections-container-ceoloide/logo_mr_useful'
     );
     await expect(logoFootprint).toBeVisible();
     await expect(unspecworksFootprint).toBeVisible();

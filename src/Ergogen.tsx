@@ -695,7 +695,7 @@ const Ergogen = () => {
                   </EditorContainer>
                 </ResizablePanel>
               )}
-              <RightPane>
+              <RightPane $fullWidth={!configContext.showConfig}>
                 {configContext.showDownloads ? (
                   <>
                     <NestedRightPane>

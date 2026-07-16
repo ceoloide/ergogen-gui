@@ -22,12 +22,6 @@ type ConvertResult = {
 
 type ConvertFunction = (options: ConvertOptions) => ConvertResult;
 
-type ArrayBufferViewLike = {
-  buffer: ArrayBuffer;
-  byteOffset: number;
-  byteLength: number;
-};
-
 interface JscadConvertModule {
   convert: ConvertFunction;
 }

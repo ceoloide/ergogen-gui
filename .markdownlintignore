@@ -2,3 +2,5 @@ node_modules
 build
 test-results
 playwright-report
+ORIGINAL_REQUEST.md
+.agents/**

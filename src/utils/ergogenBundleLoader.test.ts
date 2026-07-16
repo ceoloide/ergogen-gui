@@ -8,8 +8,6 @@ import {
   parseZipArchive,
   MAX_ARCHIVE_SIZE_BYTES,
   MAX_TEXT_FILE_SIZE_BYTES,
-  ErgogenInjection,
-  ErgogenWorkspaceBundle,
 } from './ergogenBundleLoader';
 import { isFeatureEnabled } from './featureFlags';
 

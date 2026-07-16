@@ -20,6 +20,7 @@ test.describe('Responsive Layout', () => {
 
     // 2. Click "Outputs" button
     await page.getByTestId('mobile-outputs-button').click();
+    await page.getByTestId('mobile-downloads-toggle-button').click();
 
     // 3. "Outputs" is active, editor is hidden, output is visible
     await shoot('before-mobile-output-visible-config-hidden');

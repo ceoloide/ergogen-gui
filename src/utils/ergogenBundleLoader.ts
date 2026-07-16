@@ -1,13 +1,13 @@
 import JSZip from 'jszip';
 import { isFeatureEnabled } from './featureFlags';
 
-export interface ErgogenInjection {
+interface ErgogenInjection {
   type: 'footprint' | 'outline' | 'template';
   name: string;
   content: string;
 }
 
-export interface ErgogenWorkspaceBundle {
+interface ErgogenWorkspaceBundle {
   config: string;
   injections: ErgogenInjection[];
   configPath?: string;

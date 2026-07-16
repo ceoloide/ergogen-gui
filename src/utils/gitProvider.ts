@@ -143,6 +143,7 @@ export abstract class BaseGitProvider implements GitProvider {
    * Main entry point to fetch workspace configuration.
    */
   async fetchConfig(url: string): Promise<ErgogenWorkspaceBundle> {
+    console.log(`[GitHub] Starting fetch from URL: ${url}`);
     const parsed = this.parseUrl(url);
     const { owner, repo, branch, filePath, isRepoRoot } = parsed;
     const host = parsed.host;
@@ -159,6 +160,7 @@ export abstract class BaseGitProvider implements GitProvider {
       outlinesPath: string,
       templatesPath: string
     ) => {
+      console.log('[GitHub] Checking for .gitmodules file');
       try {
         const gitmodulesContent = await this.fetchFileContent(
           owner,
@@ -167,6 +169,7 @@ export abstract class BaseGitProvider implements GitProvider {
           targetBranch,
           host
         );
+        console.log('[GitHub] .gitmodules found, parsing submodules');
         const submodules = parseGitmodules(gitmodulesContent);
 
         for (const submodule of submodules) {
@@ -606,6 +609,7 @@ export abstract class BaseGitProvider implements GitProvider {
                 const cleanName = dirPath
                   ? itemPath.slice(dirPath.length + 1).replace(/\.[^/.]+$/, '')
                   : itemPath.replace(/\.[^/.]+$/, '');
+                console.log(`[GitHub] Loaded footprint: ${cleanName}`);
                 result.push({ name: cleanName, content });
               } catch (err: unknown) {
                 if (err instanceof RateLimitError) throw err;
