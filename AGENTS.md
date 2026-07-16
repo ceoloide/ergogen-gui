@@ -7,6 +7,9 @@ For detailed component architecture, feature implementations, and the list of fu
 ## Development & Test Workflow
 
 - **pnpm Only:** Use `pnpm` exclusively for dependency management (`pnpm add`), building (`pnpm run build`), and testing. Do not use `yarn` or `npm`.
+  - **Exotic Dependencies Override**: Prepend `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false` to any `pnpm install` or `pnpm add` commands to allow Git-based subdependencies inside `ergogen` to resolve correctly.
+  - **Transitive Dependencies**: If a library is imported directly (e.g., `makerjs`), it must be declared as a direct dependency in `package.json` (do not rely on implicit transitive hoisting).
+  - **CI Overrides**: When overriding dependency versions dynamically in CI (like using `ERGOGEN_VERSION`), explicitly append the `--no-frozen-lockfile` flag to `pnpm install`.
 - **Precommit Check:** You **MUST** run `pnpm run precommit` before committing. This automatically executes formatting (`prettier`), linting (ESLint/Knip), and unit tests. Address all errors before proceeding. Warnings can be ignored but should be reported to the user as potential follow-up tasks.
 - **Unit Testing:**
   - Run unit tests with `pnpm run test:unit`. You can add the `--verbose` argument to see detailed failure reasons.
@@ -47,6 +50,7 @@ For detailed component architecture, feature implementations, and the list of fu
 
 - **Linting & Formatting:** ESLint manages linting and Prettier manages formatting.
 - **ESLint Single Source of Truth:** All rules are defined in `eslint.config.mjs`. The `eslintConfig` key in `package.json` is deprecated and must not be used.
+- **Vite Config Format**: Keep the Vite configuration file named as `vite.config.mts` to force native ES Module loading and bypass Node/Vite CommonJS API deprecation warnings.
 
 ---
 
