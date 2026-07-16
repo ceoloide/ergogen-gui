@@ -203,7 +203,7 @@ describe('Downloads', () => {
     });
     it('should render No outputs placeholder when results is null/empty', () => {
       // Arrange
-      mockContext = createMockContext(false, false, null);
+      mockState.mockContext = createMockContext(false, false, null);
 
       // Act
       render(
