@@ -51,7 +51,7 @@ jobs:
           if [ -n "$ERGOGEN_VERSION" ]; then
             echo "ERGOGEN_VERSION is set, running preinstall patch"
             node scripts/preinstall.js
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install
+            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
           else
             echo "ERGOGEN_VERSION is not set, running pnpm install --frozen-lockfile"
             PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
