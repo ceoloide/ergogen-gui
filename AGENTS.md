@@ -92,3 +92,20 @@ When creating proposals for the knowledge base in `DEVELOPMENT.md` (do not edit 
 - **User Preferences & Instructions**: Directives (persistent commands) and Style/Conventions (general design preferences).
 - **Repository & Project Context**: Purpose & Architecture (core patterns).
 - **Environment & Execution**: Setup Commands and Execution Commands.
+
+---
+
+## Swarms, Worktrees, and Pull Request Workflows
+
+- **Wave-Based Swarming**: When executing multi-task projects or addressing multiple issues:
+  - Organize issues into logical waves of work (e.g., parallel optimization tasks vs authentication tasks).
+  - Delegate independent issues to parallel subagents using the `invoke_subagent` tool.
+- **Git Worktree Workspace Isolation**:
+  - Always spawn subagents with `Workspace: "share"` configuration. This creates a lightweight git worktree branch mapping for each subagent, permitting parallel sandboxed workspaces without lockfile or source collisions.
+  - Instruct subagents to create, build, and test inside their respective worktree paths.
+- **Pull Request Creation**:
+  - Never push changes directly to the remote `main` branch.
+  - Subagents must commit their changes in their worktree, push the topic branch, and use the GitHub CLI (`gh pr create`) to open individual Pull Requests for user review.
+- **Local Validation Gating**:
+  - Never consider a task fully complete or merge a PR until the user has had an opportunity to build and test the changes locally (e.g. at `http://localhost:3000`).
+  - Keep a dev server running or prompt the user with server details to confirm changes match their expectations before finalizing.
