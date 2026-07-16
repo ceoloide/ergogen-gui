@@ -1,5 +1,32 @@
 # Changelog
 
+## Build Stack Modernization Benchmark Report
+
+July 16, 2026
+
+![Comparison metrics of Yarn/CRA/Webpack/Jest versus pnpm/Vite/Vitest build stacks.](./public/images/changelog/placeholder.png)
+
+Previously, our local development, dependency installation, and production build pipelines relied on a legacy Yarn v1 and Create React App (Webpack) setup. As the codebase grew and integrated heavier computations (such as Web Workers and three-dimensional previews), compilation times slowed, dependency installs became a bottleneck, and the bundle footprint expanded significantly.
+
+To assess the benefits of our recent shift to Vite, Vitest, and pnpm, we ran a comprehensive benchmark comparing the legacy stack against the modernized stack. Spanning 10 distinct iterations using Node v24.18.0, the benchmark measured clean install times, build times, test execution speeds, and production asset sizes. The Vite and pnpm stack achieved a 2.6x speedup in clean dependency installation and a 1.75x speedup in build times, while shrinking the total built application footprint by over 62.7%.
+
+| Metric                    | Legacy Stack (Yarn + Webpack) | Modernized Stack (pnpm + Vite) | Difference / Speedup            |
+| :------------------------ | :---------------------------- | :----------------------------- | :------------------------------ |
+| **Toolchain Versions**    | Node v24.18.0, Yarn v1.22.22  | Node v24.18.0, pnpm v11.13.0   | -                               |
+| **Clean Install Time**    | 45.03 seconds                 | 17.14 seconds                  | **2.63x faster** (-27.89s)      |
+| **Avg. Production Build** | 31.76 seconds                 | 18.14 seconds                  | **1.75x speedup** (-13.62s)     |
+| **Min. Production Build** | 30.80 seconds                 | 17.33 seconds                  | **1.78x speedup** (-13.47s)     |
+| **Max. Production Build** | 33.00 seconds                 | 19.51 seconds                  | **1.69x speedup** (-13.49s)     |
+| **Avg. Unit Test Run**    | 3.88 seconds (Jest)           | 5.03 seconds (Vitest)          | 1.30x slower (+1.15s)           |
+| **Production Build Size** | 22.31 MB (44 files)           | 8.33 MB (35 files)             | **62.7% reduction** (-13.98 MB) |
+
+**What changed:**
+
+- **pnpm Dependency Resolution**: Clean install times improved by 2.63x, leveraging pnpm's content-addressable store to bypass redundant downloads and linkages.
+- **Vite Production Bundler**: Production builds sped up by 1.75x on average, reducing wait times to just 18.14 seconds.
+- **Built Footprint Reduction**: Production bundle size was reduced by 62.7% (from 22.31 MB to 8.33 MB) by eliminating CRA/Webpack bundle overhead.
+- **Unit Testing Transition**: Documented a slight overhead in cold Vitest runs (5.03s vs 3.88s Jest), though Vitest offsets this with its near-instant watch mode during active development.
+
 ## Concurrent Bulk Export & Abstract Git Provider Architecture
 
 July 15, 2026
