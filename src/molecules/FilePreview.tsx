@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import styled from 'styled-components';
 const PcbPreview = lazy(() => import('../atoms/PcbPreview'));
 const StlPreview = lazy(() => import('../atoms/StlPreview'));
@@ -28,20 +28,21 @@ const PlaceholderLogo = styled.img`
 /**
  * Props for the FilePreview component.
  * @typedef {object} Props
- * @property {string} previewExtension - The file extension of the content to be previewed (e.g., 'svg', 'yaml').
- * @property {string} previewKey - A unique key for the preview component, essential for re-rendering.
- * @property {string} previewContent - The actual content of the file to be displayed.
- * @property {number | string} [width='100%'] - The width of the preview area.
- * @property {number | string} [height='100%'] - The height of the preview area.
- * @property {string} [className] - An optional CSS class for the container div.
- * @property {string} [data-testid] - An optional data-testid for testing purposes.
+ * @property {string} previewExtension - The extension of the file to preview (e.g. 'yaml', 'stl', 'kicad_pcb').
+ * @property {string | ArrayBuffer | Uint8Array} previewContent - The content of the file to preview.
+ * @property {string} previewKey - A unique key identifying the file preview target.
+ * @property {string | number} [width] - Optional custom width (default '100%').
+ * @property {string | number} [height] - Optional custom height (default '100%').
+ * @property {string} [className] - Optional custom class.
+ * @property {string} [data-testid] - Optional custom test id.
+ * @property {string} [aria-label] - Optional custom aria-label.
  */
 type Props = {
   previewExtension: string;
-  previewKey: string;
   previewContent: string | ArrayBuffer | Uint8Array;
-  width?: number | string;
-  height?: number | string;
+  previewKey: string;
+  width?: string | number;
+  height?: string | number;
   className?: string;
   'data-testid'?: string;
   'aria-label'?: string;
@@ -64,6 +65,20 @@ const FilePreview = ({
   'data-testid': dataTestId,
   'aria-label': ariaLabel,
 }: Props) => {
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        void import('../atoms/StlPreview');
+        void import('../atoms/PcbPreview');
+      });
+    } else {
+      const id = setTimeout(() => {
+        void import('../atoms/StlPreview');
+        void import('../atoms/PcbPreview');
+      }, 2000);
+      return () => clearTimeout(id);
+    }
+  }, []);
   const isEmpty =
     !previewContent ||
     (typeof previewContent === 'string' && previewContent === '') ||
