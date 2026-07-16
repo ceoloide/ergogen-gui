@@ -492,8 +492,8 @@ export const exportConfigsProgressively = async (
     const filename = `ergogen-config-all-${timestamp}.zip`;
     saveAs(blob, filename);
   } else {
-    // 2. Full compilation mode (like export all but progressive and abortable)
-    const activeWorkerRef = { current: null as Worker | null };
+    // 2. Full compilation mode (like export all but progressive, concurrent, and abortable)
+    const activeWorkers = new Set<Worker>();
 
     const compileConfigAbortable = (
       config: string,
@@ -509,12 +509,11 @@ export const exportConfigsProgressively = async (
           reject(new Error('Failed to create Ergogen worker'));
           return;
         }
-        activeWorkerRef.current = worker;
+        activeWorkers.add(worker);
 
         const timeout = setTimeout(() => {
           worker.terminate();
-          if (activeWorkerRef.current === worker)
-            activeWorkerRef.current = null;
+          activeWorkers.delete(worker);
           reject(new Error('Compilation timed out'));
         }, 30000);
 
@@ -523,14 +522,12 @@ export const exportConfigsProgressively = async (
           if (response.type === 'error') {
             clearTimeout(timeout);
             worker.terminate();
-            if (activeWorkerRef.current === worker)
-              activeWorkerRef.current = null;
+            activeWorkers.delete(worker);
             reject(new Error(response.error));
           } else if (response.type === 'success') {
             clearTimeout(timeout);
             worker.terminate();
-            if (activeWorkerRef.current === worker)
-              activeWorkerRef.current = null;
+            activeWorkers.delete(worker);
             resolve(response.results as Results);
           }
         };
@@ -538,8 +535,7 @@ export const exportConfigsProgressively = async (
         worker.onerror = (error) => {
           clearTimeout(timeout);
           worker.terminate();
-          if (activeWorkerRef.current === worker)
-            activeWorkerRef.current = null;
+          activeWorkers.delete(worker);
           reject(error);
         };
 
@@ -578,12 +574,11 @@ export const exportConfigsProgressively = async (
           resolve(results);
           return;
         }
-        activeWorkerRef.current = jscadWorker;
+        activeWorkers.add(jscadWorker);
 
         const timeout = setTimeout(() => {
           jscadWorker.terminate();
-          if (activeWorkerRef.current === jscadWorker)
-            activeWorkerRef.current = null;
+          activeWorkers.delete(jscadWorker);
           resolve(results);
         }, 30000);
 
@@ -592,22 +587,19 @@ export const exportConfigsProgressively = async (
           if (response.type === 'success') {
             clearTimeout(timeout);
             jscadWorker.terminate();
-            if (activeWorkerRef.current === jscadWorker)
-              activeWorkerRef.current = null;
+            activeWorkers.delete(jscadWorker);
             resolve(response.results as Results);
           } else if (response.type === 'error') {
             clearTimeout(timeout);
             jscadWorker.terminate();
-            if (activeWorkerRef.current === jscadWorker)
-              activeWorkerRef.current = null;
+            activeWorkers.delete(jscadWorker);
             resolve(results);
           }
         };
         jscadWorker.onerror = () => {
           clearTimeout(timeout);
           jscadWorker.terminate();
-          if (activeWorkerRef.current === jscadWorker)
-            activeWorkerRef.current = null;
+          activeWorkers.delete(jscadWorker);
           resolve(results);
         };
         jscadWorker.postMessage({
@@ -618,134 +610,166 @@ export const exportConfigsProgressively = async (
       });
     };
 
-    try {
-      for (let i = 0; i < configs.length; i++) {
-        if (isAborted()) {
-          if (activeWorkerRef.current) activeWorkerRef.current.terminate();
-          return;
-        }
-        const configRecord = configs[i];
-        onProgress(i, configs.length, configRecord.name);
+    const activeConfigs = new Set<string>();
+    let completedCount = 0;
+    const concurrencyLimit = Math.min(4, navigator.hardwareConcurrency || 2);
 
-        const folderName =
-          configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
-        const configFolder = zip.folder(folderName);
-        if (!configFolder) continue;
+    const processTask = async (configRecord: (typeof configs)[0]) => {
+      if (isAborted()) return;
+      activeConfigs.add(configRecord.name);
+      onProgress(
+        completedCount,
+        configs.length,
+        Array.from(activeConfigs).join(', ')
+      );
 
-        try {
-          const results = await compileConfigAbortable(
-            configRecord.config,
-            injections
-          );
-          let finalResults = results;
-          if (results.cases && Object.keys(results.cases).length > 0) {
-            finalResults = await compileJscadToStlAbortable(results);
-          }
-
-          if (isAborted()) {
-            if (activeWorkerRef.current) activeWorkerRef.current.terminate();
-            return;
-          }
-
-          configFolder.file('config.yaml', configRecord.config);
-
-          const outputsFolder = configFolder.folder('outputs');
-
-          if (outputsFolder) {
-            if (finalResults.demo?.svg) {
-              outputsFolder.file('demo.svg', finalResults.demo.svg);
-            }
-
-            if (finalResults.outlines) {
-              let outlinesFolder: JSZip | null = null;
-              for (const [name, outline] of Object.entries(
-                finalResults.outlines
-              )) {
-                if (debug || !name.startsWith('_')) {
-                  if (outline.dxf || outline.svg) {
-                    if (!outlinesFolder) {
-                      outlinesFolder = outputsFolder.folder('outlines');
-                    }
-                    if (outlinesFolder) {
-                      if (outline.dxf)
-                        outlinesFolder.file(`${name}.dxf`, outline.dxf);
-                      if (outline.svg)
-                        outlinesFolder.file(`${name}.svg`, outline.svg);
-                    }
-                  }
-                }
-              }
-            }
-
-            if (
-              finalResults.pcbs &&
-              Object.keys(finalResults.pcbs).length > 0
-            ) {
-              const pcbsFolder = outputsFolder.folder('pcbs');
-              if (pcbsFolder) {
-                for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
-                  const fileName = name.endsWith('.kicad_pcb')
-                    ? name
-                    : `${name}.kicad_pcb`;
-                  pcbsFolder.file(fileName, pcb);
-                }
-              }
-            }
-
-            if (finalResults.cases) {
-              let casesFolder: JSZip | null = null;
-              for (const [name, caseData] of Object.entries(
-                finalResults.cases
-              )) {
-                const hasJscad = !!caseData.jscad;
-                const hasStl = !!caseData.stl;
-                if (hasJscad || hasStl) {
-                  if (!casesFolder) {
-                    casesFolder = outputsFolder.folder('cases');
-                  }
-                  if (casesFolder) {
-                    if (caseData.jscad)
-                      casesFolder.file(`${name}.jscad`, caseData.jscad);
-                    if (caseData.stl)
-                      casesFolder.file(`${name}.stl`, caseData.stl);
-                  }
-                }
-              }
-            }
-
-            if (debug) {
-              const debugFolder = outputsFolder.folder('debug');
-              if (debugFolder) {
-                debugFolder.file('raw.txt', configRecord.config);
-                for (const [key, value] of Object.entries(finalResults)) {
-                  if (['canonical', 'points', 'units'].includes(key)) {
-                    debugFolder.file(
-                      `${key}.yaml`,
-                      JSON.stringify(value, null, 2)
-                    );
-                  }
-                }
-              }
-            }
-          }
-
-          if (injections && injections.length > 0) {
-            writeInjections(configFolder, injections);
-          }
-        } catch (e) {
-          console.error(`Failed to compile config ${configRecord.name}:`, e);
-          configFolder.file('config.yaml', configRecord.config);
-          configFolder.file(
-            'error.txt',
-            `Compilation failed: ${e instanceof Error ? e.message : String(e)}`
-          );
-        }
-      }
-
-      if (isAborted()) {
-        if (activeWorkerRef.current) activeWorkerRef.current.terminate();
+      const folderName =
+        configRecord.name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
+      const configFolder = zip.folder(folderName);
+      if (!configFolder) {
+        activeConfigs.delete(configRecord.name);
+        completedCount++;
+        onProgress(
+          completedCount,
+          configs.length,
+          Array.from(activeConfigs).join(', ')
+        );
         return;
       }
+
+      try {
+        const results = await compileConfigAbortable(
+          configRecord.config,
+          injections
+        );
+        let finalResults = results;
+        if (results.cases && Object.keys(results.cases).length > 0) {
+          finalResults = await compileJscadToStlAbortable(results);
+        }
+
+        if (isAborted()) return;
+
+        configFolder.file('config.yaml', configRecord.config);
+
+        const outputsFolder = configFolder.folder('outputs');
+
+        if (outputsFolder) {
+          if (finalResults.demo?.svg) {
+            outputsFolder.file('demo.svg', finalResults.demo.svg);
+          }
+
+          if (finalResults.outlines) {
+            let outlinesFolder: JSZip | null = null;
+            for (const [name, outline] of Object.entries(
+              finalResults.outlines
+            )) {
+              if (debug || !name.startsWith('_')) {
+                if (outline.dxf || outline.svg) {
+                  if (!outlinesFolder) {
+                    outlinesFolder = outputsFolder.folder('outlines');
+                  }
+                  if (outlinesFolder) {
+                    if (outline.dxf)
+                      outlinesFolder.file(`${name}.dxf`, outline.dxf);
+                    if (outline.svg)
+                      outlinesFolder.file(`${name}.svg`, outline.svg);
+                  }
+                }
+              }
+            }
+          }
+
+          if (finalResults.pcbs && Object.keys(finalResults.pcbs).length > 0) {
+            const pcbsFolder = outputsFolder.folder('pcbs');
+            if (pcbsFolder) {
+              for (const [name, pcb] of Object.entries(finalResults.pcbs)) {
+                const fileName = name.endsWith('.kicad_pcb')
+                  ? name
+                  : `${name}.kicad_pcb`;
+                pcbsFolder.file(fileName, pcb);
+              }
+            }
+          }
+
+          if (finalResults.cases) {
+            let casesFolder: JSZip | null = null;
+            for (const [name, caseData] of Object.entries(finalResults.cases)) {
+              const hasJscad = !!caseData.jscad;
+              const hasStl = !!caseData.stl;
+              if (hasJscad || hasStl) {
+                if (!casesFolder) {
+                  casesFolder = outputsFolder.folder('cases');
+                }
+                if (casesFolder) {
+                  if (caseData.jscad)
+                    casesFolder.file(`${name}.jscad`, caseData.jscad);
+                  if (caseData.stl)
+                    casesFolder.file(`${name}.stl`, caseData.stl);
+                }
+              }
+            }
+          }
+
+          if (debug) {
+            const debugFolder = outputsFolder.folder('debug');
+            if (debugFolder) {
+              debugFolder.file('raw.txt', configRecord.config);
+              for (const [key, value] of Object.entries(finalResults)) {
+                if (['canonical', 'points', 'units'].includes(key)) {
+                  debugFolder.file(
+                    `${key}.yaml`,
+                    JSON.stringify(value, null, 2)
+                  );
+                }
+              }
+            }
+          }
+        }
+
+        if (injections && injections.length > 0) {
+          writeInjections(configFolder, injections);
+        }
+      } catch (e) {
+        console.error(`Failed to compile config ${configRecord.name}:`, e);
+        configFolder.file('config.yaml', configRecord.config);
+        configFolder.file(
+          'error.txt',
+          `Compilation failed: ${e instanceof Error ? e.message : String(e)}`
+        );
+      } finally {
+        activeConfigs.delete(configRecord.name);
+        completedCount++;
+        onProgress(
+          completedCount,
+          configs.length,
+          Array.from(activeConfigs).join(', ')
+        );
+      }
+    };
+
+    try {
+      const queue = [...configs];
+      const promises: Promise<void>[] = [];
+
+      const next = async (): Promise<void> => {
+        if (isAborted() || queue.length === 0) return;
+        const configRecord = queue.shift()!;
+        await processTask(configRecord);
+        await next();
+      };
+
+      for (let i = 0; i < Math.min(concurrencyLimit, queue.length); i++) {
+        promises.push(next());
+      }
+
+      await Promise.all(promises);
+
+      if (isAborted()) {
+        activeWorkers.forEach((w) => w.terminate());
+        activeWorkers.clear();
+        return;
+      }
+
       onProgress(configs.length, configs.length, 'Creating ZIP...');
 
       const blob = await zip.generateAsync({
@@ -761,9 +785,8 @@ export const exportConfigsProgressively = async (
       const filename = `ergogen-export-all-${timestamp}.zip`;
       saveAs(blob, filename);
     } finally {
-      if (activeWorkerRef.current) {
-        activeWorkerRef.current.terminate();
-      }
+      activeWorkers.forEach((w) => w.terminate());
+      activeWorkers.clear();
     }
   }
 };

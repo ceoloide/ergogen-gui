@@ -6,6 +6,7 @@ import * as ergogenPoint from 'ergogen/src/point';
 import * as ergogenPrepare from 'ergogen/src/prepare';
 import * as ergogenAnchor from 'ergogen/src/anchor';
 import * as ergogenFilter from 'ergogen/src/filter';
+import ergogenPkg from 'ergogen/package.json';
 
 /**
  * Custom require function that runs in the browser / worker context.
@@ -72,6 +73,10 @@ const customRequire = (moduleName: string): unknown => {
     cleanName.endsWith('/filter.js')
   ) {
     return ergogenFilter;
+  }
+
+  if (cleanName === 'package.json' || cleanName.endsWith('/package.json')) {
+    return ergogenPkg;
   }
 
   throw new Error(`Cannot find module '${moduleName}' in worker context`);

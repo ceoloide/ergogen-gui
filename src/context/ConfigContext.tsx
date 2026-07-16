@@ -45,6 +45,7 @@ import {
 import { exportAllConfigs, downloadAllConfigs } from '../utils/zip';
 import {
   filterInjectionsByFeatureFlags,
+  getSkippedInjectionsWarning,
   checkForDeprecationWarnings,
   preparePreviewConfig,
 } from '../utils/generationHelpers';
@@ -1047,8 +1048,12 @@ const ConfigContextProvider = ({
       currentConfigVersion.current += 1;
 
       const warning = checkForDeprecationWarnings(parsedConfig);
-      if (warning) {
-        setDeprecationWarning(warning);
+      const skippedWarning = getSkippedInjectionsWarning(injectionInput);
+      const combinedWarning = [warning, skippedWarning]
+        .filter(Boolean)
+        .join('\n');
+      if (combinedWarning) {
+        setDeprecationWarning(combinedWarning);
       }
 
       const inputConfig =
@@ -1186,6 +1191,7 @@ const ConfigContextProvider = ({
   const selectConfig = useCallback(
     (id: string | null) => {
       resetLineage();
+      setResults(null);
       if (id === null) {
         setActiveConfigId(null);
         activeConfigIdRef.current = null;
@@ -1216,6 +1222,7 @@ const ConfigContextProvider = ({
   const createNewConfig = useCallback(
     (content: string, name?: string) => {
       resetLineage();
+      setResults(null);
       const nextUntitledNum = getNextIndexForPattern(
         configsRef.current,
         /^Untitled\s+(\d+)$/
@@ -1291,6 +1298,7 @@ const ConfigContextProvider = ({
   const duplicateConfig = useCallback(
     (id: string) => {
       resetLineage();
+      setResults(null);
       const found = configsRef.current.find((c) => c.id === id);
       if (found) {
         const newId = generateUUID();
@@ -1337,6 +1345,7 @@ const ConfigContextProvider = ({
       const isLastConfig = configsRef.current.length <= 1;
 
       if (isLastConfig || isDeletingActive) {
+        setResults(null);
         setActiveConfigId(null);
         activeConfigIdRef.current = null;
         setConfigInputState('');
@@ -1360,6 +1369,7 @@ const ConfigContextProvider = ({
   const loadPreview = useCallback(
     (config: string) => {
       resetLineage();
+      setResults(null);
       setIsPreview(true);
       setPreviewConfig(config);
       setConfigInputState(config);

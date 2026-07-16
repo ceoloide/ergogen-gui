@@ -193,7 +193,24 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
               </ProgressBarContainer>
               <ProgressTextContainer>
                 <GeneratingLabel>
-                  {currentName ? `Generating ${currentName}` : 'Preparing...'}
+                  {currentName ? (
+                    currentName.includes(', ') ? (
+                      <div>
+                        Generating:
+                        <ActiveConfigsList>
+                          {currentName.split(', ').map((name) => (
+                            <li key={name}>{name}</li>
+                          ))}
+                        </ActiveConfigsList>
+                      </div>
+                    ) : (
+                      <SingleGeneratingSpan>
+                        Generating {currentName}
+                      </SingleGeneratingSpan>
+                    )
+                  ) : (
+                    <SingleGeneratingSpan>Preparing...</SingleGeneratingSpan>
+                  )}
                 </GeneratingLabel>
                 <ProgressRatio>
                   {currentProgress} / {selectedIds.size}
@@ -451,12 +468,31 @@ const ProgressTextContainer = styled.div`
   font-size: 13px;
 `;
 
-const GeneratingLabel = styled.span`
+const GeneratingLabel = styled.div`
   color: ${theme.colors.text};
+  max-width: 80%;
+`;
+
+const SingleGeneratingSpan = styled.span`
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 80%;
+`;
+
+const ActiveConfigsList = styled.ul`
+  margin: 4px 0 0 16px;
+  padding: 0;
+  list-style-type: disc;
+  color: ${theme.colors.textDark};
+  font-size: 13px;
+  text-align: left;
+  max-height: 80px;
+  overflow-y: auto;
+
+  li {
+    margin-bottom: 2px;
+  }
 `;
 
 const ProgressRatio = styled.span`

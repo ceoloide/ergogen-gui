@@ -1,4 +1,5 @@
-import { fetchConfigFromUrl, checkRateLimit, parseGitmodules } from './github';
+import { fetchConfigFromUrl, checkRateLimit } from './github';
+import { parseGitmodules } from './gitProvider';
 import { isFeatureEnabled } from './featureFlags';
 
 vi.mock('./featureFlags', () => ({

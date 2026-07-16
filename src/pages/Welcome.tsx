@@ -5,7 +5,7 @@ import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
-import { fetchConfigFromUrl, GitHubFootprint } from '../utils/github';
+import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
@@ -13,6 +13,9 @@ import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { trackEvent } from '../utils/analytics';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
+import GithubIcon from '../atoms/GithubIcon';
+import CodebergIcon from '../atoms/CodebergIcon';
+import ForgejoIcon from '../atoms/ForgejoIcon';
 
 const Spinner = styled.div`
   border: 3px solid rgba(255, 255, 255, 0.3);
@@ -147,7 +150,7 @@ const OptionBox = styled.div`
   }
 `;
 
-const GitHubInputContainer = styled.div`
+const RepoInputContainer = styled.div`
   display: flex;
   gap: 0.5rem;
   width: 100%;
@@ -158,22 +161,85 @@ const GitHubInputContainer = styled.div`
   }
 `;
 
-const GitHubInput = styled.input`
+const UnifiedInputGroup = styled.div`
+  display: flex;
+  align-items: stretch;
   flex: 1;
   min-width: 0;
   background-color: ${theme.colors.backgroundLighter};
   border: 1px solid ${theme.colors.border};
   border-radius: 6px;
-  padding: 0.75rem 1rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease-in-out;
+
+  &:focus-within {
+    border-color: ${theme.colors.accent};
+  }
+`;
+
+const CustomDropdownContainer = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  user-select: none;
+`;
+
+const DropdownTrigger = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: transparent;
+  border: none;
+  padding: 0 0.5rem 0 0.75rem;
+  cursor: pointer;
+  height: 100%;
+  color: ${theme.colors.white};
+
+  transition: background-color 0.15s ease-in-out;
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+
+  &:hover {
+    background-color: ${theme.colors.buttonHover};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  .material-symbols-outlined {
+    font-size: 18px;
+    color: ${theme.colors.textDarker};
+    display: block;
+    margin-right: -0.15rem;
+  }
+`;
+
+const DropdownDivider = styled.div`
+  width: 1px;
+  background-color: ${theme.colors.border};
+  margin: 0.75rem 0;
+  flex-shrink: 0;
+`;
+
+const UnifiedInput = styled.input`
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 1rem 1rem 1rem 0.5rem;
   color: ${theme.colors.text};
   font-family: ${theme.fonts.body};
   font-size: ${theme.fontSizes.base};
   outline: none;
-  transition: border-color 0.15s ease-in-out;
-
-  &:focus {
-    border-color: ${theme.colors.accent};
-  }
 
   &::selection {
     background-color: ${theme.colors.accent};
@@ -181,8 +247,74 @@ const GitHubInput = styled.input`
   }
 
   &:disabled {
-    opacity: 0.5;
     cursor: not-allowed;
+    opacity: 0.5;
+  }
+`;
+
+const DropdownMenu = styled.div`
+  position: absolute;
+  top: 105%;
+  left: 0;
+  background-color: ${theme.colors.backgroundLight};
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  padding: 0.25rem 0;
+  min-width: 130px;
+  z-index: 105;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+`;
+
+const DropdownItem = styled.div<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  font-size: ${theme.fontSizes.bodySmall || '13px'};
+  color: ${({ $active }) =>
+    $active ? theme.colors.white : theme.colors.textDark};
+  background-color: ${({ $active }) =>
+    $active ? theme.colors.accent : 'transparent'};
+  cursor: pointer;
+
+  &:hover {
+    background-color: ${({ $active }) =>
+      $active ? theme.colors.accent : theme.colors.backgroundLighter};
+    color: ${theme.colors.white};
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    color: currentColor;
+    display: block;
+  }
+`;
+
+const LoadButton = styled(Button)`
+  aspect-ratio: 1 / 1;
+  padding: 1rem;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 0 5px 5px 0;
+  height: 100%;
+
+  &:active {
+    transform: none;
+    outline: none;
+  }
+
+  svg,
+  .material-symbols-outlined {
+    display: block;
+    font-size: 18px;
+  }
+
+  ${Spinner} {
+    margin-right: 0;
   }
 `;
 
@@ -267,11 +399,50 @@ const allExamples: ConfigOption[] = exampleOptions
 const Welcome = () => {
   const navigate = useNavigate();
   const configContext = useConfigContext();
-  const [githubInput, setGithubInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [repoInput, setRepoInput] = useState('');
+  const [provider, setProvider] = useState<'github' | 'codeberg' | 'forgejo'>(
+    'github'
+  );
+  const [isLocalLoading, setIsLocalLoading] = useState(false);
+  const [isRepoLoading, setIsRepoLoading] = useState(false);
+  const isLoading = isLocalLoading || isRepoLoading;
   const [shouldNavigate, setShouldNavigate] = useState(false);
 
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   const [isDragging, setIsDragging] = useState(false);
+
+  const handleRepoInputChange = (val: string) => {
+    setRepoInput(val);
+    if (val.includes('github.com/')) {
+      setProvider('github');
+    } else if (val.includes('codeberg.org/')) {
+      setProvider('codeberg');
+    } else if (val.startsWith('http://') || val.startsWith('https://')) {
+      setProvider('forgejo');
+    } else if (
+      val.includes('/') &&
+      !val.includes('github.com/') &&
+      !val.includes('codeberg.org/') &&
+      val.split('/')[0].includes('.')
+    ) {
+      setProvider('forgejo');
+    }
+  };
 
   // Use the injection conflict resolution hook
   const {
@@ -297,7 +468,14 @@ const Welcome = () => {
 
   // Navigate to home when config has been set
   useEffect(() => {
-    if (shouldNavigate && configContext?.configInput) {
+    const queryParameters = new URLSearchParams(window.location.search);
+    const hasRemoteUrlParam =
+      queryParameters.has('github') ||
+      queryParameters.has('codeberg') ||
+      queryParameters.has('forgejo') ||
+      queryParameters.has('gitea');
+
+    if ((shouldNavigate || hasRemoteUrlParam) && configContext?.configInput) {
       navigate('/');
       setShouldNavigate(false);
     }
@@ -367,12 +545,12 @@ const Welcome = () => {
 
   /**
    * Processes footprints (or any injections) with conflict resolution.
-   * Converts GitHubFootprint[] to string[][] and uses the conflict resolution hook.
+   * Converts GitInjection[] to string[][] and uses the conflict resolution hook.
    */
   const processInjections = async (
-    footprints: GitHubFootprint[],
-    outlines: GitHubFootprint[],
-    templates: GitHubFootprint[],
+    footprints: GitInjection[],
+    outlines: GitInjection[],
+    templates: GitInjection[],
     config: string,
     resolution: ConflictResolutionStrategy | null = null,
     currentInjections?: string[][]
@@ -414,26 +592,50 @@ const Welcome = () => {
 
   const handleConflictCancel = () => {
     handleConflictCancelBase();
-    setIsLoading(false);
+    setIsLocalLoading(false);
+    setIsRepoLoading(false);
     configContext?.setIsGenerating(false);
   };
 
-  const handleGitHub = () => {
-    if (!githubInput || !configContext) return;
+  const handleGitProvider = () => {
+    if (!repoInput || !configContext) return;
     const { setError, clearError, setIsGenerating } = configContext;
-    setIsLoading(true);
-    setIsGenerating(true); // Show progress bar during GitHub loading
+    setIsRepoLoading(true);
+    setIsGenerating(true); // Show progress bar during loading
     clearError();
 
-    // Track GitHub loading
-    trackEvent('github_loaded', {
-      github_url: githubInput,
+    // Track loading
+    trackEvent('repo_loaded', {
+      repo_url: repoInput,
+      provider,
     });
 
-    // Reset any pending conflict resolution state from previous loads
-    // Note: currentConflict is managed by the hook, so we only reset local state
+    let fetchUrl = repoInput.trim();
+    if (
+      !fetchUrl.includes('://') &&
+      !fetchUrl.includes('github.com') &&
+      !fetchUrl.includes('codeberg.org')
+    ) {
+      if (provider === 'codeberg') {
+        fetchUrl = `https://codeberg.org/${fetchUrl}`;
+      } else if (provider === 'forgejo') {
+        const segments = fetchUrl.split('/');
+        if (segments.length >= 2 && segments[0].includes('.')) {
+          fetchUrl = `https://${fetchUrl}`;
+        } else {
+          setError(
+            'Forgejo/Gitea requires a URL including the host (e.g., host/owner/repo)'
+          );
+          setIsRepoLoading(false);
+          setIsGenerating(false);
+          return;
+        }
+      } else {
+        fetchUrl = `https://github.com/${fetchUrl}`;
+      }
+    }
 
-    fetchConfigFromUrl(githubInput)
+    fetchConfigFromUrl(fetchUrl)
       .then(async (result) => {
         if (configContext) {
           // Show rate limit warning if present
@@ -443,18 +645,6 @@ const Welcome = () => {
 
           try {
             configContext.createNewConfig(result.config);
-
-            const footprintCount = result.footprints.length;
-            const outlineCount = result.outlines.length;
-            const templateCount = result.templates.length;
-
-            if (footprintCount || outlineCount || templateCount) {
-              configContext.setInfo(
-                `Config loaded successfully from GitHub. Found ${footprintCount} footprints, ${outlineCount} outlines, and ${templateCount} templates.`
-              );
-            } else {
-              configContext.setInfo('Config loaded successfully from GitHub.');
-            }
 
             // Process footprints with conflict resolution
             await processInjections(
@@ -472,14 +662,22 @@ const Welcome = () => {
         }
       })
       .catch((e) => {
-        setError(`Failed to load from GitHub: ${e.message}`);
+        const providerName =
+          provider === 'github'
+            ? 'GitHub'
+            : provider === 'codeberg'
+              ? 'Codeberg'
+              : 'Forgejo/Gitea';
+        setError(
+          `Failed to load from ${providerName} repository: ${e.message}`
+        );
         configContext?.setInfo(null);
         // Ensure we reset loading state and don't navigate
-        setIsLoading(false);
+        setIsRepoLoading(false);
         setIsGenerating(false);
       })
       .finally(() => {
-        setIsLoading(false);
+        setIsRepoLoading(false);
         // Note: isGenerating will be reset by generateNow or needs explicit reset on error
       });
   };
@@ -495,7 +693,7 @@ const Welcome = () => {
     if (!configContext) return;
 
     const { setError, clearError, setIsGenerating } = configContext;
-    setIsLoading(true);
+    setIsLocalLoading(true);
     setIsGenerating(true); // Show progress bar during file loading
     clearError();
 
@@ -514,18 +712,6 @@ const Welcome = () => {
 
       configContext.createNewConfig(result.config);
 
-      const footprintCount = result.footprints.length;
-      const outlineCount = result.outlines.length;
-      const templateCount = result.templates.length;
-
-      if (footprintCount || outlineCount || templateCount) {
-        configContext.setInfo(
-          `Config loaded successfully. Found ${footprintCount} footprints, ${outlineCount} outlines, and ${templateCount} templates.`
-        );
-      } else {
-        configContext.setInfo('Config loaded successfully.');
-      }
-
       // Process footprints with conflict resolution
       await processInjections(
         result.footprints,
@@ -539,10 +725,10 @@ const Welcome = () => {
       );
       configContext.setInfo(null);
       // Ensure we reset loading state and don't navigate
-      setIsLoading(false);
+      setIsLocalLoading(false);
       setIsGenerating(false);
     } finally {
-      setIsLoading(false);
+      setIsLocalLoading(false);
       // Note: isGenerating will be reset by generateNow or needs explicit reset on error
     }
   };
@@ -675,7 +861,7 @@ const Welcome = () => {
               aria-label="Select local file to load"
               data-testid="local-file-button"
             >
-              {isLoading ? (
+              {isLocalLoading ? (
                 <>
                   <Spinner /> Loading...
                 </>
@@ -685,45 +871,108 @@ const Welcome = () => {
             </Button>
           </OptionBox>
           <OptionBox>
-            <h2>From GitHub</h2>
+            <h2>From Repo</h2>
             <p>
-              Link to a YAML config file on GitHub, or simply a repo like
+              Link to a YAML config file on a Git provider (e.g. GitHub,
+              Codeberg, Forgejo), or simply a repository name like
               &quot;user/repo&quot;.
             </p>
-            <GitHubInputContainer>
-              <GitHubInput
-                placeholder="github.com/ceoloide/corney-island"
-                value={githubInput}
-                onChange={(e) => setGithubInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (
-                    e.key === 'Enter' &&
-                    !isLoading &&
-                    githubInput.trim() !== ''
-                  ) {
-                    e.preventDefault();
-                    handleGitHub();
+            <RepoInputContainer>
+              <UnifiedInputGroup>
+                <CustomDropdownContainer ref={dropdownRef}>
+                  <DropdownTrigger
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    disabled={isLoading}
+                    aria-label="Repository provider source"
+                    data-testid="repo-provider-trigger"
+                  >
+                    {provider === 'github' ? (
+                      <GithubIcon />
+                    ) : provider === 'codeberg' ? (
+                      <CodebergIcon />
+                    ) : (
+                      <ForgejoIcon />
+                    )}
+                    <span className="material-symbols-outlined">
+                      arrow_drop_down
+                    </span>
+                  </DropdownTrigger>
+                  {isDropdownOpen && (
+                    <DropdownMenu>
+                      <DropdownItem
+                        $active={provider === 'github'}
+                        onClick={() => {
+                          setProvider('github');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <GithubIcon />
+                        GitHub
+                      </DropdownItem>
+                      <DropdownItem
+                        $active={provider === 'codeberg'}
+                        onClick={() => {
+                          setProvider('codeberg');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <CodebergIcon />
+                        Codeberg
+                      </DropdownItem>
+                      <DropdownItem
+                        $active={provider === 'forgejo'}
+                        onClick={() => {
+                          setProvider('forgejo');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <ForgejoIcon />
+                        Forgejo
+                      </DropdownItem>
+                    </DropdownMenu>
+                  )}
+                </CustomDropdownContainer>
+                <DropdownDivider />
+                <UnifiedInput
+                  placeholder={
+                    provider === 'forgejo' ? 'host/user/repo' : 'user/repo'
                   }
-                }}
-                disabled={isLoading}
-                aria-label="GitHub repository URL"
-                data-testid="github-input"
-              />
-              <Button
-                onClick={handleGitHub}
-                disabled={isLoading || !githubInput}
-                aria-label="Load configuration from GitHub"
-                data-testid="github-load-button"
-              >
-                {isLoading ? (
-                  <>
-                    <Spinner /> Loading...
-                  </>
-                ) : (
-                  'Load'
-                )}
-              </Button>
-            </GitHubInputContainer>
+                  value={repoInput}
+                  onChange={(e) => handleRepoInputChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === 'Enter' &&
+                      !isLoading &&
+                      repoInput.trim() !== ''
+                    ) {
+                      e.preventDefault();
+                      handleGitProvider();
+                    }
+                  }}
+                  disabled={isLoading}
+                  aria-label="Repository URL or path"
+                  data-testid="repo-input"
+                />
+                <LoadButton
+                  onClick={handleGitProvider}
+                  disabled={isLoading || !repoInput}
+                  aria-label="Load configuration from repository"
+                  data-testid="repo-load-button"
+                >
+                  {isRepoLoading ? (
+                    <Spinner />
+                  ) : (
+                    <span
+                      className="material-symbols-outlined"
+                      style={{ display: 'block' }}
+                    >
+                      cloud_download
+                    </span>
+                  )}
+                </LoadButton>
+              </UnifiedInputGroup>
+            </RepoInputContainer>
           </OptionBox>
         </OptionsContainer>
 

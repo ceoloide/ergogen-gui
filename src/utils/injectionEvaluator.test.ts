@@ -68,4 +68,19 @@ describe('injectionEvaluator', () => {
       createInjectionModule(injectionCode);
     }).toThrow("Cannot find module 'fs' in worker context");
   });
+
+  it('should resolve package.json in worker context', () => {
+    // Arrange
+    const injectionCode = `
+      const pkg = require('../../package.json');
+      module.exports = () => pkg.version;
+    `;
+
+    // Act
+    const fn = createInjectionModule(injectionCode) as () => string;
+
+    // Assert
+    expect(typeof fn).toBe('function');
+    expect(typeof fn()).toBe('string');
+  });
 });

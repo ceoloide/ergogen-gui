@@ -201,5 +201,21 @@ describe('Downloads', () => {
       const allElements = screen.queryAllByTestId('downloads-testCase');
       expect(allElements).toHaveLength(1);
     });
+    it('should render No outputs placeholder when results is null/empty', () => {
+      // Arrange
+      mockContext = createMockContext(false, false, null);
+
+      // Act
+      render(
+        <Downloads
+          setPreview={mockSetPreview}
+          previewKey=""
+          data-testid="downloads"
+        />
+      );
+
+      // Assert
+      expect(screen.getByText('No outputs')).toBeInTheDocument();
+    });
   });
 });

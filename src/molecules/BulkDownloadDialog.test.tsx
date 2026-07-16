@@ -172,5 +172,13 @@ describe('BulkDownloadDialog', () => {
 
     expect(screen.getByText('Generating Keyboard Alpha')).toBeInTheDocument();
     expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+    // Trigger concurrent progress update
+    act(() => {
+      progressCallback(1, 2, 'Keyboard Alpha, Keyboard Beta');
+    });
+
+    expect(screen.getByText('Keyboard Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Keyboard Beta')).toBeInTheDocument();
   });
 });
