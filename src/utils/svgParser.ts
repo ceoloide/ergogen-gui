@@ -3,26 +3,23 @@ export const parseSvgToMakerJsOutline = (svgContent: string): string => {
   const doc = parser.parseFromString(svgContent, 'image/svg+xml');
   const pathElements = doc.querySelectorAll('path');
 
-  const modelsCode: string[] = [];
-  let index = 0;
+  const pathsList: string[] = [];
 
   pathElements.forEach((path) => {
     const d = path.getAttribute('d');
     if (d && d.trim()) {
       // Escape quotes and backslashes in path data to prevent breaking the JS string literal
       const escapedD = d.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      modelsCode.push(
-        `      svg_path_${index}: makerjs.importer.fromSVGPathData("${escapedD}")`
-      );
-      index++;
+      pathsList.push(`        "${escapedD}"`);
     }
   });
 
-  if (modelsCode.length === 0) {
-    return `const makerjs = require('makerjs');\nmodule.exports = {\n  models: {}\n};`;
-  }
+  return `const u = require('../utils');
 
-  return `const makerjs = require('makerjs');\nmodule.exports = {\n  models: {\n${modelsCode.join(
-    ',\n'
-  )}\n  }\n};`;
+module.exports = (config, name, points, outlines, units) => {
+    const paths = [
+${pathsList.join(',\n')}
+    ];
+    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);
+};`;
 };

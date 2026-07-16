@@ -8,9 +8,13 @@ describe('svgParser', () => {
       </svg>
     `;
     const result = parseSvgToMakerJsOutline(svgContent);
-    expect(result).toContain("const makerjs = require('makerjs');");
+    expect(result).toContain("const u = require('../utils');");
     expect(result).toContain(
-      'svg_path_0: makerjs.importer.fromSVGPathData("M 10 10 L 90 90")'
+      'module.exports = (config, name, points, outlines, units) => {'
+    );
+    expect(result).toContain('        "M 10 10 L 90 90"');
+    expect(result).toContain(
+      '    return u.svg_paths_to_outline(paths, config, name, points, outlines, units);'
     );
   });
 
@@ -22,22 +26,18 @@ describe('svgParser', () => {
       </svg>
     `;
     const result = parseSvgToMakerJsOutline(svgContent);
-    expect(result).toContain(
-      'svg_path_0: makerjs.importer.fromSVGPathData("M 10 10 L 90 90")'
-    );
-    expect(result).toContain(
-      'svg_path_1: makerjs.importer.fromSVGPathData("M 50 50 \\"test\\"")'
-    );
+    expect(result).toContain('        "M 10 10 L 90 90",');
+    expect(result).toContain('        "M 50 50 \\"test\\""');
   });
 
-  it('should return empty models if no paths are present', () => {
+  it('should return empty paths if no paths are present', () => {
     const svgContent = `
       <svg viewBox="0 0 100 100">
         <rect x="10" y="10" width="80" height="80" />
       </svg>
     `;
     const result = parseSvgToMakerJsOutline(svgContent);
-    expect(result).toContain('models: {}');
+    expect(result).toContain('    const paths = [\n\n    ];');
   });
 
   it('should ignore empty paths or paths without d attribute', () => {
@@ -49,9 +49,6 @@ describe('svgParser', () => {
       </svg>
     `;
     const result = parseSvgToMakerJsOutline(svgContent);
-    expect(result).toContain(
-      'svg_path_0: makerjs.importer.fromSVGPathData("M 10 10")'
-    );
-    expect(result).not.toContain('svg_path_1');
+    expect(result).toContain('        "M 10 10"');
   });
 });
