@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -368,7 +368,10 @@ const AppContent = ({
     // 2. Check Ergogen version
     if (sharedErgogen) {
       // Check if it's custom
-      if (isCustomErgogenVersion(sharedErgogen)) {
+      if (
+        isCustomErgogenVersion(sharedErgogen) &&
+        sharedErgogen !== currentErgogen
+      ) {
         isCompatible = false;
         const versionInfo = getErgogenVersionInfo(sharedErgogen);
         customErgogenWarning = {
@@ -404,25 +407,28 @@ const AppContent = ({
     };
   };
 
-  const loadSharedConfig = (config: string, injections?: string[][]) => {
-    if (!configContext) return;
+  const loadSharedConfig = useCallback(
+    (config: string, injections?: string[][]) => {
+      if (!configContext) return;
 
-    if (injections !== undefined && injections.length > 0) {
-      processInjectionsWithConflictResolution(injections, config).catch(
-        (error) => {
-          console.error('[App] Error processing injections:', error);
-          configContext.setError(
-            `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
-          );
-        }
-      );
-    } else {
-      configContext.loadPreview(config);
-      configContext.generateNow(config, configContext.injectionInput, {
-        pointsonly: false,
-      });
-    }
-  };
+      if (injections !== undefined && injections.length > 0) {
+        processInjectionsWithConflictResolution(injections, config).catch(
+          (error) => {
+            console.error('[App] Error processing injections:', error);
+            configContext.setError(
+              `Failed to process injections: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+          }
+        );
+      } else {
+        configContext.loadPreview(config);
+        configContext.generateNow(config, configContext.injectionInput, {
+          pointsonly: false,
+        });
+      }
+    },
+    [configContext, processInjectionsWithConflictResolution]
+  );
 
   const handleAcceptShare = () => {
     if (sharedConfigToConfirm) {
@@ -479,7 +485,7 @@ const AppContent = ({
         pendingSharedConfig.injections
       );
     }
-  }, [configContext, pendingSharedConfig]);
+  }, [configContext, pendingSharedConfig, loadSharedConfig]);
 
   /**
    * Effect to handle hash fragment changes when navigating to shared configurations.
@@ -548,7 +554,7 @@ const AppContent = ({
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [configContext]);
+  }, [configContext, loadSharedConfig]);
 
   return (
     <>

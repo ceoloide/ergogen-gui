@@ -2,11 +2,11 @@ import { renderHook, act } from '@testing-library/react';
 import { useServiceWorkerUpdate } from '../App';
 import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
 
-jest.mock('../serviceWorkerRegistration', () => ({
+vi.mock('../serviceWorkerRegistration', () => ({
   register: jest.fn(),
 }));
 
-jest.mock('../Ergogen', () => {
+vi.mock('../Ergogen', () => {
   const MockErgogen = () => null;
   MockErgogen.displayName = 'MockErgogen';
   return {
@@ -15,7 +15,7 @@ jest.mock('../Ergogen', () => {
   };
 });
 
-jest.mock('../pages/Welcome', () => {
+vi.mock('../pages/Welcome', () => {
   const MockWelcome = () => null;
   MockWelcome.displayName = 'MockWelcome';
   return {

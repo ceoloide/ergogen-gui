@@ -70,6 +70,8 @@ export const initAnalytics = (): void => {
       };
       win.gtag('js', new Date());
       win.gtag('config', trackingId);
+
+      setupGlobalErrorTracking();
     }
   } else {
     // Completely disable/remove GA4 scripts and objects
@@ -80,6 +82,8 @@ export const initAnalytics = (): void => {
     const win = window as unknown as GAWindow;
     delete win.gtag;
     delete win.dataLayer;
+
+    removeGlobalErrorTracking();
   }
 };
 
@@ -103,4 +107,63 @@ export const trackEvent = (
       ...eventParams,
     });
   }
+};
+
+/**
+ * Tracks a client-side exception or error via GA4.
+ * @param error - The Error object or message
+ * @param fatal - Whether the error is fatal / crashed the app/component
+ * @param context - Additional context/location where the error occurred
+ */
+export const trackError = (
+  error: Error | string,
+  fatal: boolean = false,
+  context?: string
+): void => {
+  const message = error instanceof Error ? error.message : error;
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  trackEvent('exception', {
+    description: context ? `[${context}] ${message}` : message,
+    fatal,
+    error_stack: stack?.substring(0, 250) || undefined, // limit length
+  });
+};
+
+let listenersAttached = false;
+
+const handleGlobalError = (event: ErrorEvent) => {
+  trackError(event.error || event.message, false, 'unhandled_error');
+};
+
+const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+  trackError(
+    event.reason || 'Unhandled Promise Rejection',
+    false,
+    'unhandled_rejection'
+  );
+};
+
+/**
+ * Sets up global event listeners to automatically track unhandled exceptions.
+ */
+export const setupGlobalErrorTracking = (): void => {
+  if (typeof window === 'undefined') return;
+  if (listenersAttached) return;
+
+  window.addEventListener('error', handleGlobalError);
+  window.addEventListener('unhandledrejection', handleUnhandledRejection);
+  listenersAttached = true;
+};
+
+/**
+ * Removes global event listeners for unhandled exceptions.
+ */
+export const removeGlobalErrorTracking = (): void => {
+  if (typeof window === 'undefined') return;
+  if (!listenersAttached) return;
+
+  window.removeEventListener('error', handleGlobalError);
+  window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  listenersAttached = false;
 };

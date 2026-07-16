@@ -11,7 +11,7 @@ const newerGuiVersion = `${major}.${minor + 1}.${patch}`;
 const olderGuiVersion = `${major}.${minor - 1 >= 0 ? minor - 1 : 0}.${patch}`;
 
 // Mock react-router-dom components and hooks to avoid React Router compatibility issues in Jest
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   Routes: ({ children }: any) => <div>{children}</div>,
   Route: ({ element }: any) => element,
   Navigate: () => <div data-testid="mock-navigate" />,
@@ -19,7 +19,7 @@ jest.mock('react-router-dom', () => ({
 }));
 
 // Mock Ergogen component
-jest.mock('./Ergogen', () => {
+vi.mock('./Ergogen', () => {
   const MockErgogen = () => <div data-testid="mock-ergogen" />;
   MockErgogen.displayName = 'MockErgogen';
   return {
@@ -29,7 +29,7 @@ jest.mock('./Ergogen', () => {
 });
 
 // Mock Welcome component
-jest.mock('./pages/Welcome', () => {
+vi.mock('./pages/Welcome', () => {
   const MockWelcome = () => <div data-testid="mock-welcome" />;
   MockWelcome.displayName = 'MockWelcome';
   return {
@@ -39,7 +39,7 @@ jest.mock('./pages/Welcome', () => {
 });
 
 // Mock Header component
-jest.mock('./atoms/Header', () => {
+vi.mock('./atoms/Header', () => {
   const MockHeader = () => <div data-testid="mock-header" />;
   MockHeader.displayName = 'MockHeader';
   return {
@@ -49,7 +49,7 @@ jest.mock('./atoms/Header', () => {
 });
 
 // Mock LoadingBar component
-jest.mock('./atoms/LoadingBar', () => {
+vi.mock('./atoms/LoadingBar', () => {
   const MockLoadingBar = () => <div data-testid="mock-loading-bar" />;
   MockLoadingBar.displayName = 'MockLoadingBar';
   return {
@@ -59,7 +59,7 @@ jest.mock('./atoms/LoadingBar', () => {
 });
 
 // Mock Banners component
-jest.mock('./organisms/Banners', () => {
+vi.mock('./organisms/Banners', () => {
   const MockBanners = () => <div data-testid="mock-banners" />;
   MockBanners.displayName = 'MockBanners';
   return {
@@ -69,7 +69,7 @@ jest.mock('./organisms/Banners', () => {
 });
 
 // Mock SideNavigation component
-jest.mock('./molecules/SideNavigation', () => {
+vi.mock('./molecules/SideNavigation', () => {
   const MockSideNavigation = () => <div data-testid="mock-side-navigation" />;
   MockSideNavigation.displayName = 'MockSideNavigation';
   return {
@@ -79,7 +79,7 @@ jest.mock('./molecules/SideNavigation', () => {
 });
 
 // Mock worker Factory
-jest.mock('./workers/workerFactory', () => ({
+vi.mock('./workers/workerFactory', () => ({
   createErgogenWorker: () => ({
     postMessage: jest.fn(),
     terminate: jest.fn(),
@@ -93,11 +93,12 @@ jest.mock('./workers/workerFactory', () => ({
 }));
 
 // Mock getConfigFromHash
-jest.mock('./utils/share', () => {
-  const originalModule = jest.requireActual('./utils/share');
+vi.mock('./utils/share', async () => {
+  const originalModule =
+    await vi.importActual<typeof import('./utils/share')>('./utils/share');
   return {
     ...originalModule,
-    getConfigFromHash: jest.fn(),
+    getConfigFromHash: vi.fn(),
   };
 });
 

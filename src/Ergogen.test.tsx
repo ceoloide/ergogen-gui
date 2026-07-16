@@ -3,64 +3,64 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import Ergogen from './Ergogen';
 import { useConfigContext } from './context/ConfigContext';
 
-jest.mock('./context/ConfigContext', () => ({
+vi.mock('./context/ConfigContext', () => ({
   useConfigContext: jest.fn(),
 }));
 
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   useNavigate: () => jest.fn(),
   useLocation: () => ({ pathname: '/' }),
 }));
 
-jest.mock('react-hotkeys-hook', () => ({
+vi.mock('react-hotkeys-hook', () => ({
   useHotkeys: jest.fn(),
 }));
 
 // Mock sub-components
-jest.mock('./molecules/ConfigEditor', () => {
+vi.mock('./molecules/ConfigEditor', () => {
   const MockConfigEditor = () => <div data-testid="mock-config-editor" />;
   MockConfigEditor.displayName = 'MockConfigEditor';
-  return MockConfigEditor;
+  return { default: MockConfigEditor };
 });
-jest.mock('./molecules/InjectionEditor', () => {
+vi.mock('./molecules/InjectionEditor', () => {
   const MockInjectionEditor = () => <div data-testid="mock-injection-editor" />;
   MockInjectionEditor.displayName = 'MockInjectionEditor';
-  return MockInjectionEditor;
+  return { default: MockInjectionEditor };
 });
-jest.mock('./molecules/Downloads', () => {
+vi.mock('./molecules/Downloads', () => {
   const MockDownloads = () => <div data-testid="mock-downloads" />;
   MockDownloads.displayName = 'MockDownloads';
-  return MockDownloads;
+  return { default: MockDownloads };
 });
-jest.mock('./molecules/Injections', () => {
+vi.mock('./molecules/Injections', () => {
   const MockInjections = () => <div data-testid="mock-injections" />;
   MockInjections.displayName = 'MockInjections';
-  return MockInjections;
+  return { default: MockInjections };
 });
-jest.mock('./molecules/FilePreview', () => {
+vi.mock('./molecules/FilePreview', () => {
   const MockFilePreview = () => <div data-testid="mock-file-preview" />;
   MockFilePreview.displayName = 'MockFilePreview';
-  return MockFilePreview;
+  return { default: MockFilePreview };
 });
-jest.mock('./molecules/ResizablePanel', () => {
+vi.mock('./molecules/ResizablePanel', () => {
   const MockResizablePanel = ({ children }: any) => <div>{children}</div>;
   MockResizablePanel.displayName = 'MockResizablePanel';
-  return MockResizablePanel;
+  return { default: MockResizablePanel };
 });
 
 // Mock zip, share, and analytics utils
 const mockCreateZip = jest.fn();
-jest.mock('./utils/zip', () => ({
+vi.mock('./utils/zip', () => ({
   createZip: (...args: any[]) => mockCreateZip(...args),
 }));
 
 const mockCreateShareableUri = jest.fn().mockReturnValue('https://share.link');
-jest.mock('./utils/share', () => ({
+vi.mock('./utils/share', () => ({
   createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
 }));
 
 const mockTrackEvent = jest.fn();
-jest.mock('./utils/analytics', () => ({
+vi.mock('./utils/analytics', () => ({
   trackEvent: (...args: any[]) => mockTrackEvent(...args),
 }));
 

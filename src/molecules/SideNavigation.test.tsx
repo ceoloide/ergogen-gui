@@ -5,12 +5,12 @@ import { useConfigContext } from '../context/ConfigContext';
 import guiPkg from '../../package.json';
 
 // Mock ConfigContext
-jest.mock('../context/ConfigContext', () => ({
+vi.mock('../context/ConfigContext', () => ({
   useConfigContext: jest.fn(),
 }));
 
 const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   Link: ({ children, to, onClick, ...props }: any) => (
     <a href={to} onClick={onClick} {...props}>
       {children}

@@ -19,17 +19,17 @@ const mockJscadWorker = {
 
 import { isFeatureEnabled } from '../utils/featureFlags';
 
-jest.mock('../utils/featureFlags', () => ({
+vi.mock('../utils/featureFlags', () => ({
   isFeatureEnabled: jest.fn(() => true),
 }));
 
-jest.mock('../workers/workerFactory', () => ({
+vi.mock('../workers/workerFactory', () => ({
   createErgogenWorker: () => mockErgogenWorker,
   createJscadWorker: () => mockJscadWorker,
 }));
 
 import { trackEvent } from '../utils/analytics';
-jest.mock('../utils/analytics', () => ({
+vi.mock('../utils/analytics', () => ({
   trackEvent: jest.fn(),
   initAnalytics: jest.fn(),
   getSendUsageMetricsEnabled: () => true,

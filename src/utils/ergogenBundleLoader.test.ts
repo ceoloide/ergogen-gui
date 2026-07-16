@@ -14,7 +14,7 @@ import {
 import { isFeatureEnabled } from './featureFlags';
 
 // Mock featureFlags
-jest.mock('./featureFlags', () => ({
+vi.mock('./featureFlags', () => ({
   isFeatureEnabled: jest.fn(),
 }));
 

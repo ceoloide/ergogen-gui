@@ -3,9 +3,9 @@
 
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-  <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192.png" />
-  <link rel="icon" sizes="192x192" href="%PUBLIC_URL%/icons/icon-192.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="icon" sizes="192x192" href="/icons/icon-192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#2a2a2a" />
   <meta name="description" content="Ergogen Web GUI — design ergonomic keyboard layouts and generate PCB, DXF, and 3D model files, fully offline." />
@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Ergogen" />
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+  <link rel="manifest" href="/manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto&display=swap">
@@ -32,17 +32,18 @@
 <body style="background: #2a2a2a;">
   <noscript>You need to enable JavaScript to run this app.</noscript>
   <div id="root"></div>
-  <script src="%PUBLIC_URL%/dependencies/maker.js"></script>
+  <script src="/dependencies/maker.js"></script>
   <script>
     makerjs = require('makerjs')
   </script>
-  <script src="%PUBLIC_URL%/dependencies/bezier.js"></script>
-  <script src="%PUBLIC_URL%/dependencies/hull.js"></script>
+  <script src="/dependencies/bezier.js"></script>
+  <script src="/dependencies/hull.js"></script>
   <script>
     myjscad = {}
   </script>
-  <script src="%PUBLIC_URL%/dependencies/kle.js"></script>
-  <script src="%PUBLIC_URL%/dependencies/kicanvas.js"></script>
+  <script src="/dependencies/kle.js"></script>
+  <script src="/dependencies/kicanvas.js"></script>
+  <script type="module" src="/src/index.tsx"></script>
 </body>
 
 </html>

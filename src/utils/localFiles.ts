@@ -3,7 +3,7 @@ import { parseZipArchive, enforceFileSizeLimit } from './ergogenBundleLoader';
 /**
  * Result of loading a local file.
  */
-export type LocalFileLoadResult = {
+type LocalFileLoadResult = {
   config: string;
   footprints: { name: string; content: string }[];
   outlines: { name: string; content: string }[];

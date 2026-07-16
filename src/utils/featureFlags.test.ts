@@ -1,7 +1,10 @@
-let mockErgogenVersion = '4.2.1';
-jest.mock('ergogen/package.json', () => ({
+const mockState = vi.hoisted(() => ({ version: '4.2.1' }));
+vi.mock('ergogen/package.json', () => ({
   get version() {
-    return mockErgogenVersion;
+    return mockState.version;
+  },
+  get default() {
+    return mockState;
   },
 }));
 
@@ -42,7 +45,7 @@ describe('featureFlags utilities', () => {
     beforeEach(() => {
       jest.resetModules();
       process.env = { ...originalEnv };
-      mockErgogenVersion = '4.2.1';
+      mockState.version = '4.2.1';
       // Delete any specific feature env vars to keep test sandbox clean
       delete process.env.REACT_APP_FEATURE_TEMPLATES;
       delete process.env.REACT_APP_FEATURE_OUTLINES;
@@ -109,13 +112,13 @@ describe('featureFlags utilities', () => {
       window.location.search = '';
 
       // Defer to package version when version in package.json is < 4.3.0
-      mockErgogenVersion = '4.2.1';
+      mockState.version = '4.2.1';
       process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#develop';
       expect(isFeatureEnabled('templates')).toBe(false);
       expect(isFeatureEnabled('outlines')).toBe(false);
 
       // Defer to package version when version in package.json is >= 4.3.0
-      mockErgogenVersion = '4.3.0';
+      mockState.version = '4.3.0';
       process.env.REACT_APP_ERGOGEN_VERSION = 'github:ceoloide/ergogen#develop';
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);

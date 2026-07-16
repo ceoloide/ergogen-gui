@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { makeShooter } from './utils/screenshots';
+import { mockGitHubNetworkRequests } from './utils/githubMocks';
 
 test.describe('GitHub Loading', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockGitHubNetworkRequests(page);
+  });
   test('should load config and footprints from ceoloide/mr_useful', async ({
     page,
   }) => {

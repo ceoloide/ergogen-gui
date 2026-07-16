@@ -4,23 +4,23 @@ import Header from './Header';
 import { useConfigContext } from '../context/ConfigContext';
 
 // Mock ConfigContext
-jest.mock('../context/ConfigContext', () => ({
+vi.mock('../context/ConfigContext', () => ({
   useConfigContext: jest.fn(),
 }));
 
 const mockCreateZip = jest.fn();
-jest.mock('../utils/zip', () => ({
+vi.mock('../utils/zip', () => ({
   createZip: (...args: any[]) => mockCreateZip(...args),
 }));
 
 const mockCreateShareableUri = jest.fn().mockReturnValue('https://share.link');
-jest.mock('../utils/share', () => ({
+vi.mock('../utils/share', () => ({
   createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
 }));
 
 const mockNavigate = jest.fn();
 const mockLocation = { pathname: '/' };
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   Link: ({ children, to, onClick, ...props }: any) => (
     <a href={to} onClick={onClick} {...props}>
       {children}
