@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    base: env.VITE_PUBLIC_URL || env.PUBLIC_URL || './',
+    base: env.VITE_PUBLIC_URL || env.PUBLIC_URL || '/',
     define: {
       'import.meta.env.VITE_ERGOGEN_VERSION': JSON.stringify(
         env.VITE_ERGOGEN_VERSION || env.ERGOGEN_VERSION || env.REACT_APP_ERGOGEN_VERSION || ''
