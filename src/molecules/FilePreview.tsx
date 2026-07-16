@@ -1,6 +1,7 @@
+import { lazy, Suspense } from 'react';
 import styled from 'styled-components';
-import PcbPreview from '../atoms/PcbPreview';
-import StlPreview from '../atoms/StlPreview';
+const PcbPreview = lazy(() => import('../atoms/PcbPreview'));
+const StlPreview = lazy(() => import('../atoms/StlPreview'));
 import SvgPreview from '../atoms/SvgPreview';
 import TextPreview from '../atoms/TextPreview';
 import { theme } from '../theme/theme';
@@ -24,23 +25,43 @@ const PlaceholderLogo = styled.img`
   user-drag: none;
 `;
 
+const LoaderText = styled.span`
+  color: ${theme.colors.textDarkest};
+  font-size: ${theme.fontSizes.sm};
+  margin-top: 1rem;
+  font-family: ${theme.fonts.body};
+  user-select: none;
+`;
+
+const PreviewLoader = () => (
+  <PlaceholderContainer>
+    <PlaceholderLogo
+      src={`${import.meta.env.BASE_URL}ergogen.png`}
+      alt="Ergogen Logo"
+      draggable="false"
+    />
+    <LoaderText>Loading preview...</LoaderText>
+  </PlaceholderContainer>
+);
+
 /**
  * Props for the FilePreview component.
  * @typedef {object} Props
- * @property {string} previewExtension - The file extension of the content to be previewed (e.g., 'svg', 'yaml').
- * @property {string} previewKey - A unique key for the preview component, essential for re-rendering.
- * @property {string} previewContent - The actual content of the file to be displayed.
- * @property {number | string} [width='100%'] - The width of the preview area.
- * @property {number | string} [height='100%'] - The height of the preview area.
- * @property {string} [className] - An optional CSS class for the container div.
- * @property {string} [data-testid] - An optional data-testid for testing purposes.
+ * @property {string} previewExtension - The extension of the file to preview (e.g. 'yaml', 'stl', 'kicad_pcb').
+ * @property {string | ArrayBuffer | Uint8Array} previewContent - The content of the file to preview.
+ * @property {string} previewKey - A unique key identifying the file preview target.
+ * @property {string | number} [width] - Optional custom width (default '100%').
+ * @property {string | number} [height] - Optional custom height (default '100%').
+ * @property {string} [className] - Optional custom class.
+ * @property {string} [data-testid] - Optional custom test id.
+ * @property {string} [aria-label] - Optional custom aria-label.
  */
 type Props = {
   previewExtension: string;
-  previewKey: string;
   previewContent: string | ArrayBuffer | Uint8Array;
-  width?: number | string;
-  height?: number | string;
+  previewKey: string;
+  width?: string | number;
+  height?: string | number;
   className?: string;
   'data-testid'?: string;
   'aria-label'?: string;
@@ -131,21 +152,25 @@ const FilePreview = ({
         );
       case 'kicad_pcb':
         return (
-          <PcbPreview
-            pcb={previewContent as string}
-            previewKey={previewKey}
-            key={previewKey}
-            aria-label={ariaLabel || `PCB preview for ${previewKey}`}
-            data-testid={dataTestId && `${dataTestId}-pcb`}
-          />
+          <Suspense fallback={<PreviewLoader />}>
+            <PcbPreview
+              pcb={previewContent as string}
+              previewKey={previewKey}
+              key={previewKey}
+              aria-label={ariaLabel || `PCB preview for ${previewKey}`}
+              data-testid={dataTestId && `${dataTestId}-pcb`}
+            />
+          </Suspense>
         );
       case 'stl':
         return (
-          <StlPreview
-            stl={previewContent}
-            aria-label={ariaLabel || `STL preview for ${previewKey}`}
-            data-testid={dataTestId && `${dataTestId}-stl`}
-          />
+          <Suspense fallback={<PreviewLoader />}>
+            <StlPreview
+              stl={previewContent}
+              aria-label={ariaLabel || `STL preview for ${previewKey}`}
+              data-testid={dataTestId && `${dataTestId}-stl`}
+            />
+          </Suspense>
         );
       default:
         return 'No preview available';
