@@ -208,4 +208,32 @@ describe('Ergogen preview_loaded tracking', () => {
     // Assert
     expect(countPreviewLoadedCalls()).toBe(1);
   });
+
+  it('fires preview_loaded again after results are cleared, e.g. when switching configs', () => {
+    // Arrange: a config is loaded and its preview has been tracked.
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      results: { demo: { svg: '<svg />' } },
+    });
+    const { rerender } = render(<Ergogen />);
+    expect(countPreviewLoadedCalls()).toBe(1);
+
+    // Act: selecting, creating or duplicating a config clears the results
+    // before the new config generates, while Ergogen stays mounted.
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      activeConfigId: '2',
+      results: null,
+    });
+    rerender(<Ergogen />);
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      activeConfigId: '2',
+      results: { demo: { svg: '<svg data-config="2" />' } },
+    });
+    rerender(<Ergogen />);
+
+    // Assert
+    expect(countPreviewLoadedCalls()).toBe(2);
+  });
 });

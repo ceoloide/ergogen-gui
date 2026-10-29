@@ -412,10 +412,17 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
   // `results` is replaced on every (auto-)generation and STL conversion, so we
   // remember the last tracked preview and only fire when the user actually
   // switches to a different file, rather than on every regeneration.
+  // Results are cleared (set to null) when a config is selected, created,
+  // duplicated or loaded from a shared link, so we reset the memory then to
+  // track the first preview of the newly loaded config.
   const lastTrackedPreviewRef = useRef<string | null>(null);
   const hasResults = Boolean(configContext?.results);
   useEffect(() => {
-    if (!hasResults || !preview.key || !preview.extension) return;
+    if (!hasResults) {
+      lastTrackedPreviewRef.current = null;
+      return;
+    }
+    if (!preview.key || !preview.extension) return;
     const previewId = `${preview.key}|${preview.extension}`;
     if (lastTrackedPreviewRef.current === previewId) return;
     lastTrackedPreviewRef.current = previewId;
