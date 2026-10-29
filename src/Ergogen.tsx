@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   ChangeEvent,
   SetStateAction,
@@ -407,15 +408,22 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
     configContext?.setInjectionInput(injections);
   }, [configContext, injectionToEdit]);
 
-  // Track preview changes
+  // Track preview changes.
+  // `results` is replaced on every (auto-)generation and STL conversion, so we
+  // remember the last tracked preview and only fire when the user actually
+  // switches to a different file, rather than on every regeneration.
+  const lastTrackedPreviewRef = useRef<string | null>(null);
+  const hasResults = Boolean(configContext?.results);
   useEffect(() => {
-    if (configContext?.results && preview.key && preview.extension) {
-      trackEvent('preview_loaded', {
-        preview_type: preview.extension,
-        preview_key: preview.key,
-      });
-    }
-  }, [preview.key, preview.extension, configContext?.results]);
+    if (!hasResults || !preview.key || !preview.extension) return;
+    const previewId = `${preview.key}|${preview.extension}`;
+    if (lastTrackedPreviewRef.current === previewId) return;
+    lastTrackedPreviewRef.current = previewId;
+    trackEvent('preview_loaded', {
+      preview_type: preview.extension,
+      preview_key: preview.key,
+    });
+  }, [preview.key, preview.extension, hasResults]);
 
   if (!configContext) return null;
   let result = null;
