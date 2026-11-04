@@ -514,4 +514,32 @@ describe('github utilities', () => {
       ]);
     });
   });
+
+  describe('GitHub Provider Authentication', () => {
+    afterEach(() => {
+      localStorage.clear();
+    });
+
+    it('should attach authorization header if github token exists in localStorage', async () => {
+      localStorage.setItem('ergogen:github_token', 'test-oauth-token');
+      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      mockFetch.mockResolvedValueOnce(
+        new Response('points: {}', { status: 200 })
+      );
+      mockFetch.mockResolvedValueOnce(new Response('[]', { status: 404 }));
+      mockFetch.mockResolvedValueOnce(new Response('[]', { status: 404 }));
+      mockFetch.mockResolvedValueOnce(new Response('[]', { status: 404 }));
+
+      await fetchConfigFromUrl('ceoloide/test-repo');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://raw.githubusercontent.com/ceoloide/test-repo/main/config.yaml',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'token test-oauth-token',
+          }),
+        })
+      );
+    });
+  });
 });

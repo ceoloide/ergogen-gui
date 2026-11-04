@@ -30,6 +30,7 @@ import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { SettingsCard, SettingsGroupTitle } from './atoms/SettingsLayout';
 import OfflineOption from './atoms/OfflineOption';
+import GitHubAuthOption from './atoms/GitHubAuthOption';
 import { PwaState } from './App';
 
 import { trackEvent } from './utils/analytics';
@@ -852,6 +853,11 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                         </SettingsCard>
                       </>
                     )}
+
+                    <SettingsGroupTitle>GitHub Connection</SettingsGroupTitle>
+                    <SettingsCard>
+                      <GitHubAuthOption />
+                    </SettingsCard>
                   </OptionContainer>
                   <Injections
                     setInjectionToEdit={setInjectionToEdit}
