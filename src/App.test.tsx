@@ -102,6 +102,14 @@ vi.mock('./utils/share', async () => {
   };
 });
 
+import { trackEvent } from './utils/analytics';
+vi.mock('./utils/analytics', () => ({
+  trackEvent: jest.fn(),
+  initAnalytics: jest.fn(),
+  getSendUsageMetricsEnabled: () => true,
+  checkIsPWA: () => false,
+}));
+
 describe('App shared version compatibility checks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -150,6 +158,13 @@ describe('App shared version compatibility checks', () => {
     expect(
       screen.queryByTestId('share-compatibility-dialog')
     ).not.toBeInTheDocument();
+    expect(trackEvent).toHaveBeenCalledWith(
+      'shared_config_declined',
+      expect.objectContaining({
+        has_injections: false,
+        injections_count: 0,
+      })
+    );
 
     // 4. Simulate another hash change to a custom Ergogen version
     (getConfigFromHash as jest.Mock).mockReturnValue({
@@ -176,5 +191,12 @@ describe('App shared version compatibility checks', () => {
     expect(
       screen.queryByTestId('share-compatibility-dialog')
     ).not.toBeInTheDocument();
+    expect(trackEvent).toHaveBeenCalledWith(
+      'shared_config_accepted',
+      expect.objectContaining({
+        has_injections: false,
+        injections_count: 0,
+      })
+    );
   });
 });

@@ -89,8 +89,19 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
         },
         () => abortRef.current
       );
+      if (!abortRef.current) {
+        trackEvent('bulk_download_completed', {
+          selected_configs_count: selectedIds.size,
+          only_configs: onlyConfigs,
+        });
+      }
     } catch (err) {
       console.error('Error during bulk download:', err);
+      trackEvent('bulk_download_failed', {
+        selected_configs_count: selectedIds.size,
+        only_configs: onlyConfigs,
+        error_message: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       // Auto-close modal if not aborted
       if (!abortRef.current) {

@@ -167,16 +167,30 @@ registerRoute(
 );
 
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// Google Analytics – offline queue
+//
+// workbox-google-analytics intercepts measurement requests (e.g. /g/collect)
+// to google-analytics.com and queues them in IndexedDB when offline.
+// Initialized before the script caching route to prevent route shadowing.
+// --------------------------------------------------------------------------
+
+initializeGoogleAnalytics();
+
+// --------------------------------------------------------------------------
 // Runtime – Google Tag Manager / gtag.js
 //
 // Cache the gtag.js script with NetworkFirst so we always try to get the
 // latest analytics code, but fall back to the cached version when offline.
+// Restricted strictly to JavaScript files so measurement hits (/g/collect)
+// are never intercepted or shadowed by this route.
 // --------------------------------------------------------------------------
 
 registerRoute(
   ({ url }: { url: URL }) =>
-    url.hostname === 'www.googletagmanager.com' ||
-    url.hostname === 'www.google-analytics.com',
+    (url.hostname === 'www.googletagmanager.com' ||
+      url.hostname === 'www.google-analytics.com') &&
+    (url.pathname.endsWith('.js') || url.pathname.endsWith('/js')),
   new NetworkFirst({
     cacheName: 'google-analytics-scripts',
     networkTimeoutSeconds: 3,
@@ -186,13 +200,3 @@ registerRoute(
     ],
   })
 );
-
-// --------------------------------------------------------------------------
-// Google Analytics – offline queue
-//
-// workbox-google-analytics intercepts all measurement requests to
-// google-analytics.com and queues them in IndexedDB when offline.
-// They are automatically replayed once connectivity is restored.
-// --------------------------------------------------------------------------
-
-initializeGoogleAnalytics();
