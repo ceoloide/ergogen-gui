@@ -474,6 +474,13 @@ const AppContent = ({
 
   const handleAcceptShare = () => {
     if (sharedConfigToConfirm) {
+      trackEvent('shared_config_accepted', {
+        has_injections: Boolean(
+          sharedConfigToConfirm.injections &&
+          sharedConfigToConfirm.injections.length > 0
+        ),
+        injections_count: sharedConfigToConfirm.injections?.length || 0,
+      });
       loadSharedConfig(
         sharedConfigToConfirm.config,
         sharedConfigToConfirm.injections
@@ -483,6 +490,15 @@ const AppContent = ({
   };
 
   const handleCancelShare = () => {
+    if (sharedConfigToConfirm) {
+      trackEvent('shared_config_declined', {
+        has_injections: Boolean(
+          sharedConfigToConfirm.injections &&
+          sharedConfigToConfirm.injections.length > 0
+        ),
+        injections_count: sharedConfigToConfirm.injections?.length || 0,
+      });
+    }
     setSharedConfigToConfirm(null);
   };
 

@@ -2,9 +2,14 @@ import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import BulkDownloadDialog from './BulkDownloadDialog';
 import { exportConfigsProgressively } from '../utils/zip';
+import { trackEvent } from '../utils/analytics';
 
 vi.mock('../utils/zip', () => ({
   exportConfigsProgressively: jest.fn(),
+}));
+
+vi.mock('../utils/analytics', () => ({
+  trackEvent: jest.fn(),
 }));
 
 describe('BulkDownloadDialog', () => {
@@ -180,5 +185,62 @@ describe('BulkDownloadDialog', () => {
 
     expect(screen.getByText('Keyboard Alpha')).toBeInTheDocument();
     expect(screen.getByText('Keyboard Beta')).toBeInTheDocument();
+  });
+
+  it('tracks bulk_download_completed when progressive export succeeds', async () => {
+    (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce(undefined);
+
+    render(
+      <BulkDownloadDialog
+        isOpen={true}
+        configs={mockConfigs}
+        injections={[]}
+        debug={false}
+        stlPreview={false}
+        onClose={mockOnClose}
+      />
+    );
+
+    const downloadBtn = screen.getByRole('button', { name: /Download \(2\)/i });
+    await act(async () => {
+      fireEvent.click(downloadBtn);
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_started', {
+      selected_configs_count: 2,
+      only_configs: true,
+    });
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_completed', {
+      selected_configs_count: 2,
+      only_configs: true,
+    });
+  });
+
+  it('tracks bulk_download_failed when progressive export rejects', async () => {
+    (exportConfigsProgressively as jest.Mock).mockRejectedValueOnce(
+      new Error('Zip generation failed')
+    );
+
+    render(
+      <BulkDownloadDialog
+        isOpen={true}
+        configs={mockConfigs}
+        injections={[]}
+        debug={false}
+        stlPreview={false}
+        onClose={mockOnClose}
+      />
+    );
+
+    const downloadBtn = screen.getByRole('button', { name: /Download \(2\)/i });
+    await act(async () => {
+      fireEvent.click(downloadBtn);
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_failed', {
+      selected_configs_count: 2,
+      only_configs: true,
+      error_message: 'Zip generation failed',
+    });
   });
 });

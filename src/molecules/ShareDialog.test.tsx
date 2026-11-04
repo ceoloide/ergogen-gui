@@ -18,6 +18,11 @@ vi.mock('../workers/workerFactory', () => ({
   createErgogenWorker: jest.fn(),
 }));
 
+import { trackEvent } from '../utils/analytics';
+vi.mock('../utils/analytics', () => ({
+  trackEvent: jest.fn(),
+}));
+
 describe('ShareDialog', () => {
   const mockClose = jest.fn();
   const mockConfig = 'points:\n  key: 1';
@@ -355,5 +360,55 @@ describe('ShareDialog', () => {
 
     // Assert
     expect(screen.getByText(/YamL parsing error/i)).toBeInTheDocument();
+  });
+
+  it('tracks share_link_copied when link is copied', async () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: jest.fn().mockImplementation(() => Promise.resolve()),
+      },
+    });
+
+    render(
+      <ShareDialog
+        config={mockConfig}
+        injections={[]}
+        onClose={mockClose}
+        data-testid="share-dialog"
+      />
+    );
+
+    // Act - Proceed to Step 2
+    const shareBtn = screen.getByRole('button', { name: /share/i });
+    fireEvent.click(shareBtn);
+
+    // Wait for auto-copy
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith(
+      'share_link_copied',
+      expect.objectContaining({
+        has_injections: false,
+        injections_count: 0,
+        source: 'auto',
+      })
+    );
+
+    // Click copy button manually
+    const copyBtn = screen.getByTestId('share-dialog-copy');
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+
+    expect(trackEvent).toHaveBeenCalledWith(
+      'share_link_copied',
+      expect.objectContaining({
+        has_injections: false,
+        injections_count: 0,
+        source: 'button',
+      })
+    );
   });
 });

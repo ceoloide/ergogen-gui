@@ -6,6 +6,7 @@ import {
   extractUsedInjectionsFromCanonical,
 } from '../utils/share';
 import { createErgogenWorker } from '../workers/workerFactory';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * Props for the ShareDialog component.
@@ -28,11 +29,13 @@ type ShareDialogProps = {
 const copyToClipboardWithFallback = async (
   text: string,
   setCopied: (value: boolean) => void,
-  timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>
+  timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>,
+  onSuccess?: () => void
 ): Promise<void> => {
   try {
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    onSuccess?.();
     // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -54,6 +57,7 @@ const copyToClipboardWithFallback = async (
       document.execCommand('copy');
       document.body.removeChild(textArea);
       setCopied(true);
+      onSuccess?.();
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -184,10 +188,23 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
     };
   }, [includeCustom, hasAnalyzed, safeInjections, config, step]);
 
+  const trackShareCopy = (source: string) => {
+    const checkedItems = includeCustom
+      ? selectionItems.filter((item) => item.checked)
+      : [];
+    trackEvent('share_link_copied', {
+      has_injections: checkedItems.length > 0,
+      injections_count: checkedItems.length,
+      source,
+    });
+  };
+
   // Auto-copy on mount of Step 2
   useEffect(() => {
     if (step === 2 && shareLink) {
-      copyToClipboardWithFallback(shareLink, setCopied, timeoutRef);
+      copyToClipboardWithFallback(shareLink, setCopied, timeoutRef, () => {
+        trackShareCopy('auto');
+      });
     }
   }, [shareLink, step]);
 
@@ -250,7 +267,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
   };
 
   const copyToClipboard = () => {
-    copyToClipboardWithFallback(shareLink, setCopied, timeoutRef);
+    copyToClipboardWithFallback(shareLink, setCopied, timeoutRef, () => {
+      trackShareCopy('button');
+    });
   };
 
   return (
