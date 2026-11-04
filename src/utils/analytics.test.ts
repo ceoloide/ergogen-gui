@@ -6,6 +6,7 @@ import {
   trackError,
   setupGlobalErrorTracking,
   removeGlobalErrorTracking,
+  isLiveTelemetryBlocked,
 } from './analytics';
 import guiPkg from '../../package.json';
 import ergogenPkg from 'ergogen/package.json';
@@ -26,6 +27,7 @@ describe('Analytics Utility', () => {
     if (script) {
       script.remove();
     }
+    removeGlobalErrorTracking();
   });
 
   afterEach(() => {
@@ -64,12 +66,35 @@ describe('Analytics Utility', () => {
       expect(getSendUsageMetricsEnabled()).toBe(true);
     });
 
-    it('should return false if localStorage has it set to false', () => {
+    it('should read sendUsageMetrics from ergogen:settings JSON when present', () => {
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: false, debug: true })
+      );
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: true, debug: false })
+      );
+      expect(getSendUsageMetricsEnabled()).toBe(true);
+    });
+
+    it('should fallback to legacy ergogen:config:sendUsageMetrics if ergogen:settings is corrupted', () => {
+      localStorage.setItem('ergogen:settings', 'invalid-json');
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      expect(getSendUsageMetricsEnabled()).toBe(true);
+    });
+
+    it('should return false if legacy localStorage has it set to false', () => {
       localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
       expect(getSendUsageMetricsEnabled()).toBe(false);
     });
 
-    it('should return true if localStorage has it set to true', () => {
+    it('should return true if legacy localStorage has it set to true', () => {
       localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       expect(getSendUsageMetricsEnabled()).toBe(true);
     });
@@ -88,11 +113,43 @@ describe('Analytics Utility', () => {
         configurable: true,
       });
     });
+
+    it('should fall back cleanly to !checkIsPWA() when localStorage access throws SecurityError', () => {
+      const getItemSpy = vi
+        .spyOn(Storage.prototype, 'getItem')
+        .mockImplementation(() => {
+          throw new Error('SecurityError: The operation is insecure.');
+        });
+
+      // In web mode, should return true without throwing
+      expect(() => getSendUsageMetricsEnabled()).not.toThrow();
+      expect(getSendUsageMetricsEnabled()).toBe(true);
+
+      // In PWA mode, should return false without throwing
+      const originalStandalone = (window.navigator as any).standalone;
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: true,
+        configurable: true,
+      });
+
+      expect(() => getSendUsageMetricsEnabled()).not.toThrow();
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+
+      Object.defineProperty(window.navigator, 'standalone', {
+        value: originalStandalone,
+        configurable: true,
+      });
+
+      getItemSpy.mockRestore();
+    });
   });
 
   describe('initAnalytics', () => {
-    it('should inject script tag and define gtag when enabled', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+    it('should inject script tag, define gtag, and pass send_page_view: false when enabled', () => {
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: true })
+      );
       initAnalytics();
 
       const script = document.getElementById(
@@ -103,20 +160,53 @@ describe('Analytics Utility', () => {
         'https://www.googletagmanager.com/gtag/js?id=G-TEST12345'
       );
       expect(window.gtag).toBeDefined();
+
+      const win = window as any;
+      expect(win.dataLayer).toBeDefined();
+      expect(win['ga-disable-G-TEST12345']).toBeUndefined();
     });
 
-    it('should clean up script tag and delete globals when disabled', () => {
+    it('should clean up script tag, delete globals, set ga-disable, and clear cookies when disabled', () => {
       // Setup: first load it
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: true })
+      );
       initAnalytics();
       expect(document.getElementById('gtag-script')).toBeInTheDocument();
 
+      // Set cookie to simulate GA cookie
+      document.cookie = '_ga=GA1.2.123456789.1234567890; path=/';
+      document.cookie = '_ga_TEST=GS1.1.123456789.1.0.1234567890.0.0.0; path=/';
+
       // Change setting to false and re-initialize
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: false })
+      );
       initAnalytics();
 
       expect(document.getElementById('gtag-script')).toBeNull();
       expect(window.gtag).toBeUndefined();
+      expect((window as any).dataLayer).toBeUndefined();
+      expect((window as any)['ga-disable-G-TEST12345']).toBe(true);
+      expect(document.cookie).not.toContain('_ga=');
+    });
+
+    it('should clear ga-disable flag when re-enabled', () => {
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: false })
+      );
+      initAnalytics();
+      expect((window as any)['ga-disable-G-TEST12345']).toBe(true);
+
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: true })
+      );
+      initAnalytics();
+      expect((window as any)['ga-disable-G-TEST12345']).toBeUndefined();
     });
   });
 
@@ -339,6 +429,102 @@ describe('Analytics Utility', () => {
           fatal: false,
         })
       );
+    });
+  });
+
+  describe('isLiveTelemetryBlocked', () => {
+    it('should not block test environment or G-TEST ids', () => {
+      expect(isLiveTelemetryBlocked('G-TEST12345')).toBe(false);
+    });
+
+    it('should allow override with VITE_FORCE_ANALYTICS or window.__FORCE_ANALYTICS__', () => {
+      vi.stubEnv('VITE_FORCE_ANALYTICS', 'true');
+      expect(isLiveTelemetryBlocked('G-REAL12345')).toBe(false);
+      vi.unstubAllEnvs();
+
+      (window as any).__FORCE_ANALYTICS__ = true;
+      expect(isLiveTelemetryBlocked('G-REAL12345')).toBe(false);
+      delete (window as any).__FORCE_ANALYTICS__;
+    });
+
+    it('should block localhost or 127.0.0.1 when not in test mode or forced', () => {
+      // Mock import.meta.env.MODE temporarily to production
+      vi.stubEnv('MODE', 'production');
+      vi.stubEnv('DEV', false);
+
+      const originalLocation = window.location;
+      delete (window as any).location;
+      (window as any).location = { hostname: 'localhost' };
+
+      expect(isLiveTelemetryBlocked('G-46F2L343EK')).toBe(true);
+
+      (window as any).location = { hostname: '127.0.0.1' };
+      expect(isLiveTelemetryBlocked('G-46F2L343EK')).toBe(true);
+
+      (window as any).location = { hostname: 'ergogen.xyz' };
+      expect(isLiveTelemetryBlocked('G-46F2L343EK')).toBe(false);
+
+      (window as any).location = originalLocation;
+    });
+  });
+
+  describe('Service Worker Google Analytics / GTM Route Matching', () => {
+    const scriptRouteMatcher = ({ url }: { url: URL }) =>
+      (url.hostname === 'www.googletagmanager.com' ||
+        url.hostname === 'www.google-analytics.com') &&
+      (url.pathname.endsWith('.js') || url.pathname.endsWith('/js'));
+
+    it('should match Google Tag Manager gtag/js script', () => {
+      const url = new URL(
+        'https://www.googletagmanager.com/gtag/js?id=G-12345&l=dataLayer'
+      );
+      expect(scriptRouteMatcher({ url })).toBe(true);
+    });
+
+    it('should match standard .js files from google-analytics and googletagmanager', () => {
+      expect(
+        scriptRouteMatcher({
+          url: new URL('https://www.google-analytics.com/analytics.js'),
+        })
+      ).toBe(true);
+      expect(
+        scriptRouteMatcher({
+          url: new URL('https://www.googletagmanager.com/gtm.js?id=GTM-123'),
+        })
+      ).toBe(true);
+    });
+
+    it('should NOT match measurement protocol collect endpoints so they are handled by Workbox background sync', () => {
+      expect(
+        scriptRouteMatcher({
+          url: new URL(
+            'https://www.google-analytics.com/g/collect?v=2&tid=G-12345'
+          ),
+        })
+      ).toBe(false);
+      expect(
+        scriptRouteMatcher({
+          url: new URL('https://www.google-analytics.com/collect?v=1'),
+        })
+      ).toBe(false);
+      expect(
+        scriptRouteMatcher({
+          url: new URL('https://www.google-analytics.com/r/collect?v=2'),
+        })
+      ).toBe(false);
+      expect(
+        scriptRouteMatcher({
+          url: new URL('https://www.google-analytics.com/mp/collect?v=2'),
+        })
+      ).toBe(false);
+    });
+
+    it('should NOT match scripts from third-party domains', () => {
+      expect(
+        scriptRouteMatcher({
+          url: new URL('https://example.com/gtag/js'),
+        })
+      ).toBe(false);
     });
   });
 });
