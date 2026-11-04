@@ -133,3 +133,107 @@ describe('Ergogen Subheader Buttons', () => {
     );
   });
 });
+
+describe('Ergogen preview_loaded tracking', () => {
+  const baseContext = {
+    configs: [],
+    activeConfigId: '1',
+    activeConfigName: 'My Awesome Board',
+    isPreview: false,
+    results: null as Record<string, unknown> | null,
+    configInput: 'points: {}',
+    injectionInput: [],
+    debug: false,
+    stlPreview: false,
+    isGenerating: false,
+    isJscadConverting: false,
+    showSettings: false,
+    showSideNav: false,
+    showConfig: true,
+    showDownloads: false,
+    setShowSettings: jest.fn(),
+    setShowSideNav: jest.fn(),
+    setShowConfig: jest.fn(),
+    setShowDownloads: jest.fn(),
+    generateNow: jest.fn(),
+  };
+
+  const countPreviewLoadedCalls = () =>
+    mockTrackEvent.mock.calls.filter(([name]) => name === 'preview_loaded')
+      .length;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('fires preview_loaded once when results first become available', () => {
+    // Arrange
+    (useConfigContext as jest.Mock).mockReturnValue(baseContext);
+    const { rerender } = render(<Ergogen />);
+
+    // Act
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      results: { demo: { svg: '<svg />' } },
+    });
+    rerender(<Ergogen />);
+
+    // Assert
+    expect(countPreviewLoadedCalls()).toBe(1);
+    expect(mockTrackEvent).toHaveBeenCalledWith('preview_loaded', {
+      preview_type: 'svg',
+      preview_key: 'demo.svg',
+    });
+  });
+
+  it('does not re-fire preview_loaded when results regenerate for the same preview', () => {
+    // Arrange
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      results: { demo: { svg: '<svg />' } },
+    });
+    const { rerender } = render(<Ergogen />);
+    expect(countPreviewLoadedCalls()).toBe(1);
+
+    // Act: simulate several auto-generation / STL completion cycles, each
+    // producing a new results object for the unchanged preview.
+    for (let i = 0; i < 3; i++) {
+      (useConfigContext as jest.Mock).mockReturnValue({
+        ...baseContext,
+        results: { demo: { svg: `<svg data-run="${i}" />` } },
+      });
+      rerender(<Ergogen />);
+    }
+
+    // Assert
+    expect(countPreviewLoadedCalls()).toBe(1);
+  });
+
+  it('fires preview_loaded again after results are cleared, e.g. when switching configs', () => {
+    // Arrange: a config is loaded and its preview has been tracked.
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      results: { demo: { svg: '<svg />' } },
+    });
+    const { rerender } = render(<Ergogen />);
+    expect(countPreviewLoadedCalls()).toBe(1);
+
+    // Act: selecting, creating or duplicating a config clears the results
+    // before the new config generates, while Ergogen stays mounted.
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      activeConfigId: '2',
+      results: null,
+    });
+    rerender(<Ergogen />);
+    (useConfigContext as jest.Mock).mockReturnValue({
+      ...baseContext,
+      activeConfigId: '2',
+      results: { demo: { svg: '<svg data-config="2" />' } },
+    });
+    rerender(<Ergogen />);
+
+    // Assert
+    expect(countPreviewLoadedCalls()).toBe(2);
+  });
+});
