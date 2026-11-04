@@ -1391,6 +1391,264 @@ describe('ConfigContextProvider', () => {
     });
   });
 
+  describe('Settings Lifecycle Tracking', () => {
+    beforeEach(() => {
+      (trackEvent as jest.Mock).mockClear();
+      localStorage.clear();
+    });
+
+    it('should fire settings_loaded strictly on initial mount and not on subsequent setting changes', () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      const settingsLoadedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'settings_loaded'
+      );
+      const settingChangedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'setting_changed'
+      );
+
+      expect(settingsLoadedCalls.length).toBe(1);
+      expect(settingChangedCalls.length).toBe(0);
+
+      // Now toggle a setting
+      act(() => {
+        capturedContext.setDebug(true);
+      });
+
+      const updatedSettingsLoadedCalls = (
+        trackEvent as jest.Mock
+      ).mock.calls.filter((call) => call[0] === 'settings_loaded');
+      const updatedSettingChangedCalls = (
+        trackEvent as jest.Mock
+      ).mock.calls.filter((call) => call[0] === 'setting_changed');
+
+      expect(updatedSettingsLoadedCalls.length).toBe(1); // STILL 1!
+      expect(updatedSettingChangedCalls.length).toBe(1);
+      expect(updatedSettingChangedCalls[0][1]).toEqual(
+        expect.objectContaining({ debug: true })
+      );
+    });
+
+    it('should mirror sendUsageMetrics into legacy localStorage key on change', () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      act(() => {
+        capturedContext.setSendUsageMetrics(false);
+      });
+
+      expect(localStorage.getItem('ergogen:config:sendUsageMetrics')).toBe(
+        'false'
+      );
+    });
+  });
+
+  describe('Compilation Telemetry Debouncing (generation_completed & generation_failed)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      (trackEvent as jest.Mock).mockClear();
+      mockInitialConfig('points: {}');
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should debounce generation_completed by 5 seconds during auto-generation', () => {
+      render(
+        <ConfigContextProvider>
+          <div />
+        </ConfigContextProvider>
+      );
+
+      // Rapid compilation completions
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: { points: { p1: { x: 0, y: 0 } } },
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      let completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(0);
+
+      // Another completion before debounce finishes
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: { points: { p1: { x: 10, y: 10 } } },
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(4000);
+      });
+      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(0);
+
+      // Reach 5 seconds
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(1);
+    });
+
+    it('should debounce generation_failed by 5 seconds during auto-generation', () => {
+      render(
+        <ConfigContextProvider>
+          <div />
+        </ConfigContextProvider>
+      );
+
+      // First error
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'error',
+            error: 'SyntaxError at line 1',
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(3000);
+      });
+      let failedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_failed'
+      );
+      expect(failedCalls.length).toBe(0);
+
+      // Second error
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'error',
+            error: 'SyntaxError at line 2',
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      failedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_failed'
+      );
+      expect(failedCalls.length).toBe(1);
+      expect(failedCalls[0][1]).toEqual(
+        expect.objectContaining({ error_message: 'SyntaxError at line 2' })
+      );
+    });
+
+    it('should cancel pending generation_failed when generation succeeds', () => {
+      render(
+        <ConfigContextProvider>
+          <div />
+        </ConfigContextProvider>
+      );
+
+      // Error occurs
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'error',
+            error: 'Incomplete YAML while typing',
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      // User fixes error and generation succeeds
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: { points: { p1: { x: 0, y: 0 } } },
+          },
+        } as MessageEvent);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+
+      const failedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_failed'
+      );
+      const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+
+      expect(failedCalls.length).toBe(0);
+      expect(completedCalls.length).toBe(1);
+    });
+
+    it('should fire immediately when autoGen is false', () => {
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ autoGen: false })
+      );
+
+      render(
+        <ConfigContextProvider>
+          <div />
+        </ConfigContextProvider>
+      );
+
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: { points: { p1: { x: 0, y: 0 } } },
+          },
+        } as MessageEvent);
+      });
+
+      // Fired immediately without waiting for timers
+      const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(1);
+    });
+  });
+
   describe('KiCad 5 deprecation warning detection', () => {
     it('should set deprecationWarning when a PCB uses kicad5 template and ceoloide footprint', async () => {
       let capturedContext: any = null;
