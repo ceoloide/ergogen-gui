@@ -77,23 +77,37 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
     });
 
     try {
-      await exportConfigsProgressively(
+      const summary = await exportConfigsProgressively(
         selectedConfigs,
         injections,
         debug,
         stlPreview,
         onlyConfigs,
-        (current, total, name) => {
+        (current, _total, name) => {
           setCurrentProgress(current);
           setCurrentName(name);
         },
         () => abortRef.current
       );
       if (!abortRef.current) {
-        trackEvent('bulk_download_completed', {
-          selected_configs_count: selectedIds.size,
-          only_configs: onlyConfigs,
-        });
+        if (
+          summary &&
+          summary.succeededCount === 0 &&
+          summary.failedCount > 0
+        ) {
+          trackEvent('bulk_download_failed', {
+            selected_configs_count: selectedIds.size,
+            failed_configs_count: summary.failedCount,
+            only_configs: onlyConfigs,
+            error_message: `All ${summary.failedCount} selected configuration(s) failed to compile`,
+          });
+        } else {
+          trackEvent('bulk_download_completed', {
+            selected_configs_count: selectedIds.size,
+            ...(summary ? { failed_configs_count: summary.failedCount } : {}),
+            only_configs: onlyConfigs,
+          });
+        }
       }
     } catch (err) {
       console.error('Error during bulk download:', err);

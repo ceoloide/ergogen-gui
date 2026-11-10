@@ -18,6 +18,11 @@ vi.mock('../utils/share', () => ({
   createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
 }));
 
+const mockTrackEvent = jest.fn();
+vi.mock('../utils/analytics', () => ({
+  trackEvent: (...args: any[]) => mockTrackEvent(...args),
+}));
+
 const mockNavigate = jest.fn();
 const mockLocation = { pathname: '/' };
 vi.mock('react-router-dom', () => ({
@@ -186,12 +191,24 @@ describe('Header', () => {
       false,
       false
     );
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      'archive_single_downloaded',
+      expect.objectContaining({
+        source: 'header',
+      })
+    );
   });
 
   it('triggers share dialog on click', () => {
     renderComponent();
     const shareBtn = screen.getByTestId('header-share-button');
     fireEvent.click(shareBtn);
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      'share_button_clicked',
+      expect.objectContaining({
+        source: 'header',
+      })
+    );
     expect(screen.getByText('Share Configuration')).toBeInTheDocument();
 
     const innerShareBtn = screen.getByRole('button', { name: 'Share' });

@@ -243,4 +243,73 @@ describe('BulkDownloadDialog', () => {
       error_message: 'Zip generation failed',
     });
   });
+
+  it('tracks bulk_download_failed instead of false completion when every config compilation fails', async () => {
+    // Arrange
+    (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce({
+      succeededCount: 0,
+      failedCount: 2,
+    });
+
+    render(
+      <BulkDownloadDialog
+        isOpen={true}
+        configs={mockConfigs}
+        injections={[]}
+        debug={false}
+        stlPreview={false}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Act
+    const downloadBtn = screen.getByRole('button', { name: /Download \(2\)/i });
+    await act(async () => {
+      fireEvent.click(downloadBtn);
+    });
+
+    // Assert
+    expect(trackEvent).not.toHaveBeenCalledWith(
+      'bulk_download_completed',
+      expect.anything()
+    );
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_failed', {
+      selected_configs_count: 2,
+      failed_configs_count: 2,
+      only_configs: true,
+      error_message: 'All 2 selected configuration(s) failed to compile',
+    });
+  });
+
+  it('includes failed_configs_count on partial bulk download completion', async () => {
+    // Arrange
+    (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce({
+      succeededCount: 1,
+      failedCount: 1,
+    });
+
+    render(
+      <BulkDownloadDialog
+        isOpen={true}
+        configs={mockConfigs}
+        injections={[]}
+        debug={false}
+        stlPreview={false}
+        onClose={mockOnClose}
+      />
+    );
+
+    // Act
+    const downloadBtn = screen.getByRole('button', { name: /Download \(2\)/i });
+    await act(async () => {
+      fireEvent.click(downloadBtn);
+    });
+
+    // Assert
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_completed', {
+      selected_configs_count: 2,
+      failed_configs_count: 1,
+      only_configs: true,
+    });
+  });
 });

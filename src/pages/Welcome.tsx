@@ -522,8 +522,7 @@ const Welcome = () => {
       if (cfg) {
         configContext.selectConfig(id);
         trackEvent('saved_config_loaded', {
-          config_name: cfg.name,
-          config_id: cfg.id,
+          stored_configs_count: configContext.configs.length,
         });
         await configContext.generateNow(
           cfg.config,
@@ -604,9 +603,8 @@ const Welcome = () => {
     setIsGenerating(true); // Show progress bar during loading
     clearError();
 
-    // Track loading
+    // Track repository import provider without transmitting raw user URLs
     trackEvent('repo_loaded', {
-      repo_url: repoInput,
       provider,
     });
 
@@ -697,10 +695,15 @@ const Welcome = () => {
     setIsGenerating(true); // Show progress bar during file loading
     clearError();
 
-    // Track local file loading
+    const normalizedFileType =
+      file.type ||
+      (file.name.includes('.')
+        ? file.name.split('.').pop()?.toLowerCase() || 'unknown'
+        : 'unknown');
+
+    // Track local file loading without transmitting the user's local filename
     trackEvent('local_file_loaded', {
-      file_name: file.name,
-      file_type: file.type || 'unknown',
+      file_type: normalizedFileType,
       file_size: file.size,
     });
 

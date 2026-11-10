@@ -8,8 +8,6 @@ export interface KeyboardAnalyticsPayload {
   count_cases: number;
   is_reversible: boolean;
   is_mirrored: boolean;
-  config_name: string;
-  config_author: string;
   count_zones: number;
   matrix_zones: number;
   has_matrix: boolean;
@@ -359,8 +357,6 @@ export function analyzeConfiguration(
     count_cases,
     is_reversible,
     is_mirrored,
-    config_name: metaName,
-    config_author: metaAuthor,
     count_zones,
     matrix_zones,
     has_matrix,

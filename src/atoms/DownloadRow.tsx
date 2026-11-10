@@ -163,7 +163,7 @@ const DownloadRow = ({
     if (showLoadingButton) return;
     trackEvent('download_button_clicked', {
       download_type: extension,
-      file_name: fileName,
+      source: 'downloads_panel',
     });
     const element = document.createElement('a');
     const file = new Blob([content as BlobPart], { type: 'octet/stream' });

@@ -129,19 +129,20 @@ mirror_thumb_t1_1:
     expect(payload.count_cases).toBe(1);
     expect(payload.is_reversible).toBe(true);
     expect(payload.is_mirrored).toBe(true);
-    expect(payload.config_name).toBe('sweep');
-    expect(payload.config_author).toBe('david');
+    expect('config_name' in payload).toBe(false);
+    expect('config_author' in payload).toBe(false);
     expect(payload.count_zones).toBe(2);
   });
 
-  it('correctly handles fallbacks for missing metadata', () => {
+  it('omits raw metadata strings while still producing a valid config_id when metadata is missing', () => {
     const canonicalNoMeta = `
 points:
   zones: {}
 `;
     const payload = analyzeConfiguration(canonicalNoMeta, '{}', 0);
-    expect(payload.config_name).toBe('no_name');
-    expect(payload.config_author).toBe('no_author');
+    expect('config_name' in payload).toBe(false);
+    expect('config_author' in payload).toBe(false);
+    expect(payload.config_id).toHaveLength(12);
   });
 
   it('performs granular matrix zone analysis with alphabetical sorting', () => {

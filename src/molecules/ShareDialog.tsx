@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import {
@@ -188,16 +188,18 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
     };
   }, [includeCustom, hasAnalyzed, safeInjections, config, step]);
 
-  const trackShareCopy = (source: string) => {
-    const checkedItems = includeCustom
-      ? selectionItems.filter((item) => item.checked)
-      : [];
+  const checkedCountRef = useRef(0);
+  checkedCountRef.current = includeCustom
+    ? selectionItems.filter((item) => item.checked).length
+    : 0;
+
+  const trackShareCopy = useCallback((source: string) => {
     trackEvent('share_link_copied', {
-      has_injections: checkedItems.length > 0,
-      injections_count: checkedItems.length,
+      has_injections: checkedCountRef.current > 0,
+      injections_count: checkedCountRef.current,
       source,
     });
-  };
+  }, []);
 
   // Auto-copy on mount of Step 2
   useEffect(() => {
@@ -206,7 +208,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
         trackShareCopy('auto');
       });
     }
-  }, [shareLink, step]);
+  }, [shareLink, step, trackShareCopy]);
 
   // Handle Esc key press
   useEffect(() => {
