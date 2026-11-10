@@ -8,6 +8,7 @@ interface NavigatorStandalone extends Navigator {
 interface GAWindow extends Window {
   dataLayer?: unknown[];
   gtag?: (...args: unknown[]) => void;
+  __ergogenSendUsageMetrics?: boolean;
 }
 
 /**
@@ -79,16 +80,65 @@ const clearGaCookies = (): void => {
 };
 
 /**
- * Helper to determine if analytics is enabled from local storage,
- * checking 'ergogen:settings' JSON first, then falling back to
- * legacy 'ergogen:config:sendUsageMetrics', defaulting to true on web and false on PWA.
+ * Purges any offline-queued Google Analytics hits stored by Workbox Background Sync.
+ */
+const clearOfflineAnalyticsQueue = (): void => {
+  if (typeof indexedDB === 'undefined') return;
+  try {
+    indexedDB.deleteDatabase('workbox-background-sync');
+  } catch {
+    // Ignore restricted IndexedDB errors
+  }
+};
+
+/**
+ * Builds a sanitized page location URL stripping query parameters (e.g. ?github=...)
+ * and hash fragments (#...) so repository URLs or shared payloads never leak via dl=.
+ */
+const getSanitizedPageLocation = (): string | undefined => {
+  if (typeof window === 'undefined' || !window.location) return undefined;
+  const origin =
+    window.location.origin && window.location.origin !== 'null'
+      ? window.location.origin
+      : `${window.location.protocol || 'https:'}//${window.location.hostname || 'localhost'}`;
+  return `${origin}${window.location.pathname || '/'}`;
+};
+
+/**
+ * Helper to determine if analytics is enabled from local storage.
+ * Checks session-memory override first, then explicit user toggle key
+ * ('ergogen:config:sendUsageMetrics'), then 'ergogen:settings' opt-outs,
+ * defaulting to true on web and false in standalone PWA mode.
+ * Fails closed (false) if localStorage throws a SecurityError.
  */
 export const getSendUsageMetricsEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
+
+  const win = window as unknown as GAWindow;
+  if (typeof win.__ergogenSendUsageMetrics === 'boolean') {
+    return win.__ergogenSendUsageMetrics;
+  }
+
   const isPWA = checkIsPWA();
 
   try {
-    // Primary: check ergogen:settings JSON object
+    // 1. Explicit user toggle key (written only when the user toggles the setting)
+    const explicitToggle = localStorage.getItem(
+      'ergogen:config:sendUsageMetrics'
+    );
+    if (explicitToggle !== null) {
+      try {
+        const parsedToggle = JSON.parse(explicitToggle);
+        if (typeof parsedToggle === 'boolean') {
+          return parsedToggle;
+        }
+      } catch {
+        // Fall through on malformed value
+      }
+    }
+
+    // 2. Settings JSON object: honor explicit opt-out anywhere, but do not let
+    // pre-install browser default (`true`) override standalone PWA default (`false`).
     const settingsRaw = localStorage.getItem('ergogen:settings');
     if (settingsRaw !== null) {
       try {
@@ -98,36 +148,32 @@ export const getSendUsageMetricsEnabled = (): boolean => {
           typeof parsed === 'object' &&
           typeof parsed.sendUsageMetrics === 'boolean'
         ) {
-          return parsed.sendUsageMetrics;
+          if (parsed.sendUsageMetrics === false) {
+            return false;
+          }
+          if (!isPWA) {
+            return true;
+          }
         }
       } catch {
-        // Fall through to legacy check on parse error
-      }
-    }
-
-    // Fallback: check legacy ergogen:config:sendUsageMetrics
-    const storedLegacy = localStorage.getItem(
-      'ergogen:config:sendUsageMetrics'
-    );
-    if (storedLegacy !== null) {
-      try {
-        return JSON.parse(storedLegacy);
-      } catch {
-        return !isPWA;
+        // Fall through to environment default on parse error
       }
     }
   } catch {
-    // Fall back cleanly if localStorage access is restricted (e.g. SecurityError in sandboxed iframe or private browsing)
-    return !isPWA;
+    // Fail closed if localStorage access is blocked (e.g. SecurityError in sandboxed contexts)
+    return false;
   }
 
   return !isPWA;
 };
 
+let wasDisabledAfterLoad = false;
+
 /**
  * Dynamically loads/initializes Google Analytics if enabled.
- * If disabled or environment is blocked, it sets the disable flag,
- * removes the script, deletes window variables, clears cookies, and unbinds error listeners.
+ * If disabled or environment is blocked, it sets the `ga-disable-<ID>` flag,
+ * clears cookies and offline queues, and unbinds error listeners while keeping
+ * any already-loaded `dataLayer`/`gtag` hook intact so re-enabling works without reload.
  */
 export const initAnalytics = (): void => {
   if (typeof window === 'undefined') return;
@@ -135,21 +181,32 @@ export const initAnalytics = (): void => {
   const enabled = getSendUsageMetricsEnabled();
   const trackingId = import.meta.env.VITE_GTAG_ID;
   const blocked = isLiveTelemetryBlocked(trackingId);
+  const existingScript = document.getElementById('gtag-script');
+
+  if (!existingScript) {
+    wasDisabledAfterLoad = false;
+  }
 
   if (enabled && trackingId && !blocked) {
-    // If previously disabled, remove disable flag
     delete (window as unknown as Record<string, unknown>)[
       'ga-disable-' + trackingId
     ];
 
-    if (!document.getElementById('gtag-script')) {
+    const win = window as unknown as GAWindow;
+    const configOptions = {
+      send_page_view: false,
+      allow_google_signals: false,
+      allow_ad_personalization_signals: false,
+      page_location: getSanitizedPageLocation(),
+    };
+
+    if (!existingScript) {
       const script = document.createElement('script');
       script.async = true;
       script.src = `https://www.googletagmanager.com/gtag/js?id=${trackingId}`;
       script.id = 'gtag-script';
       document.head.appendChild(script);
 
-      const win = window as unknown as GAWindow;
       const dataLayer = win.dataLayer || [];
       win.dataLayer = dataLayer;
 
@@ -158,27 +215,26 @@ export const initAnalytics = (): void => {
         dataLayer.push(arguments);
       };
       win.gtag('js', new Date());
-      win.gtag('config', trackingId, { send_page_view: false });
-
-      setupGlobalErrorTracking();
+      win.gtag('config', trackingId, configOptions);
+      wasDisabledAfterLoad = false;
+    } else if (wasDisabledAfterLoad) {
+      win.gtag?.('config', trackingId, configOptions);
+      wasDisabledAfterLoad = false;
     }
+
+    setupGlobalErrorTracking();
   } else {
-    // Completely disable/remove GA4 scripts, cookies, listeners, and globals
     if (trackingId) {
       (window as unknown as Record<string, unknown>)[
         'ga-disable-' + trackingId
       ] = true;
     }
-
-    const script = document.getElementById('gtag-script');
-    if (script) {
-      script.remove();
+    if (existingScript) {
+      wasDisabledAfterLoad = true;
     }
-    const win = window as unknown as GAWindow;
-    delete win.gtag;
-    delete win.dataLayer;
 
     clearGaCookies();
+    clearOfflineAnalyticsQueue();
     removeGlobalErrorTracking();
   }
 };

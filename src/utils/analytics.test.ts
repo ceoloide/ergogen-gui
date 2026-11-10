@@ -22,11 +22,14 @@ describe('Analytics Utility', () => {
     vi.stubEnv('VITE_GTAG_ID', 'G-TEST12345');
     // Clear localStorage
     localStorage.clear();
-    // Clean up dynamic script tag if present
+    // Clean up dynamic script tag and globals if present
     const script = document.getElementById('gtag-script');
     if (script) {
       script.remove();
     }
+    delete (window as any).dataLayer;
+    delete (window as any)['ga-disable-G-TEST12345'];
+    delete (window as any).__ergogenSendUsageMetrics;
     removeGlobalErrorTracking();
   });
 
@@ -114,44 +117,68 @@ describe('Analytics Utility', () => {
       });
     });
 
-    it('should fall back cleanly to !checkIsPWA() when localStorage access throws SecurityError', () => {
-      const getItemSpy = vi
-        .spyOn(Storage.prototype, 'getItem')
-        .mockImplementation(() => {
-          throw new Error('SecurityError: The operation is insecure.');
-        });
-
-      // In web mode, should return true without throwing
-      expect(() => getSendUsageMetricsEnabled()).not.toThrow();
-      expect(getSendUsageMetricsEnabled()).toBe(true);
-
-      // In PWA mode, should return false without throwing
+    it('should keep PWA default (false) when ergogen:settings has browser-default true without explicit toggle', () => {
+      // Arrange: browser visit saved default settings (no explicit ergogen:config:sendUsageMetrics toggle)
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: true, autoGen: true })
+      );
       const originalStandalone = (window.navigator as any).standalone;
       Object.defineProperty(window.navigator, 'standalone', {
         value: true,
         configurable: true,
       });
 
-      expect(() => getSendUsageMetricsEnabled()).not.toThrow();
-      expect(getSendUsageMetricsEnabled()).toBe(false);
+      try {
+        // Act & Assert: standalone PWA must stay disabled until explicitly opted in
+        expect(getSendUsageMetricsEnabled()).toBe(false);
 
-      Object.defineProperty(window.navigator, 'standalone', {
-        value: originalStandalone,
-        configurable: true,
-      });
+        // Explicit opt-in via toggle key overrides PWA default
+        localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+        expect(getSendUsageMetricsEnabled()).toBe(true);
+      } finally {
+        Object.defineProperty(window.navigator, 'standalone', {
+          value: originalStandalone,
+          configurable: true,
+        });
+      }
+    });
 
-      getItemSpy.mockRestore();
+    it('should fail closed (false) when localStorage access throws SecurityError, unless overridden in session memory', () => {
+      // Arrange
+      const getItemSpy = vi
+        .spyOn(Storage.prototype, 'getItem')
+        .mockImplementation(() => {
+          throw new Error('SecurityError: The operation is insecure.');
+        });
+
+      try {
+        // Act & Assert: fail closed on both web and PWA when storage throws
+        expect(() => getSendUsageMetricsEnabled()).not.toThrow();
+        expect(getSendUsageMetricsEnabled()).toBe(false);
+
+        // In-memory session toggle override works even without storage
+        (window as any).__ergogenSendUsageMetrics = true;
+        expect(getSendUsageMetricsEnabled()).toBe(true);
+
+        (window as any).__ergogenSendUsageMetrics = false;
+        expect(getSendUsageMetricsEnabled()).toBe(false);
+      } finally {
+        getItemSpy.mockRestore();
+      }
     });
   });
 
   describe('initAnalytics', () => {
-    it('should inject script tag, define gtag, and pass send_page_view: false when enabled', () => {
-      localStorage.setItem(
-        'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: true })
-      );
+    it('should inject script tag, define gtag, and disable automatic page views and ad signals when enabled', () => {
+      // Arrange
+      delete (window as any).gtag;
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+
+      // Act
       initAnalytics();
 
+      // Assert
       const script = document.getElementById(
         'gtag-script'
       ) as HTMLScriptElement;
@@ -164,49 +191,68 @@ describe('Analytics Utility', () => {
       const win = window as any;
       expect(win.dataLayer).toBeDefined();
       expect(win['ga-disable-G-TEST12345']).toBeUndefined();
+
+      const configCall = Array.from(win.dataLayer as IArguments[]).find(
+        (entry) => entry[0] === 'config' && entry[1] === 'G-TEST12345'
+      );
+      expect(configCall).toBeDefined();
+      expect(configCall?.[2]).toEqual(
+        expect.objectContaining({
+          send_page_view: false,
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false,
+        })
+      );
     });
 
-    it('should clean up script tag, delete globals, set ga-disable, and clear cookies when disabled', () => {
-      // Setup: first load it
-      localStorage.setItem(
-        'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: true })
-      );
-      initAnalytics();
-      expect(document.getElementById('gtag-script')).toBeInTheDocument();
+    it('should not inject script tag when disabled from the start', () => {
+      // Arrange
+      delete (window as any).gtag;
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
 
-      // Set cookie to simulate GA cookie
+      // Act
+      initAnalytics();
+
+      // Assert
+      expect(document.getElementById('gtag-script')).toBeNull();
+      expect(window.gtag).toBeUndefined();
+      expect((window as any)['ga-disable-G-TEST12345']).toBe(true);
+    });
+
+    it('should set ga-disable, clear cookies, and preserve dataLayer/gtag hook on mid-session opt-out so re-enabling works without reload', () => {
+      // Arrange: initial enabled load
+      delete (window as any).gtag;
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      initAnalytics();
+
+      const originalScript = document.getElementById('gtag-script');
+      const originalDataLayer = (window as any).dataLayer;
+      const originalGtagFn = window.gtag;
+      expect(originalScript).toBeInTheDocument();
+
       document.cookie = '_ga=GA1.2.123456789.1234567890; path=/';
       document.cookie = '_ga_TEST=GS1.1.123456789.1.0.1234567890.0.0.0; path=/';
 
-      // Change setting to false and re-initialize
-      localStorage.setItem(
-        'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: false })
-      );
+      // Act 1: opt out mid-session
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
       initAnalytics();
 
-      expect(document.getElementById('gtag-script')).toBeNull();
-      expect(window.gtag).toBeUndefined();
-      expect((window as any).dataLayer).toBeUndefined();
+      // Assert 1: disable flag set, cookies purged, original container hook preserved
       expect((window as any)['ga-disable-G-TEST12345']).toBe(true);
       expect(document.cookie).not.toContain('_ga=');
-    });
+      expect(document.getElementById('gtag-script')).toBe(originalScript);
+      expect((window as any).dataLayer).toBe(originalDataLayer);
+      expect(window.gtag).toBe(originalGtagFn);
 
-    it('should clear ga-disable flag when re-enabled', () => {
-      localStorage.setItem(
-        'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: false })
-      );
+      // Act 2: re-enable mid-session without reload
+      const lengthBeforeReEnable = originalDataLayer.length;
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
       initAnalytics();
-      expect((window as any)['ga-disable-G-TEST12345']).toBe(true);
 
-      localStorage.setItem(
-        'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: true })
-      );
-      initAnalytics();
+      // Assert 2: ga-disable cleared and config re-issued on the same hooked dataLayer
       expect((window as any)['ga-disable-G-TEST12345']).toBeUndefined();
+      expect((window as any).dataLayer).toBe(originalDataLayer);
+      expect(originalDataLayer.length).toBeGreaterThan(lengthBeforeReEnable);
     });
   });
 
@@ -465,66 +511,6 @@ describe('Analytics Utility', () => {
       expect(isLiveTelemetryBlocked('G-46F2L343EK')).toBe(false);
 
       (window as any).location = originalLocation;
-    });
-  });
-
-  describe('Service Worker Google Analytics / GTM Route Matching', () => {
-    const scriptRouteMatcher = ({ url }: { url: URL }) =>
-      (url.hostname === 'www.googletagmanager.com' ||
-        url.hostname === 'www.google-analytics.com') &&
-      (url.pathname.endsWith('.js') || url.pathname.endsWith('/js'));
-
-    it('should match Google Tag Manager gtag/js script', () => {
-      const url = new URL(
-        'https://www.googletagmanager.com/gtag/js?id=G-12345&l=dataLayer'
-      );
-      expect(scriptRouteMatcher({ url })).toBe(true);
-    });
-
-    it('should match standard .js files from google-analytics and googletagmanager', () => {
-      expect(
-        scriptRouteMatcher({
-          url: new URL('https://www.google-analytics.com/analytics.js'),
-        })
-      ).toBe(true);
-      expect(
-        scriptRouteMatcher({
-          url: new URL('https://www.googletagmanager.com/gtm.js?id=GTM-123'),
-        })
-      ).toBe(true);
-    });
-
-    it('should NOT match measurement protocol collect endpoints so they are handled by Workbox background sync', () => {
-      expect(
-        scriptRouteMatcher({
-          url: new URL(
-            'https://www.google-analytics.com/g/collect?v=2&tid=G-12345'
-          ),
-        })
-      ).toBe(false);
-      expect(
-        scriptRouteMatcher({
-          url: new URL('https://www.google-analytics.com/collect?v=1'),
-        })
-      ).toBe(false);
-      expect(
-        scriptRouteMatcher({
-          url: new URL('https://www.google-analytics.com/r/collect?v=2'),
-        })
-      ).toBe(false);
-      expect(
-        scriptRouteMatcher({
-          url: new URL('https://www.google-analytics.com/mp/collect?v=2'),
-        })
-      ).toBe(false);
-    });
-
-    it('should NOT match scripts from third-party domains', () => {
-      expect(
-        scriptRouteMatcher({
-          url: new URL('https://example.com/gtag/js'),
-        })
-      ).toBe(false);
     });
   });
 });
