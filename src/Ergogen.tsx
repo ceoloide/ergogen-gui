@@ -355,7 +355,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
         configContext.generateNow(
           configContext.configInput,
           configContext.injectionInput,
-          { pointsonly: false }
+          { pointsonly: false, isManual: true }
         );
       }
     },
@@ -521,7 +521,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
     }
     trackEvent('download_button_clicked', {
       download_type: 'yaml',
-      file_name: 'config.yaml',
+      source: 'editor',
     });
     const element = document.createElement('a');
     const file = new Blob([latestConfig], { type: 'text/yaml' });
@@ -607,7 +607,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                     configContext.generateNow(
                       configContext.configInput,
                       configContext.injectionInput,
-                      { pointsonly: false }
+                      { pointsonly: false, isManual: true }
                     )
                   }
                   aria-label="Generate configuration"
@@ -685,7 +685,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                           configContext.generateNow(
                             configContext.configInput,
                             configContext.injectionInput,
-                            { pointsonly: false }
+                            { pointsonly: false, isManual: true }
                           )
                         }
                         aria-label="Generate configuration"

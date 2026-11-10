@@ -28,7 +28,7 @@ vi.mock('../workers/workerFactory', () => ({
   createJscadWorker: () => mockJscadWorker,
 }));
 
-import { trackEvent } from '../utils/analytics';
+import { trackEvent, initAnalytics } from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
   trackEvent: jest.fn(),
   initAnalytics: jest.fn(),
@@ -1174,14 +1174,17 @@ describe('ConfigContextProvider', () => {
         jest.advanceTimersByTime(1000);
       });
 
-      // It should have tracked B, with previous_config_id of undefined (root)
+      // It should have tracked B, with previous_config_id of undefined (root), without raw config_name/config_author
       expect(getKeyboardGeneratedCalls().length).toBe(1);
-      expect(getKeyboardGeneratedCalls()[0][1]).toEqual(
+      const trackedPayload = getKeyboardGeneratedCalls()[0][1];
+      expect(trackedPayload).toEqual(
         expect.objectContaining({
-          config_name: 'Sweep',
+          config_id: expect.stringMatching(/^[a-f0-9]{12}$/),
           previous_config_id: undefined,
         })
       );
+      expect('config_name' in trackedPayload).toBe(false);
+      expect('config_author' in trackedPayload).toBe(false);
     });
 
     it('should correctly chain lineages across multiple distinct generations', async () => {
@@ -1435,8 +1438,75 @@ describe('ConfigContextProvider', () => {
       expect(updatedSettingsLoadedCalls.length).toBe(1); // STILL 1!
       expect(updatedSettingChangedCalls.length).toBe(1);
       expect(updatedSettingChangedCalls[0][1]).toEqual(
-        expect.objectContaining({ debug: true })
+        expect.objectContaining({
+          setting_name: 'debug',
+          setting_value: true,
+          debug: true,
+        })
       );
+    });
+
+    it('should initialize analytics before child useEffects execute on initial mount', () => {
+      // Arrange
+      (initAnalytics as jest.Mock).mockClear();
+      const callOrder: string[] = [];
+      (initAnalytics as jest.Mock).mockImplementation(() => {
+        callOrder.push('initAnalytics');
+      });
+
+      const ChildRouteEffect = () => {
+        React.useEffect(() => {
+          callOrder.push('childPageViewEffect');
+        }, []);
+        return null;
+      };
+
+      // Act
+      render(
+        <ConfigContextProvider>
+          <ChildRouteEffect />
+        </ConfigContextProvider>
+      );
+
+      // Assert: initAnalytics must run before child useEffect so initial page_view is never dropped
+      expect(callOrder[0]).toBe('initAnalytics');
+      expect(callOrder).toContain('childPageViewEffect');
+      (initAnalytics as jest.Mock).mockImplementation(() => {});
+    });
+
+    it('should update sendUsageMetrics state in memory even when localStorage.setItem throws SecurityError', () => {
+      // Arrange
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+      expect(capturedContext.sendUsageMetrics).toBe(true);
+
+      const originalSetItem = window.localStorage.setItem;
+      window.localStorage.setItem = () => {
+        throw new Error('SecurityError: Blocked');
+      };
+
+      try {
+        // Act
+        act(() => {
+          capturedContext.setSendUsageMetrics(false);
+        });
+
+        // Assert
+        expect(capturedContext.sendUsageMetrics).toBe(false);
+        expect((window as any).__ergogenSendUsageMetrics).toBe(false);
+      } finally {
+        window.localStorage.setItem = originalSetItem;
+        delete (window as any).__ergogenSendUsageMetrics;
+      }
     });
 
     it('should mirror sendUsageMetrics into legacy localStorage key on change', () => {
@@ -1458,6 +1528,48 @@ describe('ConfigContextProvider', () => {
 
       expect(localStorage.getItem('ergogen:config:sendUsageMetrics')).toBe(
         'false'
+      );
+    });
+
+    it('should preserve prior settings changes across sequential setting updates without stale useLocalStorage clobbering', () => {
+      // Arrange
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Act: toggle debug ON, then toggle sendUsageMetrics OFF and back ON
+      act(() => {
+        capturedContext.setDebug(true);
+      });
+      expect(capturedContext.debug).toBe(true);
+
+      act(() => {
+        capturedContext.setSendUsageMetrics(false);
+      });
+      (trackEvent as jest.Mock).mockClear();
+
+      act(() => {
+        capturedContext.setSendUsageMetrics(true);
+      });
+
+      // Assert: debug remains true and setting_changed reports sendUsageMetrics=true
+      expect(capturedContext.debug).toBe(true);
+      expect(capturedContext.sendUsageMetrics).toBe(true);
+      expect(trackEvent).toHaveBeenCalledWith(
+        'setting_changed',
+        expect.objectContaining({
+          setting_name: 'sendUsageMetrics',
+          setting_value: true,
+          debug: true,
+        })
       );
     });
   });
@@ -1642,6 +1754,120 @@ describe('ConfigContextProvider', () => {
       });
 
       // Fired immediately without waiting for timers
+      const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(1);
+    });
+
+    it('should honor mid-session autoGen toggles immediately without stale closures', () => {
+      // Arrange: start with autoGen = false
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ autoGen: false })
+      );
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+      (trackEvent as jest.Mock).mockClear();
+
+      // Act 1: turn autoGen ON mid-session and trigger 3 quick successes
+      act(() => {
+        capturedContext.setAutoGen(true);
+      });
+      act(() => {
+        for (let i = 0; i < 3; i++) {
+          mockErgogenWorker.onmessage({
+            data: {
+              type: 'success',
+              results: { points: { p1: { x: i, y: i } } },
+            },
+          } as MessageEvent);
+        }
+      });
+
+      // Assert 1: 0 emitted before 5s debounce expires, then 1 after timer fires
+      let completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(0);
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(1);
+
+      // Act 2: turn autoGen OFF mid-session and trigger 1 manual generation
+      (trackEvent as jest.Mock).mockClear();
+      act(() => {
+        capturedContext.setAutoGen(false);
+      });
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: { points: { p1: { x: 99, y: 99 } } },
+          },
+        } as MessageEvent);
+      });
+
+      // Assert 2: fires immediately without waiting for debounce timer
+      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'generation_completed'
+      );
+      expect(completedCalls.length).toBe(1);
+    });
+
+    it('should bypass debounce for explicit manual generateNow requests even when autoGen is true', async () => {
+      // Arrange
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+      (trackEvent as jest.Mock).mockClear();
+      mockErgogenWorker.postMessage.mockClear();
+
+      // Act: trigger manual generateNow and echo worker requestId
+      await act(async () => {
+        await capturedContext.generateNow('points: {}', [], {
+          pointsonly: false,
+          isManual: true,
+        });
+      });
+
+      const postedMessage =
+        mockErgogenWorker.postMessage.mock.calls.at(-1)?.[0];
+      expect(postedMessage?.requestId).toMatch(/^ergogen-manual-/);
+
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: postedMessage.requestId,
+            results: { points: { p1: { x: 1, y: 2 } } },
+          },
+        } as MessageEvent);
+      });
+
+      // Assert: fires immediately even though autoGen is true
       const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );

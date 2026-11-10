@@ -198,6 +198,7 @@ type ContextProps = {
  */
 type ProcessOptions = {
   pointsonly: boolean;
+  isManual?: boolean;
 };
 
 /**
@@ -600,12 +601,39 @@ const ConfigContextProvider = ({
   const autoGen3D = settings?.autoGen3D ?? true;
   const kicanvasPreview = settings?.kicanvasPreview ?? true;
   const stlPreview = settings?.stlPreview ?? true;
-  const sendUsageMetrics = settings?.sendUsageMetrics ?? true;
+
+  // Initialize analytics synchronously during first provider render so child route
+  // effects (e.g. AppContent initial page_view) never run before window.gtag exists,
+  // and keep sendUsageMetrics state aligned with PWA/explicit-consent rules and
+  // resilient when localStorage throws SecurityError.
+  const [sendUsageMetrics, setSendUsageMetricsState] = useState<boolean>(() => {
+    const enabled = getSendUsageMetricsEnabled();
+    initAnalytics();
+    return enabled;
+  });
+
+  const settingsRef = useRef<AppSettings | undefined>(settings);
+  settingsRef.current = settings;
+
+  const autoGenRef = useRef<boolean>(autoGen);
+  autoGenRef.current = autoGen;
+
+  const sendUsageMetricsRef = useRef<boolean>(sendUsageMetrics);
+  sendUsageMetricsRef.current = sendUsageMetrics;
+
+  const updateSettings = useCallback(
+    (updater: (current: AppSettings) => AppSettings) => {
+      const current = settingsRef.current || getDefaultSettings();
+      const next = updater(current);
+      settingsRef.current = next;
+      setSettings(next);
+    },
+    [setSettings]
+  );
 
   const setDebug = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.debug)
@@ -613,13 +641,12 @@ const ConfigContextProvider = ({
         return { ...current, debug: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setAutoGen = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.autoGen)
@@ -627,13 +654,12 @@ const ConfigContextProvider = ({
         return { ...current, autoGen: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setAutoGen3D = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.autoGen3D)
@@ -641,13 +667,12 @@ const ConfigContextProvider = ({
         return { ...current, autoGen3D: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setKicanvasPreview = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.kicanvasPreview)
@@ -655,13 +680,12 @@ const ConfigContextProvider = ({
         return { ...current, kicanvasPreview: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setStlPreview = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.stlPreview)
@@ -669,16 +693,19 @@ const ConfigContextProvider = ({
         return { ...current, stlPreview: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const queueGenerationCompleted = useCallback(
-    (payload: Record<string, string | number | boolean | undefined>) => {
+    (
+      payload: Record<string, string | number | boolean | undefined>,
+      immediate: boolean = false
+    ) => {
       if (pendingGenFailedRef.current) {
         clearTimeout(pendingGenFailedRef.current.timeoutId);
         pendingGenFailedRef.current = null;
       }
-      if (!autoGen) {
+      if (immediate || !autoGenRef.current) {
         if (pendingGenCompletedRef.current) {
           clearTimeout(pendingGenCompletedRef.current.timeoutId);
           pendingGenCompletedRef.current = null;
@@ -695,16 +722,19 @@ const ConfigContextProvider = ({
       }, ANALYTICS_DEBOUNCE_DELAY);
       pendingGenCompletedRef.current = { timeoutId, payload };
     },
-    [autoGen]
+    []
   );
 
   const queueGenerationFailed = useCallback(
-    (payload: Record<string, string | number | boolean | undefined>) => {
+    (
+      payload: Record<string, string | number | boolean | undefined>,
+      immediate: boolean = false
+    ) => {
       if (pendingGenCompletedRef.current) {
         clearTimeout(pendingGenCompletedRef.current.timeoutId);
         pendingGenCompletedRef.current = null;
       }
-      if (!autoGen) {
+      if (immediate || !autoGenRef.current) {
         if (pendingGenFailedRef.current) {
           clearTimeout(pendingGenFailedRef.current.timeoutId);
           pendingGenFailedRef.current = null;
@@ -721,29 +751,30 @@ const ConfigContextProvider = ({
       }, ANALYTICS_DEBOUNCE_DELAY);
       pendingGenFailedRef.current = { timeoutId, payload };
     },
-    [autoGen]
+    []
   );
 
   const setSendUsageMetrics = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
-        const val =
-          typeof valueOrFunc === 'function'
-            ? valueOrFunc(current.sendUsageMetrics)
-            : valueOrFunc;
-        try {
-          localStorage.setItem(
-            'ergogen:config:sendUsageMetrics',
-            JSON.stringify(val)
-          );
-        } catch {
-          // ignore storage error
-        }
-        return { ...current, sendUsageMetrics: val };
-      });
+      const val =
+        typeof valueOrFunc === 'function'
+          ? valueOrFunc(sendUsageMetricsRef.current)
+          : valueOrFunc;
+      sendUsageMetricsRef.current = val;
+      try {
+        localStorage.setItem(
+          'ergogen:config:sendUsageMetrics',
+          JSON.stringify(val)
+        );
+      } catch {
+        (
+          window as unknown as { __ergogenSendUsageMetrics?: boolean }
+        ).__ergogenSendUsageMetrics = val;
+      }
+      setSendUsageMetricsState(val);
+      updateSettings((current) => ({ ...current, sendUsageMetrics: val }));
     },
-    [setSettings]
+    [updateSettings]
   );
 
   useEffect(() => {
@@ -827,15 +858,22 @@ const ConfigContextProvider = ({
         return;
       }
 
+      const isManualRequest = Boolean(
+        response.requestId && response.requestId.startsWith('ergogen-manual-')
+      );
+
       if (response.type === 'error') {
         console.error('--- Ergogen worker error:', response.error);
         setError(response.error);
         setIsGenerating(false);
         setIsJscadConverting(false);
-        queueGenerationFailed({
-          error_message: response.error || 'Unknown worker error',
-          stored_configs_count: configsRef.current.length,
-        });
+        queueGenerationFailed(
+          {
+            error_message: response.error || 'Unknown worker error',
+            stored_configs_count: configsRef.current.length,
+          },
+          isManualRequest
+        );
         return;
       }
 
@@ -854,20 +892,23 @@ const ConfigContextProvider = ({
           const duration = generationStartTimeRef.current
             ? performance.now() - generationStartTimeRef.current
             : 0;
-          queueGenerationCompleted({
-            duration_ms: Math.round(duration),
-            points_count: newResults.points
-              ? Object.keys(newResults.points).length
-              : 0,
-            pcbs_count: newResults.pcbs
-              ? Object.keys(newResults.pcbs).length
-              : 0,
-            cases_count: newResults.cases
-              ? Object.keys(newResults.cases).length
-              : 0,
-            has_outlines: !!newResults.outlines,
-            stored_configs_count: configsRef.current.length,
-          });
+          queueGenerationCompleted(
+            {
+              duration_ms: Math.round(duration),
+              points_count: newResults.points
+                ? Object.keys(newResults.points).length
+                : 0,
+              pcbs_count: newResults.pcbs
+                ? Object.keys(newResults.pcbs).length
+                : 0,
+              cases_count: newResults.cases
+                ? Object.keys(newResults.cases).length
+                : 0,
+              has_outlines: !!newResults.outlines,
+              stored_configs_count: configsRef.current.length,
+            },
+            isManualRequest
+          );
 
           // Perform configuration analysis and track GA4 event (debounced)
           try {
@@ -964,7 +1005,7 @@ const ConfigContextProvider = ({
         setIsGenerating(false);
       }
     },
-    [stlPreview]
+    [stlPreview, queueGenerationCompleted, queueGenerationFailed]
   );
 
   /**
@@ -1054,28 +1095,47 @@ const ConfigContextProvider = ({
     };
   }, [flushPendingAnalytics]);
 
+  const prevSettingsRef = useRef<AppSettings>({
+    debug,
+    autoGen,
+    autoGen3D,
+    kicanvasPreview,
+    stlPreview,
+    sendUsageMetrics,
+  });
+
   /**
    * Effect to track settings loaded and changes.
    */
   useEffect(() => {
+    const currentSettings: AppSettings = {
+      debug,
+      autoGen,
+      autoGen3D,
+      kicanvasPreview,
+      stlPreview,
+      sendUsageMetrics,
+    };
+
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
-      trackEvent('settings_loaded', {
-        debug,
-        autoGen,
-        autoGen3D,
-        kicanvasPreview,
-        stlPreview,
-        sendUsageMetrics,
-      });
+      prevSettingsRef.current = currentSettings;
+      trackEvent('settings_loaded', { ...currentSettings });
     } else {
+      const prev = prevSettingsRef.current;
+      const changedEntry = (
+        Object.keys(currentSettings) as Array<keyof AppSettings>
+      ).find((key) => currentSettings[key] !== prev[key]);
+      prevSettingsRef.current = currentSettings;
+
       trackEvent('setting_changed', {
-        debug,
-        autoGen,
-        autoGen3D,
-        kicanvasPreview,
-        stlPreview,
-        sendUsageMetrics,
+        ...(changedEntry
+          ? {
+              setting_name: changedEntry,
+              setting_value: currentSettings[changedEntry],
+            }
+          : {}),
+        ...currentSettings,
       });
     }
   }, [
@@ -1154,13 +1214,17 @@ const ConfigContextProvider = ({
       const inputConfig =
         preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
+      const requestPrefix = options.isManual
+        ? 'ergogen-manual'
+        : 'ergogen-generate';
+
       try {
         if (ergogenWorkerRef.current) {
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
             inputConfig,
             injectionInput: inputInjection,
-            requestId: `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`,
+            requestId: `${requestPrefix}-${currentConfigVersion.current}-${Date.now()}`,
             options: {
               debug: debug,
               svg: true,
@@ -1173,10 +1237,13 @@ const ConfigContextProvider = ({
         setIsGenerating(false);
         const errMsg = typeof e === 'string' ? e : String(e);
         setError(errMsg);
-        queueGenerationFailed({
-          error_message: errMsg,
-          stored_configs_count: configsRef.current.length,
-        });
+        queueGenerationFailed(
+          {
+            error_message: errMsg,
+            stored_configs_count: configsRef.current.length,
+          },
+          Boolean(options.isManual)
+        );
         return;
       }
     },
@@ -1187,6 +1254,7 @@ const ConfigContextProvider = ({
       setSkippedWarning,
       setIsGenerating,
       debug,
+      queueGenerationFailed,
     ]
   );
 
