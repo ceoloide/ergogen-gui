@@ -31,11 +31,7 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import {
-  CacheFirst,
-  StaleWhileRevalidate,
-  NetworkFirst,
-} from 'workbox-strategies';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { initialize as initializeGoogleAnalytics } from 'workbox-google-analytics';
 
@@ -167,36 +163,11 @@ registerRoute(
 );
 
 // --------------------------------------------------------------------------
-// --------------------------------------------------------------------------
-// Google Analytics – offline queue
+// Google Analytics – offline queue and script caching
 //
-// workbox-google-analytics intercepts measurement requests (e.g. /g/collect)
-// to google-analytics.com and queues them in IndexedDB when offline.
-// Initialized before the script caching route to prevent route shadowing.
+// `workbox-google-analytics` registers NetworkFirst routes for `/gtag/js`,
+// `/gtm.js`, and `/analytics.js` as well as BackgroundSync collect routes
+// (`GET` and `POST`) so failed hits queue in IndexedDB while offline.
 // --------------------------------------------------------------------------
 
 initializeGoogleAnalytics();
-
-// --------------------------------------------------------------------------
-// Runtime – Google Tag Manager / gtag.js
-//
-// Cache the gtag.js script with NetworkFirst so we always try to get the
-// latest analytics code, but fall back to the cached version when offline.
-// Restricted strictly to JavaScript files so measurement hits (/g/collect)
-// are never intercepted or shadowed by this route.
-// --------------------------------------------------------------------------
-
-registerRoute(
-  ({ url }: { url: URL }) =>
-    (url.hostname === 'www.googletagmanager.com' ||
-      url.hostname === 'www.google-analytics.com') &&
-    (url.pathname.endsWith('.js') || url.pathname.endsWith('/js')),
-  new NetworkFirst({
-    cacheName: 'google-analytics-scripts',
-    networkTimeoutSeconds: 3,
-    plugins: [
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-      new ExpirationPlugin({ maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 7 }),
-    ],
-  })
-);

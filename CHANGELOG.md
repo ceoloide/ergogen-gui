@@ -2,20 +2,20 @@
 
 ## Privacy Controls & Anti-Spam Telemetry Overhaul
 
-November 4, 2026
+November 10, 2026
 
 ![Visual representation of privacy controls and debounced compiler telemetry.](./public/images/changelog/placeholder.png)
 
-Previously, disabling "Send Usage Metrics" in the settings modal failed to persist across sessions due to a configuration key mismatch, and background Google Analytics scripts remained partially active. In addition, rapid live keyboard editing frequently dispatched intermediate compilation events on every keystroke.
+Previously, disabling "Send Usage Metrics" in the settings modal failed to persist across sessions due to a configuration key mismatch, standalone PWA installs could inherit enabled defaults from prior browser visits, and rapid live keyboard editing dispatched intermediate compilation events on every keystroke.
 
-We overhauled telemetry privacy enforcement to immediately disable tracking scripts, purge persistent cookies, and synchronously honor user opt-outs across reloads. Furthermore, compiler telemetry events (`generation_completed` and `generation_failed`) are now debounced by 5 seconds during active editing, eliminating runaway event dispatching.
+We overhauled telemetry privacy enforcement to immediately halt hit transmission, purge cookies and offline queues, strip potentially sensitive metadata and URLs, and honor standalone PWA and restricted-storage defaults—while allowing metrics to be toggled off and back on mid-session without reloading. Compiler telemetry events (`generation_completed` and `generation_failed`) now debounce by 5 seconds during live auto-generation while firing immediately on manual runs.
 
 **What changed:**
 
-- **Strict Privacy Opt-Out**: Toggling "Send Usage Metrics" off immediately sets native disabling flags, removes Google Tag scripts, clears dataLayer globals, purges analytics cookies, and persists preferences across sessions.
-- **Compilation Anti-Spam Debouncing**: Background compiler success and error telemetry events now use a 5-second cooldown during live editing, preventing per-keystroke noise in telemetry streams.
-- **Initial Page View Deduplication**: Eliminated duplicate initial page views on application boot by configuring client routing as the single source of truth for page metrics.
-- **Offline & Sharing Funnel Metrics**: Fixed Service Worker route ordering for offline telemetry queueing, and added tracking for shared link copying, shared configuration review, and bulk download status.
+- **Strict Privacy & Mid-Session Controls**: Toggling "Send Usage Metrics" off sets native `ga-disable` flags, purges `_ga` cookies and queued offline hits, fails closed when storage is blocked, preserves standalone PWA opt-out defaults, and supports re-enabling in the same session without a reload.
+- **Data Minimization**: Removed raw configuration names, authors, local filenames, repository URLs, and URL query strings from analytics payloads, and disabled Google Signals and ad personalization pings.
+- **Compilation Anti-Spam Debouncing**: Auto-generated compiler success and error events use a 5-second settlement debounce that responds live to setting changes, while manual **Generate** triggers emit immediately.
+- **Accurate Route & Export Funnels**: Synchronized bootstrap initialization so initial page views fire reliably once per route without duplicates, and added share-copy, shared-config review, and per-config bulk export failure tracking.
 
 ## SVG Outlines & Offline PWA Settings Integration
 

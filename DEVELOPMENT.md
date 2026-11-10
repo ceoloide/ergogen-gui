@@ -422,14 +422,14 @@ The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically u
 
 ### Caching Strategies
 
-| Asset type                         | Strategy                      | Cache name                 |
-| ---------------------------------- | ----------------------------- | -------------------------- |
-| Vite-bundled JS/CSS/HTML           | **Precache** (install-time)   | Workbox default            |
-| `public/dependencies/*.js` scripts | **CacheFirst** (runtime)      | `public-dependencies-v1`   |
-| Google Fonts CSS                   | **StaleWhileRevalidate**      | `google-fonts-stylesheets` |
-| Google Fonts binaries              | **CacheFirst**                | `google-fonts-webfonts`    |
-| gtag.js / GA scripts               | **NetworkFirst** (3s timeout) | `google-analytics-scripts` |
-| GA measurement requests            | **Background Sync queue**     | `workbox-background-sync`  |
+| Asset type                         | Strategy                    | Cache name                 |
+| ---------------------------------- | --------------------------- | -------------------------- |
+| Vite-bundled JS/CSS/HTML           | **Precache** (install-time) | Workbox default            |
+| `public/dependencies/*.js` scripts | **CacheFirst** (runtime)    | `public-dependencies-v1`   |
+| Google Fonts CSS                   | **StaleWhileRevalidate**    | `google-fonts-stylesheets` |
+| Google Fonts binaries              | **CacheFirst**              | `google-fonts-webfonts`    |
+| gtag.js / GTM / GA scripts         | **NetworkFirst**            | `workbox-google-analytics` |
+| GA measurement requests            | **Background Sync queue**   | `workbox-background-sync`  |
 
 ### Update Flow
 
@@ -442,33 +442,33 @@ The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically u
 
 ### Google Analytics & Privacy Controls
 
-To respect user privacy, Google Analytics is dynamically initialized and can be completely disabled via the **"Send Usage Metrics"** option in the settings pane:
+To respect user privacy, Google Analytics (`gtag.js`) is initialized synchronously at application bootstrap (`src/index.tsx`) and during `ConfigContextProvider`'s initial render (so initial route `page_view` hits are never missed), and can be toggled at any time via **"Send Usage Metrics"** in the settings pane:
 
-- **Web Default**: Enabled by default to collect usage statistics.
-- **PWA Default**: Disabled by default in standalone/PWA mode to ensure a fully private, offline-first experience.
-- **Opt-out Behavior**: When disabled, the Google Analytics script tag (`gtag.js`) is completely omitted/removed from the DOM, and all global objects (`window.gtag`, `window.dataLayer`) are deleted. No interaction with GA4 occurs, and event tracking is entirely skipped.
+- **Web Default**: Enabled by default on standard web origins (blocked automatically on `localhost` / development builds), and fails closed (`false`) if `localStorage` access throws a `SecurityError` (falling back to an in-memory session toggle so users can still opt in or out).
+- **PWA Default**: Disabled by default in standalone/installed PWA mode—even if `localStorage` already contains default browser settings from a pre-install visit. Standalone mode only enables telemetry after an explicit user toggle (`ergogen:config:sendUsageMetrics`).
+- **Opt-out & Mid-Session Re-Enable**: When disabled before loading, `gtag.js` is never injected. When disabled mid-session, `window['ga-disable-<ID>'] = true` is set immediately, `_ga` / `_ga_*` cookies and the `workbox-background-sync` IndexedDB queue are purged, and global error listeners are removed—while preserving any already-initialized `dataLayer` / `window.gtag` hook so re-enabling metrics in the same session resumes immediately without requiring a page reload.
+- **Data Minimization & Signal Hardening**: `gtag('config', ...)` disables automatic page views (`send_page_view: false`), Google Signals (`allow_google_signals: false`), and ad personalization (`allow_ad_personalization_signals: false`), and sanitizes `page_location` / `page_path` to strip query strings (such as `?github=...`) and hash fragments. Raw `meta.name`, `meta.author`, local filenames, and repository URLs are never transmitted in event payloads (`meta.name` and `meta.author` are used strictly in-browser when computing the 12-character SHA-256 `config_id` hash).
 
 When enabled:
 
-- Offline queuing: `workbox-google-analytics` intercepts measurement requests and queues them in IndexedDB using Background Sync when the device is offline, replaying them automatically once connection is restored.
-- Asset caching: The `gtag.js` script is cached with a `NetworkFirst` strategy (3-second timeout) to support offline loading.
+- Offline queuing & script caching: `workbox-google-analytics` registers `NetworkFirst` caching for `gtag.js` and queues failed Measurement Protocol requests in IndexedDB using Workbox Background Sync while offline.
 
-#### Keyboard Generation Tracking
+#### Keyboard Generation & Compilation Tracking
 
-Upon successful keyboard generation, the layout is analyzed using `configAnalyzer.ts`.
+Upon keyboard compilation in the Ergogen Web Worker, `ConfigContext.tsx` records `generation_completed` / `generation_failed` and analyzes successful layouts using `configAnalyzer.ts`.
 
-This parses and extracts:
+`configAnalyzer.ts` parses and extracts:
 
 - Outline, PCB, and Case counts
 - Boolean flags like `is_reversible` and `is_mirrored`
 - `keyboard_keys` representing the estimated physical switch count (doubled if reversible and asymmetric, otherwise matching `matrix_keys`)
 - Alpha-sorted granular matrix zone details (zone names, counts, column names, row names, etc.)
-- A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout.
-- A `previous_config_id` chaining layouts together inside the user session.
+- A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout
+- A `previous_config_id` chaining layouts together inside the user session
 
 To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 
-- **Settlement Debounce**: Keyboard layout generation is logged with a **5-second settlement debounce**. This filters out intermediate states as the user is typing, ensuring only final configurations are logged.
+- **Settlement Debounce**: Both `keyboard_generated` and auto-triggered `generation_completed` / `generation_failed` events use a **5-second settlement debounce** when `autoGen` is enabled (tracked via a ref so mid-session setting changes apply immediately without restarting Web Workers). Explicit manual **Generate** button / `Ctrl+Enter` actions and manual mode (`autoGen === false`) bypass the debounce and emit immediately. Any pending `generation_failed` timer is cancelled if compilation succeeds before the cooldown expires (and vice versa).
 - **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
 - **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, immediately clears the lineage context and cancels any pending tracking timeouts, ensuring subsequent builds start fresh.
 - **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
