@@ -272,13 +272,86 @@ export const initAnalytics = (): void => {
 };
 
 /**
+ * File extensions the app can load. Anything else is reported as `other`, so
+ * no part of a user's filename is ever sent.
+ */
+const SUPPORTED_FILE_TYPES = new Set(['yaml', 'yml', 'json', 'zip', 'ekb']);
+
+/**
+ * Maps a filename to a fixed analytics file type.
+ */
+export const classifyFileType = (fileName: string): string => {
+  const dotIndex = fileName.lastIndexOf('.');
+  const extension =
+    dotIndex >= 0 ? fileName.slice(dotIndex + 1).toLowerCase() : '';
+  return SUPPORTED_FILE_TYPES.has(extension) ? extension : 'other';
+};
+
+/**
+ * GA4 truncates event parameter values at 100 characters.
+ */
+const GA4_PARAM_VALUE_LIMIT = 100;
+
+/**
+ * Quoted segments in compiler and runtime errors usually echo user-written
+ * config keys or values (zone names, field paths, footprint names).
+ */
+const QUOTED_TEXT = /"[^"\n]*"|'[^'\n]*'|`[^`\n]*`/g;
+
+/**
+ * A stack frame line in V8 (`at fn (url:1:2)`) or Firefox/Safari (`fn@url:1:2`).
+ */
+const STACK_FRAME = /^at\s|^[^\s@]*@\S+:\d+:\d+$/;
+
+/**
+ * Keeps the first line of an error, replaces quoted values with `*`, and
+ * caps it at the GA4 limit. Later lines (such as YAML excerpts) are dropped.
+ */
+const scrubErrorText = (text: string): string =>
+  text
+    .split('\n')[0]
+    .replace(QUOTED_TEXT, (quoted) => `${quoted[0]}*${quoted[0]}`)
+    .trim()
+    .slice(0, GA4_PARAM_VALUE_LIMIT);
+
+/**
+ * Keeps only stack frame lines, dropping the message line that V8 prepends.
+ */
+const scrubStack = (stack: string): string | undefined => {
+  const frames = stack
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => STACK_FRAME.test(line));
+  return frames.length > 0
+    ? frames.join(' ').slice(0, GA4_PARAM_VALUE_LIMIT)
+    : undefined;
+};
+
+type EventParams = { [key: string]: string | number | boolean | undefined };
+
+/**
+ * Applies the error scrubbing rules to any event that carries error text.
+ */
+const scrubEventParams = (params: EventParams): EventParams => {
+  const scrubbed = { ...params };
+  for (const key of ['error_message', 'description'] as const) {
+    const value = scrubbed[key];
+    if (typeof value === 'string') scrubbed[key] = scrubErrorText(value);
+  }
+  if (typeof scrubbed.error_stack === 'string') {
+    scrubbed.error_stack = scrubStack(scrubbed.error_stack);
+  }
+  return scrubbed;
+};
+
+/**
  * Tracks a Google Analytics event if enabled and window.gtag is available.
  * @param eventName - The name of the event
  * @param eventParams - Optional parameters for the event
  */
 export const trackEvent = (
   eventName: string,
-  eventParams?: { [key: string]: string | number | boolean | undefined }
+  eventParams?: EventParams
 ): void => {
   const trackingId = import.meta.env.VITE_GTAG_ID;
   if (
@@ -298,7 +371,7 @@ export const trackEvent = (
         import.meta.env.VITE_ERGOGEN_VERSION
       ),
       is_pwa: checkIsPWA(),
-      ...eventParams,
+      ...scrubEventParams(eventParams ?? {}),
     });
   }
 };
@@ -320,7 +393,7 @@ export const trackError = (
   trackEvent('exception', {
     description: context ? `[${context}] ${message}` : message,
     fatal,
-    error_stack: stack?.substring(0, 250) || undefined, // limit length
+    error_stack: stack,
   });
 };
 

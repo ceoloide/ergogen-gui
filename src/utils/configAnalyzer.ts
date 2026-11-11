@@ -11,12 +11,9 @@ export interface KeyboardAnalyticsPayload {
   count_zones: number;
   matrix_zones: number;
   has_matrix: boolean;
-  matrix_zone_names: string;
   matrix_col_counts: string;
   matrix_row_counts: string;
   matrix_key_counts: string;
-  matrix_col_names: string;
-  matrix_row_names: string;
   matrix_keys: number;
   keyboard_keys: number;
   config_id: string;
@@ -227,25 +224,21 @@ export function analyzeConfiguration(
   const matrix_zones = matrixZonesList.length;
   const has_matrix = matrix_zones > 0;
 
-  let matrix_zone_names = '';
   let matrix_col_counts = '';
   let matrix_row_counts = '';
   let matrix_key_counts = '';
-  let matrix_col_names = '';
-  let matrix_row_names = '';
   let matrix_keys = 0;
 
   const pointsKeys = Object.keys(pointsObj);
 
   if (has_matrix) {
+    // Counts are listed in alphabetical zone order. Zone, column and row names
+    // are user-written YAML keys, so they are never sent.
     const sortedZones = [...matrixZonesList].sort();
 
-    const zoneNamesArr: string[] = [];
     const colCountsArr: number[] = [];
     const rowCountsArr: number[] = [];
     const keyCountsArr: number[] = [];
-    const colNamesArr: string[] = [];
-    const rowNamesArr: string[] = [];
 
     for (const zoneName of sortedZones) {
       const zone = zonesObj[zoneName] as Record<string, unknown> | undefined;
@@ -253,10 +246,8 @@ export function analyzeConfiguration(
       const cols = Object.keys(
         (zone?.columns || {}) as Record<string, unknown>
       );
-      const sortedCols = [...cols].sort();
 
       const rows = Object.keys((zone?.rows || {}) as Record<string, unknown>);
-      const sortedRows = [...rows].sort();
 
       // Mirroring check
       const hasZoneMirror =
@@ -289,23 +280,16 @@ export function analyzeConfiguration(
         zoneKeyCount *= 2;
       }
 
-      zoneNamesArr.push(zoneName);
-      colCountsArr.push(sortedCols.length);
-      rowCountsArr.push(sortedRows.length);
+      colCountsArr.push(cols.length);
+      rowCountsArr.push(rows.length);
       keyCountsArr.push(zoneKeyCount);
-
-      colNamesArr.push(sortedCols.join(','));
-      rowNamesArr.push(sortedRows.join(','));
 
       matrix_keys += zoneKeyCount;
     }
 
-    matrix_zone_names = zoneNamesArr.join(',');
     matrix_col_counts = colCountsArr.join(',');
     matrix_row_counts = rowCountsArr.join(',');
     matrix_key_counts = keyCountsArr.join(',');
-    matrix_col_names = colNamesArr.join('|');
-    matrix_row_names = rowNamesArr.join('|');
   }
 
   // 5. Deterministic Geometric Hash (config_id)
@@ -360,12 +344,9 @@ export function analyzeConfiguration(
     count_zones,
     matrix_zones,
     has_matrix,
-    matrix_zone_names,
     matrix_col_counts,
     matrix_row_counts,
     matrix_key_counts,
-    matrix_col_names,
-    matrix_row_names,
     matrix_keys,
     keyboard_keys,
     config_id,

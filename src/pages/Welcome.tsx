@@ -11,7 +11,7 @@ import { loadLocalFile } from '../utils/localFiles';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
 import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
-import { trackEvent } from '../utils/analytics';
+import { trackEvent, classifyFileType } from '../utils/analytics';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import GithubIcon from '../atoms/GithubIcon';
 import CodebergIcon from '../atoms/CodebergIcon';
@@ -695,15 +695,9 @@ const Welcome = () => {
     setIsGenerating(true); // Show progress bar during file loading
     clearError();
 
-    const normalizedFileType =
-      file.type ||
-      (file.name.includes('.')
-        ? file.name.split('.').pop()?.toLowerCase() || 'unknown'
-        : 'unknown');
-
-    // Track local file loading without transmitting the user's local filename
+    // Report only a fixed file type, never any part of the local filename
     trackEvent('local_file_loaded', {
-      file_type: normalizedFileType,
+      file_type: classifyFileType(file.name),
       file_size: file.size,
     });
 

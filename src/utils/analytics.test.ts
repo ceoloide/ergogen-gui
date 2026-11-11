@@ -8,6 +8,7 @@ import {
   setupGlobalErrorTracking,
   removeGlobalErrorTracking,
   isLiveTelemetryBlocked,
+  classifyFileType,
 } from './analytics';
 import guiPkg from '../../package.json';
 import ergogenPkg from 'ergogen/package.json';
@@ -434,6 +435,69 @@ describe('Analytics Utility', () => {
       (window as any).gtag = undefined;
 
       expect(() => trackEvent('test_event')).not.toThrow();
+    });
+  });
+
+  describe('classifyFileType', () => {
+    it('should map supported extensions case-insensitively', () => {
+      expect(classifyFileType('corne.yaml')).toBe('yaml');
+      expect(classifyFileType('CORNE.YML')).toBe('yml');
+      expect(classifyFileType('board.json')).toBe('json');
+      expect(classifyFileType('archive.zip')).toBe('zip');
+      expect(classifyFileType('layout.ekb')).toBe('ekb');
+    });
+
+    it('should never return free text from the filename', () => {
+      expect(classifyFileType('john.smith')).toBe('other');
+      expect(classifyFileType('corne v2.final draft')).toBe('other');
+      expect(classifyFileType('README')).toBe('other');
+    });
+  });
+
+  describe('error text scrubbing', () => {
+    it('should replace quoted user values and drop extra lines from error_message', () => {
+      setSendUsageMetricsEnabled(true);
+
+      trackEvent('generation_failed', {
+        error_message:
+          'Unexpected key "secret_zone" within field \'points.zones.my_board\'!\n 1 | meta:\n 2 |   author: Jane Doe',
+      });
+
+      expect((window.gtag as jest.Mock).mock.calls[1][2].error_message).toBe(
+        'Unexpected key "*" within field \'*\'!'
+      );
+    });
+
+    it('should cap error_message at the GA4 limit of 100 characters', () => {
+      setSendUsageMetricsEnabled(true);
+
+      trackEvent('generation_failed', { error_message: 'x'.repeat(300) });
+
+      expect(
+        (window.gtag as jest.Mock).mock.calls[1][2].error_message
+      ).toHaveLength(100);
+    });
+
+    it('should scrub exception descriptions and keep only stack frames', () => {
+      setSendUsageMetricsEnabled(true);
+      const err = new Error(
+        'Cannot read properties of undefined (reading `name`)'
+      );
+      err.stack = [
+        'TypeError: Cannot read properties of undefined (reading `name`)',
+        '    at analyze (https://ergogen.ceoloide.com/assets/index-abc.js:1:200)',
+        '    at run (https://ergogen.ceoloide.com/assets/index-abc.js:1:300)',
+      ].join('\n');
+
+      trackError(err, false, 'unhandled_error');
+
+      const params = (window.gtag as jest.Mock).mock.calls[1][2];
+      expect(params.description).toBe(
+        '[unhandled_error] Cannot read properties of undefined (reading `*`)'
+      );
+      expect(params.error_stack).not.toContain('reading');
+      expect(params.error_stack.startsWith('at analyze')).toBe(true);
+      expect(params.error_stack.length).toBeLessThanOrEqual(100);
     });
   });
 

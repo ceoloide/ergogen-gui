@@ -152,8 +152,11 @@ points:
     // Assert
     expect(payload.matrix_zones).toBe(2);
     expect(payload.has_matrix).toBe(true);
-    // alphabetical sorted: matrix, thumb
-    expect(payload.matrix_zone_names).toBe('matrix,thumb');
+    // Zone, column and row names are user-written YAML keys, so they stay local
+    expect(payload).not.toHaveProperty('matrix_zone_names');
+    expect(payload).not.toHaveProperty('matrix_col_names');
+    expect(payload).not.toHaveProperty('matrix_row_names');
+    // Counts are ordered by zone name (alphabetical: matrix, thumb)
     // col counts for matrix: 2 (pinky, ring), thumb: 1 (t1) -> sorted matrix: pinky, ring (2), thumb: t1 (1) -> '2,1'
     expect(payload.matrix_col_counts).toBe('2,1');
     // row counts for matrix: 2 (bottom, home), thumb: 1 (1) -> '2,1'
@@ -165,18 +168,6 @@ points:
     // Total key count list: '8,2'
     expect(payload.matrix_key_counts).toBe('8,2');
     expect(payload.matrix_keys).toBe(10);
-
-    // Col names sorted alphabetically in each zone:
-    // matrix columns: pinky, ring (sorted alphabetically: 'pinky,ring')
-    // thumb columns: t1 (sorted: 't1')
-    // Joined by '|' -> 'pinky,ring|t1'
-    expect(payload.matrix_col_names).toBe('pinky,ring|t1');
-
-    // Row names sorted alphabetically in each zone:
-    // matrix rows: bottom, home (sorted alphabetically: 'bottom,home')
-    // thumb rows: 1 (sorted: '1')
-    // Joined by '|' -> 'bottom,home|1'
-    expect(payload.matrix_row_names).toBe('bottom,home|1');
   });
 
   it('correctly handles case when has_matrix is false', () => {
@@ -189,12 +180,9 @@ points:
     const payload = analyzeConfiguration(canonicalNoMatrix, '{}', 10);
     expect(payload.matrix_zones).toBe(0);
     expect(payload.has_matrix).toBe(false);
-    expect(payload.matrix_zone_names).toBe('');
     expect(payload.matrix_col_counts).toBe('');
     expect(payload.matrix_row_counts).toBe('');
     expect(payload.matrix_key_counts).toBe('');
-    expect(payload.matrix_col_names).toBe('');
-    expect(payload.matrix_row_names).toBe('');
     expect(payload.matrix_keys).toBe(0);
   });
 
