@@ -557,12 +557,21 @@ const ConfigContextProvider = ({
     }
   }, []);
 
-  const flushPendingAnalytics = useCallback(() => {
+  /**
+   * Sends a pending generation outcome right away. A compilation that already
+   * happened is always reported, even when the user moves on within the
+   * debounce window.
+   */
+  const flushPendingGenerationEvent = useCallback(() => {
     const pendingGeneration = pendingGenerationEventRef.current;
     if (pendingGeneration) {
       cancelPendingGenerationEvent();
       trackEvent(pendingGeneration.name, pendingGeneration.payload);
     }
+  }, [cancelPendingGenerationEvent]);
+
+  const flushPendingAnalytics = useCallback(() => {
+    flushPendingGenerationEvent();
     if (pendingAnalyticsRef.current) {
       const { timeoutId, payload, configId } = pendingAnalyticsRef.current;
       clearTimeout(timeoutId);
@@ -570,16 +579,22 @@ const ConfigContextProvider = ({
       lastTrackedConfigIdRef.current = configId;
       pendingAnalyticsRef.current = null;
     }
-  }, [cancelPendingGenerationEvent]);
+  }, [flushPendingGenerationEvent]);
 
+  /**
+   * Starts a new lineage when the user switches, creates, duplicates or
+   * deletes a config, or opens a preview. A pending keyboard_generated event
+   * belongs to the old lineage and is dropped. A pending generation outcome
+   * describes a compilation that already ran, so it is sent instead.
+   */
   const resetLineage = useCallback(() => {
     lastTrackedConfigIdRef.current = undefined;
-    cancelPendingGenerationEvent();
+    flushPendingGenerationEvent();
     if (pendingAnalyticsRef.current) {
       clearTimeout(pendingAnalyticsRef.current.timeoutId);
       pendingAnalyticsRef.current = null;
     }
-  }, [cancelPendingGenerationEvent]);
+  }, [flushPendingGenerationEvent]);
 
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
     'ergogen:injection',

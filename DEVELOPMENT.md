@@ -499,7 +499,7 @@ To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 
 - **Settlement Debounce**: Both `keyboard_generated` and auto-triggered `generation_completed` / `generation_failed` events use a **5-second settlement debounce** when `autoGen` is enabled (tracked via a ref so mid-session setting changes apply immediately without restarting Web Workers). Explicit manual **Generate** button / `Ctrl+Enter` actions and manual mode (`autoGen === false`) bypass the debounce and emit immediately. Only one generation outcome is pending at a time, so a transient `generation_failed` is dropped if compilation succeeds before the cooldown expires (and vice versa). Both events carry `trigger: 'auto' | 'manual'`.
 - **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
-- **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, immediately clears the lineage context and cancels any pending tracking timeouts, ensuring subsequent builds start fresh.
+- **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, clears the lineage context and drops any pending `keyboard_generated` event, so subsequent builds start fresh. A pending `generation_completed` or `generation_failed` is sent immediately instead, because that compilation already happened.
 - **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
 
 ### PWA Manifest

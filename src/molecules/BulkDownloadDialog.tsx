@@ -132,6 +132,14 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
   };
 
   const handleAbort = () => {
+    if (isGenerating && !abortRef.current) {
+      // Closes the export funnel, so a cancel isn't mistaken for a crash
+      trackEvent('bulk_download_cancelled', {
+        selected_configs_count: selectedIds.size,
+        completed_configs_count: currentProgress,
+        only_configs: onlyConfigs,
+      });
+    }
     abortRef.current = true;
     onClose();
   };

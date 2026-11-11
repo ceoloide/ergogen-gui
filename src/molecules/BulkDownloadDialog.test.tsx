@@ -316,4 +316,60 @@ describe('BulkDownloadDialog', () => {
       only_configs: true,
     });
   });
+
+  it('tracks bulk_download_cancelled with progress when a running export is cancelled', async () => {
+    // Arrange: an export that reports progress and never finishes on its own
+    let progressCallback: any = null;
+    (exportConfigsProgressively as jest.Mock).mockImplementation(
+      (_configs, _injections, _debug, _stl, _only, onProgress) => {
+        progressCallback = onProgress;
+        return new Promise(() => {});
+      }
+    );
+    render(
+      <BulkDownloadDialog
+        isOpen={true}
+        configs={mockConfigs}
+        injections={[]}
+        debug={false}
+        stlPreview={false}
+        onClose={mockOnClose}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Download \(2\)/i }));
+    act(() => {
+      progressCallback(1, 2, 'Keyboard Beta');
+    });
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    // Assert
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_cancelled', {
+      selected_configs_count: 2,
+      completed_configs_count: 1,
+      only_configs: true,
+    });
+  });
+
+  it('does not track bulk_download_cancelled when closing before an export starts', () => {
+    (trackEvent as jest.Mock).mockClear();
+    render(
+      <BulkDownloadDialog
+        isOpen={true}
+        configs={mockConfigs}
+        injections={[]}
+        debug={false}
+        stlPreview={false}
+        onClose={mockOnClose}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(trackEvent).not.toHaveBeenCalledWith(
+      'bulk_download_cancelled',
+      expect.anything()
+    );
+  });
 });

@@ -1658,6 +1658,45 @@ describe('ConfigContextProvider', () => {
       );
     });
 
+    it('should send, not drop, a pending generation event when switching configs', () => {
+      // Arrange: an auto-build finishes, then the user switches config within 5s
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            results: { points: { p1: { x: 0, y: 0 } } },
+          },
+        } as MessageEvent);
+      });
+      const countCompleted = () =>
+        (trackEvent as jest.Mock).mock.calls.filter(
+          (call) => call[0] === 'generation_completed'
+        ).length;
+      expect(countCompleted()).toBe(0);
+
+      // Act
+      act(() => {
+        capturedContext.createNewConfig('points: {}', 'Another board');
+      });
+
+      // Assert: the compilation really happened, so it is reported once
+      expect(countCompleted()).toBe(1);
+      act(() => {
+        jest.advanceTimersByTime(10000);
+      });
+      expect(countCompleted()).toBe(1);
+    });
+
     it('should cancel pending generation_failed when generation succeeds', () => {
       render(
         <ConfigContextProvider>
