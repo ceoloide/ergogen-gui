@@ -68,6 +68,13 @@ interface MultiConfigContainer {
 
 import { Results } from '../types/results';
 
+type GenerationEventName = 'generation_completed' | 'generation_failed';
+
+type GenerationEventPayload = Record<
+  string,
+  string | number | boolean | undefined
+>;
+
 interface AppSettings {
   debug: boolean;
   autoGen: boolean;
@@ -532,28 +539,29 @@ const ConfigContextProvider = ({
     configId: string;
   } | null>(null);
 
-  const pendingGenCompletedRef = useRef<{
+  /**
+   * The latest generation outcome waiting out the debounce. A newer outcome
+   * replaces it, so a transient syntax error is dropped once compilation
+   * succeeds again. Keyboard lineage below uses its own, separate debounce.
+   */
+  const pendingGenerationEventRef = useRef<{
+    name: GenerationEventName;
+    payload: GenerationEventPayload;
     timeoutId: NodeJS.Timeout;
-    payload: Record<string, string | number | boolean | undefined>;
   } | null>(null);
 
-  const pendingGenFailedRef = useRef<{
-    timeoutId: NodeJS.Timeout;
-    payload: Record<string, string | number | boolean | undefined>;
-  } | null>(null);
+  const cancelPendingGenerationEvent = useCallback(() => {
+    if (pendingGenerationEventRef.current) {
+      clearTimeout(pendingGenerationEventRef.current.timeoutId);
+      pendingGenerationEventRef.current = null;
+    }
+  }, []);
 
   const flushPendingAnalytics = useCallback(() => {
-    if (pendingGenCompletedRef.current) {
-      const { timeoutId, payload } = pendingGenCompletedRef.current;
-      clearTimeout(timeoutId);
-      trackEvent('generation_completed', payload);
-      pendingGenCompletedRef.current = null;
-    }
-    if (pendingGenFailedRef.current) {
-      const { timeoutId, payload } = pendingGenFailedRef.current;
-      clearTimeout(timeoutId);
-      trackEvent('generation_failed', payload);
-      pendingGenFailedRef.current = null;
+    const pendingGeneration = pendingGenerationEventRef.current;
+    if (pendingGeneration) {
+      cancelPendingGenerationEvent();
+      trackEvent(pendingGeneration.name, pendingGeneration.payload);
     }
     if (pendingAnalyticsRef.current) {
       const { timeoutId, payload, configId } = pendingAnalyticsRef.current;
@@ -562,23 +570,16 @@ const ConfigContextProvider = ({
       lastTrackedConfigIdRef.current = configId;
       pendingAnalyticsRef.current = null;
     }
-  }, []);
+  }, [cancelPendingGenerationEvent]);
 
   const resetLineage = useCallback(() => {
     lastTrackedConfigIdRef.current = undefined;
-    if (pendingGenCompletedRef.current) {
-      clearTimeout(pendingGenCompletedRef.current.timeoutId);
-      pendingGenCompletedRef.current = null;
-    }
-    if (pendingGenFailedRef.current) {
-      clearTimeout(pendingGenFailedRef.current.timeoutId);
-      pendingGenFailedRef.current = null;
-    }
+    cancelPendingGenerationEvent();
     if (pendingAnalyticsRef.current) {
       clearTimeout(pendingAnalyticsRef.current.timeoutId);
       pendingAnalyticsRef.current = null;
     }
-  }, []);
+  }, [cancelPendingGenerationEvent]);
 
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
     'ergogen:injection',
@@ -694,62 +695,29 @@ const ConfigContextProvider = ({
     [updateSettings]
   );
 
-  const queueGenerationCompleted = useCallback(
+  /**
+   * Reports a generation outcome. Explicit (manual) generations and runs with
+   * auto-generate off are sent immediately. Auto-generation outcomes wait for
+   * edits to settle, and each new outcome replaces the pending one.
+   */
+  const queueGenerationEvent = useCallback(
     (
-      payload: Record<string, string | number | boolean | undefined>,
-      immediate: boolean = false
+      name: GenerationEventName,
+      payload: GenerationEventPayload,
+      immediate: boolean
     ) => {
-      if (pendingGenFailedRef.current) {
-        clearTimeout(pendingGenFailedRef.current.timeoutId);
-        pendingGenFailedRef.current = null;
-      }
+      cancelPendingGenerationEvent();
       if (immediate || !autoGenRef.current) {
-        if (pendingGenCompletedRef.current) {
-          clearTimeout(pendingGenCompletedRef.current.timeoutId);
-          pendingGenCompletedRef.current = null;
-        }
-        trackEvent('generation_completed', payload);
+        trackEvent(name, payload);
         return;
       }
-      if (pendingGenCompletedRef.current) {
-        clearTimeout(pendingGenCompletedRef.current.timeoutId);
-      }
       const timeoutId = setTimeout(() => {
-        trackEvent('generation_completed', payload);
-        pendingGenCompletedRef.current = null;
+        pendingGenerationEventRef.current = null;
+        trackEvent(name, payload);
       }, ANALYTICS_DEBOUNCE_DELAY);
-      pendingGenCompletedRef.current = { timeoutId, payload };
+      pendingGenerationEventRef.current = { name, payload, timeoutId };
     },
-    []
-  );
-
-  const queueGenerationFailed = useCallback(
-    (
-      payload: Record<string, string | number | boolean | undefined>,
-      immediate: boolean = false
-    ) => {
-      if (pendingGenCompletedRef.current) {
-        clearTimeout(pendingGenCompletedRef.current.timeoutId);
-        pendingGenCompletedRef.current = null;
-      }
-      if (immediate || !autoGenRef.current) {
-        if (pendingGenFailedRef.current) {
-          clearTimeout(pendingGenFailedRef.current.timeoutId);
-          pendingGenFailedRef.current = null;
-        }
-        trackEvent('generation_failed', payload);
-        return;
-      }
-      if (pendingGenFailedRef.current) {
-        clearTimeout(pendingGenFailedRef.current.timeoutId);
-      }
-      const timeoutId = setTimeout(() => {
-        trackEvent('generation_failed', payload);
-        pendingGenFailedRef.current = null;
-      }, ANALYTICS_DEBOUNCE_DELAY);
-      pendingGenFailedRef.current = { timeoutId, payload };
-    },
-    []
+    [cancelPendingGenerationEvent]
   );
 
   const setSendUsageMetrics = useCallback(
@@ -856,7 +824,8 @@ const ConfigContextProvider = ({
         setError(response.error);
         setIsGenerating(false);
         setIsJscadConverting(false);
-        queueGenerationFailed(
+        queueGenerationEvent(
+          'generation_failed',
           {
             error_message: response.error || 'Unknown worker error',
             stored_configs_count: configsRef.current.length,
@@ -882,7 +851,8 @@ const ConfigContextProvider = ({
           const duration = generationStartTimeRef.current
             ? performance.now() - generationStartTimeRef.current
             : 0;
-          queueGenerationCompleted(
+          queueGenerationEvent(
+            'generation_completed',
             {
               duration_ms: Math.round(duration),
               points_count: newResults.points
@@ -996,7 +966,7 @@ const ConfigContextProvider = ({
         setIsGenerating(false);
       }
     },
-    [stlPreview, queueGenerationCompleted, queueGenerationFailed]
+    [stlPreview, queueGenerationEvent]
   );
 
   /**
@@ -1233,7 +1203,8 @@ const ConfigContextProvider = ({
         setIsGenerating(false);
         const errMsg = typeof e === 'string' ? e : String(e);
         setError(errMsg);
-        queueGenerationFailed(
+        queueGenerationEvent(
+          'generation_failed',
           {
             error_message: errMsg,
             stored_configs_count: configsRef.current.length,
@@ -1251,7 +1222,7 @@ const ConfigContextProvider = ({
       setSkippedWarning,
       setIsGenerating,
       debug,
-      queueGenerationFailed,
+      queueGenerationEvent,
     ]
   );
 
