@@ -101,10 +101,17 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
             only_configs: onlyConfigs,
             error_message: `All ${summary.failedCount} selected configuration(s) failed to compile`,
           });
+        } else if (summary && summary.failedCount > 0) {
+          // Kept separate from bulk_download_completed, which is a key event
+          // and should only count exports where every config compiled.
+          trackEvent('bulk_download_partial', {
+            selected_configs_count: selectedIds.size,
+            failed_configs_count: summary.failedCount,
+            only_configs: onlyConfigs,
+          });
         } else {
           trackEvent('bulk_download_completed', {
             selected_configs_count: selectedIds.size,
-            ...(summary ? { failed_configs_count: summary.failedCount } : {}),
             only_configs: onlyConfigs,
           });
         }

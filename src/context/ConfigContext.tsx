@@ -860,6 +860,7 @@ const ConfigContextProvider = ({
           {
             error_message: response.error || 'Unknown worker error',
             stored_configs_count: configsRef.current.length,
+            trigger: isManualRequest ? 'manual' : 'auto',
           },
           isManualRequest
         );
@@ -895,6 +896,7 @@ const ConfigContextProvider = ({
                 : 0,
               has_outlines: !!newResults.outlines,
               stored_configs_count: configsRef.current.length,
+              trigger: isManualRequest ? 'manual' : 'auto',
             },
             isManualRequest
           );
@@ -1106,10 +1108,15 @@ const ConfigContextProvider = ({
       sendUsageMetrics,
     };
 
+    // sendUsageMetrics is always true on any event that reaches GA, so it
+    // is not sent as a parameter (setting_name still records the toggle).
+    const { sendUsageMetrics: _alwaysTrue, ...reportedSettings } =
+      currentSettings;
+
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       prevSettingsRef.current = currentSettings;
-      trackEvent('settings_loaded', { ...currentSettings });
+      trackEvent('settings_loaded', { ...reportedSettings });
     } else {
       const prev = prevSettingsRef.current;
       const changedEntry = (
@@ -1124,7 +1131,7 @@ const ConfigContextProvider = ({
               setting_value: currentSettings[changedEntry],
             }
           : {}),
-        ...currentSettings,
+        ...reportedSettings,
       });
     }
   }, [
@@ -1230,6 +1237,7 @@ const ConfigContextProvider = ({
           {
             error_message: errMsg,
             stored_configs_count: configsRef.current.length,
+            trigger: options.isManual ? 'manual' : 'auto',
           },
           Boolean(options.isManual)
         );

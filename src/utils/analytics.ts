@@ -365,7 +365,6 @@ export const trackEvent = (
     window.gtag('set', { page_location: pageLocation });
     window.gtag('event', eventName, {
       page_location: pageLocation,
-      event_category: 'user_action',
       gui_version: guiPkg.version,
       ergogen_version: getFullErgogenVersion(
         import.meta.env.VITE_ERGOGEN_VERSION

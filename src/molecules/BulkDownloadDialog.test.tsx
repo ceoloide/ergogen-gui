@@ -281,7 +281,7 @@ describe('BulkDownloadDialog', () => {
     });
   });
 
-  it('includes failed_configs_count on partial bulk download completion', async () => {
+  it('tracks bulk_download_partial, not a completed key event, when some configs fail', async () => {
     // Arrange
     (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce({
       succeededCount: 1,
@@ -306,7 +306,11 @@ describe('BulkDownloadDialog', () => {
     });
 
     // Assert
-    expect(trackEvent).toHaveBeenCalledWith('bulk_download_completed', {
+    expect(trackEvent).not.toHaveBeenCalledWith(
+      'bulk_download_completed',
+      expect.anything()
+    );
+    expect(trackEvent).toHaveBeenCalledWith('bulk_download_partial', {
       selected_configs_count: 2,
       failed_configs_count: 1,
       only_configs: true,

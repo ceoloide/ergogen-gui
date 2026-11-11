@@ -54,8 +54,13 @@ const copyToClipboardWithFallback = async (
       textArea.style.opacity = '0';
       document.body.appendChild(textArea);
       textArea.select();
-      document.execCommand('copy');
+      // execCommand returns false when copying is unsupported or blocked
+      const didCopy = document.execCommand('copy');
       document.body.removeChild(textArea);
+      if (!didCopy) {
+        console.error('Fallback copy method was rejected by the browser.');
+        return;
+      }
       setCopied(true);
       onSuccess?.();
       if (timeoutRef.current) {

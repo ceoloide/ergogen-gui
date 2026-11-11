@@ -339,7 +339,6 @@ describe('Analytics Utility', () => {
       trackEvent(eventName, eventParams);
 
       expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
-        event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
@@ -349,14 +348,13 @@ describe('Analytics Utility', () => {
       });
     });
 
-    it('should call window.gtag with default category, versions, and is_pwa when eventParams is not provided', () => {
+    it('should call window.gtag with versions and is_pwa when eventParams is not provided', () => {
       setSendUsageMetricsEnabled(true);
       const eventName = 'test_event';
 
       trackEvent(eventName);
 
       expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
-        event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
@@ -364,20 +362,14 @@ describe('Analytics Utility', () => {
       });
     });
 
-    it('should allow overriding event_category', () => {
+    it('should not send the constant event_category parameter', () => {
       setSendUsageMetricsEnabled(true);
-      const eventName = 'test_event';
-      const eventParams = { event_category: 'custom_category' };
 
-      trackEvent(eventName, eventParams);
+      trackEvent('test_event');
 
-      expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
-        event_category: 'custom_category',
-        gui_version: guiPkg.version,
-        ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
-        is_pwa: false,
-        page_location: `${window.location.origin}/`,
-      });
+      expect((window.gtag as jest.Mock).mock.calls[1][2]).not.toHaveProperty(
+        'event_category'
+      );
     });
 
     it('should reflect custom Ergogen versions from environment variables', () => {
@@ -388,7 +380,6 @@ describe('Analytics Utility', () => {
       trackEvent(eventName);
 
       expect(window.gtag).toHaveBeenCalledWith('event', eventName, {
-        event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: 'github:ceoloide/ergogen#v4.3.0',
         is_pwa: false,
@@ -407,7 +398,6 @@ describe('Analytics Utility', () => {
       trackEvent('test_event');
 
       expect(window.gtag).toHaveBeenCalledWith('event', 'test_event', {
-        event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: true,
@@ -507,7 +497,6 @@ describe('Analytics Utility', () => {
       trackError('test error message', true, 'test_context');
 
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
-        event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
@@ -524,7 +513,6 @@ describe('Analytics Utility', () => {
       trackError(err, false);
 
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
-        event_category: 'user_action',
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,

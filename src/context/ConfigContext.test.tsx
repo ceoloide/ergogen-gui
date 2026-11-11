@@ -1426,6 +1426,8 @@ describe('ConfigContextProvider', () => {
       );
 
       expect(settingsLoadedCalls.length).toBe(1);
+      // Always true for any event that reaches GA, so it is not sent
+      expect(settingsLoadedCalls[0][1]).not.toHaveProperty('sendUsageMetrics');
       expect(settingChangedCalls.length).toBe(0);
 
       // Now toggle a setting
@@ -1649,7 +1651,10 @@ describe('ConfigContextProvider', () => {
       );
       expect(failedCalls.length).toBe(1);
       expect(failedCalls[0][1]).toEqual(
-        expect.objectContaining({ error_message: 'SyntaxError at line 2' })
+        expect.objectContaining({
+          error_message: 'SyntaxError at line 2',
+          trigger: 'auto',
+        })
       );
     });
 
@@ -1839,6 +1844,9 @@ describe('ConfigContextProvider', () => {
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(1);
+      expect(completedCalls[0][1]).toEqual(
+        expect.objectContaining({ trigger: 'manual' })
+      );
     });
   });
 
