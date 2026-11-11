@@ -79,7 +79,9 @@ const clearGaCookies = (): void => {
 };
 
 /**
- * Purges any offline-queued Google Analytics hits stored by Workbox Background Sync.
+ * Best-effort request to delete the offline analytics queue left by builds
+ * that used workbox-google-analytics. The service worker owns the real
+ * cleanup: it deletes the database on activation and no longer queues hits.
  */
 const clearOfflineAnalyticsQueue = (): void => {
   if (typeof indexedDB === 'undefined') return;

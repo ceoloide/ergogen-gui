@@ -80,9 +80,6 @@ importers:
       workbox-expiration:
         specifier: ^7.4.1
         version: 7.4.1
-      workbox-google-analytics:
-        specifier: ^7.4.1
-        version: 7.4.1
       workbox-precaching:
         specifier: ^7.4.1
         version: 7.4.1

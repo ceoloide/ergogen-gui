@@ -2,7 +2,6 @@ const mockClientsClaim = vi.fn();
 const mockPrecacheAndRoute = vi.fn();
 const mockCreateHandlerBoundToURL = vi.fn(() => 'bound-index-handler');
 const mockRegisterRoute = vi.fn();
-const mockInitializeGoogleAnalytics = vi.fn();
 
 vi.mock('workbox-core', () => ({
   clientsClaim: (...args: unknown[]) => mockClientsClaim(...args),
@@ -57,34 +56,39 @@ vi.mock('workbox-cacheable-response', () => ({
   },
 }));
 
-vi.mock('workbox-google-analytics', () => ({
-  initialize: (...args: unknown[]) => mockInitializeGoogleAnalytics(...args),
-}));
-
 describe('Service Worker registration and route wiring', () => {
   const originalSelf = (globalThis as Record<string, unknown>).self;
   const mockSkipWaiting = vi.fn();
   let messageHandlers: Array<(event: { data?: { type?: string } }) => void> =
     [];
+  let activateHandlers: Array<
+    (event: { waitUntil: (promise: Promise<unknown>) => void }) => void
+  > = [];
+  const deleteRequest: {
+    onsuccess?: () => void;
+    onerror?: () => void;
+    onblocked?: () => void;
+  } = {};
+  const mockDeleteDatabase = vi.fn(() => deleteRequest);
 
   beforeAll(async () => {
     messageHandlers = [];
+    activateHandlers = [];
+    vi.stubGlobal('indexedDB', { deleteDatabase: mockDeleteDatabase });
     Object.defineProperty(globalThis, 'self', {
       configurable: true,
       writable: true,
       value: {
         __WB_MANIFEST: [{ url: 'index.html', revision: '1' }],
         skipWaiting: mockSkipWaiting,
-        addEventListener: vi.fn(
-          (
-            type: string,
-            handler: (event: { data?: { type?: string } }) => void
-          ) => {
-            if (type === 'message') {
-              messageHandlers.push(handler);
-            }
+        addEventListener: vi.fn((type: string, handler: any) => {
+          if (type === 'message') {
+            messageHandlers.push(handler);
           }
-        ),
+          if (type === 'activate') {
+            activateHandlers.push(handler);
+          }
+        }),
       },
     });
 
@@ -92,6 +96,7 @@ describe('Service Worker registration and route wiring', () => {
   });
 
   afterAll(() => {
+    vi.unstubAllGlobals();
     Object.defineProperty(globalThis, 'self', {
       configurable: true,
       writable: true,
@@ -99,11 +104,7 @@ describe('Service Worker registration and route wiring', () => {
     });
   });
 
-  it('initializes Workbox Google Analytics without registering a dead duplicate script route', () => {
-    // Assert Workbox GA initialization ran
-    expect(mockInitializeGoogleAnalytics).toHaveBeenCalledTimes(1);
-
-    // Assert none of the custom registerRoute matchers intercept GTM/GA scripts or /g/collect
+  it('does not intercept Google Analytics hits or scripts, so nothing is queued for later replay', () => {
     const gaCollectUrl = new URL(
       'https://www.google-analytics.com/g/collect?v=2&tid=G-TEST12345'
     );
@@ -113,10 +114,7 @@ describe('Service Worker registration and route wiring', () => {
 
     for (const [matcher] of mockRegisterRoute.mock.calls) {
       expect(
-        matcher({
-          request: { mode: 'cors' } as Request,
-          url: gaCollectUrl,
-        })
+        matcher({ request: { mode: 'cors' } as Request, url: gaCollectUrl })
       ).toBe(false);
       expect(
         matcher({
@@ -125,6 +123,32 @@ describe('Service Worker registration and route wiring', () => {
         })
       ).toBe(false);
     }
+  });
+
+  it('deletes the legacy offline analytics queue on activation and waits for it', async () => {
+    // Arrange
+    expect(activateHandlers.length).toBe(1);
+    let pending: Promise<unknown> | undefined;
+
+    // Act
+    activateHandlers[0]({
+      waitUntil: (promise) => {
+        pending = promise;
+      },
+    });
+
+    // Assert: activation waits until the database is actually deleted
+    expect(mockDeleteDatabase).toHaveBeenCalledWith('workbox-background-sync');
+    expect(pending).toBeInstanceOf(Promise);
+    let settled = false;
+    void pending!.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    deleteRequest.onsuccess?.();
+    await pending;
+    expect(settled).toBe(true);
   });
 
   it('routes SPA navigations to index.html while skipping internal paths and static files', () => {
