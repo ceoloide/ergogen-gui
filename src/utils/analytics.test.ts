@@ -2,6 +2,7 @@ import {
   trackEvent,
   initAnalytics,
   getSendUsageMetricsEnabled,
+  setSendUsageMetricsEnabled,
   checkIsPWA,
   trackError,
   setupGlobalErrorTracking,
@@ -20,7 +21,9 @@ describe('Analytics Utility', () => {
     // Reset environment variable before each test
     vi.stubEnv('VITE_ERGOGEN_VERSION', '');
     vi.stubEnv('VITE_GTAG_ID', 'G-TEST12345');
-    // Clear localStorage
+    // Drop any in-memory consent from earlier tests (a successful write
+    // clears it), then clear localStorage
+    setSendUsageMetricsEnabled(true);
     localStorage.clear();
     // Clean up dynamic script tag and globals if present
     const script = document.getElementById('gtag-script');
@@ -29,7 +32,6 @@ describe('Analytics Utility', () => {
     }
     delete (window as any).dataLayer;
     delete (window as any)['ga-disable-G-TEST12345'];
-    delete (window as any).__ergogenSendUsageMetrics;
     removeGlobalErrorTracking();
   });
 
@@ -65,87 +67,81 @@ describe('Analytics Utility', () => {
   });
 
   describe('getSendUsageMetricsEnabled', () => {
-    it('should default to true on web (not PWA mode)', () => {
-      expect(getSendUsageMetricsEnabled()).toBe(true);
+    const setStandalone = (value: boolean | undefined) => {
+      Object.defineProperty(window.navigator, 'standalone', {
+        value,
+        configurable: true,
+      });
+    };
+
+    afterEach(() => {
+      setStandalone(undefined);
     });
 
-    it('should read sendUsageMetrics from ergogen:settings JSON when present', () => {
+    it('should default to true on web and false in standalone PWA mode', () => {
+      expect(getSendUsageMetricsEnabled()).toBe(true);
+
+      setStandalone(true);
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+    });
+
+    it('should honor an opt-out stored in ergogen:settings', () => {
       localStorage.setItem(
         'ergogen:settings',
         JSON.stringify({ sendUsageMetrics: false, debug: true })
       );
       expect(getSendUsageMetricsEnabled()).toBe(false);
-
-      localStorage.setItem(
-        'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: true, debug: false })
-      );
-      expect(getSendUsageMetricsEnabled()).toBe(true);
     });
 
-    it('should fallback to legacy ergogen:config:sendUsageMetrics if ergogen:settings is corrupted', () => {
-      localStorage.setItem('ergogen:settings', 'invalid-json');
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
-      expect(getSendUsageMetricsEnabled()).toBe(false);
-
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
-      expect(getSendUsageMetricsEnabled()).toBe(true);
-    });
-
-    it('should return false if legacy localStorage has it set to false', () => {
+    it('should honor an opt-out stored in the legacy key', () => {
       localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
       expect(getSendUsageMetricsEnabled()).toBe(false);
     });
 
-    it('should return true if legacy localStorage has it set to true', () => {
+    it('should not let a stale legacy true override a later ergogen:settings opt-out', () => {
+      // Arrange: builds before 211ff8a wrote the legacy key on every mount,
+      // then the user opted out through the consolidated settings object.
       localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
-      expect(getSendUsageMetricsEnabled()).toBe(true);
-    });
-
-    it('should default to false in PWA mode if not configured', () => {
-      const originalStandalone = (window.navigator as any).standalone;
-      Object.defineProperty(window.navigator, 'standalone', {
-        value: true,
-        configurable: true,
-      });
-
-      expect(getSendUsageMetricsEnabled()).toBe(false);
-
-      Object.defineProperty(window.navigator, 'standalone', {
-        value: originalStandalone,
-        configurable: true,
-      });
-    });
-
-    it('should keep PWA default (false) when ergogen:settings has browser-default true without explicit toggle', () => {
-      // Arrange: browser visit saved default settings (no explicit ergogen:config:sendUsageMetrics toggle)
       localStorage.setItem(
         'ergogen:settings',
-        JSON.stringify({ sendUsageMetrics: true, autoGen: true })
+        JSON.stringify({ sendUsageMetrics: false })
       );
-      const originalStandalone = (window.navigator as any).standalone;
-      Object.defineProperty(window.navigator, 'standalone', {
-        value: true,
-        configurable: true,
-      });
 
-      try {
-        // Act & Assert: standalone PWA must stay disabled until explicitly opted in
-        expect(getSendUsageMetricsEnabled()).toBe(false);
-
-        // Explicit opt-in via toggle key overrides PWA default
-        localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
-        expect(getSendUsageMetricsEnabled()).toBe(true);
-      } finally {
-        Object.defineProperty(window.navigator, 'standalone', {
-          value: originalStandalone,
-          configurable: true,
-        });
-      }
+      // Act & Assert
+      expect(getSendUsageMetricsEnabled()).toBe(false);
     });
 
-    it('should fail closed (false) when localStorage access throws SecurityError, unless overridden in session memory', () => {
-      // Arrange
+    it('should not treat automatically saved true values as a PWA opt-in', () => {
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: true })
+      );
+      setStandalone(true);
+
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+    });
+
+    it('should let an explicit toggle override older opt-outs and the PWA default', () => {
+      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      localStorage.setItem(
+        'ergogen:settings',
+        JSON.stringify({ sendUsageMetrics: false })
+      );
+      setStandalone(true);
+
+      setSendUsageMetricsEnabled(true);
+
+      expect(localStorage.getItem('ergogen:consent:sendUsageMetrics')).toBe(
+        'true'
+      );
+      expect(getSendUsageMetricsEnabled()).toBe(true);
+
+      setSendUsageMetricsEnabled(false);
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+    });
+
+    it('should fail closed when localStorage reads throw', () => {
       const getItemSpy = vi
         .spyOn(Storage.prototype, 'getItem')
         .mockImplementation(() => {
@@ -153,19 +149,47 @@ describe('Analytics Utility', () => {
         });
 
       try {
-        // Act & Assert: fail closed on both web and PWA when storage throws
         expect(() => getSendUsageMetricsEnabled()).not.toThrow();
-        expect(getSendUsageMetricsEnabled()).toBe(false);
-
-        // In-memory session toggle override works even without storage
-        (window as any).__ergogenSendUsageMetrics = true;
-        expect(getSendUsageMetricsEnabled()).toBe(true);
-
-        (window as any).__ergogenSendUsageMetrics = false;
         expect(getSendUsageMetricsEnabled()).toBe(false);
       } finally {
         getItemSpy.mockRestore();
       }
+    });
+
+    it('should keep a toggle in memory while storage writes fail, and drop it once a write succeeds', () => {
+      // Arrange: storage writes fail when the user opts in
+      const setItemSpy = vi
+        .spyOn(Storage.prototype, 'setItem')
+        .mockImplementation(() => {
+          throw new Error('QuotaExceededError');
+        });
+      try {
+        setSendUsageMetricsEnabled(true);
+        expect(getSendUsageMetricsEnabled()).toBe(true);
+        setSendUsageMetricsEnabled(false);
+        expect(getSendUsageMetricsEnabled()).toBe(false);
+        setSendUsageMetricsEnabled(true);
+        expect(getSendUsageMetricsEnabled()).toBe(true);
+      } finally {
+        setItemSpy.mockRestore();
+      }
+
+      // Act: storage recovers and the user opts out
+      setSendUsageMetricsEnabled(false);
+
+      // Assert: the earlier in-memory opt-in no longer wins
+      expect(getSendUsageMetricsEnabled()).toBe(false);
+      expect(localStorage.getItem('ergogen:consent:sendUsageMetrics')).toBe(
+        'false'
+      );
+    });
+
+    it('should follow storage changes from other tabs once no write has failed', () => {
+      setSendUsageMetricsEnabled(true);
+
+      localStorage.setItem('ergogen:consent:sendUsageMetrics', 'false');
+
+      expect(getSendUsageMetricsEnabled()).toBe(false);
     });
   });
 
@@ -173,7 +197,7 @@ describe('Analytics Utility', () => {
     it('should inject script tag, define gtag, and disable automatic page views and ad signals when enabled', () => {
       // Arrange
       delete (window as any).gtag;
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
 
       // Act
       initAnalytics();
@@ -208,7 +232,7 @@ describe('Analytics Utility', () => {
     it('should not inject script tag when disabled from the start', () => {
       // Arrange
       delete (window as any).gtag;
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      setSendUsageMetricsEnabled(false);
 
       // Act
       initAnalytics();
@@ -222,7 +246,7 @@ describe('Analytics Utility', () => {
     it('should set ga-disable, clear cookies, and preserve dataLayer/gtag hook on mid-session opt-out so re-enabling works without reload', () => {
       // Arrange: initial enabled load
       delete (window as any).gtag;
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       initAnalytics();
 
       const originalScript = document.getElementById('gtag-script');
@@ -234,7 +258,7 @@ describe('Analytics Utility', () => {
       document.cookie = '_ga_TEST=GS1.1.123456789.1.0.1234567890.0.0.0; path=/';
 
       // Act 1: opt out mid-session
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      setSendUsageMetricsEnabled(false);
       initAnalytics();
 
       // Assert 1: disable flag set, cookies purged, original container hook preserved
@@ -246,7 +270,7 @@ describe('Analytics Utility', () => {
 
       // Act 2: re-enable mid-session without reload
       const lengthBeforeReEnable = originalDataLayer.length;
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       initAnalytics();
 
       // Assert 2: ga-disable cleared and config re-issued on the same hooked dataLayer
@@ -258,7 +282,7 @@ describe('Analytics Utility', () => {
 
   describe('trackEvent', () => {
     it('should call window.gtag with GUI, Ergogen versions, and is_pwa when enabled and gtag is defined', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       const eventName = 'test_event';
       const eventParams = { param1: 'value1', param2: 123 };
 
@@ -275,7 +299,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should call window.gtag with default category, versions, and is_pwa when eventParams is not provided', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       const eventName = 'test_event';
 
       trackEvent(eventName);
@@ -289,7 +313,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should allow overriding event_category', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       const eventName = 'test_event';
       const eventParams = { event_category: 'custom_category' };
 
@@ -304,7 +328,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should reflect custom Ergogen versions from environment variables', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.3.0');
       const eventName = 'test_event';
 
@@ -319,7 +343,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should set is_pwa to true when running in standalone mode', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       const originalStandalone = (window.navigator as any).standalone;
       Object.defineProperty(window.navigator, 'standalone', {
         value: true,
@@ -342,7 +366,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should not call window.gtag when analytics is disabled', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'false');
+      setSendUsageMetricsEnabled(false);
       const mockGtag = jest.fn();
       window.gtag = mockGtag;
 
@@ -352,7 +376,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should not throw or call anything when window.gtag is undefined', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       (window as any).gtag = undefined;
 
       expect(() => trackEvent('test_event')).not.toThrow();
@@ -361,7 +385,7 @@ describe('Analytics Utility', () => {
 
   describe('trackError', () => {
     it('should call window.gtag with exception event and string message', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       trackError('test error message', true, 'test_context');
 
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
@@ -376,7 +400,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should extract error message and stack from Error object', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       const err = new Error('nested failure');
       trackError(err, false);
 
@@ -440,7 +464,7 @@ describe('Analytics Utility', () => {
     });
 
     it('should track global errors and unhandled rejections', () => {
-      localStorage.setItem('ergogen:config:sendUsageMetrics', 'true');
+      setSendUsageMetricsEnabled(true);
       setupGlobalErrorTracking();
 
       // Trigger error event

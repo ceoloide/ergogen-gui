@@ -21,6 +21,7 @@ import {
   trackEvent,
   initAnalytics,
   getSendUsageMetricsEnabled,
+  setSendUsageMetricsEnabled,
   trackError,
 } from '../utils/analytics';
 import {
@@ -602,15 +603,12 @@ const ConfigContextProvider = ({
   const kicanvasPreview = settings?.kicanvasPreview ?? true;
   const stlPreview = settings?.stlPreview ?? true;
 
-  // Initialize analytics synchronously during first provider render so child route
-  // effects (e.g. AppContent initial page_view) never run before window.gtag exists,
-  // and keep sendUsageMetrics state aligned with PWA/explicit-consent rules and
-  // resilient when localStorage throws SecurityError.
-  const [sendUsageMetrics, setSendUsageMetricsState] = useState<boolean>(() => {
-    const enabled = getSendUsageMetricsEnabled();
-    initAnalytics();
-    return enabled;
-  });
+  // Consent is resolved by the analytics module (explicit toggle, older
+  // opt-outs, then the web/PWA default). Analytics itself is bootstrapped in
+  // src/index.tsx before React renders; the effect below applies changes.
+  const [sendUsageMetrics, setSendUsageMetricsState] = useState<boolean>(
+    getSendUsageMetricsEnabled
+  );
 
   const settingsRef = useRef<AppSettings | undefined>(settings);
   settingsRef.current = settings;
@@ -761,16 +759,7 @@ const ConfigContextProvider = ({
           ? valueOrFunc(sendUsageMetricsRef.current)
           : valueOrFunc;
       sendUsageMetricsRef.current = val;
-      try {
-        localStorage.setItem(
-          'ergogen:config:sendUsageMetrics',
-          JSON.stringify(val)
-        );
-      } catch {
-        (
-          window as unknown as { __ergogenSendUsageMetrics?: boolean }
-        ).__ergogenSendUsageMetrics = val;
-      }
+      setSendUsageMetricsEnabled(val);
       setSendUsageMetricsState(val);
       updateSettings((current) => ({ ...current, sendUsageMetrics: val }));
     },

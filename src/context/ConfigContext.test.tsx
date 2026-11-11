@@ -28,10 +28,15 @@ vi.mock('../workers/workerFactory', () => ({
   createJscadWorker: () => mockJscadWorker,
 }));
 
-import { trackEvent, initAnalytics } from '../utils/analytics';
+import {
+  trackEvent,
+  initAnalytics,
+  setSendUsageMetricsEnabled,
+} from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
   trackEvent: jest.fn(),
   initAnalytics: jest.fn(),
+  setSendUsageMetricsEnabled: jest.fn(),
   getSendUsageMetricsEnabled: () => true,
   checkIsPWA: () => false,
 }));
@@ -1446,36 +1451,30 @@ describe('ConfigContextProvider', () => {
       );
     });
 
-    it('should initialize analytics before child useEffects execute on initial mount', () => {
+    it('should not initialize analytics while rendering, leaving bootstrap to the entry point', () => {
       // Arrange
       (initAnalytics as jest.Mock).mockClear();
-      const callOrder: string[] = [];
-      (initAnalytics as jest.Mock).mockImplementation(() => {
-        callOrder.push('initAnalytics');
-      });
-
-      const ChildRouteEffect = () => {
-        React.useEffect(() => {
-          callOrder.push('childPageViewEffect');
-        }, []);
+      let initCallsDuringRender = -1;
+      const RenderProbe = () => {
+        initCallsDuringRender = (initAnalytics as jest.Mock).mock.calls.length;
         return null;
       };
 
       // Act
       render(
         <ConfigContextProvider>
-          <ChildRouteEffect />
+          <RenderProbe />
         </ConfigContextProvider>
       );
 
-      // Assert: initAnalytics must run before child useEffect so initial page_view is never dropped
-      expect(callOrder[0]).toBe('initAnalytics');
-      expect(callOrder).toContain('childPageViewEffect');
-      (initAnalytics as jest.Mock).mockImplementation(() => {});
+      // Assert: no render-time side effects; the consent effect runs after commit
+      expect(initCallsDuringRender).toBe(0);
+      expect(initAnalytics).toHaveBeenCalled();
     });
 
-    it('should update sendUsageMetrics state in memory even when localStorage.setItem throws SecurityError', () => {
+    it('should record an explicit sendUsageMetrics toggle through the analytics consent API', () => {
       // Arrange
+      (setSendUsageMetricsEnabled as jest.Mock).mockClear();
       let capturedContext: any = null;
       const TestComponent = () => {
         capturedContext = useConfigContext();
@@ -1489,46 +1488,14 @@ describe('ConfigContextProvider', () => {
       );
       expect(capturedContext.sendUsageMetrics).toBe(true);
 
-      const originalSetItem = window.localStorage.setItem;
-      window.localStorage.setItem = () => {
-        throw new Error('SecurityError: Blocked');
-      };
-
-      try {
-        // Act
-        act(() => {
-          capturedContext.setSendUsageMetrics(false);
-        });
-
-        // Assert
-        expect(capturedContext.sendUsageMetrics).toBe(false);
-        expect((window as any).__ergogenSendUsageMetrics).toBe(false);
-      } finally {
-        window.localStorage.setItem = originalSetItem;
-        delete (window as any).__ergogenSendUsageMetrics;
-      }
-    });
-
-    it('should mirror sendUsageMetrics into legacy localStorage key on change', () => {
-      let capturedContext: any = null;
-      const TestComponent = () => {
-        capturedContext = useConfigContext();
-        return null;
-      };
-
-      render(
-        <ConfigContextProvider>
-          <TestComponent />
-        </ConfigContextProvider>
-      );
-
+      // Act
       act(() => {
         capturedContext.setSendUsageMetrics(false);
       });
 
-      expect(localStorage.getItem('ergogen:config:sendUsageMetrics')).toBe(
-        'false'
-      );
+      // Assert
+      expect(setSendUsageMetricsEnabled).toHaveBeenCalledWith(false);
+      expect(capturedContext.sendUsageMetrics).toBe(false);
     });
 
     it('should preserve prior settings changes across sequential setting updates without stale useLocalStorage clobbering', () => {

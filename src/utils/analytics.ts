@@ -8,7 +8,6 @@ interface NavigatorStandalone extends Navigator {
 interface GAWindow extends Window {
   dataLayer?: unknown[];
   gtag?: (...args: unknown[]) => void;
-  __ergogenSendUsageMetrics?: boolean;
 }
 
 /**
@@ -105,66 +104,91 @@ const getSanitizedPageLocation = (): string | undefined => {
 };
 
 /**
- * Helper to determine if analytics is enabled from local storage.
- * Checks session-memory override first, then explicit user toggle key
- * ('ergogen:config:sendUsageMetrics'), then 'ergogen:settings' opt-outs,
- * defaulting to true on web and false in standalone PWA mode.
- * Fails closed (false) if localStorage throws a SecurityError.
+ * Storage key written only when the user explicitly toggles "Send Usage Metrics".
+ */
+const CONSENT_KEY = 'ergogen:consent:sendUsageMetrics';
+
+/**
+ * Older storage locations. Earlier builds wrote `true` to both of them
+ * automatically (the legacy key on every mount until 211ff8a, the settings
+ * object on first visit), so only a stored `false` there reflects a choice.
+ */
+const LEGACY_CONSENT_KEY = 'ergogen:config:sendUsageMetrics';
+const SETTINGS_KEY = 'ergogen:settings';
+
+/**
+ * Consent chosen this session that could not be saved to localStorage.
+ * It is cleared as soon as a save succeeds, so storage stays the source of
+ * truth and changes made in other tabs are honored.
+ */
+let unsavedSessionConsent: boolean | undefined;
+
+const readStoredBoolean = (key: string): boolean | undefined => {
+  const raw = localStorage.getItem(key);
+  if (raw === null) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'boolean' ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const readSettingsConsent = (): boolean | undefined => {
+  const raw = localStorage.getItem(SETTINGS_KEY);
+  if (raw === null) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.sendUsageMetrics === 'boolean'
+      ? parsed.sendUsageMetrics
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Resolves whether usage metrics may be sent, in this order:
+ * 1. A toggle from this session that could not be saved.
+ * 2. The explicit consent key, written only by the settings toggle.
+ * 3. A `false` in the legacy key or the settings object (an older opt-out).
+ * 4. The default: enabled on the web, disabled in standalone PWA mode.
+ * Fails closed if localStorage cannot be read.
  */
 export const getSendUsageMetricsEnabled = (): boolean => {
   if (typeof window === 'undefined') return false;
-
-  const win = window as unknown as GAWindow;
-  if (typeof win.__ergogenSendUsageMetrics === 'boolean') {
-    return win.__ergogenSendUsageMetrics;
-  }
-
-  const isPWA = checkIsPWA();
+  if (unsavedSessionConsent !== undefined) return unsavedSessionConsent;
 
   try {
-    // 1. Explicit user toggle key (written only when the user toggles the setting)
-    const explicitToggle = localStorage.getItem(
-      'ergogen:config:sendUsageMetrics'
-    );
-    if (explicitToggle !== null) {
-      try {
-        const parsedToggle = JSON.parse(explicitToggle);
-        if (typeof parsedToggle === 'boolean') {
-          return parsedToggle;
-        }
-      } catch {
-        // Fall through on malformed value
-      }
-    }
+    const explicitConsent = readStoredBoolean(CONSENT_KEY);
+    if (explicitConsent !== undefined) return explicitConsent;
 
-    // 2. Settings JSON object: honor explicit opt-out anywhere, but do not let
-    // pre-install browser default (`true`) override standalone PWA default (`false`).
-    const settingsRaw = localStorage.getItem('ergogen:settings');
-    if (settingsRaw !== null) {
-      try {
-        const parsed = JSON.parse(settingsRaw);
-        if (
-          parsed &&
-          typeof parsed === 'object' &&
-          typeof parsed.sendUsageMetrics === 'boolean'
-        ) {
-          if (parsed.sendUsageMetrics === false) {
-            return false;
-          }
-          if (!isPWA) {
-            return true;
-          }
-        }
-      } catch {
-        // Fall through to environment default on parse error
-      }
+    if (
+      readStoredBoolean(LEGACY_CONSENT_KEY) === false ||
+      readSettingsConsent() === false
+    ) {
+      return false;
     }
   } catch {
-    // Fail closed if localStorage access is blocked (e.g. SecurityError in sandboxed contexts)
     return false;
   }
 
-  return !isPWA;
+  return !checkIsPWA();
+};
+
+/**
+ * Records an explicit "Send Usage Metrics" choice. If localStorage rejects
+ * the write, the choice is kept in memory for the rest of the session.
+ */
+export const setSendUsageMetricsEnabled = (enabled: boolean): void => {
+  try {
+    localStorage.setItem(CONSENT_KEY, JSON.stringify(enabled));
+    unsavedSessionConsent = undefined;
+  } catch {
+    unsavedSessionConsent = enabled;
+  }
 };
 
 let wasDisabledAfterLoad = false;
