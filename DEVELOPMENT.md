@@ -428,8 +428,9 @@ The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically u
 | `public/dependencies/*.js` scripts | **CacheFirst** (runtime)    | `public-dependencies-v1`   |
 | Google Fonts CSS                   | **StaleWhileRevalidate**    | `google-fonts-stylesheets` |
 | Google Fonts binaries              | **CacheFirst**              | `google-fonts-webfonts`    |
-| gtag.js / GTM / GA scripts         | **NetworkFirst**            | `workbox-google-analytics` |
-| GA measurement requests            | **Background Sync queue**   | `workbox-background-sync`  |
+| gtag.js and GA measurement hits    | **Not intercepted**         | None                       |
+
+The service worker does not cache or queue Google Analytics traffic. Hits sent while offline are dropped, because a queued hit could be replayed after the user opts out. On activation, the worker deletes the `workbox-background-sync` IndexedDB database that earlier builds (which used `workbox-google-analytics`) left behind.
 
 ### Update Flow
 
@@ -442,16 +443,44 @@ The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically u
 
 ### Google Analytics & Privacy Controls
 
-To respect user privacy, Google Analytics (`gtag.js`) is initialized synchronously at application bootstrap (`src/index.tsx`) and during `ConfigContextProvider`'s initial render (so initial route `page_view` hits are never missed), and can be toggled at any time via **"Send Usage Metrics"** in the settings pane:
+`src/utils/analytics.ts` owns all consent and transport logic. `src/index.tsx` calls `initAnalytics()` before React renders, so the first route's `page_view` always finds `window.gtag`. `ConfigContextProvider` reads consent for the settings switch and re-runs `initAnalytics()` in an effect when it changes. It never initializes analytics during render.
 
-- **Web Default**: Enabled by default on standard web origins (blocked automatically on `localhost` / development builds), and fails closed (`false`) if `localStorage` access throws a `SecurityError` (falling back to an in-memory session toggle so users can still opt in or out).
-- **PWA Default**: Disabled by default in standalone/installed PWA mode—even if `localStorage` already contains default browser settings from a pre-install visit. Standalone mode only enables telemetry after an explicit user toggle (`ergogen:config:sendUsageMetrics`).
-- **Opt-out & Mid-Session Re-Enable**: When disabled before loading, `gtag.js` is never injected. When disabled mid-session, `window['ga-disable-<ID>'] = true` is set immediately, `_ga` / `_ga_*` cookies and the `workbox-background-sync` IndexedDB queue are purged, and global error listeners are removed—while preserving any already-initialized `dataLayer` / `window.gtag` hook so re-enabling metrics in the same session resumes immediately without requiring a page reload.
-- **Data Minimization & Signal Hardening**: `gtag('config', ...)` disables automatic page views (`send_page_view: false`), Google Signals (`allow_google_signals: false`), and ad personalization (`allow_ad_personalization_signals: false`), and sanitizes `page_location` / `page_path` to strip query strings (such as `?github=...`) and hash fragments. Raw `meta.name`, `meta.author`, local filenames, and repository URLs are never transmitted in event payloads (`meta.name` and `meta.author` are used strictly in-browser when computing the 12-character SHA-256 `config_id` hash).
+#### Consent resolution
 
-When enabled:
+`getSendUsageMetricsEnabled()` resolves consent in this order:
 
-- Offline queuing & script caching: `workbox-google-analytics` registers `NetworkFirst` caching for `gtag.js` and queues failed Measurement Protocol requests in IndexedDB using Workbox Background Sync while offline.
+1. **Unsaved session choice**: a toggle whose localStorage write failed is kept in module memory. It is dropped as soon as a write succeeds, so storage stays the source of truth across tabs.
+2. **Explicit consent key**: `ergogen:consent:sendUsageMetrics`, written only by `setSendUsageMetricsEnabled()` when the user toggles "Send Usage Metrics". This is the only way to opt in beyond the default.
+3. **Older opt-outs**: a `false` in the legacy `ergogen:config:sendUsageMetrics` key or in `ergogen:settings.sendUsageMetrics`. A `true` in either is ignored, because earlier builds wrote `true` there automatically (the legacy key on every mount from #144 until `211ff8a`, the settings object on first visit).
+4. **Default**: enabled on the web, disabled in standalone PWA mode.
+
+If localStorage cannot be read, consent fails closed (`false`).
+
+#### Environment gate
+
+`isLiveTelemetryBlocked()` blocks all hits on `localhost`, `127.0.0.1`, `[::1]`, `*.localhost` and in Vite dev builds. Any of these overrides lifts the block, for reproducing telemetry locally:
+
+- `VITE_FORCE_ANALYTICS=true` at build time.
+- `window.__FORCE_ANALYTICS__ = true`, set before the app loads (for example with Playwright's `addInitScript`).
+- A tracking ID starting with `G-TEST`.
+
+Unit tests (`MODE === 'test'`) are never blocked. The overrides do not bypass user consent. To check hits without sending them, intercept `/g/collect` in the browser and fulfill or abort it locally.
+
+#### Opt-out and re-enable
+
+- Disabled before load: `gtag.js` is never injected.
+- Disabled mid-session: `window['ga-disable-<ID>'] = true` stops hits immediately, `_ga` and `_ga_*` cookies are expired, and global error listeners are removed. The loaded `dataLayer` and `window.gtag` are kept, so re-enabling in the same session clears the flag, re-issues `gtag('config')`, and resumes without a reload.
+
+#### Data minimization
+
+The "anonymous usage statistics" wording in the settings pane relies on these rules:
+
+- `gtag('config')` disables automatic page views, Google Signals and ad personalization. `App.tsx` sends one `page_view` per route change.
+- Every event carries `page_location` with the query string and hash removed, so `?github=...` and share payloads never leave the browser. `trackEvent()` also refreshes it with `gtag('set')` so automatic Enhanced Measurement events follow navigation. It is never set in `gtag('config')`, because config parameters stick to every later event.
+- No free text written by the user is sent: no config names or authors, filenames, repository URLs, or zone, column and row names. `meta.name` and `meta.author` are only used locally as inputs to the 12-character SHA-256 `config_id`.
+- `local_file_loaded` reports `file_type` from a fixed list (`yaml`, `yml`, `json`, `zip`, `ekb`, or `other`).
+- `trackEvent()` scrubs `error_message`, `description` and `error_stack` for every caller. It keeps the first line only, replaces quoted values with `*`, keeps only stack frame lines, and caps values at the GA4 limit of 100 characters. Error text is kept because it is the main signal for compiler failures, but quoted values are where ergogen and the browser echo user-written keys.
+- Constant parameters (`event_category`, the `sendUsageMetrics` setting) are not sent, because they cannot split any report.
 
 #### Keyboard Generation & Compilation Tracking
 
@@ -462,13 +491,13 @@ Upon keyboard compilation in the Ergogen Web Worker, `ConfigContext.tsx` records
 - Outline, PCB, and Case counts
 - Boolean flags like `is_reversible` and `is_mirrored`
 - `keyboard_keys` representing the estimated physical switch count (doubled if reversible and asymmetric, otherwise matching `matrix_keys`)
-- Alpha-sorted granular matrix zone details (zone names, counts, column names, row names, etc.)
+- Per-zone column, row and key counts, listed in alphabetical zone order (names are not sent)
 - A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout
 - A `previous_config_id` chaining layouts together inside the user session
 
 To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 
-- **Settlement Debounce**: Both `keyboard_generated` and auto-triggered `generation_completed` / `generation_failed` events use a **5-second settlement debounce** when `autoGen` is enabled (tracked via a ref so mid-session setting changes apply immediately without restarting Web Workers). Explicit manual **Generate** button / `Ctrl+Enter` actions and manual mode (`autoGen === false`) bypass the debounce and emit immediately. Any pending `generation_failed` timer is cancelled if compilation succeeds before the cooldown expires (and vice versa).
+- **Settlement Debounce**: Both `keyboard_generated` and auto-triggered `generation_completed` / `generation_failed` events use a **5-second settlement debounce** when `autoGen` is enabled (tracked via a ref so mid-session setting changes apply immediately without restarting Web Workers). Explicit manual **Generate** button / `Ctrl+Enter` actions and manual mode (`autoGen === false`) bypass the debounce and emit immediately. Only one generation outcome is pending at a time, so a transient `generation_failed` is dropped if compilation succeeds before the cooldown expires (and vice versa). Both events carry `trigger: 'auto' | 'manual'`.
 - **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
 - **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, immediately clears the lineage context and cancels any pending tracking timeouts, ensuring subsequent builds start fresh.
 - **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
