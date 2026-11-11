@@ -229,6 +229,32 @@ describe('Analytics Utility', () => {
       );
     });
 
+    it('should set a cleaned page_location globally instead of pinning it in the config call', () => {
+      // Arrange
+      delete (window as any).gtag;
+      setSendUsageMetricsEnabled(true);
+      window.history.pushState({}, '', '/landing?github=secret/repo#config');
+
+      try {
+        // Act
+        initAnalytics();
+
+        // Assert
+        const entries = Array.from((window as any).dataLayer as IArguments[]);
+        const setIndex = entries.findIndex(
+          (entry) =>
+            entry[0] === 'set' &&
+            entry[1]?.page_location === `${window.location.origin}/landing`
+        );
+        const configIndex = entries.findIndex((entry) => entry[0] === 'config');
+        expect(setIndex).toBeGreaterThanOrEqual(0);
+        expect(setIndex).toBeLessThan(configIndex);
+        expect(entries[configIndex][2]).not.toHaveProperty('page_location');
+      } finally {
+        window.history.pushState({}, '', '/');
+      }
+    });
+
     it('should not inject script tag when disabled from the start', () => {
       // Arrange
       delete (window as any).gtag;
@@ -281,6 +307,29 @@ describe('Analytics Utility', () => {
   });
 
   describe('trackEvent', () => {
+    it('should attach the current cleaned page_location to every event and refresh it for automatic events', () => {
+      // Arrange: land on one page, then navigate client-side
+      setSendUsageMetricsEnabled(true);
+      window.history.pushState({}, '', '/?github=secret/repo');
+      window.history.pushState({}, '', '/new?github=secret/repo#hash');
+
+      try {
+        // Act
+        trackEvent('keyboard_generated');
+
+        // Assert
+        const expectedLocation = `${window.location.origin}/new`;
+        const calls = (window.gtag as jest.Mock).mock.calls;
+        expect(calls[0]).toEqual(['set', { page_location: expectedLocation }]);
+        expect(calls[1][0]).toBe('event');
+        expect(calls[1][2]).toEqual(
+          expect.objectContaining({ page_location: expectedLocation })
+        );
+      } finally {
+        window.history.pushState({}, '', '/');
+      }
+    });
+
     it('should call window.gtag with GUI, Ergogen versions, and is_pwa when enabled and gtag is defined', () => {
       setSendUsageMetricsEnabled(true);
       const eventName = 'test_event';
@@ -293,6 +342,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
+        page_location: `${window.location.origin}/`,
         param1: 'value1',
         param2: 123,
       });
@@ -309,6 +359,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
+        page_location: `${window.location.origin}/`,
       });
     });
 
@@ -324,6 +375,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
+        page_location: `${window.location.origin}/`,
       });
     });
 
@@ -339,6 +391,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: 'github:ceoloide/ergogen#v4.3.0',
         is_pwa: false,
+        page_location: `${window.location.origin}/`,
       });
     });
 
@@ -357,6 +410,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: true,
+        page_location: `${window.location.origin}/`,
       });
 
       Object.defineProperty(window.navigator, 'standalone', {
@@ -393,6 +447,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
+        page_location: `${window.location.origin}/`,
         description: '[test_context] test error message',
         fatal: true,
         error_stack: undefined,
@@ -409,6 +464,7 @@ describe('Analytics Utility', () => {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
+        page_location: `${window.location.origin}/`,
         description: 'nested failure',
         fatal: false,
         error_stack: expect.any(String),

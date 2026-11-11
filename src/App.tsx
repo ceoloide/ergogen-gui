@@ -332,13 +332,10 @@ const AppContent = ({
   configsCountRef.current = configContext?.configs?.length || 0;
 
   useEffect(() => {
-    const cleanOrigin =
-      window.location.origin && window.location.origin !== 'null'
-        ? window.location.origin
-        : `${window.location.protocol}//${window.location.hostname}`;
+    // trackEvent() attaches the current page_location with the query string
+    // and hash removed, so shared payloads and repository URLs never leak.
     trackEvent('page_view', {
       page_path: location.pathname,
-      page_location: `${cleanOrigin}${location.pathname}`,
       stored_configs_count: configsCountRef.current,
     });
   }, [location.pathname]);

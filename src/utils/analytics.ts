@@ -221,8 +221,12 @@ export const initAnalytics = (): void => {
       send_page_view: false,
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
-      page_location: getSanitizedPageLocation(),
     };
+    // Set page_location globally rather than in the config call: config
+    // parameters stick to every later event, which would attribute them all
+    // to the landing page. trackEvent() refreshes it on each event.
+    const setCurrentPageLocation = () =>
+      win.gtag?.('set', { page_location: getSanitizedPageLocation() });
 
     if (!existingScript) {
       const script = document.createElement('script');
@@ -239,9 +243,11 @@ export const initAnalytics = (): void => {
         dataLayer.push(arguments);
       };
       win.gtag('js', new Date());
+      setCurrentPageLocation();
       win.gtag('config', trackingId, configOptions);
       wasDisabledAfterLoad = false;
     } else if (wasDisabledAfterLoad) {
+      setCurrentPageLocation();
       win.gtag?.('config', trackingId, configOptions);
       wasDisabledAfterLoad = false;
     }
@@ -278,7 +284,12 @@ export const trackEvent = (
     !isLiveTelemetryBlocked(trackingId) &&
     window.gtag
   ) {
+    // Keep the global value current so automatic Enhanced Measurement events
+    // (scrolls, outbound clicks) are attributed to the page the user is on.
+    const pageLocation = getSanitizedPageLocation();
+    window.gtag('set', { page_location: pageLocation });
     window.gtag('event', eventName, {
+      page_location: pageLocation,
       event_category: 'user_action',
       gui_version: guiPkg.version,
       ergogen_version: getFullErgogenVersion(
