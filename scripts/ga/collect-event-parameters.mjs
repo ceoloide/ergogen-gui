@@ -5,8 +5,9 @@
  *
  * Object literals are read directly, including spreads of literals and of
  * conditional expressions. A payload held in a variable cannot be read
- * statically; it must be listed in RESOLVED_ELSEWHERE with the reason it is
- * covered, otherwise it is reported as unresolved.
+ * statically. It is accepted only at the exact calls listed in
+ * FORWARDING_CALLS, or as one of the INTERFACE_PAYLOADS for the listed
+ * events; anything else is reported as unresolved and fails the test.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,20 +22,26 @@ const SOURCE_DIR = path.join(ROOT, 'src');
 const TRACKING_FUNCTIONS = new Set(['trackEvent', 'queueGenerationEvent']);
 
 /**
- * Non-literal payloads and why they need no direct check. Keys are
- * `<file>: <expression>`.
+ * Exact calls (`<file>: <call>`) that forward a payload built elsewhere, and
+ * where that payload is checked. A new call with a variable payload, even
+ * with the same variable name, is not covered by these entries.
  */
-const RESOLVED_ELSEWHERE = {
-  // queueGenerationEvent() forwards its payload; its call sites are scanned.
-  'src/context/ConfigContext.tsx: payload':
-    'generation payloads come from scanned queueGenerationEvent() calls, and keyboard_generated from analyzeConfiguration(), checked in ga-config.test.mjs',
-  'src/context/ConfigContext.tsx: pendingGeneration.payload':
-    'a queued payload from a scanned queueGenerationEvent() call',
+const FORWARDING_CALLS = {
+  'src/context/ConfigContext.tsx: trackEvent(name, payload)':
+    'queueGenerationEvent() sending its payload; its call sites are scanned',
+  'src/context/ConfigContext.tsx: trackEvent(pendingGeneration.name, pendingGeneration.payload)':
+    'a payload queued by a scanned queueGenerationEvent() call',
+  "src/context/ConfigContext.tsx: trackEvent('keyboard_generated', payload)":
+    'the analyzeConfiguration() result, whose keys ga-config.test.mjs checks',
 };
 
-/** Payload variables whose keys are the members of an interface. */
+/**
+ * Payload variables whose keys are the members of an interface, accepted
+ * only in the listed file and events.
+ */
 const INTERFACE_PAYLOADS = {
   'src/context/ConfigContext.tsx: reportedSettings': {
+    events: ['settings_loaded', 'setting_changed'],
     interfaceName: 'AppSettings',
     // Destructured out before sending, see ConfigContext.tsx.
     omit: ['sendUsageMetrics'],
@@ -69,12 +76,19 @@ const interfaceMembers = (sourceFile, interfaceName) => {
   return members;
 };
 
+/** The call as `callee(arg, arg)`, independent of the original formatting. */
+const callText = (call, sourceFile) =>
+  `${call.expression.getText(sourceFile)}(${call.arguments
+    .map((argument) => argument.getText(sourceFile).replace(/\s+/g, ' '))
+    .join(', ')})`;
+
 /**
  * Returns the parameter keys of a payload expression, adding anything it
  * cannot read to `unresolved`.
  */
 const payloadKeys = (expression, context) => {
-  const { sourceFile, relativeFile, unresolved } = context;
+  const { sourceFile, relativeFile, call, unresolved, usedExemptions } =
+    context;
 
   if (ts.isParenthesizedExpression(expression)) {
     return payloadKeys(expression.expression, context);
@@ -104,60 +118,98 @@ const payloadKeys = (expression, context) => {
     });
   }
 
-  const key = `${relativeFile}: ${expression.getText(sourceFile)}`;
-  if (INTERFACE_PAYLOADS[key]) {
-    const { interfaceName, omit } = INTERFACE_PAYLOADS[key];
+  const eventArgument = call.arguments[0];
+  const eventName =
+    eventArgument && ts.isStringLiteral(eventArgument)
+      ? eventArgument.text
+      : null;
+  const interfacePayload =
+    INTERFACE_PAYLOADS[`${relativeFile}: ${expression.getText(sourceFile)}`];
+  if (interfacePayload && interfacePayload.events.includes(eventName)) {
+    const { interfaceName, omit } = interfacePayload;
     const members = interfaceMembers(sourceFile, interfaceName);
-    if (!members) {
-      unresolved.push(`${key} (interface ${interfaceName} not found)`);
-      return [];
-    }
-    return members.filter((member) => !omit.includes(member));
+    if (members) return members.filter((member) => !omit.includes(member));
   }
-  if (!RESOLVED_ELSEWHERE[key]) unresolved.push(key);
+
+  const callKey = `${relativeFile}: ${callText(call, sourceFile)}`;
+  if (FORWARDING_CALLS[callKey]) {
+    usedExemptions.push(callKey);
+  } else {
+    unresolved.push(callKey);
+  }
   return [];
 };
 
 /**
- * @returns {{ calls: { location: string, keys: string[] }[], unresolved: string[] }}
+ * Scans one source file.
+ *
+ * @param {{ relativeFile: string, text: string }} source
+ * @returns {{ calls: { location: string, keys: string[] }[], unresolved: string[], usedExemptions: string[] }}
+ */
+export const collectFromSource = ({ relativeFile, text }) => {
+  const calls = [];
+  const unresolved = [];
+  const usedExemptions = [];
+  const sourceFile = ts.createSourceFile(
+    relativeFile,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    relativeFile.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  );
+
+  const visit = (node) => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      TRACKING_FUNCTIONS.has(node.expression.text)
+    ) {
+      const payload = node.arguments[1];
+      const { line } = sourceFile.getLineAndCharacterOfPosition(
+        node.getStart(sourceFile)
+      );
+      const context = {
+        sourceFile,
+        relativeFile,
+        call: node,
+        unresolved,
+        usedExemptions,
+      };
+      calls.push({
+        location: `${relativeFile}:${line + 1}`,
+        keys: payload ? payloadKeys(payload, context) : [],
+      });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  return { calls, unresolved, usedExemptions };
+};
+
+/**
+ * Scans every non-test source file under src/.
+ *
+ * @returns {{ calls: { location: string, keys: string[] }[], unresolved: string[], unusedExemptions: string[] }}
  */
 export const collectEventParameters = () => {
   const calls = [];
   const unresolved = [];
+  const used = new Set();
 
   for (const file of listSourceFiles()) {
-    const text = fs.readFileSync(file, 'utf8');
-    if (![...TRACKING_FUNCTIONS].some((name) => text.includes(`${name}(`)))
-      continue;
-
     const relativeFile = path.relative(ROOT, file).split(path.sep).join('/');
-    const sourceFile = ts.createSourceFile(
-      file,
-      text,
-      ts.ScriptTarget.Latest,
-      true
-    );
-    const context = { sourceFile, relativeFile, unresolved };
-
-    const visit = (node) => {
-      if (
-        ts.isCallExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        TRACKING_FUNCTIONS.has(node.expression.text)
-      ) {
-        const payload = node.arguments[1];
-        const { line } = sourceFile.getLineAndCharacterOfPosition(
-          node.getStart(sourceFile)
-        );
-        calls.push({
-          location: `${relativeFile}:${line + 1}`,
-          keys: payload ? payloadKeys(payload, context) : [],
-        });
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(sourceFile);
+    const result = collectFromSource({
+      relativeFile,
+      text: fs.readFileSync(file, 'utf8'),
+    });
+    calls.push(...result.calls);
+    unresolved.push(...result.unresolved);
+    result.usedExemptions.forEach((key) => used.add(key));
   }
 
-  return { calls, unresolved };
+  const unusedExemptions = Object.keys(FORWARDING_CALLS).filter(
+    (key) => !used.has(key)
+  );
+  return { calls, unresolved, unusedExemptions };
 };

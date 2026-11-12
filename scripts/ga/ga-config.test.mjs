@@ -139,7 +139,7 @@ describe('gaConfig', () => {
     });
 
     it('only passes payloads it cannot read where another test covers them', () => {
-      // Assert: a new non-literal payload must be added to RESOLVED_ELSEWHERE
+      // Assert: a new non-literal payload must be added to FORWARDING_CALLS
       // together with a test that checks its keys.
       expect(unresolved).toEqual([]);
     });
