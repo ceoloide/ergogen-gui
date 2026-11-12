@@ -153,15 +153,35 @@ const pickWebStream = (streams, requested, property) => {
   );
 };
 
-const readCurrentState = async (client, property, streamId) => {
-  const [customDimensions, customMetrics, keyEvents, streams, dataRetention] =
-    await Promise.all([
-      client.list(`v1beta/${property}/customDimensions`, 'customDimensions'),
-      client.list(`v1beta/${property}/customMetrics`, 'customMetrics'),
-      client.list(`v1beta/${property}/keyEvents`, 'keyEvents'),
-      client.list(`v1beta/${property}/dataStreams`, 'dataStreams'),
-      client.call('GET', `v1beta/${property}/dataRetentionSettings`),
-    ]);
+/**
+ * Reads the live property. Teardown passes `includeSettings: false`, because
+ * it never changes stream or retention settings and should not fail on them
+ * (for example on a property with several web streams).
+ */
+export const readCurrentState = async (
+  client,
+  property,
+  { streamId, includeSettings }
+) => {
+  const [customDimensions, customMetrics, keyEvents] = await Promise.all([
+    client.list(`v1beta/${property}/customDimensions`, 'customDimensions'),
+    client.list(`v1beta/${property}/customMetrics`, 'customMetrics'),
+    client.list(`v1beta/${property}/keyEvents`, 'keyEvents'),
+  ]);
+  const registrations = { customDimensions, customMetrics, keyEvents };
+  if (!includeSettings) {
+    return {
+      ...registrations,
+      stream: null,
+      enhancedMeasurement: null,
+      dataRetention: null,
+    };
+  }
+
+  const [streams, dataRetention] = await Promise.all([
+    client.list(`v1beta/${property}/dataStreams`, 'dataStreams'),
+    client.call('GET', `v1beta/${property}/dataRetentionSettings`),
+  ]);
   const stream = pickWebStream(streams, streamId, property);
   const enhancedMeasurement = stream
     ? await client.call(
@@ -169,14 +189,7 @@ const readCurrentState = async (client, property, streamId) => {
         `v1alpha/${stream.name}/enhancedMeasurementSettings`
       )
     : null;
-  return {
-    stream,
-    customDimensions,
-    customMetrics,
-    keyEvents,
-    enhancedMeasurement,
-    dataRetention,
-  };
+  return { ...registrations, stream, enhancedMeasurement, dataRetention };
 };
 
 const describeAction = (action) => {
@@ -195,7 +208,7 @@ const describeAction = (action) => {
   return `${action.kind} ${subject}${detail}`.trim();
 };
 
-const applyAction = async (client, property, current, action) => {
+export const applyAction = async (client, property, current, action) => {
   const mask = (path) =>
     `${path}?updateMask=${encodeURIComponent(action.updateMask)}`;
   switch (action.kind) {
@@ -259,7 +272,10 @@ const main = async () => {
   }
 
   const client = createClient(await getAccessToken());
-  const current = await readCurrentState(client, property, options.stream);
+  const current = await readCurrentState(client, property, {
+    streamId: options.stream,
+    includeSettings: options.command === 'setup',
+  });
   const plan =
     options.command === 'setup'
       ? planSetup({

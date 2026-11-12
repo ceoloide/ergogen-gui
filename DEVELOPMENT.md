@@ -506,7 +506,7 @@ To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 
 #### Google Analytics property setup
 
-GA4 only reports custom event parameters that are registered on the property. `scripts/ga/ga-config.mjs` declares everything the property needs: custom dimensions and metrics, key events, retired registrations, Enhanced Measurement settings for the web stream, and data retention. `scripts/ga/ga-config.test.mjs` fails if the app sends a parameter that is not registered there, so add new parameters to the config in the same change. When the app stops sending a parameter, move it to `retired` instead of deleting it.
+GA4 only reports custom event parameters that are registered on the property. `scripts/ga/ga-config.mjs` declares everything the property needs: custom dimensions and metrics, key events, retired registrations, Enhanced Measurement settings for the web stream, and data retention. `scripts/ga/ga-config.test.mjs` fails if the app sends a parameter that is not registered there, so add new parameters to the config in the same change. It parses every `trackEvent()` and `queueGenerationEvent()` call in `src/` with the TypeScript compiler (`scripts/ga/collect-event-parameters.mjs`), and also checks the payloads built at runtime by `analyzeConfiguration()`, `trackEvent()` and `trackError()`. A payload passed as a variable cannot be read statically, so the test fails until it is listed in `RESOLVED_ELSEWHERE` with the test that covers it. When the app stops sending a parameter, move it to `retired` instead of deleting it.
 
 `scripts/ga/ga-admin.mjs` applies the config through the GA Admin API. The planning logic is in `scripts/ga/plan.mjs` and has no network calls, so it is unit-tested. Both commands are dry runs unless `--apply` is passed:
 
@@ -522,10 +522,10 @@ pnpm ga:setup -- --property 440040157 --prune-retired --apply
 pnpm ga:teardown -- --property 440040157 --apply --confirm 440040157
 ```
 
-- **Setup** creates missing registrations and updates display names, descriptions, metric units and stream or retention settings that differ. It never changes a registration's type or scope, because GA does not allow that; it warns instead. History-based page views stay off, because `App.tsx` sends its own `page_view`.
-- **Teardown** archives the managed dimensions and metrics (active and retired) and deletes the managed key events. Hand-made registrations, GA's built-in `purchase` key event, and stream or retention settings are left alone. Archiving hides a dimension's history from reports and cannot be undone, which is why teardown requires `--confirm <property id>`.
+- **Setup** creates missing registrations and updates display names, descriptions, metric units and stream or retention settings that differ. It never changes a registration's type, because GA does not allow that; it warns instead. Only event-scoped registrations are matched, so a user- or item-scoped dimension that shares a parameter name is never updated, archived or deleted. History-based page views stay off, because `App.tsx` sends its own `page_view`.
+- **Teardown** archives the managed dimensions and metrics (active and retired) and deletes the managed key events. Hand-made registrations, registrations in other scopes, GA's built-in `purchase` key event, and stream or retention settings are left alone; teardown does not even read the stream settings. Archiving hides a dimension's history from reports and cannot be undone, which is why teardown requires `--confirm <property id>`.
 - **Authentication**: set `GA_ACCESS_TOKEN` to a token with the `analytics.edit` scope, or `GA_SERVICE_ACCOUNT` to a service account that has Editor access on the property (for example `ga4-agent@ceoloide-ergogen.iam.gserviceaccount.com`). With a service account, the script exchanges your `gcloud` user token for a scoped token through the IAM Credentials API, because `gcloud`'s own impersonation ignores `--scopes`. Without either variable it uses `gcloud auth application-default print-access-token`. `GA_PROPERTY_ID` can replace `--property`.
-- A property with several web streams needs `--stream <id>`.
+- On a property with several web streams, setup needs `--stream <id>`.
 
 ### PWA Manifest
 
