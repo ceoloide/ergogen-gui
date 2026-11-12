@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { gaConfig } from './ga-config.mjs';
 import { analyzeConfiguration } from '../../src/utils/configAnalyzer';
 import { trackEvent, trackError } from '../../src/utils/analytics';
+import { collectEventParameters } from './collect-event-parameters.mjs';
 
 // Parameters GA4 understands natively, so they need no registration.
 const BUILT_IN_PARAMETERS = new Set(['page_location', 'page_path']);
@@ -115,48 +116,32 @@ describe('gaConfig', () => {
     });
   });
 
-  it('registers every app setting reported in settings events', () => {
-    // Arrange: settings_loaded and setting_changed send these keys.
-    const settings = [
-      'debug',
-      'autoGen',
-      'autoGen3D',
-      'kicanvasPreview',
-      'stlPreview',
-      'setting_name',
-      'setting_value',
-    ];
+  describe('parameters sent from the source code', () => {
+    const { calls, unresolved } = collectEventParameters();
 
-    // Act
-    const missing = settings.filter((name) => !registered.has(name));
+    it('finds the call sites it inspects', () => {
+      // Assert: guards against the scanner silently matching nothing.
+      expect(calls.length).toBeGreaterThan(40);
+    });
 
-    // Assert
-    expect(missing).toEqual([]);
-  });
+    it('registers every parameter passed to trackEvent and queueGenerationEvent', () => {
+      // Act
+      const missing = calls.flatMap(({ location, keys }) =>
+        keys
+          .filter(
+            (key) => !registered.has(key) && !BUILT_IN_PARAMETERS.has(key)
+          )
+          .map((key) => `${location} sends unregistered "${key}"`)
+      );
 
-  it('registers the parameters of generation, bulk export and upload events', () => {
-    // Arrange: payload keys built in ConfigContext, BulkDownloadDialog and Welcome.
-    const params = [
-      'trigger',
-      'duration_ms',
-      'points_count',
-      'pcbs_count',
-      'cases_count',
-      'has_outlines',
-      'stored_configs_count',
-      'error_message',
-      'selected_configs_count',
-      'completed_configs_count',
-      'failed_configs_count',
-      'only_configs',
-      'file_type',
-      'file_size',
-    ];
+      // Assert
+      expect(missing).toEqual([]);
+    });
 
-    // Act
-    const missing = params.filter((name) => !registered.has(name));
-
-    // Assert
-    expect(missing).toEqual([]);
+    it('only passes payloads it cannot read where another test covers them', () => {
+      // Assert: a new non-literal payload must be added to RESOLVED_ELSEWHERE
+      // together with a test that checks its keys.
+      expect(unresolved).toEqual([]);
+    });
   });
 });
