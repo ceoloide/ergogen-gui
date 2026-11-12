@@ -464,6 +464,8 @@ If localStorage cannot be read, consent fails closed (`false`).
 - `window.__FORCE_ANALYTICS__ = true`, set before the app loads (for example with Playwright's `addInitScript`).
 - A tracking ID starting with `G-TEST`.
 
+**Kill switch**: builds without `VITE_GTAG_ID` never load `gtag.js` or send anything. CI reads it from the `VITE_GTAG_ID` (or legacy `REACT_APP_GTAG_ID`) repository variable, so clearing that variable and redeploying turns analytics off for everyone. There is no separate feature flag; `src/utils/featureFlags.ts` only gates Ergogen-version features.
+
 Unit tests (`MODE === 'test'`) are never blocked. The overrides do not bypass user consent. To check hits without sending them, intercept `/g/collect` in the browser and fulfill or abort it locally.
 
 #### Opt-out and re-enable
@@ -501,6 +503,29 @@ To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 - **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
 - **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, clears the lineage context and drops any pending `keyboard_generated` event, so subsequent builds start fresh. A pending `generation_completed` or `generation_failed` is sent immediately instead, because that compilation already happened.
 - **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
+
+#### Google Analytics property setup
+
+GA4 only reports custom event parameters that are registered on the property. `scripts/ga/ga-config.mjs` declares everything the property needs: custom dimensions and metrics, key events, retired registrations, Enhanced Measurement settings for the web stream, and data retention. `scripts/ga/ga-config.test.mjs` fails if the app sends a parameter that is not registered there, so add new parameters to the config in the same change. When the app stops sending a parameter, move it to `retired` instead of deleting it.
+
+`scripts/ga/ga-admin.mjs` applies the config through the GA Admin API. The planning logic is in `scripts/ga/plan.mjs` and has no network calls, so it is unit-tested. Both commands are dry runs unless `--apply` is passed:
+
+```bash
+# Show, then apply, what the property is missing
+pnpm ga:setup -- --property 440040157
+pnpm ga:setup -- --property 440040157 --apply
+
+# Also archive retired dimensions and delete retired key events
+pnpm ga:setup -- --property 440040157 --prune-retired --apply
+
+# Remove every registration the config manages (asks for --confirm)
+pnpm ga:teardown -- --property 440040157 --apply --confirm 440040157
+```
+
+- **Setup** creates missing registrations and updates display names, descriptions, metric units and stream or retention settings that differ. It never changes a registration's type or scope, because GA does not allow that; it warns instead. History-based page views stay off, because `App.tsx` sends its own `page_view`.
+- **Teardown** archives the managed dimensions and metrics (active and retired) and deletes the managed key events. Hand-made registrations, GA's built-in `purchase` key event, and stream or retention settings are left alone. Archiving hides a dimension's history from reports and cannot be undone, which is why teardown requires `--confirm <property id>`.
+- **Authentication**: set `GA_ACCESS_TOKEN` to a token with the `analytics.edit` scope, or `GA_SERVICE_ACCOUNT` to a service account that has Editor access on the property (for example `ga4-agent@ceoloide-ergogen.iam.gserviceaccount.com`). With a service account, the script exchanges your `gcloud` user token for a scoped token through the IAM Credentials API, because `gcloud`'s own impersonation ignores `--scopes`. Without either variable it uses `gcloud auth application-default print-access-token`. `GA_PROPERTY_ID` can replace `--property`.
+- A property with several web streams needs `--stream <id>`.
 
 ### PWA Manifest
 
