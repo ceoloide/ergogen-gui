@@ -21,6 +21,7 @@ import {
   trackEvent,
   initAnalytics,
   getSendUsageMetricsEnabled,
+  setSendUsageMetricsEnabled,
   trackError,
 } from '../utils/analytics';
 import {
@@ -66,6 +67,13 @@ interface MultiConfigContainer {
 }
 
 import { Results } from '../types/results';
+
+type GenerationEventName = 'generation_completed' | 'generation_failed';
+
+type GenerationEventPayload = Record<
+  string,
+  string | number | boolean | undefined
+>;
 
 interface AppSettings {
   debug: boolean;
@@ -198,6 +206,7 @@ type ContextProps = {
  */
 type ProcessOptions = {
   pointsonly: boolean;
+  isManual?: boolean;
 };
 
 /**
@@ -530,7 +539,39 @@ const ConfigContextProvider = ({
     configId: string;
   } | null>(null);
 
+  /**
+   * The latest generation outcome waiting out the debounce. A newer outcome
+   * replaces it, so a transient syntax error is dropped once compilation
+   * succeeds again. Keyboard lineage below uses its own, separate debounce.
+   */
+  const pendingGenerationEventRef = useRef<{
+    name: GenerationEventName;
+    payload: GenerationEventPayload;
+    timeoutId: NodeJS.Timeout;
+  } | null>(null);
+
+  const cancelPendingGenerationEvent = useCallback(() => {
+    if (pendingGenerationEventRef.current) {
+      clearTimeout(pendingGenerationEventRef.current.timeoutId);
+      pendingGenerationEventRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Sends a pending generation outcome right away. A compilation that already
+   * happened is always reported, even when the user moves on within the
+   * debounce window.
+   */
+  const flushPendingGenerationEvent = useCallback(() => {
+    const pendingGeneration = pendingGenerationEventRef.current;
+    if (pendingGeneration) {
+      cancelPendingGenerationEvent();
+      trackEvent(pendingGeneration.name, pendingGeneration.payload);
+    }
+  }, [cancelPendingGenerationEvent]);
+
   const flushPendingAnalytics = useCallback(() => {
+    flushPendingGenerationEvent();
     if (pendingAnalyticsRef.current) {
       const { timeoutId, payload, configId } = pendingAnalyticsRef.current;
       clearTimeout(timeoutId);
@@ -538,15 +579,22 @@ const ConfigContextProvider = ({
       lastTrackedConfigIdRef.current = configId;
       pendingAnalyticsRef.current = null;
     }
-  }, []);
+  }, [flushPendingGenerationEvent]);
 
+  /**
+   * Starts a new lineage when the user switches, creates, duplicates or
+   * deletes a config, or opens a preview. A pending keyboard_generated event
+   * belongs to the old lineage and is dropped. A pending generation outcome
+   * describes a compilation that already ran, so it is sent instead.
+   */
   const resetLineage = useCallback(() => {
     lastTrackedConfigIdRef.current = undefined;
+    flushPendingGenerationEvent();
     if (pendingAnalyticsRef.current) {
       clearTimeout(pendingAnalyticsRef.current.timeoutId);
       pendingAnalyticsRef.current = null;
     }
-  }, []);
+  }, [flushPendingGenerationEvent]);
 
   const [injectionInput, setInjectionInput] = useLocalStorage<string[][]>(
     'ergogen:injection',
@@ -570,12 +618,36 @@ const ConfigContextProvider = ({
   const autoGen3D = settings?.autoGen3D ?? true;
   const kicanvasPreview = settings?.kicanvasPreview ?? true;
   const stlPreview = settings?.stlPreview ?? true;
-  const sendUsageMetrics = settings?.sendUsageMetrics ?? true;
+
+  // Consent is resolved by the analytics module (explicit toggle, older
+  // opt-outs, then the web/PWA default). Analytics itself is bootstrapped in
+  // src/index.tsx before React renders; the effect below applies changes.
+  const [sendUsageMetrics, setSendUsageMetricsState] = useState<boolean>(
+    getSendUsageMetricsEnabled
+  );
+
+  const settingsRef = useRef<AppSettings | undefined>(settings);
+  settingsRef.current = settings;
+
+  const autoGenRef = useRef<boolean>(autoGen);
+  autoGenRef.current = autoGen;
+
+  const sendUsageMetricsRef = useRef<boolean>(sendUsageMetrics);
+  sendUsageMetricsRef.current = sendUsageMetrics;
+
+  const updateSettings = useCallback(
+    (updater: (current: AppSettings) => AppSettings) => {
+      const current = settingsRef.current || getDefaultSettings();
+      const next = updater(current);
+      settingsRef.current = next;
+      setSettings(next);
+    },
+    [setSettings]
+  );
 
   const setDebug = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.debug)
@@ -583,13 +655,12 @@ const ConfigContextProvider = ({
         return { ...current, debug: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setAutoGen = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.autoGen)
@@ -597,13 +668,12 @@ const ConfigContextProvider = ({
         return { ...current, autoGen: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setAutoGen3D = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.autoGen3D)
@@ -611,13 +681,12 @@ const ConfigContextProvider = ({
         return { ...current, autoGen3D: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setKicanvasPreview = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.kicanvasPreview)
@@ -625,13 +694,12 @@ const ConfigContextProvider = ({
         return { ...current, kicanvasPreview: val };
       });
     },
-    [setSettings]
+    [updateSettings]
   );
 
   const setStlPreview = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
+      updateSettings((current) => {
         const val =
           typeof valueOrFunc === 'function'
             ? valueOrFunc(current.stlPreview)
@@ -639,21 +707,46 @@ const ConfigContextProvider = ({
         return { ...current, stlPreview: val };
       });
     },
-    [setSettings]
+    [updateSettings]
+  );
+
+  /**
+   * Reports a generation outcome. Explicit (manual) generations and runs with
+   * auto-generate off are sent immediately. Auto-generation outcomes wait for
+   * edits to settle, and each new outcome replaces the pending one.
+   */
+  const queueGenerationEvent = useCallback(
+    (
+      name: GenerationEventName,
+      payload: GenerationEventPayload,
+      immediate: boolean
+    ) => {
+      cancelPendingGenerationEvent();
+      if (immediate || !autoGenRef.current) {
+        trackEvent(name, payload);
+        return;
+      }
+      const timeoutId = setTimeout(() => {
+        pendingGenerationEventRef.current = null;
+        trackEvent(name, payload);
+      }, ANALYTICS_DEBOUNCE_DELAY);
+      pendingGenerationEventRef.current = { name, payload, timeoutId };
+    },
+    [cancelPendingGenerationEvent]
   );
 
   const setSendUsageMetrics = useCallback(
     (valueOrFunc: SetStateAction<boolean>) => {
-      setSettings((prev) => {
-        const current = prev || getDefaultSettings();
-        const val =
-          typeof valueOrFunc === 'function'
-            ? valueOrFunc(current.sendUsageMetrics)
-            : valueOrFunc;
-        return { ...current, sendUsageMetrics: val };
-      });
+      const val =
+        typeof valueOrFunc === 'function'
+          ? valueOrFunc(sendUsageMetricsRef.current)
+          : valueOrFunc;
+      sendUsageMetricsRef.current = val;
+      setSendUsageMetricsEnabled(val);
+      setSendUsageMetricsState(val);
+      updateSettings((current) => ({ ...current, sendUsageMetrics: val }));
     },
-    [setSettings]
+    [updateSettings]
   );
 
   useEffect(() => {
@@ -737,15 +830,24 @@ const ConfigContextProvider = ({
         return;
       }
 
+      const isManualRequest = Boolean(
+        response.requestId && response.requestId.startsWith('ergogen-manual-')
+      );
+
       if (response.type === 'error') {
         console.error('--- Ergogen worker error:', response.error);
         setError(response.error);
         setIsGenerating(false);
         setIsJscadConverting(false);
-        trackEvent('generation_failed', {
-          error_message: response.error || 'Unknown worker error',
-          stored_configs_count: configsRef.current.length,
-        });
+        queueGenerationEvent(
+          'generation_failed',
+          {
+            error_message: response.error || 'Unknown worker error',
+            stored_configs_count: configsRef.current.length,
+            trigger: isManualRequest ? 'manual' : 'auto',
+          },
+          isManualRequest
+        );
         return;
       }
 
@@ -764,20 +866,25 @@ const ConfigContextProvider = ({
           const duration = generationStartTimeRef.current
             ? performance.now() - generationStartTimeRef.current
             : 0;
-          trackEvent('generation_completed', {
-            duration_ms: Math.round(duration),
-            points_count: newResults.points
-              ? Object.keys(newResults.points).length
-              : 0,
-            pcbs_count: newResults.pcbs
-              ? Object.keys(newResults.pcbs).length
-              : 0,
-            cases_count: newResults.cases
-              ? Object.keys(newResults.cases).length
-              : 0,
-            has_outlines: !!newResults.outlines,
-            stored_configs_count: configsRef.current.length,
-          });
+          queueGenerationEvent(
+            'generation_completed',
+            {
+              duration_ms: Math.round(duration),
+              points_count: newResults.points
+                ? Object.keys(newResults.points).length
+                : 0,
+              pcbs_count: newResults.pcbs
+                ? Object.keys(newResults.pcbs).length
+                : 0,
+              cases_count: newResults.cases
+                ? Object.keys(newResults.cases).length
+                : 0,
+              has_outlines: !!newResults.outlines,
+              stored_configs_count: configsRef.current.length,
+              trigger: isManualRequest ? 'manual' : 'auto',
+            },
+            isManualRequest
+          );
 
           // Perform configuration analysis and track GA4 event (debounced)
           try {
@@ -874,7 +981,7 @@ const ConfigContextProvider = ({
         setIsGenerating(false);
       }
     },
-    [stlPreview]
+    [stlPreview, queueGenerationEvent]
   );
 
   /**
@@ -964,29 +1071,52 @@ const ConfigContextProvider = ({
     };
   }, [flushPendingAnalytics]);
 
+  const prevSettingsRef = useRef<AppSettings>({
+    debug,
+    autoGen,
+    autoGen3D,
+    kicanvasPreview,
+    stlPreview,
+    sendUsageMetrics,
+  });
+
   /**
    * Effect to track settings loaded and changes.
    */
   useEffect(() => {
-    trackEvent('settings_loaded', {
+    const currentSettings: AppSettings = {
       debug,
       autoGen,
       autoGen3D,
       kicanvasPreview,
       stlPreview,
       sendUsageMetrics,
-    });
+    };
+
+    // sendUsageMetrics is always true on any event that reaches GA, so it
+    // is not sent as a parameter (setting_name still records the toggle).
+    const { sendUsageMetrics: _alwaysTrue, ...reportedSettings } =
+      currentSettings;
 
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
+      prevSettingsRef.current = currentSettings;
+      trackEvent('settings_loaded', { ...reportedSettings });
     } else {
+      const prev = prevSettingsRef.current;
+      const changedEntry = (
+        Object.keys(currentSettings) as Array<keyof AppSettings>
+      ).find((key) => currentSettings[key] !== prev[key]);
+      prevSettingsRef.current = currentSettings;
+
       trackEvent('setting_changed', {
-        debug,
-        autoGen,
-        autoGen3D,
-        kicanvasPreview,
-        stlPreview,
-        sendUsageMetrics,
+        ...(changedEntry
+          ? {
+              setting_name: changedEntry,
+              setting_value: currentSettings[changedEntry],
+            }
+          : {}),
+        ...reportedSettings,
       });
     }
   }, [
@@ -1065,13 +1195,17 @@ const ConfigContextProvider = ({
       const inputConfig =
         preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
+      const requestPrefix = options.isManual
+        ? 'ergogen-manual'
+        : 'ergogen-generate';
+
       try {
         if (ergogenWorkerRef.current) {
           ergogenWorkerRef.current.postMessage({
             type: 'generate',
             inputConfig,
             injectionInput: inputInjection,
-            requestId: `ergogen-generate-${currentConfigVersion.current}-${Date.now()}`,
+            requestId: `${requestPrefix}-${currentConfigVersion.current}-${Date.now()}`,
             options: {
               debug: debug,
               svg: true,
@@ -1084,10 +1218,15 @@ const ConfigContextProvider = ({
         setIsGenerating(false);
         const errMsg = typeof e === 'string' ? e : String(e);
         setError(errMsg);
-        trackEvent('generation_failed', {
-          error_message: errMsg,
-          stored_configs_count: configsRef.current.length,
-        });
+        queueGenerationEvent(
+          'generation_failed',
+          {
+            error_message: errMsg,
+            stored_configs_count: configsRef.current.length,
+            trigger: options.isManual ? 'manual' : 'auto',
+          },
+          Boolean(options.isManual)
+        );
         return;
       }
     },
@@ -1098,6 +1237,7 @@ const ConfigContextProvider = ({
       setSkippedWarning,
       setIsGenerating,
       debug,
+      queueGenerationEvent,
     ]
   );
 

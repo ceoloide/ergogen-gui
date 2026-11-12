@@ -332,11 +332,13 @@ const AppContent = ({
   configsCountRef.current = configContext?.configs?.length || 0;
 
   useEffect(() => {
+    // trackEvent() attaches the current page_location with the query string
+    // and hash removed, so shared payloads and repository URLs never leak.
     trackEvent('page_view', {
-      page_path: location.pathname + location.search,
+      page_path: location.pathname,
       stored_configs_count: configsCountRef.current,
     });
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   // Track if we've already processed the initial pending shared config
   const hasProcessedInitialSharedConfig = useRef(false);
@@ -474,6 +476,13 @@ const AppContent = ({
 
   const handleAcceptShare = () => {
     if (sharedConfigToConfirm) {
+      trackEvent('shared_config_accepted', {
+        has_injections: Boolean(
+          sharedConfigToConfirm.injections &&
+          sharedConfigToConfirm.injections.length > 0
+        ),
+        injections_count: sharedConfigToConfirm.injections?.length || 0,
+      });
       loadSharedConfig(
         sharedConfigToConfirm.config,
         sharedConfigToConfirm.injections
@@ -483,6 +492,15 @@ const AppContent = ({
   };
 
   const handleCancelShare = () => {
+    if (sharedConfigToConfirm) {
+      trackEvent('shared_config_declined', {
+        has_injections: Boolean(
+          sharedConfigToConfirm.injections &&
+          sharedConfigToConfirm.injections.length > 0
+        ),
+        injections_count: sharedConfigToConfirm.injections?.length || 0,
+      });
+    }
     setSharedConfigToConfirm(null);
   };
 

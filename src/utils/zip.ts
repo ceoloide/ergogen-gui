@@ -439,6 +439,11 @@ export const downloadAllConfigs = async (
   saveAs(blob, filename);
 };
 
+interface ProgressiveExportSummary {
+  succeededCount: number;
+  failedCount: number;
+}
+
 export const exportConfigsProgressively = async (
   configs: { name: string; config: string }[],
   injections: string[][] | undefined,
@@ -447,7 +452,7 @@ export const exportConfigsProgressively = async (
   onlyConfigs: boolean,
   onProgress: (current: number, total: number, name: string) => void,
   isAborted: () => boolean
-) => {
+): Promise<ProgressiveExportSummary | undefined> => {
   const zip = new JSZip();
   const usedNames = new Set<string>();
 
@@ -491,6 +496,7 @@ export const exportConfigsProgressively = async (
       .split('T')[0];
     const filename = `ergogen-config-all-${timestamp}.zip`;
     saveAs(blob, filename);
+    return { succeededCount: configs.length, failedCount: 0 };
   } else {
     // 2. Full compilation mode (like export all but progressive, concurrent, and abortable)
     const activeWorkers = new Set<Worker>();
@@ -612,6 +618,8 @@ export const exportConfigsProgressively = async (
 
     const activeConfigs = new Set<string>();
     let completedCount = 0;
+    let succeededCount = 0;
+    let failedCount = 0;
     const concurrencyLimit = Math.min(4, navigator.hardwareConcurrency || 2);
 
     const processTask = async (configRecord: (typeof configs)[0]) => {
@@ -729,7 +737,9 @@ export const exportConfigsProgressively = async (
         if (injections && injections.length > 0) {
           writeInjections(configFolder, injections);
         }
+        succeededCount++;
       } catch (e) {
+        failedCount++;
         console.error(`Failed to compile config ${configRecord.name}:`, e);
         configFolder.file('config.yaml', configRecord.config);
         configFolder.file(
@@ -784,6 +794,7 @@ export const exportConfigsProgressively = async (
         .split('T')[0];
       const filename = `ergogen-export-all-${timestamp}.zip`;
       saveAs(blob, filename);
+      return { succeededCount, failedCount };
     } finally {
       activeWorkers.forEach((w) => w.terminate());
       activeWorkers.clear();

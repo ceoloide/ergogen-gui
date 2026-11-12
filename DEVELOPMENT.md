@@ -422,14 +422,15 @@ The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically u
 
 ### Caching Strategies
 
-| Asset type                         | Strategy                      | Cache name                 |
-| ---------------------------------- | ----------------------------- | -------------------------- |
-| Vite-bundled JS/CSS/HTML           | **Precache** (install-time)   | Workbox default            |
-| `public/dependencies/*.js` scripts | **CacheFirst** (runtime)      | `public-dependencies-v1`   |
-| Google Fonts CSS                   | **StaleWhileRevalidate**      | `google-fonts-stylesheets` |
-| Google Fonts binaries              | **CacheFirst**                | `google-fonts-webfonts`    |
-| gtag.js / GA scripts               | **NetworkFirst** (3s timeout) | `google-analytics-scripts` |
-| GA measurement requests            | **Background Sync queue**     | `workbox-background-sync`  |
+| Asset type                         | Strategy                    | Cache name                 |
+| ---------------------------------- | --------------------------- | -------------------------- |
+| Vite-bundled JS/CSS/HTML           | **Precache** (install-time) | Workbox default            |
+| `public/dependencies/*.js` scripts | **CacheFirst** (runtime)    | `public-dependencies-v1`   |
+| Google Fonts CSS                   | **StaleWhileRevalidate**    | `google-fonts-stylesheets` |
+| Google Fonts binaries              | **CacheFirst**              | `google-fonts-webfonts`    |
+| gtag.js and GA measurement hits    | **Not intercepted**         | None                       |
+
+The service worker does not cache or queue Google Analytics traffic. Hits sent while offline are dropped, because a queued hit could be replayed after the user opts out. On activation, the worker deletes the `workbox-background-sync` IndexedDB database that earlier builds (which used `workbox-google-analytics`) left behind.
 
 ### Update Flow
 
@@ -442,36 +443,89 @@ The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically u
 
 ### Google Analytics & Privacy Controls
 
-To respect user privacy, Google Analytics is dynamically initialized and can be completely disabled via the **"Send Usage Metrics"** option in the settings pane:
+`src/utils/analytics.ts` owns all consent and transport logic. `src/index.tsx` calls `initAnalytics()` before React renders, so the first route's `page_view` always finds `window.gtag`. `ConfigContextProvider` reads consent for the settings switch and re-runs `initAnalytics()` in an effect when it changes. It never initializes analytics during render.
 
-- **Web Default**: Enabled by default to collect usage statistics.
-- **PWA Default**: Disabled by default in standalone/PWA mode to ensure a fully private, offline-first experience.
-- **Opt-out Behavior**: When disabled, the Google Analytics script tag (`gtag.js`) is completely omitted/removed from the DOM, and all global objects (`window.gtag`, `window.dataLayer`) are deleted. No interaction with GA4 occurs, and event tracking is entirely skipped.
+#### Consent resolution
 
-When enabled:
+`getSendUsageMetricsEnabled()` resolves consent in this order:
 
-- Offline queuing: `workbox-google-analytics` intercepts measurement requests and queues them in IndexedDB using Background Sync when the device is offline, replaying them automatically once connection is restored.
-- Asset caching: The `gtag.js` script is cached with a `NetworkFirst` strategy (3-second timeout) to support offline loading.
+1. **Unsaved session choice**: a toggle whose localStorage write failed is kept in module memory. It is dropped as soon as a write succeeds, so storage stays the source of truth across tabs.
+2. **Explicit consent key**: `ergogen:consent:sendUsageMetrics`, written only by `setSendUsageMetricsEnabled()` when the user toggles "Send Usage Metrics". This is the only way to opt in beyond the default.
+3. **Older opt-outs**: a `false` in the legacy `ergogen:config:sendUsageMetrics` key or in `ergogen:settings.sendUsageMetrics`. A `true` in either is ignored, because earlier builds wrote `true` there automatically (the legacy key on every mount from #144 until `211ff8a`, the settings object on first visit).
+4. **Default**: enabled on the web, disabled in standalone PWA mode.
 
-#### Keyboard Generation Tracking
+If localStorage cannot be read, consent fails closed (`false`).
 
-Upon successful keyboard generation, the layout is analyzed using `configAnalyzer.ts`.
+#### Environment gate
 
-This parses and extracts:
+`isLiveTelemetryBlocked()` blocks all hits on `localhost`, `127.0.0.1`, `[::1]`, `*.localhost` and in Vite dev builds. Any of these overrides lifts the block, for reproducing telemetry locally:
+
+- `VITE_FORCE_ANALYTICS=true` at build time.
+- `window.__FORCE_ANALYTICS__ = true`, set before the app loads (for example with Playwright's `addInitScript`).
+- A tracking ID starting with `G-TEST`.
+
+**Kill switch**: builds without `VITE_GTAG_ID` never load `gtag.js` or send anything. CI reads it from the `VITE_GTAG_ID` (or legacy `REACT_APP_GTAG_ID`) repository variable, so clearing that variable and redeploying turns analytics off for everyone. There is no separate feature flag; `src/utils/featureFlags.ts` only gates Ergogen-version features.
+
+Unit tests (`MODE === 'test'`) are never blocked. The overrides do not bypass user consent. To check hits without sending them, intercept `/g/collect` in the browser and fulfill or abort it locally.
+
+#### Opt-out and re-enable
+
+- Disabled before load: `gtag.js` is never injected.
+- Disabled mid-session: `window['ga-disable-<ID>'] = true` stops hits immediately, `_ga` and `_ga_*` cookies are expired, and global error listeners are removed. The loaded `dataLayer` and `window.gtag` are kept, so re-enabling in the same session clears the flag, re-issues `gtag('config')`, and resumes without a reload.
+
+#### Data minimization
+
+The "anonymous usage statistics" wording in the settings pane relies on these rules:
+
+- `gtag('config')` disables automatic page views, Google Signals and ad personalization. `App.tsx` sends one `page_view` per route change.
+- Every event carries `page_location` with the query string and hash removed, so `?github=...` and share payloads never leave the browser. `trackEvent()` also refreshes it with `gtag('set')` so automatic Enhanced Measurement events follow navigation. It is never set in `gtag('config')`, because config parameters stick to every later event.
+- No free text written by the user is sent: no config names or authors, filenames, repository URLs, or zone, column and row names. `meta.name` and `meta.author` are only used locally as inputs to the 12-character SHA-256 `config_id`.
+- `local_file_loaded` reports `file_type` from a fixed list (`yaml`, `yml`, `json`, `zip`, `ekb`, or `other`).
+- `trackEvent()` scrubs `error_message`, `description` and `error_stack` for every caller. It keeps the first line only, replaces quoted values with `*`, keeps only stack frame lines, and caps values at the GA4 limit of 100 characters. Error text is kept because it is the main signal for compiler failures, but quoted values are where ergogen and the browser echo user-written keys.
+- Constant parameters (`event_category`, the `sendUsageMetrics` setting) are not sent, because they cannot split any report.
+
+#### Keyboard Generation & Compilation Tracking
+
+Upon keyboard compilation in the Ergogen Web Worker, `ConfigContext.tsx` records `generation_completed` / `generation_failed` and analyzes successful layouts using `configAnalyzer.ts`.
+
+`configAnalyzer.ts` parses and extracts:
 
 - Outline, PCB, and Case counts
 - Boolean flags like `is_reversible` and `is_mirrored`
 - `keyboard_keys` representing the estimated physical switch count (doubled if reversible and asymmetric, otherwise matching `matrix_keys`)
-- Alpha-sorted granular matrix zone details (zone names, counts, column names, row names, etc.)
-- A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout.
-- A `previous_config_id` chaining layouts together inside the user session.
+- Per-zone column, row and key counts, listed in alphabetical zone order (names are not sent)
+- A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout
+- A `previous_config_id` chaining layouts together inside the user session
 
 To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
 
-- **Settlement Debounce**: Keyboard layout generation is logged with a **5-second settlement debounce**. This filters out intermediate states as the user is typing, ensuring only final configurations are logged.
+- **Settlement Debounce**: Both `keyboard_generated` and auto-triggered `generation_completed` / `generation_failed` events use a **5-second settlement debounce** when `autoGen` is enabled (tracked via a ref so mid-session setting changes apply immediately without restarting Web Workers). Explicit manual **Generate** button / `Ctrl+Enter` actions and manual mode (`autoGen === false`) bypass the debounce and emit immediately. Only one generation outcome is pending at a time, so a transient `generation_failed` is dropped if compilation succeeds before the cooldown expires (and vice versa). Both events carry `trigger: 'auto' | 'manual'`.
 - **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
-- **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, immediately clears the lineage context and cancels any pending tracking timeouts, ensuring subsequent builds start fresh.
+- **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, clears the lineage context and drops any pending `keyboard_generated` event, so subsequent builds start fresh. A pending `generation_completed` or `generation_failed` is sent immediately instead, because that compilation already happened.
 - **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
+
+#### Google Analytics property setup
+
+GA4 only reports custom event parameters that are registered on the property. `scripts/ga/ga-config.mjs` declares everything the property needs: custom dimensions and metrics, key events, retired registrations, Enhanced Measurement settings for the web stream, and data retention. `scripts/ga/ga-config.test.mjs` fails if the app sends a parameter that is not registered there, so add new parameters to the config in the same change. It parses every `trackEvent()` and `queueGenerationEvent()` call in `src/` with the TypeScript compiler (`scripts/ga/collect-event-parameters.mjs`), and also checks the payloads built at runtime by `analyzeConfiguration()`, `trackEvent()` and `trackError()`. A payload passed as a variable cannot be read statically, so the test fails until that exact call is listed in `FORWARDING_CALLS` with the reason its payload is covered elsewhere. When the app stops sending a parameter, move it to `retired` instead of deleting it.
+
+`scripts/ga/ga-admin.mjs` applies the config through the GA Admin API. The planning logic is in `scripts/ga/plan.mjs` and has no network calls, so it is unit-tested. Both commands are dry runs unless `--apply` is passed:
+
+```bash
+# Show, then apply, what the property is missing
+pnpm ga:setup -- --property 440040157
+pnpm ga:setup -- --property 440040157 --apply
+
+# Also archive retired dimensions and delete retired key events
+pnpm ga:setup -- --property 440040157 --prune-retired --apply
+
+# Remove every registration the config manages (asks for --confirm)
+pnpm ga:teardown -- --property 440040157 --apply --confirm 440040157
+```
+
+- **Setup** creates missing registrations and updates display names, descriptions, metric units and stream or retention settings that differ. It never changes a registration's type, because GA does not allow that; it warns instead. Only event-scoped registrations are matched, so a user- or item-scoped dimension that shares a parameter name is never updated, archived or deleted. History-based page views stay off, because `App.tsx` sends its own `page_view`.
+- **Teardown** archives the managed dimensions and metrics (active and retired) and deletes the managed key events. Hand-made registrations, registrations in other scopes, GA's built-in `purchase` key event, and stream or retention settings are left alone; teardown does not even read the stream settings. Archiving hides a dimension's history from reports and cannot be undone, which is why teardown requires `--confirm <property id>`.
+- **Authentication**: set `GA_ACCESS_TOKEN` to a token with the `analytics.edit` scope, or `GA_SERVICE_ACCOUNT` to a service account that has Editor access on the property (for example `ga4-agent@ceoloide-ergogen.iam.gserviceaccount.com`). With a service account, the script exchanges your `gcloud` user token for a scoped token through the IAM Credentials API, because `gcloud`'s own impersonation ignores `--scopes`. Without either variable it uses `gcloud auth application-default print-access-token`. `GA_PROPERTY_ID` can replace `--property`.
+- On a property with several web streams, setup needs `--stream <id>`.
 
 ### PWA Manifest
 

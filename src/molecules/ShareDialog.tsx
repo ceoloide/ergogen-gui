@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import {
@@ -6,6 +6,7 @@ import {
   extractUsedInjectionsFromCanonical,
 } from '../utils/share';
 import { createErgogenWorker } from '../workers/workerFactory';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * Props for the ShareDialog component.
@@ -28,11 +29,13 @@ type ShareDialogProps = {
 const copyToClipboardWithFallback = async (
   text: string,
   setCopied: (value: boolean) => void,
-  timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>
+  timeoutRef: React.MutableRefObject<NodeJS.Timeout | null>,
+  onSuccess?: () => void
 ): Promise<void> => {
   try {
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    onSuccess?.();
     // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -51,9 +54,15 @@ const copyToClipboardWithFallback = async (
       textArea.style.opacity = '0';
       document.body.appendChild(textArea);
       textArea.select();
-      document.execCommand('copy');
+      // execCommand returns false when copying is unsupported or blocked
+      const didCopy = document.execCommand('copy');
       document.body.removeChild(textArea);
+      if (!didCopy) {
+        console.error('Fallback copy method was rejected by the browser.');
+        return;
+      }
       setCopied(true);
+      onSuccess?.();
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -184,12 +193,27 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
     };
   }, [includeCustom, hasAnalyzed, safeInjections, config, step]);
 
+  const checkedCountRef = useRef(0);
+  checkedCountRef.current = includeCustom
+    ? selectionItems.filter((item) => item.checked).length
+    : 0;
+
+  const trackShareCopy = useCallback((source: string) => {
+    trackEvent('share_link_copied', {
+      has_injections: checkedCountRef.current > 0,
+      injections_count: checkedCountRef.current,
+      source,
+    });
+  }, []);
+
   // Auto-copy on mount of Step 2
   useEffect(() => {
     if (step === 2 && shareLink) {
-      copyToClipboardWithFallback(shareLink, setCopied, timeoutRef);
+      copyToClipboardWithFallback(shareLink, setCopied, timeoutRef, () => {
+        trackShareCopy('auto');
+      });
     }
-  }, [shareLink, step]);
+  }, [shareLink, step, trackShareCopy]);
 
   // Handle Esc key press
   useEffect(() => {
@@ -250,7 +274,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({
   };
 
   const copyToClipboard = () => {
-    copyToClipboardWithFallback(shareLink, setCopied, timeoutRef);
+    copyToClipboardWithFallback(shareLink, setCopied, timeoutRef, () => {
+      trackShareCopy('button');
+    });
   };
 
   return (

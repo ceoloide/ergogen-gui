@@ -1,5 +1,22 @@
 # Changelog
 
+## Privacy Controls & Anti-Spam Telemetry Overhaul
+
+November 11, 2026
+
+![Visual representation of privacy controls and debounced compiler telemetry.](./public/images/changelog/placeholder.png)
+
+Previously, turning off "Send Usage Metrics" did not survive a page reload, installed apps could inherit the browser's default and start sending metrics, and live editing sent a compiler event on nearly every keystroke.
+
+Your choice in the settings pane is now the only thing that can turn metrics on, and an earlier opt-out is always honored. Turning metrics off stops data from being sent immediately, and you can turn them back on without reloading. Compiler events now wait until you stop typing.
+
+**What changed:**
+
+- **Opt-out that sticks**: Your choice is saved and respected on every visit, installed apps stay opted out unless you opt in, and metrics stay off if your browser blocks storage.
+- **Nothing sent after opt-out**: Turning metrics off stops hits at once and clears analytics cookies. Hits are no longer queued while offline, so nothing can be sent later.
+- **Less personal data**: Configuration names, authors, filenames, repository URLs, layout key names and URL query strings are no longer sent, and error messages are stripped of the values you typed.
+- **Quieter, more accurate events**: Compiler events wait 5 seconds after your last edit, except when you press **Generate**. Every event now reports the page you were actually on.
+
 ## SVG Outlines & Offline PWA Settings Integration
 
 July 16, 2026

@@ -15,9 +15,10 @@
  *   on subsequent visits, even offline.
  * - **Runtime – Google Fonts**: Cached with StaleWhileRevalidate (CSS) and
  *   CacheFirst (font files) for fast, offline-capable typography.
- * - **Runtime – Google Analytics**: Uses workbox-google-analytics to queue
- *   analytics events in IndexedDB when offline and replay them when
- *   connectivity is restored. The gtag.js script itself is cached too.
+ * - **Google Analytics**: Not intercepted. Hits sent while offline are
+ *   dropped instead of being queued, because a queued hit could be replayed
+ *   after the user opts out. On activation, this worker deletes the queue
+ *   database left behind by earlier builds that used workbox-google-analytics.
  *
  * Update flow:
  * - On every page load the browser re-fetches this file from the server.
@@ -31,13 +32,8 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import {
-  CacheFirst,
-  StaleWhileRevalidate,
-  NetworkFirst,
-} from 'workbox-strategies';
+import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
-import { initialize as initializeGoogleAnalytics } from 'workbox-google-analytics';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -167,32 +163,30 @@ registerRoute(
 );
 
 // --------------------------------------------------------------------------
-// Runtime – Google Tag Manager / gtag.js
+// Google Analytics – remove the legacy offline queue
 //
-// Cache the gtag.js script with NetworkFirst so we always try to get the
-// latest analytics code, but fall back to the cached version when offline.
+// Earlier builds used workbox-google-analytics, which queued failed hits in
+// the `workbox-background-sync` IndexedDB database and replayed them later
+// without checking consent. This worker no longer queues analytics, so delete
+// that database on activation. By then the previous worker is redundant and
+// no longer receives the sync events that triggered replays. If it still
+// holds a connection, the delete completes as soon as that connection closes.
 // --------------------------------------------------------------------------
 
-registerRoute(
-  ({ url }: { url: URL }) =>
-    url.hostname === 'www.googletagmanager.com' ||
-    url.hostname === 'www.google-analytics.com',
-  new NetworkFirst({
-    cacheName: 'google-analytics-scripts',
-    networkTimeoutSeconds: 3,
-    plugins: [
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-      new ExpirationPlugin({ maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 7 }),
-    ],
-  })
-);
+const LEGACY_ANALYTICS_QUEUE_DB = 'workbox-background-sync';
 
-// --------------------------------------------------------------------------
-// Google Analytics – offline queue
-//
-// workbox-google-analytics intercepts all measurement requests to
-// google-analytics.com and queues them in IndexedDB when offline.
-// They are automatically replayed once connectivity is restored.
-// --------------------------------------------------------------------------
+const deleteLegacyAnalyticsQueue = (): Promise<void> =>
+  new Promise((resolve) => {
+    try {
+      const request = indexedDB.deleteDatabase(LEGACY_ANALYTICS_QUEUE_DB);
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
 
-initializeGoogleAnalytics();
+self.addEventListener('activate', (event) => {
+  event.waitUntil(deleteLegacyAnalyticsQueue());
+});

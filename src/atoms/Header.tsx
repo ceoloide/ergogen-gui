@@ -278,6 +278,7 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
       has_injections: !!configContext.injectionInput?.length,
       injections_count: configContext.injectionInput?.length || 0,
       stored_configs_count: configContext.configs?.length || 0,
+      source: 'header',
     });
     createZip(
       configContext.results,
@@ -301,6 +302,7 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
     trackEvent('share_button_clicked', {
       has_injections: !!configContext.injectionInput?.length,
       injections_count: configContext.injectionInput?.length || 0,
+      source: 'header',
     });
 
     setShowShareDialog(true);

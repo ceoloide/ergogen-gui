@@ -77,20 +77,52 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
     });
 
     try {
-      await exportConfigsProgressively(
+      const summary = await exportConfigsProgressively(
         selectedConfigs,
         injections,
         debug,
         stlPreview,
         onlyConfigs,
-        (current, total, name) => {
+        (current, _total, name) => {
           setCurrentProgress(current);
           setCurrentName(name);
         },
         () => abortRef.current
       );
+      if (!abortRef.current) {
+        if (
+          summary &&
+          summary.succeededCount === 0 &&
+          summary.failedCount > 0
+        ) {
+          trackEvent('bulk_download_failed', {
+            selected_configs_count: selectedIds.size,
+            failed_configs_count: summary.failedCount,
+            only_configs: onlyConfigs,
+            error_message: `All ${summary.failedCount} selected configuration(s) failed to compile`,
+          });
+        } else if (summary && summary.failedCount > 0) {
+          // Kept separate from bulk_download_completed, which is a key event
+          // and should only count exports where every config compiled.
+          trackEvent('bulk_download_partial', {
+            selected_configs_count: selectedIds.size,
+            failed_configs_count: summary.failedCount,
+            only_configs: onlyConfigs,
+          });
+        } else {
+          trackEvent('bulk_download_completed', {
+            selected_configs_count: selectedIds.size,
+            only_configs: onlyConfigs,
+          });
+        }
+      }
     } catch (err) {
       console.error('Error during bulk download:', err);
+      trackEvent('bulk_download_failed', {
+        selected_configs_count: selectedIds.size,
+        only_configs: onlyConfigs,
+        error_message: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       // Auto-close modal if not aborted
       if (!abortRef.current) {
@@ -100,6 +132,14 @@ const BulkDownloadDialog: React.FC<BulkDownloadDialogProps> = ({
   };
 
   const handleAbort = () => {
+    if (isGenerating && !abortRef.current) {
+      // Closes the export funnel, so a cancel isn't mistaken for a crash
+      trackEvent('bulk_download_cancelled', {
+        selected_configs_count: selectedIds.size,
+        completed_configs_count: currentProgress,
+        only_configs: onlyConfigs,
+      });
+    }
     abortRef.current = true;
     onClose();
   };

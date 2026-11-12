@@ -1,6 +1,10 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { createZip, downloadAllConfigs } from './zip';
+import {
+  createZip,
+  downloadAllConfigs,
+  exportConfigsProgressively,
+} from './zip';
 vi.mock('jszip', () => ({
   default: vi.fn(),
 }));
@@ -344,6 +348,69 @@ describe('downloadAllConfigs', () => {
     expect(saveAs).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringMatching(/^ergogen-config-all-\d{4}-\d{2}-\d{2}\.zip$/)
+    );
+  });
+});
+
+describe('exportConfigsProgressively', () => {
+  let mockZip: any;
+  let mockFolders: Record<string, any>;
+
+  const createMockFolder = () => {
+    const folder: any = {
+      file: jest.fn().mockReturnThis(),
+      folder: jest.fn(),
+    };
+    folder.folder.mockImplementation((name: string) => {
+      if (!mockFolders[name]) {
+        mockFolders[name] = createMockFolder();
+      }
+      return mockFolders[name];
+    });
+    return folder;
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFolders = {};
+    mockZip = {
+      file: jest.fn().mockReturnThis(),
+      folder: jest.fn().mockImplementation((name: string) => {
+        if (!mockFolders[name]) {
+          mockFolders[name] = createMockFolder();
+        }
+        return mockFolders[name];
+      }),
+      generateAsync: jest
+        .fn()
+        .mockResolvedValue(new Blob(['mock progressive zip'])),
+    };
+    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+  });
+
+  it('returns failedCount when full-compilation configs fail and write error.txt', async () => {
+    // Arrange: createErgogenWorker returns null, causing each config compilation to fail
+    const configs = [
+      { name: 'Broken One', config: 'invalid: [' },
+      { name: 'Broken Two', config: 'invalid: {' },
+    ];
+
+    // Act
+    const summary = await exportConfigsProgressively(
+      configs,
+      [],
+      false,
+      false,
+      false, // onlyConfigs = false -> compiles each config
+      jest.fn(),
+      () => false
+    );
+
+    // Assert
+    expect(summary).toEqual({ succeededCount: 0, failedCount: 2 });
+    expect(mockFolders['Broken One'].file).toHaveBeenCalledWith(
+      'error.txt',
+      expect.stringContaining('Compilation failed:')
     );
   });
 });

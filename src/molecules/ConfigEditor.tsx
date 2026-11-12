@@ -135,7 +135,10 @@ const ConfigEditor = ({
         debouncedSetConfigInput.cancel();
         updateRealtimeConfigInput(currentConfig);
         setConfigInput(currentConfig);
-        generateNow(currentConfig, injectionInput, { pointsonly: false });
+        generateNow(currentConfig, injectionInput, {
+          pointsonly: false,
+          isManual: true,
+        });
       },
     });
   };

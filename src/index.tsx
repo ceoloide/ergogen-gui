@@ -5,7 +5,12 @@ import styled, { createGlobalStyle } from 'styled-components';
 import { loader } from '@monaco-editor/react';
 import App from './App';
 import { defineErgogenTheme } from './utils/monaco';
+import { initAnalytics } from './utils/analytics';
 import { theme } from './theme/theme';
+
+// Initialize Google Analytics stub/consent synchronously before React renders
+// so initial route effects never miss the first page_view hit.
+initAnalytics();
 
 /**
  * The main container for the entire application.

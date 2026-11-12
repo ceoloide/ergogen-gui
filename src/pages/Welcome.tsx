@@ -11,7 +11,7 @@ import { loadLocalFile } from '../utils/localFiles';
 import { mapSeparateToInjectionsArray } from '../utils/ergogenBundleLoader';
 import Button from '../atoms/Button';
 import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
-import { trackEvent } from '../utils/analytics';
+import { trackEvent, classifyFileType } from '../utils/analytics';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import GithubIcon from '../atoms/GithubIcon';
 import CodebergIcon from '../atoms/CodebergIcon';
@@ -522,8 +522,7 @@ const Welcome = () => {
       if (cfg) {
         configContext.selectConfig(id);
         trackEvent('saved_config_loaded', {
-          config_name: cfg.name,
-          config_id: cfg.id,
+          stored_configs_count: configContext.configs.length,
         });
         await configContext.generateNow(
           cfg.config,
@@ -604,9 +603,8 @@ const Welcome = () => {
     setIsGenerating(true); // Show progress bar during loading
     clearError();
 
-    // Track loading
+    // Track repository import provider without transmitting raw user URLs
     trackEvent('repo_loaded', {
-      repo_url: repoInput,
       provider,
     });
 
@@ -697,10 +695,9 @@ const Welcome = () => {
     setIsGenerating(true); // Show progress bar during file loading
     clearError();
 
-    // Track local file loading
+    // Report only a fixed file type, never any part of the local filename
     trackEvent('local_file_loaded', {
-      file_name: file.name,
-      file_type: file.type || 'unknown',
+      file_type: classifyFileType(file.name),
       file_size: file.size,
     });
 

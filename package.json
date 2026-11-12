@@ -29,7 +29,6 @@
     "workbox-cacheable-response": "^7.4.1",
     "workbox-core": "^7.4.1",
     "workbox-expiration": "^7.4.1",
-    "workbox-google-analytics": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1",
     "workbox-strategies": "^7.4.1"
@@ -38,6 +37,8 @@
     "prepare": "husky",
     "preinstall": "node scripts/preinstall.js",
     "build-ergogen": "./patch/patch_ergogen.sh",
+    "ga:setup": "node scripts/ga/ga-admin.mjs setup",
+    "ga:teardown": "node scripts/ga/ga-admin.mjs teardown",
     "generate-previews": "ts-node --project scripts/tsconfig.json scripts/generate-previews.js",
     "postinstall": "node scripts/postinstall.js && pnpm run build-ergogen",
     "prestart": "pnpm run build-ergogen && pnpm run generate-previews",
