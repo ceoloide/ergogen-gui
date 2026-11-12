@@ -250,24 +250,50 @@ describe('planSetup', () => {
     ]);
   });
 
-  it('warns when a dimension has a non-event scope', () => {
-    // Arrange
+  it('ignores same-name dimensions in other scopes and creates the event one', () => {
+    // Arrange: a user-scoped "trigger" belongs to something else.
+    const userTrigger = dimension('trigger', 'User Trigger', {
+      scope: 'USER',
+      name: 'properties/1/customDimensions/user_trigger',
+    });
     const current = {
       ...inSync(),
-      customDimensions: [
-        dimension('trigger', 'Generation Trigger', { scope: 'USER' }),
-        dimension('gui_version', 'GUI Version'),
-      ],
+      customDimensions: [userTrigger, dimension('gui_version', 'GUI Version')],
     };
 
     // Act
     const plan = planSetup({ current, desired });
 
     // Assert
-    expect(plan.actions).toEqual([]);
-    expect(plan.warnings).toEqual([
-      'Custom dimension "trigger" has scope USER, expected EVENT. Scope cannot be changed; archive it and run setup again.',
+    expect(plan.actions).toEqual([
+      {
+        kind: 'createCustomDimension',
+        body: {
+          parameterName: 'trigger',
+          displayName: 'Generation Trigger',
+          scope: 'EVENT',
+        },
+      },
     ]);
+    expect(plan.warnings).toEqual([]);
+  });
+
+  it('never prunes a retired name registered in another scope', () => {
+    // Arrange
+    const current = {
+      ...inSync(),
+      customDimensions: [
+        ...inSync().customDimensions,
+        dimension('matrix_zone_names', 'User Zones', { scope: 'USER' }),
+      ],
+    };
+
+    // Act
+    const plan = planSetup({ current, desired, pruneRetired: true });
+
+    // Assert
+    expect(plan.actions).toEqual([]);
+    expect(plan.warnings).toEqual([]);
   });
 });
 
@@ -280,6 +306,14 @@ describe('planTeardown', () => {
         ...inSync().customDimensions,
         dimension('matrix_zone_names', 'Matrix Zone Names'),
         dimension('someone_elses', 'Unmanaged'),
+        dimension('source', 'User Source', {
+          scope: 'USER',
+          name: 'properties/1/customDimensions/user_source',
+        }),
+        dimension('trigger', 'Item Trigger', {
+          scope: 'ITEM',
+          name: 'properties/1/customDimensions/item_trigger',
+        }),
       ],
       keyEvents: [
         keyEvent('keyboard_generated'),

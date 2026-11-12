@@ -13,6 +13,17 @@ const EVENT_SCOPE = 'EVENT';
 const DIMENSION_FIELDS = ['displayName', 'description'];
 const METRIC_FIELDS = ['displayName', 'description', 'measurementUnit'];
 
+/**
+ * GA keys registrations by scope and parameter name, so a USER- or
+ * ITEM-scoped dimension can share a name with ours and belong to someone
+ * else. Everything this config manages is event-scoped; other scopes are
+ * never matched, updated, archived or deleted. GA omits `scope` for
+ * event-scoped registrations in some responses, so a missing scope counts as
+ * EVENT.
+ */
+const eventScoped = (items = []) =>
+  items.filter((item) => (item.scope ?? EVENT_SCOPE) === EVENT_SCOPE);
+
 const byParameterName = (items = []) =>
   new Map(items.map((item) => [item.parameterName, item]));
 
@@ -64,13 +75,6 @@ const planDefinitions = ({
         kind: `createCustom${type}`,
         body: { ...desiredItem, scope: EVENT_SCOPE },
       });
-      continue;
-    }
-
-    if (existing.scope && existing.scope !== EVENT_SCOPE) {
-      warnings.push(
-        `Custom ${type.toLowerCase()} "${parameterName}" has scope ${existing.scope}, expected ${EVENT_SCOPE}. Scope cannot be changed; archive it and run setup again.`
-      );
       continue;
     }
 
@@ -149,7 +153,12 @@ const planSettings = (kind, currentSettings, desiredSettings, actions) => {
  * @param {boolean} [args.pruneRetired] Archive or delete retired registrations.
  * @returns {{ actions: object[], warnings: string[] }}
  */
-export const planSetup = ({ current, desired, pruneRetired = false }) => {
+export const planSetup = ({ current: live, desired, pruneRetired = false }) => {
+  const current = {
+    ...live,
+    customDimensions: eventScoped(live.customDimensions),
+    customMetrics: eventScoped(live.customMetrics),
+  };
   const actions = [];
   const warnings = [];
   const retired = desired.retired ?? {};
@@ -244,7 +253,12 @@ export const planSetup = ({ current, desired, pruneRetired = false }) => {
  * @param {object} args.desired The declared configuration.
  * @returns {{ actions: object[], warnings: string[] }}
  */
-export const planTeardown = ({ current, desired }) => {
+export const planTeardown = ({ current: live, desired }) => {
+  const current = {
+    ...live,
+    customDimensions: eventScoped(live.customDimensions),
+    customMetrics: eventScoped(live.customMetrics),
+  };
   const retired = desired.retired ?? {};
   const managed = (active, retiredNames = []) =>
     new Set([...active, ...retiredNames]);
