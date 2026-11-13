@@ -54,7 +54,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    env: { VITE_BUILD_ID: buildId },
+    env: { VITE_BUILD_ID: buildId, VITE_PUBLIC_URL: '', PUBLIC_URL: '' },
     command: `pnpm build && pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
     url: `${baseURL}/build-id.txt`,
     reuseExistingServer: false,

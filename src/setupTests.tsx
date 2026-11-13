@@ -7,7 +7,9 @@ import { vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type { LinkProps } from 'react-router-dom';
 
-window.URL.createObjectURL = vi.fn();
+if (typeof window !== 'undefined') {
+  window.URL.createObjectURL = vi.fn();
+}
 
 // Polyfill for TextEncoder and TextDecoder
 if (typeof global.TextEncoder === 'undefined') {

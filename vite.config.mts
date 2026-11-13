@@ -1,3 +1,4 @@
+import packageJson from './package.json';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv, Plugin } from 'vite';
@@ -7,6 +8,14 @@ import { VitePWA } from 'vite-plugin-pwa';
 // We will use standard React plugin and PWA plugin in injectManifest mode
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  // Keep fork/repository identity for canonical builds. Plain npm ranges retain
+  // the existing installed-version fallback in the application's helpers.
+  const engineSpecifier = packageJson.dependencies.ergogen;
+  const defaultEngineVersion = /^(?:github:)?[\w.-]+\/[\w.-]+(?:#.+)?$/.test(
+    engineSpecifier
+  )
+    ? engineSpecifier
+    : '';
 
   return {
     resolve: {
@@ -89,7 +98,7 @@ export default defineConfig(({ mode }) => {
         env.VITE_ERGOGEN_VERSION ||
           env.ERGOGEN_VERSION ||
           env.REACT_APP_ERGOGEN_VERSION ||
-          ''
+          defaultEngineVersion
       ),
       'import.meta.env.VITE_GTAG_ID': JSON.stringify(
         env.VITE_GTAG_ID || env.REACT_APP_GTAG_ID || ''

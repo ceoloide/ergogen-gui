@@ -61,7 +61,7 @@
     "precommit": "pnpm validate:fast",
     "tools:install": "sh scripts/install-ci-tools.sh",
     "format:check": "prettier --check \"*.{js,mjs,ts,mts,json,jsonc,md}\" \"{src,e2e,patch,tests,scripts}/**/*.{ts,tsx,js,mjs,jsx,json,css,md}\" \".github/**/*.{yml,yaml}\" \".lintstagedrc.json\"",
-    "lint:security": "zizmor --offline .github/workflows",
+    "lint:security": "zizmor --offline .github",
     "lint:shell": "shellcheck scripts/*.sh patch/*.sh",
     "fix": "pnpm format && pnpm lint:js --fix && pnpm lint:md --fix",
     "typecheck:tooling": "tsc --project tsconfig.tooling.json",

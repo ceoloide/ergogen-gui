@@ -306,3 +306,11 @@ accept full SHAs; matching `*_FOOTPRINTS_URL` variables allow a mirror.
 
 Example preview SVGs are version-controlled. Regenerate them explicitly with
 `pnpm generate-previews` and review changes; ordinary builds do not rewrite them.
+
+## Contributing
+
+Contributions are welcome! If you have a feature request, bug report, or want to contribute to the code, please feel free to open an issue or submit a pull request.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

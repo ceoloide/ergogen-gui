@@ -24,12 +24,12 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      - name: Install locked dependencies
+        run: PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
       - name: Install validation tools
         run: |
           pnpm tools:install
           echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
-      - name: Install locked dependencies
-        run: PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
       - name: Validate
         run: pnpm validate
         env:

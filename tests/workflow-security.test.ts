@@ -52,7 +52,7 @@ describe('workflow validation tools', () => {
       'actionlint -shellcheck=shellcheck -pyflakes='
     );
     expect(packageJson.scripts['lint:security']).toBe(
-      'zizmor --offline .github/workflows'
+      'zizmor --offline .github'
     );
     expect(packageJson.scripts.lint).toContain('pnpm lint:workflows');
     expect(packageJson.scripts.lint).toContain('pnpm lint:security');
