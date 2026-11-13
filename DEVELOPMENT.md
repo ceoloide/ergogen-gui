@@ -16,7 +16,7 @@ uses the same installer and commands.
 | Command                                          | Checks                                                                                                                           |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, all Vitest tests. Never edits files. |
-| `pnpm validate`                                  | `validate:fast` plus the production build (what CI requires).                                                                    |
+| `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                |
 | `pnpm validate:extended`                         | `validate:fast` plus a fresh production build and all Playwright tests.                                                          |
 | `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                          |
 | `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                        |
@@ -87,8 +87,9 @@ Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
 - **Repository and archive layout**: `config.yaml` at the root (repositories also
   try `ergogen/config.yaml` and then search for other YAML files), with optional `footprints/`, `outlines/` and
   `templates/` folders. Injection names are the path inside that folder without
-  `.js`. Repositories also follow matching Git submodules. ZIP and `.ekb` archives
-  use the same layout; size limits are in `src/utils/ergogenBundleLoader.ts`.
+  its file extension (`.js`; repository outlines may also be `.svg`). Repositories
+  also follow matching Git submodules. ZIP and `.ekb` archives use the same
+  layout (`.js` only); size limits are in `src/utils/ergogenBundleLoader.ts`.
 - **Conflicts**: every source (repository, archive, share link) merges through
   `src/utils/injections.ts`; on a name clash the user chooses skip, overwrite or
   keep both (`name_1`), optionally for all remaining clashes.
@@ -97,8 +98,9 @@ Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
 
 `src/utils/share.ts` encodes `{ config, injections?, guiVersion, ergogenVersion }`
 with `lz-string` into the URL hash; the README documents the public contract. The
-share dialog runs a temporary worker in debug mode and offers only footprints
-that appear in the canonical PCB output, plus all templates and outlines.
+share dialog runs a temporary worker in debug mode and offers only the
+footprints, templates and outlines referenced in the canonical PCB or outline
+output.
 
 On load, `App.tsx` decodes the hash, then shows `ShareVersionCompatibilityDialog`
 if the link's GUI or Ergogen version is newer than the running one or its engine
@@ -115,8 +117,8 @@ later). The first match wins:
 2. Build variables `VITE_FEATURE_*` (else `REACT_APP_FEATURE_*`), literal `true` or
    `false`.
 3. The engine version from `VITE_ERGOGEN_VERSION`. If that is not semver (a branch
-   or commit), the installed package version is used. A custom ref is not enabled
-   automatically.
+   or commit), the installed package version is used instead, so features turn on
+   only if that installed version is 4.3.0 or later (unless a rule above wins).
 
 Gates apply in the injections panel, local and repository loaders, and on the main
 thread before generation, so stale stored injections cannot reach an engine that
@@ -134,7 +136,7 @@ configuration with a worker pool.
 
 The installed `ergogen` package is read-only: pnpm hard-links it from a shared
 store. `patch/patch_ergogen.sh` (`pnpm build-ergogen`, run by `postinstall`,
-`predev`, `prebuild` and `pretest:unit`) copies it to
+`predev`, `prestart`, `prebuild` and `pretest:unit`) copies it to
 `node_modules/.ergogen-engine`, links its installed dependencies, fetches the two
 footprint libraries at full commit SHAs, installs `patch/footprints_index.js` and
 checks that the engine loads. It never runs a nested install or build or changes
@@ -247,11 +249,12 @@ from the same origin.
   removes error listeners; opting back in resumes without a reload.
 - **Data minimization**: no automatic page views, Google Signals or ad
   personalization; `App.tsx` sends one `page_view` per route. `page_location` drops
-  query string and hash. No user-written text is sent (config names, authors,
-  filenames, repository URLs, zone/column/row names); `meta.name` and
-  `meta.author` only feed a 12-character SHA-256 `config_id`. `trackEvent()`
-  scrubs error text to its first line, masks quoted values and caps it at 100
-  characters.
+  query string and hash. Structured generation metrics carry no config names,
+  authors, filenames, repository URLs or zone/column/row names; `meta.name` and
+  `meta.author` only feed a 12-character SHA-256 `config_id`. Error text is
+  scrubbed on a best-effort basis: `trackEvent()` keeps its first line, masks
+  quoted values and caps it at 100 characters, so unquoted user text in an error
+  message can still be sent.
 - **Generation events** (`generation_completed`, `generation_failed`,
   `keyboard_generated`, from `ConfigContext` and `configAnalyzer.ts`) wait for a
   5-second quiet period during auto-generation, are sent at once for manual runs,

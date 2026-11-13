@@ -32,9 +32,9 @@ makes these network requests:
 - Google Analytics only when the build includes a tag ID (see
   [Configuration](#configuration)). Without one, no analytics script loads and the
   "Send Usage Metrics" switch has no effect, even if it shows as on. With an ID,
-  metrics default to on in a browser tab and off in the installed app; any saved
-  opt-out wins, unreadable storage counts as an opt-out, and development builds and
-  loopback hosts never send. Hits are not queued offline. DEVELOPMENT.md lists
+  metrics default to on in a browser tab and off in the installed app; a saved
+  choice wins (an explicit one over a legacy opt-out), unreadable storage counts
+  as an opt-out, and development builds and loopback hosts never send. Hits are not queued offline. DEVELOPMENT.md lists
   [what is collected](DEVELOPMENT.md#analytics-and-privacy).
 
 Editor, KiCanvas and worker code are served locally. After a visit with a service
@@ -110,8 +110,13 @@ and caches less offline. Use a domain root or custom domain until
 
 ## Configuration
 
-All settings are read at build time from the shell or `.env*` files and baked into
-`dist/`. Changing variables on the server does not reconfigure an existing build.
+Vite reads these settings at build time from the shell or `.env*` files and bakes
+them into `dist/`. Changing variables on the server does not reconfigure an
+existing build. Only Vite reads `.env*` files, but a shell `ERGOGEN_VERSION` is also
+read by `scripts/preinstall.js` and engine preparation (`postinstall`, `predev`,
+`prestart`, `prebuild`, `pretest:unit`), which fails unless it matches the
+installed specifier, so it can break a canonical frozen install. Use
+`VITE_ERGOGEN_VERSION` to change only the displayed identity.
 
 | Variable (first non-empty wins)                                        | Default                                                                                 | Effect                                                                                                                                                             |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
