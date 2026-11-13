@@ -484,6 +484,14 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
                 <span className="material-symbols-outlined">add_2</span>
                 <NewButtonText>New</NewButtonText>
               </AccentIconButton>
+              <OutlineIconButton
+                onClick={() => navigate('/layout-editor')}
+                aria-label="Open Layout Editor"
+                data-testid="layout-editor-button"
+                title="Open Layout Editor"
+              >
+                <span className="material-symbols-outlined">grid_view</span>
+              </OutlineIconButton>
               <ArchiveIconButton
                 onClick={handleDownloadArchive}
                 disabled={
