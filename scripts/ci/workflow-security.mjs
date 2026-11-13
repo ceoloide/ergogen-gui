@@ -5,6 +5,7 @@
  * (empty when the workflow is safe) so tests can assert on both the real
  * workflows and deliberately broken copies of them.
  */
+import { posix } from 'node:path';
 import { evaluateCondition, evaluateValue } from './workflow-expressions.mjs';
 
 export const PRODUCTION_BRANCH_REF = 'refs/heads/main';
@@ -33,6 +34,11 @@ const CHECKOUT_ACTION = 'actions/checkout';
 const UPLOAD_ARTIFACT_ACTION = 'actions/upload-artifact';
 const DOWNLOAD_ARTIFACT_ACTION = 'actions/download-artifact';
 
+const normalizeDirectory = (directory) =>
+  typeof directory === 'string'
+    ? posix.normalize(directory).replace(/\/+$/, '') || '/'
+    : undefined;
+
 /** `owner/repo@ref` -> `owner/repo` */
 export const actionName = (step) => step.uses?.split('@')[0];
 
@@ -51,7 +57,7 @@ export const triggerEvents = (workflow) => {
  */
 export const effectivePermissions = (workflow, job) => {
   const declared = job.permissions ?? workflow.permissions;
-  if (declared === undefined) return { explicit: false, scopes: {} };
+  if (declared == null) return { explicit: false, scopes: {} };
   if (declared === 'read-all')
     return { explicit: true, scopes: { '*': 'read' } };
   if (declared === 'write-all')
@@ -139,6 +145,23 @@ export const findCheckoutViolations = (workflow) => {
   return violations;
 };
 
+/** Removing the deploy PR trigger must not remove PR build/lint/test coverage. */
+export const findCiCoverageViolations = (workflow) => {
+  const isUnconditional = (item) =>
+    item.if === undefined &&
+    (item['continue-on-error'] === undefined ||
+      item['continue-on-error'] === false);
+  const commands = Object.values(workflow.jobs ?? {})
+    .filter(isUnconditional)
+    .flatMap((job) => job.steps ?? [])
+    .filter(isUnconditional)
+    .map((step) => step.run?.trim());
+
+  return ['pnpm run build', 'pnpm run lint', 'pnpm run test:unit']
+    .filter((command) => !commands.includes(command))
+    .map((command) => `CI does not unconditionally require ${command}`);
+};
+
 /** The deploy workflow may only start from trusted, maintainer-controlled events. */
 export const findDeployTriggerViolations = (workflow) => {
   const violations = [];
@@ -151,7 +174,8 @@ export const findDeployTriggerViolations = (workflow) => {
   const pushBranches = triggers.push?.branches;
   if (
     'push' in triggers &&
-    JSON.stringify(pushBranches) !== JSON.stringify(['main'])
+    (JSON.stringify(pushBranches) !== JSON.stringify(['main']) ||
+      Object.keys(triggers.push).some((key) => key !== 'branches'))
   ) {
     violations.push(`deploy workflow push trigger is not limited to main`);
   }
@@ -252,7 +276,9 @@ const concurrencyGroup = (concurrency, context) => {
   if (concurrency === undefined) return undefined;
   const group =
     typeof concurrency === 'string' ? concurrency : concurrency.group;
-  return evaluateValue(group, context);
+  const value = evaluateValue(group, context);
+  // GitHub treats concurrency group names as case-insensitive.
+  return typeof value === 'string' ? value.toLowerCase() : value;
 };
 
 /**
@@ -331,12 +357,41 @@ export const findArtifactHandoffViolations = (workflow) => {
       );
       continue;
     }
+    for (const input of ['name', 'path']) {
+      const value = download.with?.[input];
+      if (typeof value !== 'string' || value.trim() === '') {
+        violations.push(
+          `job "${publishJobId}" artifact download needs a non-empty ${input}`
+        );
+      }
+    }
+    // Keep the bounded same-run, named-artifact handoff. Explicit selectors or
+    // credentials could fetch a different run/repository despite a matching name.
+    for (const input of [
+      'run-id',
+      'repository',
+      'github-token',
+      'pattern',
+      'artifact-ids',
+    ]) {
+      if (Object.hasOwn(download.with ?? {}, input)) {
+        violations.push(
+          `job "${publishJobId}" artifact download overrides ${input}`
+        );
+      }
+    }
     if (steps.indexOf(download) > steps.indexOf(publish)) {
       violations.push(
         `job "${publishJobId}" publishes before downloading the artifact`
       );
     }
-    if (publish.with?.publish_dir !== download.with?.path) {
+    const publishDirectory = publish.with?.publish_dir;
+    if (
+      typeof publishDirectory !== 'string' ||
+      publishDirectory.trim() === '' ||
+      normalizeDirectory(publishDirectory) !==
+        normalizeDirectory(download.with?.path)
+    ) {
       violations.push(
         `job "${publishJobId}" publishes a directory other than the downloaded artifact`
       );
@@ -356,6 +411,16 @@ export const findArtifactHandoffViolations = (workflow) => {
       );
     }
     for (const producerId of producers) {
+      const upload = workflow.jobs[producerId].steps.find(
+        (step) =>
+          actionName(step) === UPLOAD_ARTIFACT_ACTION &&
+          step.with?.name === download.with?.name
+      );
+      if (upload.with?.['if-no-files-found'] !== 'error') {
+        violations.push(
+          `artifact producer "${producerId}" does not fail on missing site files`
+        );
+      }
       const producerWrites = writeScopes(
         effectivePermissions(workflow, workflow.jobs[producerId])
       );

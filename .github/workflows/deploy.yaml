@@ -21,7 +21,7 @@ permissions:
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-# Only runs on main publish, so only they join the production "pages" group; a manual run on another
+# Only runs on main can publish, so only they join the production "pages" group; a manual run on another
 # branch builds in its own group and can never displace a queued production deployment.
 concurrency:
   group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}

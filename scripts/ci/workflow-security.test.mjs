@@ -9,6 +9,7 @@ import {
   effectivePermissions,
   findArtifactHandoffViolations,
   findCheckoutViolations,
+  findCiCoverageViolations,
   findConcurrencyViolations,
   findDeployGateViolations,
   findDeployTriggerViolations,
@@ -31,6 +32,7 @@ const ciWorkflow = loadWorkflow('ci.yaml');
 
 /** A fresh, mutable copy of the deploy workflow for negative cases. */
 const deployCopy = () => JSON.parse(JSON.stringify(deployWorkflow));
+const ciCopy = () => JSON.parse(JSON.stringify(ciWorkflow));
 
 const jobRunsCommands = (job) =>
   (job.steps ?? []).some(
@@ -259,6 +261,14 @@ describe('deploy workflow', () => {
 });
 
 describe('CI workflow', () => {
+  it('retains unconditional PR build, lint and unit test steps', () => {
+    // Act
+    const violations = findCiCoverageViolations(ciWorkflow);
+
+    // Assert
+    expect(violations).toEqual([]);
+  });
+
   it('validates pull requests targeting main', () => {
     // Act
     const triggers = triggerEvents(ciWorkflow);
@@ -432,7 +442,9 @@ describe('workflow security checks reject unsafe changes', () => {
     const violations = findCheckoutViolations(workflow);
 
     // Assert
-    expect(violations.length).toBeGreaterThan(0);
+    expect(violations).toEqual([
+      'job "build" checks out with persisted credentials',
+    ]);
   });
 
   it('flags a publish job that is no longer restricted to main', () => {
@@ -503,4 +515,132 @@ describe('workflow security checks reject unsafe changes', () => {
       `job "${publishJobId}" publishes a directory other than the downloaded artifact`,
     ]);
   });
+
+  it.each(['run-id', 'repository', 'github-token', 'pattern', 'artifact-ids'])(
+    'flags the artifact download override %s',
+    (input) => {
+      // Arrange
+      const workflow = deployCopy();
+      const download = workflow.jobs.deploy.steps.find(
+        (step) => actionName(step) === 'actions/download-artifact'
+      );
+      download.with[input] = 'unexpected-selector';
+
+      // Act
+      const violations = findArtifactHandoffViolations(workflow);
+
+      // Assert
+      expect(violations).toContain(
+        `job "deploy" artifact download overrides ${input}`
+      );
+    }
+  );
+
+  it.each(['name', 'path'])('flags a missing download %s', (input) => {
+    // Arrange
+    const workflow = deployCopy();
+    const download = workflow.jobs.deploy.steps.find(
+      (step) => actionName(step) === 'actions/download-artifact'
+    );
+    delete download.with[input];
+
+    // Act
+    const violations = findArtifactHandoffViolations(workflow);
+
+    // Assert
+    expect(violations).toContain(
+      `job "deploy" artifact download needs a non-empty ${input}`
+    );
+  });
+
+  it('flags missing upload failure handling', () => {
+    // Arrange
+    const workflow = deployCopy();
+    const upload = workflow.jobs.build.steps.find(
+      (step) => actionName(step) === 'actions/upload-artifact'
+    );
+    delete upload.with['if-no-files-found'];
+
+    // Act
+    const violations = findArtifactHandoffViolations(workflow);
+
+    // Assert
+    expect(violations).toContain(
+      'artifact producer "build" does not fail on missing site files'
+    );
+  });
+
+  it('accepts equivalent artifact directory spellings', () => {
+    // Arrange
+    const workflow = deployCopy();
+    workflow.jobs.deploy.steps[0].with.path = 'dist/';
+
+    // Act
+    const violations = findArtifactHandoffViolations(workflow);
+
+    // Assert
+    expect(violations).toEqual([]);
+  });
+
+  it('flags a case variant of the production concurrency group in CI', () => {
+    // Arrange
+    const workflow = ciCopy();
+    workflow.concurrency = { group: 'PAGES', 'cancel-in-progress': false };
+
+    // Act
+    const violations = findConcurrencyViolations(workflow);
+
+    // Assert
+    expect(violations).toContain(
+      'pull_request on refs/heads/main joins "pages" without deploying'
+    );
+  });
+
+  it('flags null permissions instead of treating them as an explicit empty map', () => {
+    // Arrange
+    const workflow = ciCopy();
+    workflow.permissions = null;
+
+    // Act
+    const violations = findPermissionViolations(workflow);
+
+    // Assert
+    expect(violations).toEqual([
+      'job "lint-and-test" inherits the repository default token permissions',
+    ]);
+  });
+
+  it('flags an additional push tag filter in deploy', () => {
+    // Arrange
+    const workflow = deployCopy();
+    workflow.on.push.tags = ['v*'];
+
+    // Act
+    const violations = findDeployTriggerViolations(workflow);
+
+    // Assert
+    expect(violations).toContain(
+      'deploy workflow push trigger is not limited to main'
+    );
+  });
+
+  it.each(['pnpm run build', 'pnpm run lint', 'pnpm run test:unit'])(
+    'flags a removed or conditional CI step: %s',
+    (command) => {
+      // Arrange
+      const workflow = ciCopy();
+      const step = workflow.jobs['lint-and-test'].steps.find(
+        (candidate) => candidate.run === command
+      );
+      step.if = false;
+
+      // Act
+      const violations = findCiCoverageViolations(workflow);
+
+      // Assert
+      expect(violations).toContain(
+        `CI does not unconditionally require ${command}`
+      );
+    }
+  );
 });
