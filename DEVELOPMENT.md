@@ -1,573 +1,291 @@
-# Ergogen Web UI - Developer Documentation & Knowledge Base
-
-This document serves as a knowledge base and architectural guide for the project, tracking implementation details, design decisions, and future tasks.
-
-## Ergogen CLI
-
-[Ergogen](https://github.com/ergogen/ergogen) is a command line tool that allows users to define the characteristics of ergognomic keyboards (usually split ones) in YAML code, then generating assets to help fabricate the board. Ergogen helps with the general layout of the keys, the creation of a KiCad compatible PCB, the creation of DXF outlines for integration with other CAD software, and OpenJSCAD 3D models for keyboard case creation.
-
-## Component Architecture
-
-The project follows the principles of **Atomic Design** to structure its React components. This methodology helps create a scalable and maintainable component library. Components are organized into the following directories:
-
-- **`src/atoms`**: The smallest, most basic building blocks of the UI. These are individual HTML elements like buttons, inputs, and icons. They are highly reusable and should not contain any business logic.
-- **`src/molecules`**: Groups of atoms that function together as a single unit. For example, a search form might consist of an input atom and a button atom.
-- **`src/organisms`**: More complex UI components composed of molecules and/or atoms. These components represent distinct sections of an interface, like a header or a file download list.
-- **`src/pages`**: The highest-level components that represent entire pages in the application. They are responsible for composing organisms and other components to build a complete user view.
-
-This structure promotes reusability and a clear separation of concerns, making it easier to develop and test components in isolation.
-
-## Resizable Panels
-
-The application uses a custom `ResizablePanel` component (`src/molecules/ResizablePanel.tsx`) for creating resizable split-panel layouts. This component replaced the `react-split` library to provide more control over styling and behavior.
-
-### Features
-
-- **Drag-to-resize**: Supports both mouse and touch interactions for resizing
-- **Flexible constraints**: Supports `minWidth`, `maxWidth` (as pixels, percentages, or numbers), and `initialWidth`
-- **Side-aware**: Can be configured as a left or right panel with appropriate handle positioning
-- **Performance optimized**: Uses inline styles for width to avoid generating excessive CSS classes during resize operations
-
-### Usage
-
-The `ResizablePanel` component is used throughout the application for:
-
-- **Config panel**: Left-side panel containing the configuration editor
-- **Downloads panel**: Right-side panel containing the file downloads list
-- **Settings panel**: Left-side panel containing options and injections list
-
-### Implementation Details
-
-- Width is managed via React state and updated during drag operations
-- Maximum width calculation handles percentage strings (e.g., `"70%"`), pixel strings (e.g., `"600px"`), and numeric values
-- On mobile devices (≤639px), panels automatically expand to 100% width and resize handles are hidden
-- The resize handle includes visual feedback with hover effects and a gap effect using `box-shadow`
-
-## Web Workers
-
-The application offloads long-running, computationally intensive tasks to Web Workers to prevent the main UI thread from freezing. This ensures the user interface remains responsive while processing complex keyboard layouts or generating 3D models.
-
-- **`ergogen.worker.ts`**: This worker is responsible for running the core Ergogen logic. It takes the user's YAML configuration as input and generates the raw output data, including outlines, PCB information, and case designs.
-  - **Lifecycle Management**: To prevent custom injections (footprints, outlines, templates) from lingering in Ergogen's persistent module-level registry inside the worker thread when renamed or deleted, the worker is terminated and recreated fresh every time the settings panel (`showSettings`) transitions from open (`true`) to closed (`false`).
-  - **Auto-Generation Suspension**: Auto-generation runs are suspended while the settings panel is open to ensure maximum performance and responsiveness when editing custom footprint code or modifying settings. Once the settings panel is closed, the worker is restarted and a generation run is triggered immediately to compile all edits.
-  - **Custom Injection Evaluation**: Evaluates custom user-provided injection scripts (such as outlines, templates, or footprints) within the worker context. It binds a custom `require` resolver to support dynamic runtime module resolution for common packages/modules (e.g. `makerjs`, `../utils`, and internal Ergogen helpers like `assert`, `prepare`, etc.).
-
-- **`jscad.worker.ts`**: This worker handles 3D geometry processing. It receives the output from the Ergogen worker and uses JSCAD to generate 3D models for previewing. It is also responsible for converting these models into the STL format for downloading.
-
-Communication with the workers is managed through a standard message-passing system (`postMessage` and `onmessage`), with the main application thread and workers exchanging data as needed.
-
-### Worker Factory & Vitest Testing
-
-To handle Web Worker instantiation in a centralized and testable way, the application uses `src/workers/workerFactory.ts`. This module exports `createErgogenWorker` and `createJscadWorker`.
-
-Since we use Vitest and native ESM, the native worker instantiation using `new Worker(new URL('./jscad.worker', import.meta.url))` runs natively and seamlessly in both development/production builds and the Vitest test runner.
-
-To verify worker instantiation and error boundaries inside `src/workers/workerFactory.test.ts`, we mock `window.Worker` and clean it up inside `finally` blocks to guarantee test run isolation without requiring any temporary file generation hacks.
-
-## Local File Loading
-
-The application supports loading Ergogen configurations from local files on the user's computer. This includes support for multiple file formats and drag-and-drop functionality.
-
-### Supported File Types
-
-- **YAML/JSON files** (`.yaml`, `.yml`, `.json`): Direct configuration files that are loaded as text
-- **ZIP archives** (`.zip`): Archives containing `config.yaml` in the root and optionally `footprints`, `outlines`, or `templates` folders
-- **EKB archives** (`.ekb`): Ergogen keyboard archives (essentially ZIP files with a different extension)
-
-### Archive Structure
-
-When loading ZIP or EKB archives, the application expects:
-
-- **`config.yaml`** (required): Must be present in the root directory of the archive
-- **`footprints/` folder** (optional): Contains custom footprints as `.js` files organized in subfolders
-  - Names are derived from the relative path under `footprints`, excluding the `.js` extension
-- **`outlines/` folder** (optional): Contains custom outlines as `.js` files organized in subfolders
-  - Names are derived from the relative path under `outlines`, excluding the `.js` extension
-- **`templates/` folder** (optional): Contains custom templates as `.js` files organized in subfolders
-  - Names are derived from the relative path under `templates`, excluding the `.js` extension
-
-### Drag and Drop
-
-Users can drag and drop files anywhere on the welcome page to load them. Visual feedback includes:
-
-- Dashed border around the page when dragging
-- Overlay message indicating drop target
-- Automatic file type validation
-- Error messages for invalid file types or missing config.yaml
-
-### Local File Conflict Resolution
-
-When loading footprints, outlines, or templates from local archives, the same unified conflict resolution system applies. Users can choose to skip, overwrite, or keep both versions of conflicting injections. The system works for all injection types and shows type-specific dialogs (e.g., "Footprint Conflict", "Outline Conflict", "Template Conflict").
-
-### Local File Implementation
-
-- **`src/utils/localFiles.ts`**: Contains `loadLocalFile` function that handles all file types:
-  - `loadTextFile`: Reads YAML/JSON files using FileReader
-  - `loadZipArchive`: Extracts config.yaml, footprints, outlines, and templates from ZIP/EKB archives using JSZip
-  - `extractFootprintName` / `extractOutlineName` / `extractTemplateName`: Generates names from relative file paths
-- **`src/pages/Welcome.tsx`**: Integrates local file loading with drag-and-drop handlers and conflict resolution
-
-## GitHub Integration
-
-The application supports loading Ergogen configurations directly from GitHub repositories. This feature includes automatic footprint, outline, and template loading.
-
-### Loading from GitHub
-
-GitHub configurations can be loaded in two ways:
-
-1. **Via Welcome Page Input**: User enters a GitHub URL in the input field on the Welcome page
-2. **Via URL Parameter**: User navigates to a URL with `?github=user/repo` parameter (e.g., `https://ceoloide.github.io/ergogen-gui/?github=ceoloide/corney-island`)
-
-When a user provides a GitHub repository URL (e.g., `user/repo` or `https://github.com/user/repo`), the application:
-
-1. **Fetches the configuration file**: Attempts to load `config.yaml` from standard locations:
-   - Root directory: `/config.yaml`
-   - Ergogen subdirectory: `/ergogen/config.yaml`
-   - Tries both `main` and `master` branches
-
-2. **Fetches custom injections**: Recursively scans for `footprints/`, `outlines/`, and `templates/` folders alongside the config file:
-   - Searches for `.js` files at any depth within these folders
-   - Constructs injection names from the folder path and filename (e.g., `folder1/folder2/file_name`)
-   - Uses the GitHub API to traverse directories
-
-3. **Handles Git Submodules**: Checks for `.gitmodules` file in the repository root:
-   - Parses the `.gitmodules` file to find submodules within footprints, outlines, or templates folders
-   - For each matching submodule, fetches the submodule repository recursively
-   - Loads all `.js` files from the submodule and prefixes names with the relative path
-
-### GitHub Conflict Resolution
-
-The application provides a unified conflict resolution system for all injection types (footprints, templates, and outlines) across multiple loading scenarios:
-
-#### When Conflicts Occur
-
-Conflict resolution is triggered when loading injections from:
-
-1. **GitHub repository URLs** (via the Welcome page input or `?github=` URL parameter)
-2. **Local files** (ZIP/EKB archives with injections)
-3. **Shared configuration links** (hash fragments with injections)
-
-#### Conflict Resolution Dialog
-
-When a conflict is detected, a `ConflictResolutionDialog` is displayed to the user with:
-
-1. **Type-specific messaging**: The dialog shows the specific injection type (e.g., "Footprint Conflict", "Outline Conflict", "Template Conflict") rather than generic "injection" terminology, making it clearer for users.
-
-2. **Three resolution options**:
-   - **Skip**: The new injection is not loaded
-   - **Overwrite**: The new injection replaces the existing one
-   - **Keep Both**: Both injections are retained; the new one gets a unique name with an incremental suffix (e.g., `footprint_1`)
-
-3. **"Apply to all conflicts" checkbox**: Allows the user to use the same resolution strategy for all subsequent conflicts in the current load operation.
-
-#### Generic Implementation
-
-The conflict resolution infrastructure is generic and works with any injection type:
-
-- Uses `checkForInjectionConflict(type, name, existingInjections)` for type-aware conflict detection
-- Uses `mergeInjectionArraysWithResolution(newInjections, existingInjections, resolution)` for merging with conflict resolution
-- The dialog accepts an `injectionType` prop to display type-specific messages
-- Supports footprints, outlines, and templates
-
-### GitHub Implementation
-
-- **`src/utils/github.ts`**: Contains `fetchConfigFromUrl` function that returns config, footprints, outlines, and templates, plus helper functions:
-  - `fetchFootprintsFromDirectory`: Recursive directory traversal for a single directory
-  - `fetchFootprintsFromRepo`: Recursive traversal of an entire repository (for submodules)
-  - `parseGitmodules`: Parses `.gitmodules` file to extract submodule paths and URLs
-  - `bfsForYamlFiles`: Performs breadth-first search to find YAML files in repository
-- **`src/utils/injections.ts`**: Generic utility functions for conflict resolution:
-  - `checkForInjectionConflict(type, name, existingInjections)`: Type-aware conflict detection
-  - `generateUniqueInjectionName(type, baseName, existingInjections)`: Generates unique names for any injection type
-  - `mergeInjectionArraysWithResolution(newInjections, existingInjections, resolution)`: Merges injections with conflict resolution
-  - `mergeInjections(newFootprints, existingInjections, resolution)`: Footprint-specific wrapper (deprecated, use `mergeInjectionArraysWithResolution` instead)
-  - `mergeInjectionArrays(newInjections, existingInjections)`: Default merge with overwrite strategy
-- **`src/molecules/ConflictResolutionDialog.tsx`**: React component for the conflict resolution UI that displays type-specific messages
-- **`src/pages/Welcome.tsx`**: Orchestrates the loading process (both GitHub and local files), handles conflicts sequentially, and manages dialog state. Also includes drag-and-drop handlers for local file loading
-- **`src/context/ConfigContext.tsx`**: Handles conflict resolution for GitHub URI parameter loading (`?github=...`)
-- **`src/App.tsx`**: Handles conflict resolution for shared config hash fragment loading
-
-### GitHub API Rate Limiting
-
-The GitHub loading functionality uses unauthenticated requests, which are subject to GitHub's rate limits:
-
-#### API Requests (api.github.com)
-
-- **Rate Limit**: 60 requests per hour for unauthenticated requests
-- **Detection**: The code checks for HTTP 403 status with `X-RateLimit-Remaining: 0` header
-- **80% Warning**: Displays warning when 80% of hourly allowance is consumed
-- **User Feedback**: When rate limit is exceeded, a clear error message is displayed: "Cannot load from GitHub right now. You've used your hourly request allowance. Please wait about an hour and try again."
-- **Graceful Handling**: The loading process continues even if rate limit is hit, just showing the error to the user
-- **Console Logging**: All rate limit headers (Limit, Remaining, Used, Reset) are logged with `[GitHub Rate Limit]` prefix
-
-#### Raw Content Requests (raw.githubusercontent.com)
-
-- **Rate Limit**: 5,000 requests per hour for unauthenticated requests
-- **Detection**: The code checks for HTTP 429 status
-- **User Feedback**: When rate limit is exceeded, displays: "You've reached your hourly request allowance for loading content from GitHub. Please wait 30 minutes and try again."
-- **No 80% Warning**: raw.githubusercontent.com doesn't provide rate limit headers, so proactive warnings are not possible
-- **Graceful Handling**: The loading process continues even if rate limit is hit, just showing the error to the user
-
-**Future Enhancement**: Implement authenticated GitHub API requests to increase API rate limit to 5,000 requests per hour. This would require:
-
-- OAuth integration or personal access token support
-- Secure token storage
-- UI for token configuration
-- Fallback to unauthenticated requests if no token is provided
-
-## Configuration Sharing
-
-The application supports sharing keyboard configurations via URL hash fragments. Users can generate a shareable link that contains the configuration and only the custom footprints that are actually used, allowing recipients to load the complete setup with a single click.
-
-### Share Link Format
-
-Shareable links use the format: `<baseUrl>#<encoded-config>` (resolving to the deployment domain, e.g. `https://ceoloide.github.io/ergogen-gui/#<encoded-config>`) where the hash fragment contains:
-
-- The keyboard configuration (YAML/JSON string)
-- Only the footprint injections that were selected by the user in the Share dialog (filtered to those actually used in the design)
-- All non-footprint injections (templates, etc.) that were selected by the user
-- **Version metadata**:
-  - `guiVersion`: The version of the GUI in package.json at the time of creation (e.g. `0.8.9`)
-  - `ergogenVersion`: The full Ergogen version used (e.g. `github:ceoloide/ergogen#v4.3.0` or official `github:ergogen/ergogen#v4.2.1`)
-
-The configuration, injections, and version metadata are compressed and URL-encoded using `lz-string`'s `compressToEncodedURIComponent` function for efficient transmission.
-
-### Sharing Process
-
-The sharing flow is a two-step wizard inside `ShareDialog`:
-
-**Step 1 – Selection View:**
-
-1. The user clicks the share button in the header or subheader. The `ShareDialog` opens at Step 1.
-2. An **"Include custom libraries"** toggle is shown (defaulted to ON).
-3. When ON and custom injections are present, the dialog immediately spawns a **temporary background worker** (via `createErgogenWorker()`) and runs Ergogen generation in debug mode.
-4. The worker response includes the `canonical` output. The dialog calls `extractUsedFootprintsFromCanonical(canonical)` to identify which footprint names are referenced in the PCBs section.
-5. The dialog builds a **checklist** of eligible injections:
-   - Footprint injections are only included if they appear in the canonical output.
-   - Template and outline injections are always included.
-   - All items default to checked.
-6. The user can uncheck individual items to exclude them from the share package.
-7. When the toggle is OFF, no worker is spawned and no injections are shared.
-8. The user clicks **Share** to proceed to Step 2.
-
-**Step 2 – Copy Link View:**
-
-1. `createShareableUri` is called with the config and the user-selected injections.
-2. The generated link is displayed in a read-only input and **auto-copied** to the clipboard.
-3. A "Copy link" button provides visual feedback (changes to "Link copied" with a check icon for 2.5 seconds).
-
-### Dialog UI
-
-The `ShareDialog` component provides:
-
-- **Step 1**: Toggle switch, loading spinner (while analyzing), error message (if worker fails), injection checklist with type badges (footprint / outline / template), and a Share button.
-- **Step 2**: Read-only share link input, Copy button with feedback, close button (X), Escape key support.
-
-### Loading Shared Configurations
-
-When a user navigates to a URL with a hash fragment:
-
-1. **Initial Load / Hash Changes**: On page load or hash change, `App.tsx` checks for a hash fragment, decodes, and validates the shared payload structure.
-2. **Version Compatibility Checking**: Before loading the configuration, the application performs environment checks:
-   - If the current GUI version is older than the one in the share link, or if the current Ergogen version is older than the one in the share link, or if the share link used a custom Ergogen version:
-     - The loading is intercepted and a **Version Compatibility Warning Modal** (`ShareVersionCompatibilityDialog`) is shown.
-     - The user is alerted of the version mismatches (e.g., GUI/Ergogen version differences) or that a custom Ergogen fork was used (with a clickable link to the GitHub repository/ref for investigation).
-     - The user can choose to **Accept and Load** (which imports the configuration as is) or **Cancel** (which aborts loading completely).
-   - **Backward Compatibility**: If a parsed share link lacks version information (legacy links), the application assumes it was shared with GUI version `0.9.0` and official Ergogen version `4.2.1` (`github:ergogen/ergogen#v4.2.1`).
-   - If all versions are compatible (or the user accepts the compatibility warning dialog), the configuration loading proceeds.
-
-3. **Conflict Resolution**:
-   - If injections are present, conflict resolution is performed using `ConflictResolutionDialog` for name conflicts.
-   - Updates the configuration state and triggers regeneration.
-
-### Error Handling
-
-The share system provides comprehensive error handling:
-
-- **Decode Errors**: Invalid or corrupted encoded strings display: "The shared configuration link is invalid or corrupted. The encoded data could not be decompressed."
-- **Validation Errors**: Valid strings with invalid structure display: "The shared configuration link does not contain a valid configuration. The decoded data is missing required fields or has an invalid structure."
-- **Console Logging**: All errors are logged to the console with `[Share]` prefix for debugging
-- **Debug Mode**: Adding `?debug` to the URL enables debug logging that shows the decoded configuration object in the console
-
-### Sharing Implementation
-
-- **`src/utils/share.ts`**: Core sharing utilities:
-  - `encodeConfig`: Compresses and encodes configuration and injections, automatically embedding GUI and Ergogen version metadata.
-  - `decodeConfig`: Decompresses and validates shared configurations. Assigns default fallback versions (`0.9.0` for GUI, `github:ergogen/ergogen#v4.2.1` for Ergogen) for backward compatibility when versions are missing in the payload. Returns `DecodeResult`.
-  - `createShareableUri`: Constructs the full shareable URL.
-  - `getConfigFromHash`: Extracts and decodes hash fragment from current URL.
-  - `extractUsedFootprintsFromCanonical`: Extracts footprint names from canonical output's PCBs section.
-  - `filterInjectionsForSharing`: Filters injections to only include used footprints.
-- **`src/utils/version.ts`**: Contains version parsing, comparison, and extraction utilities (`parseVersion`, `compareVersions`, `getSemverFromErgogenVersion`, `isCustomErgogenVersion`).
-- **`src/utils/injections.ts`**: Contains functions for merging injection arrays.
-- **`src/molecules/ShareDialog.tsx`**: Two-step dialog for sharing configurations.
-- **`src/molecules/ShareDialog.test.tsx`**: Unit tests for the two-step sharing flow.
-- **`src/molecules/ShareVersionCompatibilityDialog.tsx`**: Themed warning modal shown when loading a shared config with version mismatches or a custom Ergogen version.
-- **`src/molecules/ShareVersionCompatibilityDialog.test.tsx`**: Unit tests for the warning dialog.
-- **`src/App.tsx`**: Handles initial hash loading, hash change events, and integrates version compatibility warning checks before loading shared configurations.
-- **`src/App.test.tsx`**: Integration tests verifying App's mount and hashchange behavior when receiving compatible, incompatible, and custom-version share links.
-- **`src/atoms/Header.tsx`**: Contains the share button and share functionality.
-
-### Future Enhancements
-
-Several potential improvements could enhance the sharing feature:
-
-1. **URL Length Validation**: Very large configurations might create URLs that exceed browser URL length limits (typically 2048-8192 characters depending on browser). Could add validation to warn users or suggest alternative sharing methods when URLs become too long.
-2. **QR Code Generation**: For easier mobile sharing, could generate QR codes that users can scan to load configurations directly on mobile devices.
-3. **Share Link Shortening**: Very long URLs can be unwieldy. Could integrate with URL shortening services or create a custom short link service with a backend API.
-4. **Mobile Native Sharing**: On mobile devices, could integrate with native sharing APIs (Web Share API) to allow sharing through the device's native share menu (SMS, email, social media, etc.).
-5. **Share Link History**: Track previously generated share links in localStorage, allowing users to easily access and re-share recent configurations.
-6. **Share Link Validation**: Add a "Test Link" feature that validates a share link works correctly before sharing it with others.
-7. **Better Error Recovery**: When encountering partially corrupted share links, attempt to recover and load what's possible rather than showing a complete error (e.g., load config even if injections are corrupted).
-8. **Share Link Expiration**: Add optional expiration dates or time-to-live (TTL) for share links, useful for temporary sharing scenarios.
-9. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
-
-## Engine Preparation and Compatibility Experiments
-
-The installed `ergogen` package is read-only: pnpm may hard-link its files into
-multiple checkouts. `patch/patch_ergogen.sh` copies it to
-`node_modules/.ergogen-engine`, links the already installed runtime dependencies,
-fetches ceoloide/infused-kim footprints at reviewed full SHAs, installs the index,
-inlines package metadata and verifies the engine loads. It never changes global
-Git settings or runs a nested package install/build. An input stamp skips unchanged
-work; changed inputs clear the checkout's Vite cache. Vite and Vitest alias the
-engine package and subpaths to this prepared copy. `postinstall`, development and
-build preparation invoke the same idempotent command.
-
-Canonical CI and deployment install the frozen lockfile. Engine version changes
-require reviewed package/lock updates, rather than repository-variable overrides. Canonical GitHub/repository identity metadata defaults to the committed engine specifier, preserving existing fork share links. Explicit compatibility metadata overrides retain their precedence; plain npm ranges retain the installed-version fallback.
-For an isolated compatibility experiment, explicitly run `scripts/preinstall.js`
-with `ERGOGEN_VERSION` before `pnpm install --no-frozen-lockfile`; pnpm reads its
-manifest before the lifecycle hook. The helper preserves its original-manifest
-backup across repeated invocations, and postinstall restores it. Preparation checks
-the requested specifier against the installed lockfile. See README for commands.
-Do not commit experiment lockfiles or regenerated previews.
-
-The footprint commit defaults live in `patch/patch_ergogen.sh`; bump them through
-review and validate the actual browser worker. Engine preparation tests use local
-Git repositories and hard-linked fixture files to verify isolation, failure
-handling, pinned fetches and repeat-run behavior without network access.
-Example preview SVG regeneration is explicit; acceptance builds never rewrite
-tracked preview files.
-
-## CI & Deployment Workflows
-
-GitHub Actions workflows live in `.github/workflows`, pin Ubuntu 26.04 with Playwright 1.65.0, and keep untrusted code away from write-scoped tokens:
-
-- **`ci.yaml`** validates pull requests to `main` using the shared non-mutating `pnpm validate` command (format, lint, type checks, complete Vitest suite and production build) with a `contents: read` token and non-persisted checkout credentials. It then installs Chromium, runs the production Playwright suite, and uploads native reports and failure attachments under the tested SHA.
-- **`deploy.yaml`** runs only on pushes to `main`, `workflow_dispatch` and `repository_dispatch` (never on pull requests). It has two jobs:
-  1. `build` (`contents: read`): checks out without persisted credentials, installs locked dependencies, validates/builds, adds `404.html` and (on `main`) `CNAME`, then uploads `dist` as a one-day `github-pages-site` artifact.
-  2. `deploy` (`contents: write`, `main` only): downloads that artifact and publishes it to the `gh-pages` branch with `peaceiris/actions-gh-pages`. It never checks out, installs or runs repository code.
-- **Concurrency**: runs on `main` share the `pages` group with `cancel-in-progress: false`, so production deploys are serialized and never cancelled mid-flight. Manual runs on other branches only build, in their own group.
-- **Workflow validation**: `pnpm lint:workflows` runs actionlint 1.7.12 with ShellCheck 0.11.0; `pnpm lint:security` runs zizmor 1.32.0 offline across `.github`, including Dependabot configuration. Both Dependabot update ecosystems have a seven-day cooldown. `scripts/install-ci-tools.sh` installs checksum-verified native Linux x86_64 releases into a checkout-owned directory. Other platforms install matching native releases on `PATH`. All action references are commit-pinned and maintained through Dependabot. No Docker or Python prerequisite is introduced.
-- **Repository policy tests**: `tests/workflow-security.test.ts` uses Vitest and `js-yaml` for permissions, triggers, credentials, artifact handoff and the required shared PR validation step. Reviewed publish/concurrency declarations are checked explicitly; tests do not implement GitHub's expression language. The publisher's authentication/destination inputs are allowlisted and publish failures cannot be ignored.
-- **Validation contract**: `validate:fast` checks formatting, lint, dependencies, workflow security/syntax, shell, TypeScript and the complete Vitest suite; `validate` adds the production build; `validate:extended` combines fast checks with a fresh production build and the complete Playwright suite. `fix` owns source corrections. `precommit` delegates to the same fast checks. Application and source tests use the strict root TypeScript project; browser/policy/configuration TypeScript uses `tsconfig.tooling.json`. Maintained scripts are linted/formatted, and analytics `.test.mjs` files run in Vitest with the application suite.
-- **Browser harness**: `playwright.config.mts` allocates a loopback port and uses strict binding with no existing-server reuse. Its server command builds the production application with a unique build ID. `e2e/global-setup.ts` verifies `build-id.txt` before tests run. The harness keeps failure traces/screenshots without relying on retries. Build/server/browser outputs are checkout-local and ignored. The pinned prebuilt Monaco editor and its workers are served locally through `vite-plugin-static-copy` and a base-aware React loader path, preserving the existing loader behavior without rebuilding Monaco's compiler. The 8 MiB precache-file limit accommodates its approximately 7 MB TypeScript worker. Precaching the full editor is intentional for offline startup and language support: the manifest is about 21 MB total, with about 16 MB from Monaco, increasing initial background download/storage cost. Changed editor assets are refreshed on upgrades. The browser fixture blocks external requests; provider tests install deterministic page routes. The obsolete unused public Ergogen bundle is removed.
-- **Semantic corpus**: `tests/engine-corpus.test.ts` runs the real prepared engine and checks key count/pitch, outline dimensions, KiCad 8 vendor footprint generation and invalid-footprint rejection. Existing ZIP tests cover archive layout. It is a small initial corpus, not exhaustive geometry coverage.
-- **Evidence**: native JUnit reports live in `reports/`; CI uploads available reports on success or failure with a commit-labelled artifact name. Playwright additionally writes its HTML report and failure attachments. Uploads do not grant the PR workflow a write token.
-
-## Version Information & Custom Build Indicators
-
-To improve transparency and debuggability for users running custom repositories, branches, tags, or commit hashes of Ergogen, the application displays version information directly in the sidebar footer and highlights custom builds using dedicated badges:
-
-- **GUI Version Button**: Displays the GitHub logo alongside "GUI" and the local `package.json` version (e.g., `0.6.3`). Clicking it links directly to the GUI codebase on GitHub.
-- **Ergogen Version Button**: Displays the GitHub logo alongside "Ergogen" and the currently built Ergogen version.
-  - **Standard Releases**: Shows the standard version number (e.g., `4.2.1`) in standard gray.
-  - **Custom Builds**: If built using a custom repository or reference (detected via `isCustom`), the version text is colored in green (`theme.colors.accent`) and a vertical `DEV` badge is shown on the right-hand edge of the button.
-  - **Commit Hashes**: Full 40-character commit hashes are automatically truncated to 7 characters (e.g., `fb2509f`) and link directly to `/commit/` on GitHub instead of `/tree/`.
-  - **Other References**: Shorter labels (such as tags like `v4.3.0` or branch names like `develop`) are kept intact and link to `/tree/` on GitHub.
-
-### Custom DEV Chip & Explanation Modal
-
-When the built Ergogen version is custom (`isCustom` is true), a green superscript DEV chip (`<DevChip>`) is displayed next to the app name in both the Header and Sidebar.
-
-- **Icon and Badge**: Contains a beaker (`science`) icon and `DEV` text.
-- **Hover/Tap Popover**: Hovering (desktop) or tapping (mobile) on the chip triggers a floating explanation popover card.
-- **Close Delay**: Incorporates a 250ms mouse-leave transition delay to allow the user's cursor to navigate into the popover and click the repository link without closing the card prematurely.
-- **Global Click Close**: Sets up global window click listeners to automatically close the popover on touch screens or outer clicks.
-
-## Feature Flags
-
-The application implements a hybrid feature flag system (`src/utils/featureFlags.ts`) to control the visibility and usage of capabilities based on the active environment and loaded Ergogen version.
-
-This is primarily used to control outline and template injections, which require Ergogen `v4.3.0` or higher:
-
-- **Production builds** (running the standard npm package release `v4.2.1`) have these features disabled to prevent compilation errors inside the worker thread.
-- **Development/Custom builds** (running custom refs or versions `>= v4.3.0`) have them enabled.
-
-### Evaluation Lifecycle
-
-When querying `isFeatureEnabled(featureName)`, the system checks conditions in the following priority order:
-
-1. **URL Query Param Overrides**: e.g., `?ff_templates=true` (high-priority override, useful for manual verification/debugging).
-2. **Build-Time Environment Variables**: Checks if `REACT_APP_FEATURE_TEMPLATES` is set to `'true'` or `'false'`.
-3. **Runtime Version Check**: Checks the loaded Ergogen version (`displayText`). If it is standard semver, it compares it against the feature's minimum required version (`4.3.0`). Custom development references (e.g. `develop` branch or commit hashes) default to enabling the feature.
-
-### Integrated Gating
-
-Feature flags are enforced across the following components:
-
-- **Injections Side Panel (`Injections.tsx`)**: Outlines and Templates tabs and action/upload buttons are conditionally hidden.
-- **Local File Loader (`localFiles.ts`)**: Drops and ZIP archive extraction skip outline/template folders if disabled.
-- **GitHub Loader (`github.ts`)**: Traversal of outlines and templates subfolders/submodules is skipped if disabled.
-- **Generation Payload (`ConfigContext.tsx`)**: Injections are filtered on the main thread before invoking `generateNow` on the worker to prevent compile-time crashes from stale/localStorage values.
-
-## Multi-Configuration Management
-
-The application features a built-in Multi-Configuration Management system allowing users to work on multiple YAML/JSON configurations, switch between them instantly, search their lists, rename, duplicate, and delete configurations.
-
-### Key Architecture Components
-
-1. **State & Actions Context (`ConfigContext.tsx`)**:
-   - Manages active configuration ID (`activeConfigId`), active configuration name (`activeConfigName`), list of saved configurations (`configs`), and a temporary read-only state for URL-shared previews (`isPreview`).
-   - Syncs active config code content (`configInput`) to whichever saved configuration is currently active, auto-saving it dynamically to `localStorage`.
-   - Offers helpers like `createNewConfig`, `deleteConfig`, `duplicateConfig`, `renameConfig`, `selectConfig`, and `exportAllConfigs`.
-2. **Persistence (`constants.ts`)**:
-   - Key name: `ergogen:multi-config` maps to a JSON container following the `MultiConfigContainer` scheme.
-   - Automatically migrates legacy configurations (saved on `LOCAL_STORAGE_CONFIG` or `ergogen:config` key) on startup.
-   - **Version 2**: Upgraded to store formatted inline SVG previews (`previewSvg`) in `SavedConfig` metadata inside `ergogen:multi-config`.
-   - **Background Compilation**: Triggers a silent compile on mount for all configurations that lack a preview SVG (e.g. legacy/v1 designs) to generate their SVGs, skipping the heavy STL generation phase.
-3. **ZIP Exporter Utilities (`zip.ts`)**:
-   - Offers background worker compilation sequences that compiles all configurations concurrently or sequentially and zips them up into a single file with custom folder structures.
-   - **Optimization**: Employs a local folder cache Map (`writeInjections`) when injecting footprint, template, and outline files into ZIP archives to bypass redundant JSZip nested folder search and creation overhead, improving creation times by up to ~37%.
-
-## Monaco Editor & Performance Optimization
-
-To prevent editing lag and cursor jumping in the Monaco editor when working with heavy configurations or on slow CPUs:
-
-- **Uncontrolled Editor Component**: The Monaco `Editor` component in `src/molecules/ConfigEditor.tsx` is configured as uncontrolled (using `defaultValue` instead of `value`). This prevents React from forcing value synchronizations on every render.
-- **Debounced Context State Updates**: Keystrokes trigger a debounced context update (500ms delay) using `lodash.debounce`. This avoids triggering heavy React tree re-renders and synchronous `localStorage` disk writes (which stringify all configurations and their SVG previews) during active typing.
-- **Focus Blur Flushing**: Any pending debounced state update is immediately flushed via `debouncedSetConfigInput.flush()` when the editor loses focus (such as when a user clicks the "Download" or "Generate" buttons), ensuring other components have the latest value immediately.
-- **Realtime Context Reference**: The context exposes `getRealtimeConfigInput` and `updateRealtimeConfigInput` to track the synchronous, real-time code buffer value via a React ref. Action handlers (like download and compile generation) prefer this realtime value over the debounced state value to ensure they always operate on the absolute latest changes.
-
-## Progressive Web App (PWA)
-
-The application is configured as a fully offline-capable PWA using Vite's built-in Workbox integration (`vite-plugin-pwa`).
-
-### Service Worker Architecture
-
-The `vite-plugin-pwa` plugin detects `src/service-worker.ts` and automatically uses `InjectManifest` mode (instead of `GenerateSW`), giving full control over the service worker logic. The plugin injects the precache manifest into `self.__WB_MANIFEST` at build time.
-
-### Caching Strategies
-
-| Asset type                         | Strategy                    | Cache name                 |
-| ---------------------------------- | --------------------------- | -------------------------- |
-| Vite-bundled JS/CSS/HTML           | **Precache** (install-time) | Workbox default            |
-| `public/dependencies/*.js` scripts | **CacheFirst** (runtime)    | `public-dependencies-v1`   |
-| Google Fonts CSS                   | **StaleWhileRevalidate**    | `google-fonts-stylesheets` |
-| Google Fonts binaries              | **CacheFirst**              | `google-fonts-webfonts`    |
-| gtag.js and GA measurement hits    | **Not intercepted**         | None                       |
-
-The service worker does not cache or queue Google Analytics traffic. Hits sent while offline are dropped, because a queued hit could be replayed after the user opts out. On activation, the worker deletes the `workbox-background-sync` IndexedDB database that earlier builds (which used `workbox-google-analytics`) left behind.
-
-### Update Flow
-
-1. Every page load (or every 24 hours max), the browser re-fetches `service-worker.js` from the server.
-2. If the file has changed (new build deployed), the browser installs the new SW in a **"waiting"** state.
-3. `serviceWorkerRegistration.ts` fires its `onUpdate` callback with the waiting `ServiceWorkerRegistration`.
-4. `App.tsx`'s `useServiceWorkerUpdate` hook stores the registration and returns an `onUpdate` handler.
-5. `Header.tsx` renders `UpdateChip` (a pulsing green pill) when `onUpdate` is defined.
-6. User clicks the chip → `SKIP_WAITING` is posted to the new SW → SW activates → page reloads with fresh assets (with a 1-second safety fallback reload if the event doesn't fire).
-
-### Google Analytics & Privacy Controls
-
-`src/utils/analytics.ts` owns all consent and transport logic. `src/index.tsx` calls `initAnalytics()` before React renders, so the first route's `page_view` always finds `window.gtag`. `ConfigContextProvider` reads consent for the settings switch and re-runs `initAnalytics()` in an effect when it changes. It never initializes analytics during render.
-
-#### Consent resolution
-
-`getSendUsageMetricsEnabled()` resolves consent in this order:
-
-1. **Unsaved session choice**: a toggle whose localStorage write failed is kept in module memory. It is dropped as soon as a write succeeds, so storage stays the source of truth across tabs.
-2. **Explicit consent key**: `ergogen:consent:sendUsageMetrics`, written only by `setSendUsageMetricsEnabled()` when the user toggles "Send Usage Metrics". This is the only way to opt in beyond the default.
-3. **Older opt-outs**: a `false` in the legacy `ergogen:config:sendUsageMetrics` key or in `ergogen:settings.sendUsageMetrics`. A `true` in either is ignored, because earlier builds wrote `true` there automatically (the legacy key on every mount from #144 until `211ff8a`, the settings object on first visit).
-4. **Default**: enabled on the web, disabled in standalone PWA mode.
-
-If localStorage cannot be read, consent fails closed (`false`).
-
-#### Environment gate
-
-`isLiveTelemetryBlocked()` blocks all hits on `localhost`, `127.0.0.1`, `[::1]`, `*.localhost` and in Vite dev builds. Any of these overrides lifts the block, for reproducing telemetry locally:
-
-- `VITE_FORCE_ANALYTICS=true` at build time.
-- `window.__FORCE_ANALYTICS__ = true`, set before the app loads (for example with Playwright's `addInitScript`).
-- A tracking ID starting with `G-TEST`.
-
-**Kill switch**: builds without `VITE_GTAG_ID` never load `gtag.js` or send anything. CI reads it from the `VITE_GTAG_ID` (or legacy `REACT_APP_GTAG_ID`) repository variable, so clearing that variable and redeploying turns analytics off for everyone. There is no separate feature flag; `src/utils/featureFlags.ts` only gates Ergogen-version features.
-
-Unit tests (`MODE === 'test'`) are never blocked. The overrides do not bypass user consent. To check hits without sending them, intercept `/g/collect` in the browser and fulfill or abort it locally.
-
-#### Opt-out and re-enable
-
-- Disabled before load: `gtag.js` is never injected.
-- Disabled mid-session: `window['ga-disable-<ID>'] = true` stops hits immediately, `_ga` and `_ga_*` cookies are expired, and global error listeners are removed. The loaded `dataLayer` and `window.gtag` are kept, so re-enabling in the same session clears the flag, re-issues `gtag('config')`, and resumes without a reload.
-
-#### Data minimization
-
-The "anonymous usage statistics" wording in the settings pane relies on these rules:
-
-- `gtag('config')` disables automatic page views, Google Signals and ad personalization. `App.tsx` sends one `page_view` per route change.
-- Every event carries `page_location` with the query string and hash removed, so `?github=...` and share payloads never leave the browser. `trackEvent()` also refreshes it with `gtag('set')` so automatic Enhanced Measurement events follow navigation. It is never set in `gtag('config')`, because config parameters stick to every later event.
-- No free text written by the user is sent: no config names or authors, filenames, repository URLs, or zone, column and row names. `meta.name` and `meta.author` are only used locally as inputs to the 12-character SHA-256 `config_id`.
-- `local_file_loaded` reports `file_type` from a fixed list (`yaml`, `yml`, `json`, `zip`, `ekb`, or `other`).
-- `trackEvent()` scrubs `error_message`, `description` and `error_stack` for every caller. It keeps the first line only, replaces quoted values with `*`, keeps only stack frame lines, and caps values at the GA4 limit of 100 characters. Error text is kept because it is the main signal for compiler failures, but quoted values are where ergogen and the browser echo user-written keys.
-- Constant parameters (`event_category`, the `sendUsageMetrics` setting) are not sent, because they cannot split any report.
-
-#### Keyboard Generation & Compilation Tracking
-
-Upon keyboard compilation in the Ergogen Web Worker, `ConfigContext.tsx` records `generation_completed` / `generation_failed` and analyzes successful layouts using `configAnalyzer.ts`.
-
-`configAnalyzer.ts` parses and extracts:
-
-- Outline, PCB, and Case counts
-- Boolean flags like `is_reversible` and `is_mirrored`
-- `keyboard_keys` representing the estimated physical switch count (doubled if reversible and asymmetric, otherwise matching `matrix_keys`)
-- Per-zone column, row and key counts, listed in alphabetical zone order (names are not sent)
-- A deterministic 12-character SHA-256 geometric `config_id` hash of the keyboard layout
-- A `previous_config_id` chaining layouts together inside the user session
-
-To ensure accuracy and prevent cluttering Google Analytics / BigQuery:
-
-- **Settlement Debounce**: Both `keyboard_generated` and auto-triggered `generation_completed` / `generation_failed` events use a **5-second settlement debounce** when `autoGen` is enabled (tracked via a ref so mid-session setting changes apply immediately without restarting Web Workers). Explicit manual **Generate** button / `Ctrl+Enter` actions and manual mode (`autoGen === false`) bypass the debounce and emit immediately. Only one generation outcome is pending at a time, so a transient `generation_failed` is dropped if compilation succeeds before the cooldown expires (and vice versa). Both events carry `trigger: 'auto' | 'manual'`.
-- **Redundancy Suppression**: The event is skipped if the generated geometric `config_id` is identical to the last successfully tracked `config_id`.
-- **Load Boundary Resets**: Switching, creating, duplicating, or deleting configurations, or viewing previews, clears the lineage context and drops any pending `keyboard_generated` event, so subsequent builds start fresh. A pending `generation_completed` or `generation_failed` is sent immediately instead, because that compilation already happened.
-- **Safety Exit Flushes**: When navigating away or closing the page, the window listens to `visibilitychange` (transitioning to `hidden`) and `pagehide` to immediately and synchronously flush any pending debounced events.
-
-#### Google Analytics property setup
-
-GA4 only reports custom event parameters that are registered on the property. `scripts/ga/ga-config.mjs` declares everything the property needs: custom dimensions and metrics, key events, retired registrations, Enhanced Measurement settings for the web stream, and data retention. `scripts/ga/ga-config.test.mjs` fails if the app sends a parameter that is not registered there, so add new parameters to the config in the same change. It parses every `trackEvent()` and `queueGenerationEvent()` call in `src/` with the TypeScript compiler (`scripts/ga/collect-event-parameters.mjs`), and also checks the payloads built at runtime by `analyzeConfiguration()`, `trackEvent()` and `trackError()`. A payload passed as a variable cannot be read statically, so the test fails until that exact call is listed in `FORWARDING_CALLS` with the reason its payload is covered elsewhere. When the app stops sending a parameter, move it to `retired` instead of deleting it.
-
-`scripts/ga/ga-admin.mjs` applies the config through the GA Admin API. The planning logic is in `scripts/ga/plan.mjs` and has no network calls, so it is unit-tested. Both commands are dry runs unless `--apply` is passed:
-
-```bash
-# Show, then apply, what the property is missing
-pnpm ga:setup -- --property 440040157
-pnpm ga:setup -- --property 440040157 --apply
-
-# Also archive retired dimensions and delete retired key events
-pnpm ga:setup -- --property 440040157 --prune-retired --apply
-
-# Remove every registration the config manages (asks for --confirm)
-pnpm ga:teardown -- --property 440040157 --apply --confirm 440040157
+# Development guide
+
+This file records how the app works and how to change it safely. Install, run and
+self-hosting steps live in [README.md](README.md); rules for every change live in
+[AGENTS.md](AGENTS.md). Future work belongs in
+[GitHub issues](https://github.com/ceoloide/ergogen-gui/issues), not here.
+
+## Validation
+
+Install exactly as in the README (Node from `.node-version`, pnpm from
+`packageManager`, `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install
+--frozen-lockfile`). Validation also needs the native tools listed in the README;
+on Linux x86_64 run `pnpm tools:install` and add `$PWD/.tools/bin` to `PATH`. CI
+uses the same installer and commands.
+
+| Command                                          | Checks                                                                                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, all Vitest tests. Never edits files. |
+| `pnpm validate`                                  | `validate:fast` plus the production build (what CI requires).                                                                    |
+| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build and all Playwright tests.                                                          |
+| `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                          |
+| `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                        |
+| `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                            |
+
+A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
+does. Application code uses the strict root `tsconfig.json`; browser tests, policy
+tests and configuration files use `tsconfig.tooling.json`. Husky/lint-staged run
+quick fixes on staged files; GitHub enforces validation independently.
+
+Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
+report and traces/screenshots of failures (no retries). Attach them, with the
+commit and exact command, to failure reports. All outputs are Git-ignored.
+
+### Browser tests
+
+`playwright.config.mts` picks a free loopback port (or `PLAYWRIGHT_TEST_PORT`),
+builds the production app with a unique `VITE_BUILD_ID` (`PLAYWRIGHT_BUILD_ID`,
+generated when unset) at base `/`, and serves it with `vite preview --strictPort`.
+`e2e/global-setup.ts` fails the run unless `build-id.txt` matches, so tests never
+reach a stale or foreign server. `CI` forbids `.only` and sets two workers. The
+fixture blocks external requests; provider tests route deterministic responses.
+One GitHub import regression is disabled pending
+[#227](https://github.com/ceoloide/ergogen-gui/issues/227).
+
+Other test suites worth knowing: `tests/engine-corpus.test.ts` runs the prepared
+engine on a small corpus (key count, outline size, KiCad 8 footprints, invalid
+footprint rejection); `tests/workflow-security.test.ts` checks workflow policy;
+`tests/build-version.test.ts` checks build-time engine identity.
+
+## Source layout
+
+Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
+`src/pages`. Global state is `src/context/ConfigContext.tsx`; pure logic is in
+`src/utils`; workers are in `src/workers`; theme tokens are in
+`src/theme/theme.ts`. `index.html` loads the classic-script helpers in
+`public/dependencies` (maker.js, KLE parser, KiCanvas and others) before
+`src/index.tsx`.
+
+## Generation
+
+- `ergogen.worker.ts` runs Ergogen; `jscad.worker.ts` turns its output into 3D
+  previews and STL. `src/workers/workerFactory.ts` creates both, so tests can mock
+  `Worker`.
+- Ergogen keeps injected footprints, templates and outlines in a module-level
+  registry. Closing the settings panel therefore terminates and recreates the
+  Ergogen worker, then regenerates, so renamed or deleted injections cannot
+  linger. Auto-generation is paused while settings are open.
+- `src/utils/injectionEvaluator.ts` evaluates injection code with `new Function`
+  inside the worker, with a `require` that only resolves `makerjs` and Ergogen
+  internals. This is not a sandbox: injected code, including code from share links
+  and imported repositories, runs in a same-origin worker with no further
+  isolation, so loading it means trusting it.
+- The Monaco editor is uncontrolled. Keystrokes update context after a 500 ms
+  debounce (context updates re-render widely and persist all configurations);
+  blur flushes it. Download and generate actions read the current buffer through
+  `getRealtimeConfigInput()` rather than the debounced state.
+
+## Loading and injections
+
+- **Providers** register in `src/utils/gitProvider.ts`. GitHub handles
+  `github.com` and bare `owner/repo`; Codeberg handles `codeberg.org`; the Forgejo
+  provider handles any other HTTP(S) host (Forgejo and Gitea share its API). All
+  requests are unauthenticated and bounded by `GIT_BFS_MAX_REQUESTS` and
+  `GIT_BFS_MAX_DEPTH` in `src/context/constants.ts`. GitHub rate-limit responses
+  become user-facing messages; authenticated requests are tracked in
+  [#164](https://github.com/ceoloide/ergogen-gui/issues/164).
+- **Repository and archive layout**: `config.yaml` at the root (repositories also
+  try `ergogen/config.yaml` and then search for other YAML files), with optional `footprints/`, `outlines/` and
+  `templates/` folders. Injection names are the path inside that folder without
+  `.js`. Repositories also follow matching Git submodules. ZIP and `.ekb` archives
+  use the same layout; size limits are in `src/utils/ergogenBundleLoader.ts`.
+- **Conflicts**: every source (repository, archive, share link) merges through
+  `src/utils/injections.ts`; on a name clash the user chooses skip, overwrite or
+  keep both (`name_1`), optionally for all remaining clashes.
+
+## Sharing
+
+`src/utils/share.ts` encodes `{ config, injections?, guiVersion, ergogenVersion }`
+with `lz-string` into the URL hash; the README documents the public contract. The
+share dialog runs a temporary worker in debug mode and offers only footprints
+that appear in the canonical PCB output, plus all templates and outlines.
+
+On load, `App.tsx` decodes the hash, then shows `ShareVersionCompatibilityDialog`
+if the link's GUI or Ergogen version is newer than the running one or its engine
+is custom. Links without versions are treated as GUI `0.9.0` and
+`github:ergogen/ergogen#v4.2.1`, so old links keep loading. Decode and validation
+failures show distinct messages; `?debug` logs the decoded payload.
+
+## Feature flags
+
+`src/utils/featureFlags.ts` gates custom templates and outlines (Ergogen 4.3.0 and
+later). The first match wins:
+
+1. URL `?ff_templates=` / `?ff_outlines=` set to literal `true` or `false`.
+2. Build variables `VITE_FEATURE_*` (else `REACT_APP_FEATURE_*`), literal `true` or
+   `false`.
+3. The engine version from `VITE_ERGOGEN_VERSION`. If that is not semver (a branch
+   or commit), the installed package version is used. A custom ref is not enabled
+   automatically.
+
+Gates apply in the injections panel, local and repository loaders, and on the main
+thread before generation, so stale stored injections cannot reach an engine that
+rejects them.
+
+## Configurations and storage
+
+`ConfigContext` keeps several configurations in `localStorage` under
+`ergogen:multi-config` (version 2 stores an SVG preview per configuration) and
+migrates the older single-config keys on startup. Configurations without a preview
+are compiled in the background without the STL stage. Bulk export (`src/utils/zip.ts`) compiles every
+configuration with a worker pool.
+
+## Engine and footprints
+
+The installed `ergogen` package is read-only: pnpm hard-links it from a shared
+store. `patch/patch_ergogen.sh` (`pnpm build-ergogen`, run by `postinstall`,
+`predev`, `prebuild` and `pretest:unit`) copies it to
+`node_modules/.ergogen-engine`, links its installed dependencies, fetches the two
+footprint libraries at full commit SHAs, installs `patch/footprints_index.js` and
+checks that the engine loads. It never runs a nested install or build or changes
+Git configuration. An input stamp makes repeat runs a no-op; changed inputs also
+clear the Vite cache. Vite and Vitest alias `ergogen` and its subpaths to this
+copy.
+
+Footprint pins and sources default in the script and can be overridden for one
+run:
+
+| Variable                                                      | Use                              |
+| ------------------------------------------------------------- | -------------------------------- |
+| `CEOLOIDE_FOOTPRINTS_COMMIT`, `INFUSED_KIM_FOOTPRINTS_COMMIT` | Another full 40-character SHA.   |
+| `CEOLOIDE_FOOTPRINTS_URL`, `INFUSED_KIM_FOOTPRINTS_URL`       | A mirror of the same repository. |
+
+Change the defaults only through a reviewed PR with full validation including
+browser tests. Engine preparation tests use local Git fixtures and need no
+network.
+
+### Engine experiments
+
+Canonical installs, CI and deployment use the `package.json` specifier and the
+frozen lockfile. To change the production engine, update both in a reviewed PR.
+To try another engine, use a separate checkout:
+
+```shell
+export ERGOGEN_VERSION=github:ceoloide/ergogen#develop   # or ergogen@<version>
+node scripts/preinstall.js
+PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
+pnpm dev
 ```
 
-- **Setup** creates missing registrations and updates display names, descriptions, metric units and stream or retention settings that differ. It never changes a registration's type, because GA does not allow that; it warns instead. Only event-scoped registrations are matched, so a user- or item-scoped dimension that shares a parameter name is never updated, archived or deleted. History-based page views stay off, because `App.tsx` sends its own `page_view`.
-- **Teardown** archives the managed dimensions and metrics (active and retired) and deletes the managed key events. Hand-made registrations, registrations in other scopes, GA's built-in `purchase` key event, and stream or retention settings are left alone; teardown does not even read the stream settings. Archiving hides a dimension's history from reports and cannot be undone, which is why teardown requires `--confirm <property id>`.
-- **Authentication**: set `GA_ACCESS_TOKEN` to a token with the `analytics.edit` scope, or `GA_SERVICE_ACCOUNT` to a service account that has Editor access on the property (for example `ga4-agent@ceoloide-ergogen.iam.gserviceaccount.com`). With a service account, the script exchanges your `gcloud` user token for a scoped token through the IAM Credentials API, because `gcloud`'s own impersonation ignores `--scopes`. Without either variable it uses `gcloud auth application-default print-access-token`. `GA_PROPERTY_ID` can replace `--property`.
-- On a property with several web streams, setup needs `--stream <id>`.
+pnpm 11 reads the manifest before the root `preinstall` hook, so the script must
+run first. It backs up `package.json`; `postinstall` restores it. Keep
+`ERGOGEN_VERSION` set: preparation fails if it differs from the installed
+specifier, and Vite also uses it as the displayed engine identity. Never commit
+the experiment's `package.json`, `pnpm-lock.yaml` or preview SVGs. Restore
+canonical inputs and reinstall with `--frozen-lockfile` before reporting
+canonical results.
 
-### PWA Manifest
+Example preview SVGs in `public/images/previews` are tracked. Regenerate them only
+with `pnpm generate-previews` and review the diff; builds never rewrite them.
 
-`public/manifest.json` uses the full PWA manifest spec:
+## CI and deployment
 
-- `id: "./"` — canonical identity for the PWA install
-- `display_override: ["window-controls-overlay", "standalone"]` — enables title-bar area on desktop PWAs
-- `theme_color / background_color: "#2a2a2a"` — matches the app's dark theme for splash screens
-- Icons: `public/icons/icon-192.png` and `public/icons/icon-512.png` (dark background, white logo)
+- `ci.yaml` runs on pull requests to `main` with a read-only token and
+  unpersisted checkout credentials: `pnpm validate`, then Playwright, then uploads
+  `reports/` and Playwright output as `validation-<sha>`.
+- `deploy.yaml` runs on pushes to `main`, manual dispatch and
+  `repository_dispatch`, never on pull requests. Its read-only `build` job
+  validates, builds, adds `404.html` and (on `main`, if `CNAME_DOMAIN` is set)
+  `CNAME`, then uploads `dist` as a one-day artifact. The `deploy` job, the only
+  one with `contents: write`, runs only on `main`, downloads the artifact and
+  publishes it to `gh-pages` with `peaceiris/actions-gh-pages`. It never checks
+  out or runs repository code.
+- Production runs share the `pages` concurrency group without cancellation.
+  GitHub keeps one pending run per group, so a newer push replaces a queued older
+  one (not FIFO); the latest `main` still deploys. Manual runs on other branches
+  build in their own group and never publish.
+- Build variables come from repository variables; see the README configuration
+  section. Note that CI prefers `REACT_APP_GTAG_ID` over `VITE_GTAG_ID`, the
+  reverse of `vite.config.mts`
+  ([#230](https://github.com/ceoloide/ergogen-gui/issues/230)).
+- Actions are pinned by commit and updated by Dependabot with a seven-day
+  cooldown. `tests/workflow-security.test.ts` asserts permissions, triggers,
+  credentials, the artifact handoff, the shared validation step and the
+  publisher's allowed inputs; update it with any workflow change.
 
-### PWA Implementation Files
+## Service worker
 
-- **`src/service-worker.ts`**: Workbox service worker source (compiled by `vite-plugin-pwa`'s InjectManifest mode)
-- **`src/serviceWorkerRegistration.ts`**: SW registration utility with `onUpdate` callback
-- **`src/atoms/UpdateChip.tsx`**: Pulsing chip rendered in Header when an update is waiting
-- **`public/manifest.json`**: Full PWA web app manifest
-- **`public/icons/`**: PWA icon set (192×192 and 512×512)
+`src/service-worker.ts` is built by `vite-plugin-pwa` in `injectManifest` mode and
+registered by `src/serviceWorkerRegistration.ts` only in production builds and
+from the same origin.
+
+- **Precache**: every built `.js`, `.css` and `.html` file, including the local
+  Monaco copy and `public/dependencies`: about 21 MB, 16 MB of it Monaco (the
+  TypeScript worker alone is about 7 MB, hence the 8 MiB per-file limit). This is
+  what makes offline start and editor language support work, at a large first
+  download.
+- **Runtime**: navigations fall back to the precached `index.html`. Google Fonts
+  use stale-while-revalidate (CSS) and cache-first (font files). The routes for
+  `dependencies/` and images join `BASE_URL` with another `/`, so they never match;
+  images are therefore not cached offline ([#229](https://github.com/ceoloide/ergogen-gui/issues/229)).
+- **Analytics** requests are not intercepted, and activation deletes the
+  `workbox-background-sync` database that older builds used to queue hits.
+- **Updates**: a changed `service-worker.js` installs as waiting; the header
+  shows `UpdateChip`; clicking it posts `SKIP_WAITING` and reloads (with a
+  one-second fallback reload). `?force_update` and `?force_install` show the update
+  and install controls for testing.
+
+## Analytics and privacy
+
+`src/utils/analytics.ts` owns consent and transport. `src/index.tsx` calls
+`initAnalytics()` before rendering; the settings switch re-runs it.
+
+- **No tag ID, no analytics.** Without `VITE_GTAG_ID` (or `REACT_APP_GTAG_ID`) the
+  script is never loaded, and minification removes the loader. The settings switch
+  still renders from stored consent ([#230](https://github.com/ceoloide/ergogen-gui/issues/230)).
+- **Consent**, first match wins: a choice made this session whose storage write
+  failed; the explicit key `ergogen:consent:sendUsageMetrics`; a stored `false` in
+  the legacy `ergogen:config:sendUsageMetrics` or `ergogen:settings` (a stored
+  `true` there is ignored because old builds wrote it automatically); otherwise on
+  in a browser tab and off in standalone PWA mode. Unreadable storage means off.
+- **Environment block**: no hits from Vite development builds or `localhost`,
+  `127.0.0.1`, `[::1]`, `*.localhost`, unless `VITE_FORCE_ANALYTICS=true`,
+  `window.__FORCE_ANALYTICS__ = true` before load, or a `G-TEST*` ID. Tests
+  (`MODE === 'test'`) are never blocked. No override bypasses consent. To check
+  hits without sending them, intercept `/g/collect` in the browser.
+- **Opt-out mid-session** sets `ga-disable-<ID>`, expires `_ga*` cookies and
+  removes error listeners; opting back in resumes without a reload.
+- **Data minimization**: no automatic page views, Google Signals or ad
+  personalization; `App.tsx` sends one `page_view` per route. `page_location` drops
+  query string and hash. No user-written text is sent (config names, authors,
+  filenames, repository URLs, zone/column/row names); `meta.name` and
+  `meta.author` only feed a 12-character SHA-256 `config_id`. `trackEvent()`
+  scrubs error text to its first line, masks quoted values and caps it at 100
+  characters.
+- **Generation events** (`generation_completed`, `generation_failed`,
+  `keyboard_generated`, from `ConfigContext` and `configAnalyzer.ts`) wait for a
+  5-second quiet period during auto-generation, are sent at once for manual runs,
+  skip unchanged `config_id`s, reset lineage when switching configurations and
+  flush on `pagehide` or when the page is hidden.
+
+### Google Analytics property setup
+
+Only maintainers of a GA4 property need this; self-hosting needs no Google
+account. GA reports only custom parameters registered on the property.
+`scripts/ga/ga-config.mjs` declares them, and `scripts/ga/ga-config.test.mjs`
+fails when the app sends an unregistered parameter. Register new parameters in
+the same change, and move ones no longer sent to `retired` instead of deleting
+them.
+
+`scripts/ga/ga-admin.mjs` applies the config through the GA Admin API:
+
+```shell
+pnpm ga:setup -- --property <id> [--stream <id>] [--prune-retired] [--apply]
+pnpm ga:teardown -- --property <id> --apply --confirm <id>
+```
+
+Without `--apply` both commands only print the plan, but they still authenticate
+and read the property. `GA_PROPERTY_ID` can replace `--property`. Credentials, in
+order: `GA_ACCESS_TOKEN` (a token with the `analytics.edit` scope);
+`GA_SERVICE_ACCOUNT` (a service account with Editor access, impersonated through
+the IAM Credentials API using your `gcloud` login); otherwise
+`gcloud auth application-default print-access-token`. Setup never changes a
+registration's type and touches only event-scoped registrations. Teardown archives
+managed dimensions and metrics irreversibly, hence `--confirm`.
+
+## Changelog
+
+`CHANGELOG.md` holds user-facing changes, newest first: features, notable fixes
+and workflow changes, not refactors or dependency bumps. Copy the shape of the
+latest entry: title, date, screenshot, a short problem and solution, and a **What
+changed** list, under 300 words.

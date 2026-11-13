@@ -1,108 +1,68 @@
-# Ergogen Web UI
+# Ergogen Web UI: rules for every change
 
-This project is a React-based web interface for the [Ergogen](https://github.com/ergogen/ergogen) project, including quality-of-life improvements to the users like live reload of outputs, integrated footprint libraries and loading directly from GitHub.
+A React and Vite web interface for [Ergogen](https://github.com/ergogen/ergogen).
+Read [README.md](README.md) for setup and hosting and
+[DEVELOPMENT.md](DEVELOPMENT.md) for architecture, validation and procedures.
+These rules apply to people and coding agents alike.
 
-For architecture and implemented behavior, refer to `DEVELOPMENT.md`. Future work is tracked in GitHub issues.
+## Dependencies and inputs
 
-## Development & Test Workflow
+- Use pnpm only, at the versions in `.node-version` and `packageManager`. Install
+  with `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile`;
+  keep the prefix on every `pnpm install` or `pnpm add`.
+- Declare every directly imported package in `package.json`; never rely on
+  transitive hoisting.
+- Canonical work uses the committed `package.json`, `pnpm-lock.yaml`, engine
+  specifier and footprint pins. Change them only on purpose, in review. Never
+  commit inputs or generated previews from an engine experiment
+  ([procedure](DEVELOPMENT.md#engine-experiments)).
 
-- **pnpm Only:** Use `pnpm` exclusively for dependency management (`pnpm add`), building (`pnpm run build`), and testing. Do not use `yarn` or `npm`.
-  - **Exotic Dependencies Override**: Prepend `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false` to any `pnpm install` or `pnpm add` commands to allow Git-based subdependencies inside `ergogen` to resolve correctly.
-  - **Transitive Dependencies**: If a library is imported directly (e.g., `makerjs`), it must be declared as a direct dependency in `package.json` (do not rely on implicit transitive hoisting).
-  - **Canonical Inputs**: CI and deployment use the frozen lockfile. For a separate compatibility experiment, explicitly run `scripts/preinstall.js` with `ERGOGEN_VERSION` before installing with `--no-frozen-lockfile`; follow README and restore canonical inputs before canonical acceptance.
-- **Setup:** Use Node 24.22.3 (`.node-version`), pnpm 11.12.0 (`packageManager`) and a frozen canonical lockfile. On Linux x86_64, run `pnpm tools:install` and put `$PWD/.tools/bin` on `PATH`; other platforms need the matching actionlint, ShellCheck and zizmor releases documented in README.
-- **Validation:** Run `pnpm validate:fast` for non-mutating format/lint/type/workflow checks and all Vitest tests, or `pnpm validate` to include the production build. Run `pnpm fix` explicitly to correct formatting/lint. Never treat a Vite build as a TypeScript check.
-- **Precommit Check:** You **MUST** run `pnpm run precommit` before committing. It runs the same non-mutating fast checks. Address errors before proceeding. Report existing warnings and exact limitations; do not silently skip failing gates.
-- **Unit Testing:**
-  - Run unit tests with `pnpm run test:unit`. You can add the `--verbose` argument to see detailed failure reasons.
-  - Follow the **Arrange, Act, Assert (AAA)** pattern in tests.
-  - Follow a strict **Red-Green-Refactor (TDD)** cycle: write a failing test first, implement the minimum code to pass, then refactor.
-  - Keep tests fast (e.g. by mocking heavy operations). Global Vitest setup is located in `src/setupTests.tsx`.
-  - Focus on a single failing test at a time when fixing issues.
-- **E2E Testing:** Run `pnpm run test:e2e` for Playwright against a fresh production build on an isolated strict port. Install Chromium with `pnpm exec playwright install chromium`. The harness checks build identity and retains failure traces; never attach tests to an existing dev server. E2E is not part of `precommit`.
-- **Knip Check:** Dependency pruning is checked via `pnpm knip` (run automatically as part of `pnpm run lint`). Ignore unused file warnings for files within `patch/` or `public/` directories.
-- **Focus Linting:** Only address lint/format errors in files you modified.
+## Validation
 
-### Commit, Issue & Documentation Guidelines
+- Run `pnpm precommit` before every commit and fix what it reports. Use
+  `pnpm validate` when the build is affected and `pnpm validate:extended` (or
+  `pnpm test:e2e`) for behavior visible in the browser. Commands are described in
+  [DEVELOPMENT.md](DEVELOPMENT.md#validation).
+- Never skip, disable or silently ignore a failing check. Fix failures your change
+  introduces; report pre-existing failures and warnings separately, with the
+  command and output.
+- A Vite build is not a type check.
+- Write a failing test before fixing a bug or adding behavior where practical.
+  Arrange, act, assert; mock heavy work; keep global setup in
+  `src/setupTests.tsx`. Run one file with
+  `pnpm exec vitest run <path> --reporter=verbose`.
+- Select elements in tests by role, accessible name or text; use `data-testid`
+  only as a fallback.
 
-- **Small Commits:** Keep changes small, incremental, and self-contained (typically addressing one part of a feature at a time, including related test code). Explain the "why" and decisions in your commit description.
-- **Environment Isolation:** Do not commit experiment changes to `pnpm-lock.yaml`, `package.json`, or generated previews if the environment is running with a custom `ERGOGEN_VERSION` environment variable (treat them as temporary files).
-- **Knowledge Base:** Keep `DEVELOPMENT.md` up-to-date with architectural/component changes. Propose updates for user preferences, directives, styles, context, and execution setup.
-- **GitHub Issue Creation for Tasks:** Do NOT add new future tasks or follow-up items to `DEVELOPMENT.md`. Instead, create a GitHub issue on `ceoloide/ergogen-gui` for each task or refactoring idea using the `gh` command-line tool.
-  - **Issue Title Format:** Use `[TASK-XXX] Title`; inspect existing issues to choose the next unused sequential ID.
-  - **Issue Body:** Include a clear description of the context, problem, and proposed fix.
-  - **Escape Hatch:** If the `gh` CLI tool is unavailable or unauthenticated, report the task details clearly to the user in your final response so they can log the issue manually.
-- **Changelog Updates:** For major user-facing changes, add an entry to `CHANGELOG.md` using the format detailed below.
+## Code style
 
----
+- Prefer clear code over short code.
+- Style with `styled-components`, including global styles; no CSS files. Colors
+  and spacing come from `src/theme/theme.ts`; add a token rather than hardcoding.
+- Prefix styled-only props with `$`. Use inline `style` for values that change
+  often, such as widths while dragging.
+- Use semantic HTML and ARIA labels.
+- ESLint rules live only in `eslint.config.mjs`. Keep `vite.config.mts` as an
+  `.mts` file.
 
-## Design Principles
+## Documentation
 
-- **Clarity Over Brevity:** Code should prioritize human legibility and clarity over minimizing lines of code.
-- **Centralized Theming:** All colors and spacing properties must be centralized in `src/theme/theme.ts`. Use theme variables instead of hardcoded values, adding new variables if needed.
-- **Styled Components:** Manage all styling (including global styles via `GlobalStyle`) with `styled-components`. Avoid separate CSS files like `index.css`.
-  - **Transient Props:** Prefix styled-component-only props with `$` (e.g., `$isVisible`) to prevent them from passing to the DOM.
-  - **Performance:** Use inline `style` props for high-frequency updates (e.g., width during drag operations) to prevent excessive class generation.
-- **Accessibility:** Use semantic HTML and ARIA attributes (e.g., `aria-label`) to ensure accessibility and simplify testing.
-- **User-Centric Selectors:** Select elements in tests by accessible name, role, or text. Use `data-testid` only as a fallback.
+- Keep `README.md` (users and self-hosters) and `DEVELOPMENT.md` (contributors)
+  accurate when behavior, configuration or procedures change. Describe each
+  procedure in one file and link to it from others.
+- Track follow-up work in GitHub issues on `ceoloide/ergogen-gui`, titled
+  `[TASK-NNN] Title` with the next unused number; never as a list in the docs. If
+  you cannot create the issue, give its text in your report.
+- Add a `CHANGELOG.md` entry for user-facing changes
+  ([style](DEVELOPMENT.md#changelog)).
 
----
+## Commits and pull requests
 
-## Development Environment Configuration
-
-- **Linting & Formatting:** ESLint manages linting and Prettier manages formatting.
-- **ESLint Single Source of Truth:** All rules are defined in `eslint.config.mjs`. The `eslintConfig` key in `package.json` is deprecated and must not be used.
-- **Vite Config Format**: Keep the Vite configuration file named as `vite.config.mts` to force native ES Module loading and bypass Node/Vite CommonJS API deprecation warnings.
-
----
-
-## Changelog Guidelines
-
-`CHANGELOG.md` tracks user-facing changes in reverse chronological order in a blog-post style (under 300 words).
-
-### When to Add Changelog Entries
-
-- **Add for:** New features, major enhancements, user-impactful bug fixes, workflow changes.
-- **Skip for:** Internal refactoring, dependency updates, minor bug fixes, documentation-only changes.
-
-### Changelog Entry Format
-
-```markdown
-## Feature Title
-
-Month DD, YYYY
-
-![A description of a screenshot of the feature.](./public/images/changelog/placeholder.png)
-
-[Problem description - 1-2 sentences about what was difficult before]
-
-[Solution explanation - 2-3 sentences about how it works now and why it's better]
-
-**What changed:**
-
-- **Key feature**: Brief description of what users can now do
-- **Another feature**: How it improves the experience
-- **Supporting feature**: Additional benefit or capability
-```
-
----
-
-## Knowledge Base Update Instructions
-
-When creating proposals for the knowledge base in `DEVELOPMENT.md` (do not edit `AGENTS.md` for this), organize them as follows:
-
-- **User Preferences & Instructions**: Directives (persistent commands) and Style/Conventions (general design preferences).
-- **Repository & Project Context**: Purpose & Architecture (core patterns).
-- **Environment & Execution**: Setup Commands and Execution Commands.
-
----
-
-## Swarms, Worktrees, and Pull Request Workflows
-
-- **Parallel Work**: Assign independent work explicit file ownership and isolated harness-provided worktrees. Keep package/lock and shared validation configuration under one integration owner. Build and test inside each owning checkout. Use the delegation/worktree tools actually available in the current harness; do not invent tool names or manually create a child's checkout.
-- **Pull Request Creation**:
-  - Never push changes directly to the remote `main` branch.
-  - Subagents must commit their changes in their worktree, push the topic branch, and use the GitHub CLI (`gh pr create`) to open individual Pull Requests for user review.
-- **Local Validation Gating**:
-  - Never consider a task fully complete or merge a PR until the user has had an opportunity to build and test the changes locally (e.g. at `http://localhost:3000`).
-  - Keep a dev server running or prompt the user with server details to confirm changes match their expectations before finalizing.
+- Keep commits small and self-contained, with tests, and explain why in the
+  message.
+- Never push to `main`; open a pull request from a topic branch. Stay within the
+  requested scope and do not merge without the owner's approval.
+- For functional changes, give the owner a chance to try the change locally
+  (`pnpm dev`, or a production preview) before merging.
+- Parallel work uses separate checkouts with clear file ownership; one owner
+  changes `package.json`, `pnpm-lock.yaml` and shared validation configuration.
