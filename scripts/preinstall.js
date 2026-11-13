@@ -4,15 +4,24 @@ const path = require('path');
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
 const backupPath = path.join(__dirname, '..', 'packages.json.bak');
 
+/**
+ * ERGOGEN_VERSION accepts either a dependency specifier
+ * (e.g. `github:ceoloide/ergogen#develop`) or the `ergogen@<specifier>` form
+ * shown in the README. package.json needs the bare specifier.
+ */
+function toDependencySpecifier(ergogenVersion) {
+  return ergogenVersion.replace(/^ergogen@/, '');
+}
+
 function preinstall() {
-  const ergogenVersion = process.env.ERGOGEN_VERSION;
-  if (!ergogenVersion) {
+  if (!process.env.ERGOGEN_VERSION) {
     console.log(
       'ERGOGEN_VERSION env variable is not set. Skipping preinstall patch.'
     );
     return;
   }
 
+  const ergogenVersion = toDependencySpecifier(process.env.ERGOGEN_VERSION);
   console.log(`ERGOGEN_VERSION is set to: ${ergogenVersion}`);
 
   if (!fs.existsSync(packageJsonPath)) {
@@ -29,11 +38,9 @@ function preinstall() {
       console.log(
         `ergogen dependency in package.json is already set to ${ergogenVersion}. No patch needed.`
       );
-      // If a leftover backup exists from a matching version (e.g. failed prior run), clean it up
-      if (fs.existsSync(backupPath)) {
-        console.log('Cleaning up leftover packages.json.bak...');
-        fs.unlinkSync(backupPath);
-      }
+      // Keep any existing backup: it holds the original package.json from an
+      // earlier preinstall run (e.g. CI runs this script explicitly before
+      // `pnpm install` runs it again), and postinstall restores it.
       return;
     }
 

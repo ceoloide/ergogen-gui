@@ -322,21 +322,49 @@ Several potential improvements could enhance the sharing feature:
 8. **Share Link Expiration**: Add optional expiration dates or time-to-live (TTL) for share links, useful for temporary sharing scenarios.
 9. **Compression Optimization**: Investigate alternative compression algorithms or compression settings that might provide better compression ratios for large configurations while maintaining URL safety.
 
-## Ergogen Version Override Lifecycle
+## Engine Preparation and Compatibility Experiments
 
-To allow developers and CI to override the default Ergogen version using the `ERGOGEN_VERSION` environment variable without permanently modifying `package.json` (or breaking the build due to `pnpm-lock.yaml` mismatch in CI), the project implements a temporary package.json patching workflow:
+The installed `ergogen` package is read-only: pnpm may hard-link its files into
+multiple checkouts. `patch/patch_ergogen.sh` copies it to
+`node_modules/.ergogen-engine`, links the already installed runtime dependencies,
+fetches ceoloide/infused-kim footprints at reviewed full SHAs, installs the index,
+inlines package metadata and verifies the engine loads. It never changes global
+Git settings or runs a nested package install/build. An input stamp skips unchanged
+work; changed inputs clear the checkout's Vite cache. Vite and Vitest alias the
+engine package and subpaths to this prepared copy. `postinstall`, development and
+build preparation invoke the same idempotent command.
 
-1. **Pre-install (`scripts/preinstall.js`)**:
-   - Executes before dependencies are resolved and installed.
-   - If `ERGOGEN_VERSION` is set and differs from the current `"ergogen"` dependency version in `package.json`, it backs up `package.json` to `packages.json.bak` and temporarily patches the `"ergogen"` dependency to the custom version.
-   - If the version matches or is not set, it does nothing (and cleans up any stale `packages.json.bak` backups).
+Canonical CI and deployment install the frozen lockfile. Engine version changes
+require reviewed package/lock updates, rather than repository-variable overrides. Canonical GitHub/repository identity metadata defaults to the committed engine specifier, preserving existing fork share links. Explicit compatibility metadata overrides retain their precedence; plain npm ranges retain the installed-version fallback.
+For an isolated compatibility experiment, explicitly run `scripts/preinstall.js`
+with `ERGOGEN_VERSION` before `pnpm install --no-frozen-lockfile`; pnpm reads its
+manifest before the lifecycle hook. The helper preserves its original-manifest
+backup across repeated invocations, and postinstall restores it. Preparation checks
+the requested specifier against the installed lockfile. See README for commands.
+Do not commit experiment lockfiles or regenerated previews.
 
-2. **Installation**:
-   - In CI, if `ERGOGEN_VERSION` is set, `pnpm install` is run without `--frozen-lockfile` to allow the package manager to dynamically update the lockfile in memory for the custom Ergogen dependency. If `ERGOGEN_VERSION` is not set, `pnpm install --frozen-lockfile` is used to guarantee consistent builds.
+The footprint commit defaults live in `patch/patch_ergogen.sh`; bump them through
+review and validate the actual browser worker. Engine preparation tests use local
+Git repositories and hard-linked fixture files to verify isolation, failure
+handling, pinned fetches and repeat-run behavior without network access.
+Example preview SVG regeneration is explicit; acceptance builds never rewrite
+tracked preview files.
 
-3. **Post-install (`scripts/postinstall.js`)**:
-   - Executes after dependencies are successfully installed.
-   - If `packages.json.bak` exists, it restores the original `package.json` and deletes the backup file, ensuring that the workspace remains clean and no modified `package.json` is committed.
+## CI & Deployment Workflows
+
+GitHub Actions workflows live in `.github/workflows`, pin Ubuntu 26.04 with Playwright 1.65.0, and keep untrusted code away from write-scoped tokens:
+
+- **`ci.yaml`** validates pull requests to `main` using the shared non-mutating `pnpm validate` command (format, lint, type checks, complete Vitest suite and production build) with a `contents: read` token and non-persisted checkout credentials. It then installs Chromium, runs the production Playwright suite, and uploads native reports and failure attachments under the tested SHA.
+- **`deploy.yaml`** runs only on pushes to `main`, `workflow_dispatch` and `repository_dispatch` (never on pull requests). It has two jobs:
+  1. `build` (`contents: read`): checks out without persisted credentials, installs locked dependencies, validates/builds, adds `404.html` and (on `main`) `CNAME`, then uploads `dist` as a one-day `github-pages-site` artifact.
+  2. `deploy` (`contents: write`, `main` only): downloads that artifact and publishes it to the `gh-pages` branch with `peaceiris/actions-gh-pages`. It never checks out, installs or runs repository code.
+- **Concurrency**: runs on `main` share the `pages` group with `cancel-in-progress: false`, so production deploys are serialized and never cancelled mid-flight. Manual runs on other branches only build, in their own group.
+- **Workflow validation**: `pnpm lint:workflows` runs actionlint 1.7.12 with ShellCheck 0.11.0; `pnpm lint:security` runs zizmor 1.32.0 offline across `.github`, including Dependabot configuration. Both Dependabot update ecosystems have a seven-day cooldown. `scripts/install-ci-tools.sh` installs checksum-verified native Linux x86_64 releases into a checkout-owned directory. Other platforms install matching native releases on `PATH`. All action references are commit-pinned and maintained through Dependabot. No Docker or Python prerequisite is introduced.
+- **Repository policy tests**: `tests/workflow-security.test.ts` uses Vitest and `js-yaml` for permissions, triggers, credentials, artifact handoff and the required shared PR validation step. Reviewed publish/concurrency declarations are checked explicitly; tests do not implement GitHub's expression language. The publisher's authentication/destination inputs are allowlisted and publish failures cannot be ignored.
+- **Validation contract**: `validate:fast` checks formatting, lint, dependencies, workflow security/syntax, shell, TypeScript and the complete Vitest suite; `validate` adds the production build; `validate:extended` combines fast checks with a fresh production build and the complete Playwright suite. `fix` owns source corrections. `precommit` delegates to the same fast checks. Application and source tests use the strict root TypeScript project; browser/policy/configuration TypeScript uses `tsconfig.tooling.json`. Maintained scripts are linted/formatted, and analytics `.test.mjs` files run in Vitest with the application suite.
+- **Browser harness**: `playwright.config.mts` allocates a loopback port and uses strict binding with no existing-server reuse. Its server command builds the production application with a unique build ID. `e2e/global-setup.ts` verifies `build-id.txt` before tests run. The harness keeps failure traces/screenshots without relying on retries. Build/server/browser outputs are checkout-local and ignored. The pinned prebuilt Monaco editor and its workers are served locally through `vite-plugin-static-copy` and a base-aware React loader path, preserving the existing loader behavior without rebuilding Monaco's compiler. The 8 MiB precache-file limit accommodates its approximately 7 MB TypeScript worker. Precaching the full editor is intentional for offline startup and language support: the manifest is about 21 MB total, with about 16 MB from Monaco, increasing initial background download/storage cost. Changed editor assets are refreshed on upgrades. The browser fixture blocks external requests; provider tests install deterministic page routes. The obsolete unused public Ergogen bundle is removed.
+- **Semantic corpus**: `tests/engine-corpus.test.ts` runs the real prepared engine and checks key count/pitch, outline dimensions, KiCad 8 vendor footprint generation and invalid-footprint rejection. Existing ZIP tests cover archive layout. It is a small initial corpus, not exhaustive geometry coverage.
+- **Evidence**: native JUnit reports live in `reports/`; CI uploads available reports on success or failure with a commit-labelled artifact name. Playwright additionally writes its HTML report and failure attachments. Uploads do not grant the PR workflow a write token.
 
 ## Version Information & Custom Build Indicators
 

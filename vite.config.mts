@@ -1,3 +1,6 @@
+import packageJson from './package.json';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -5,9 +8,43 @@ import { VitePWA } from 'vite-plugin-pwa';
 // We will use standard React plugin and PWA plugin in injectManifest mode
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  // Keep fork/repository identity for canonical builds. Plain npm ranges retain
+  // the existing installed-version fallback in the application's helpers.
+  const engineSpecifier = packageJson.dependencies.ergogen;
+  const defaultEngineVersion = /^(?:github:)?[\w.-]+\/[\w.-]+(?:#.+)?$/.test(
+    engineSpecifier
+  )
+    ? engineSpecifier
+    : '';
 
   return {
+    resolve: {
+      alias: [
+        {
+          find: /^ergogen(?=\/|$)/,
+          replacement: fileURLToPath(
+            new URL('./node_modules/.ergogen-engine', import.meta.url)
+          ),
+        },
+      ],
+    },
     plugins: [
+      {
+        name: 'validation-build-identity',
+        generateBundle() {
+          if (env.VITE_BUILD_ID) {
+            this.emitFile({
+              type: 'asset',
+              fileName: 'build-id.txt',
+              source: env.VITE_BUILD_ID,
+            });
+          }
+        },
+      },
+      // Copy the pinned prebuilt editor instead of rebuilding its compiler.
+      viteStaticCopy({
+        targets: [{ src: 'node_modules/monaco-editor/min/vs', dest: 'monaco' }],
+      }),
       // React support
       react(),
 
@@ -20,7 +57,9 @@ export default defineConfig(({ mode }) => {
         manifest: false, // We use the existing public/manifest.json
         injectManifest: {
           injectionPoint: 'self.__WB_MANIFEST',
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          // Monaco's pinned TypeScript worker is about 7 MB. Keep all editor
+          // assets precached so offline startup and language support work.
+          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         },
       }),
 
@@ -40,7 +79,8 @@ export default defineConfig(({ mode }) => {
             .filter(
               (chunk) =>
                 chunk.type === 'chunk' &&
-                (chunk.fileName.includes('three-') || chunk.fileName.includes('PcbPreview-'))
+                (chunk.fileName.includes('three-') ||
+                  chunk.fileName.includes('PcbPreview-'))
             )
             .map(
               (chunk) =>
@@ -55,7 +95,10 @@ export default defineConfig(({ mode }) => {
     base: env.VITE_PUBLIC_URL || env.PUBLIC_URL || '/',
     define: {
       'import.meta.env.VITE_ERGOGEN_VERSION': JSON.stringify(
-        env.VITE_ERGOGEN_VERSION || env.ERGOGEN_VERSION || env.REACT_APP_ERGOGEN_VERSION || ''
+        env.VITE_ERGOGEN_VERSION ||
+          env.ERGOGEN_VERSION ||
+          env.REACT_APP_ERGOGEN_VERSION ||
+          defaultEngineVersion
       ),
       'import.meta.env.VITE_GTAG_ID': JSON.stringify(
         env.VITE_GTAG_ID || env.REACT_APP_GTAG_ID || ''
@@ -77,7 +120,12 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('three') || id.includes('@react-three') || id.includes('three-stdlib') || id.includes('three-mesh-bvh')) {
+              if (
+                id.includes('three') ||
+                id.includes('@react-three') ||
+                id.includes('three-stdlib') ||
+                id.includes('three-mesh-bvh')
+              ) {
                 return 'three';
               }
               if (id.includes('makerjs')) {
@@ -91,9 +139,9 @@ export default defineConfig(({ mode }) => {
               }
               return 'vendor';
             }
-          }
-        }
-      }
+          },
+        },
+      },
     },
     worker: {
       format: 'iife',

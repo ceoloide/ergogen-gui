@@ -32,3 +32,10 @@ yarn_start.log
 
 # temporary worker test files
 src/workers/*.tmp.ts
+# Local validation tools, evidence and generated builds
+/.tools/
+/reports/
+/dist/
+/.generated/
+
+*.timestamp-*.mjs

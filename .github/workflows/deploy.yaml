@@ -2,78 +2,92 @@
 
 name: Build and deploy on GitHub Pages
 
+# Pull requests are validated by ci.yaml. This workflow only runs for trusted,
+# maintainer-controlled events so that pull request code can never reach the
+# write-scoped publish job or the production concurrency group.
 on:
   # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
+    branches: ['main']
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
   repository_dispatch:
-  pull_request:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Default to a read-only token; only the publish job is granted write access.
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# Only runs on main can publish, so only they join the production "pages" group; a manual run on another
+# branch builds in its own group and can never displace a queued production deployment.
 concurrency:
-  group: "pages"
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  # Installs dependencies and builds the site with a read-only token, then hands
+  # the result to the publish job as a short-lived artifact of this run.
+  build:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24.x'
+          node-version-file: .node-version
           cache: pnpm
-      - name: Configure Git to use HTTPS for GitHub
+      - name: Install locked dependencies
+        run: PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
+      - name: Install validation tools
         run: |
-          git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
-          git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
-          git config --global --add url."https://github.com/".insteadOf "git+ssh://git@github.com/"
-          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
-      - name: pnpm install
-        run: |
-          if [ -n "$ERGOGEN_VERSION" ]; then
-            echo "ERGOGEN_VERSION is set, running preinstall patch"
-            node scripts/preinstall.js
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
-          else
-            echo "ERGOGEN_VERSION is not set, running pnpm install --frozen-lockfile"
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
-          fi
-        env:
-          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: pnpm build
-        run: pnpm run build
+          pnpm tools:install
+          echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
+      - name: Validate production build
+        run: pnpm validate
         env:
           VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
-          VITE_ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
       - name: Create 404.html for SPA routing
         run: cp ./dist/index.html ./dist/404.html
       - name: Conditionally create CNAME
         if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
-        run: echo "${{ vars.CNAME_DOMAIN }}" > ./dist/CNAME
+        run: echo "$CNAME_DOMAIN" > ./dist/CNAME
         env:
           CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
+      - name: Upload site artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: github-pages-site
+          path: ./dist
+          if-no-files-found: error
+          retention-days: 1
+
+  # Publishes the prebuilt site to the gh-pages branch. This is the only job with
+  # a write-scoped token, and it never checks out, installs or runs repository code.
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download site artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: github-pages-site
+          path: ./dist
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist

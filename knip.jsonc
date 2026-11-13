@@ -3,14 +3,11 @@
   "entry": [
     "src/service-worker.ts",
     "**/*.test.{ts,tsx}",
-    "src/workers/*.worker.{ts,tsx}"
+    "src/workers/*.worker.{ts,tsx}",
   ],
-  "project": [
-    "src/**/*.{ts,tsx}"
-  ],
-  "ignore": [
-    "src/ergogen.d.ts"
-  ],
+  "project": ["src/**/*.{ts,tsx}"],
+  // Native release binary installed separately from the Node dependency graph.
+  "ignoreBinaries": ["actionlint", "shellcheck", "zizmor"],
   "ignoreDependencies": [
     "@jscad/csg",
     "@jscad/stl-serializer",
@@ -19,6 +16,6 @@
     "@typescript-eslint/parser",
     "baseline-browser-mapping",
     "eslint-plugin-prettier",
-    "markdownlint"
-  ]
+    "markdownlint",
+  ],
 }

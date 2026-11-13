@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import App from './App';
@@ -81,13 +82,13 @@ vi.mock('./molecules/SideNavigation', () => {
 // Mock worker Factory
 vi.mock('./workers/workerFactory', () => ({
   createErgogenWorker: () => ({
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
     onmessage: null,
   }),
   createJscadWorker: () => ({
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
     onmessage: null,
   }),
 }));
@@ -104,20 +105,20 @@ vi.mock('./utils/share', async () => {
 
 import { trackEvent } from './utils/analytics';
 vi.mock('./utils/analytics', () => ({
-  trackEvent: jest.fn(),
-  initAnalytics: jest.fn(),
+  trackEvent: vi.fn(),
+  initAnalytics: vi.fn(),
   getSendUsageMetricsEnabled: () => true,
   checkIsPWA: () => false,
 }));
 
 describe('App shared version compatibility checks', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('verifies version checking workflow during mount and subsequent hash changes', () => {
     // 1. Initial mount with compatible configuration
-    (getConfigFromHash as jest.Mock).mockReturnValue({
+    (getConfigFromHash as Mock).mockReturnValue({
       success: true,
       config: {
         config: 'points: {}',
@@ -134,7 +135,7 @@ describe('App shared version compatibility checks', () => {
     ).not.toBeInTheDocument();
 
     // 2. Simulate hash change to a warning configuration (newer GUI version)
-    (getConfigFromHash as jest.Mock).mockReturnValue({
+    (getConfigFromHash as Mock).mockReturnValue({
       success: true,
       config: {
         config: 'points: {}',
@@ -167,7 +168,7 @@ describe('App shared version compatibility checks', () => {
     );
 
     // 4. Simulate another hash change to a custom Ergogen version
-    (getConfigFromHash as jest.Mock).mockReturnValue({
+    (getConfigFromHash as Mock).mockReturnValue({
       success: true,
       config: {
         config: 'points: {}',

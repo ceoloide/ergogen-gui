@@ -1,0 +1,7 @@
+# GitHub's hosted Ubuntu 26.04 label is newer than actionlint 1.7.12's catalog.
+# Declare that one label through actionlint's supported label extension, while
+# retaining validation for all other runner labels.
+# https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04

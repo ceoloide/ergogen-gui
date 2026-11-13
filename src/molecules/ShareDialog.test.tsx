@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import ShareDialog from './ShareDialog';
@@ -15,16 +16,16 @@ vi.mock('../utils/share', async () => {
 
 // Mock the worker factory
 vi.mock('../workers/workerFactory', () => ({
-  createErgogenWorker: jest.fn(),
+  createErgogenWorker: vi.fn(),
 }));
 
 import { trackEvent } from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
-  trackEvent: jest.fn(),
+  trackEvent: vi.fn(),
 }));
 
 describe('ShareDialog', () => {
-  const mockClose = jest.fn();
+  const mockClose = vi.fn();
   const mockConfig = 'points:\n  key: 1';
   const mockInjections = [
     ['footprint', 'mx', 'module.exports = {}'],
@@ -36,18 +37,16 @@ describe('ShareDialog', () => {
   let mockWorker: any;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (createShareableUri as jest.Mock).mockReturnValue(
-      'https://share.link/test'
-    );
+    vi.clearAllMocks();
+    (createShareableUri as Mock).mockReturnValue('https://share.link/test');
 
     mockWorker = {
-      postMessage: jest.fn(),
-      terminate: jest.fn(),
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
       onmessage: null,
       onerror: null,
     };
-    (createErgogenWorker as jest.Mock).mockReturnValue(mockWorker);
+    (createErgogenWorker as Mock).mockReturnValue(mockWorker);
   });
 
   it('renders Step 1 with Include custom libraries switched ON by default', () => {
@@ -365,7 +364,7 @@ describe('ShareDialog', () => {
   it('tracks share_link_copied when link is copied', async () => {
     Object.assign(navigator, {
       clipboard: {
-        writeText: jest.fn().mockImplementation(() => Promise.resolve()),
+        writeText: vi.fn().mockImplementation(() => Promise.resolve()),
       },
     });
 
@@ -418,7 +417,7 @@ describe('ShareDialog', () => {
     beforeEach(() => {
       Object.assign(navigator, {
         clipboard: {
-          writeText: jest.fn().mockRejectedValue(new Error('Not allowed')),
+          writeText: vi.fn().mockRejectedValue(new Error('Not allowed')),
         },
       });
     });
@@ -445,8 +444,8 @@ describe('ShareDialog', () => {
 
     it('does not track share_link_copied when the fallback copy also fails', async () => {
       // Arrange
-      (trackEvent as jest.Mock).mockClear();
-      document.execCommand = jest.fn(() => false);
+      (trackEvent as Mock).mockClear();
+      document.execCommand = vi.fn(() => false);
 
       // Act
       await openAndShare();
@@ -461,8 +460,8 @@ describe('ShareDialog', () => {
 
     it('tracks share_link_copied when the fallback copy succeeds', async () => {
       // Arrange
-      (trackEvent as jest.Mock).mockClear();
-      document.execCommand = jest.fn(() => true);
+      (trackEvent as Mock).mockClear();
+      document.execCommand = vi.fn(() => true);
 
       // Act
       await openAndShare();

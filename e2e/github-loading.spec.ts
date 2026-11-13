@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeShooter } from './utils/screenshots';
 import { mockGitHubNetworkRequests } from './utils/githubMocks';
 
@@ -43,7 +43,7 @@ test.describe('GitHub Loading', () => {
 
     // Verify loading bar appears during GitHub loading
     const loadingBar = page.getByTestId('loading-bar');
-    await expect(loadingBar).toBeVisible({ timeout: 5000 });
+    await expect(loadingBar).toBeVisible({ timeout: 20000 });
     await shoot('loading-bar-visible');
 
     // Wait for the config to be loaded (should navigate to home)
@@ -57,7 +57,9 @@ test.describe('GitHub Loading', () => {
     await shoot('config-editor-visible');
 
     // Verify that console logs show GitHub loading activity
-    await page.waitForTimeout(2000); // Give time for all logs to appear
+    await expect
+      .poll(() => logs.some((log) => log.includes('Loaded footprint')))
+      .toBe(true);
 
     // Check that we have GitHub logging
     expect(logs.length).toBeGreaterThan(0);
@@ -73,16 +75,16 @@ test.describe('GitHub Loading', () => {
     // Check for footprint loading
     expect(logs.some((log) => log.includes('Loaded footprint'))).toBe(true);
 
-    await page.waitForTimeout(2000); // Give time for the config to load
-
     // Open settings to check footprints
-    const settingsButton = page.getByTestId('settings-button');
+    const settingsButton = page.getByRole('button', {
+      name: 'Show settings panel',
+    });
     await settingsButton.click();
     await shoot('settings-opened');
 
     // Wait for the injections/footprints section to be visible
     await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
+      timeout: 20000,
     });
     await shoot('injections-visible');
 
@@ -98,6 +100,7 @@ test.describe('GitHub Loading', () => {
     await shoot('footprints-loaded');
   });
 
+  // Existing disabled regression: https://github.com/ceoloide/ergogen-gui/issues/227.
   test.skip('should load config with URL parameter and footprints', async ({
     page,
   }) => {
@@ -124,12 +127,14 @@ test.describe('GitHub Loading', () => {
 
     // Wait for config to be loaded and editor to be visible
     await expect(page.getByTestId('config-editor')).toBeVisible({
-      timeout: 5000,
+      timeout: 20000,
     });
     await shoot('config-editor-visible-url-param');
 
     // Wait for logs
-    await page.waitForTimeout(2000);
+    await expect
+      .poll(() => logs.some((log) => log.includes('Loaded footprint')))
+      .toBe(true);
 
     // Verify GitHub activity in logs
     expect(logs.length).toBeGreaterThan(0);
@@ -137,12 +142,14 @@ test.describe('GitHub Loading', () => {
     expect(logs.some((log) => log.includes('Loaded footprint'))).toBe(true);
 
     // Open settings to verify footprints
-    const settingsButton = page.getByTestId('settings-button');
+    const settingsButton = page.getByRole('button', {
+      name: 'Show settings panel',
+    });
     await settingsButton.click();
     await shoot('settings-opened-url-param');
 
     await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
+      timeout: 20000,
     });
 
     const footprintRows = page.locator(
@@ -201,12 +208,14 @@ test.describe('GitHub Loading', () => {
     });
 
     // Open settings and verify first footprint
-    let settingsButton = page.getByTestId('settings-button');
+    let settingsButton = page.getByRole('button', {
+      name: 'Show settings panel',
+    });
     await settingsButton.click();
     await shoot('settings-opened-first');
 
     await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
+      timeout: 20000,
     });
 
     // Check for unspecworks/pico_oneside footprint
@@ -219,7 +228,7 @@ test.describe('GitHub Loading', () => {
     // Navigate back to welcome page
     const newConfigButton = page.getByTestId('new-config-button');
     await newConfigButton.click();
-    await expect(page).toHaveURL(/.*\/new/, { timeout: 5000 });
+    await expect(page).toHaveURL(/.*\/new/, { timeout: 20000 });
     await shoot('back-to-welcome');
 
     // Load second repository
@@ -228,7 +237,9 @@ test.describe('GitHub Loading', () => {
     await shoot('second-repo-loading');
 
     // Wait for logs
-    await page.waitForTimeout(10000);
+    await expect(page.getByTestId('conflict-dialog-box')).toBeVisible({
+      timeout: 20000,
+    });
     await shoot('second-repo-loaded-injections');
 
     // Resolve conflict dialog if it appears
@@ -249,12 +260,12 @@ test.describe('GitHub Loading', () => {
     await shoot('second-repo-loaded');
 
     // Open settings and verify both footprints are present
-    settingsButton = page.getByTestId('settings-button');
+    settingsButton = page.getByRole('button', { name: 'Show settings panel' });
     await settingsButton.click();
     await shoot('settings-opened-second');
 
     await expect(page.getByTestId('injections-container')).toBeVisible({
-      timeout: 5000,
+      timeout: 20000,
     });
 
     // Both footprints should be present

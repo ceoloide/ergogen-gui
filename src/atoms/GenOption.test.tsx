@@ -7,11 +7,11 @@ describe('GenOption', () => {
     optionId: 'test-option',
     label: 'Test Option Title',
     checked: false,
-    setSelected: jest.fn(),
+    setSelected: vi.fn(),
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders the option title/label', () => {

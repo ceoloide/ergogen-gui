@@ -1,9 +1,10 @@
+import type { Mock } from 'vitest';
 import { loadLocalFile } from './localFiles';
 import JSZip from 'jszip';
 import { isFeatureEnabled } from './featureFlags';
 
 vi.mock('./featureFlags', () => ({
-  isFeatureEnabled: jest.fn(() => true),
+  isFeatureEnabled: vi.fn(() => true),
 }));
 
 // Helper to flush promises
@@ -83,7 +84,7 @@ describe('localFiles utilities', () => {
   beforeEach(() => {
     // Store original FileReader
     originalFileReader = global.FileReader;
-    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+    (isFeatureEnabled as Mock).mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -97,7 +98,7 @@ describe('localFiles utilities', () => {
         // Arrange
         const fileContent = 'points:\n  - [0, 0]';
         const file = createMockFile('config.yaml', fileContent, 'text/yaml');
-        global.FileReader = jest.fn(
+        global.FileReader = vi.fn(
           () => new (createMockFileReader(fileContent))()
         ) as any;
 
@@ -115,7 +116,7 @@ describe('localFiles utilities', () => {
         // Arrange
         const fileContent = 'points:\n  - [0, 0]';
         const file = createMockFile('config.yml', fileContent, 'text/yaml');
-        global.FileReader = jest.fn(
+        global.FileReader = vi.fn(
           () => new (createMockFileReader(fileContent))()
         ) as any;
 
@@ -137,7 +138,7 @@ describe('localFiles utilities', () => {
           fileContent,
           'application/json'
         );
-        global.FileReader = jest.fn(
+        global.FileReader = vi.fn(
           () => new (createMockFileReader(fileContent))()
         ) as any;
 
@@ -154,7 +155,7 @@ describe('localFiles utilities', () => {
       it('handles FileReader errors', async () => {
         // Arrange
         const file = createMockFile('config.yaml', 'content', 'text/yaml');
-        global.FileReader = jest.fn(
+        global.FileReader = vi.fn(
           () => new (createMockFileReader('', true))()
         ) as any;
 
@@ -208,7 +209,7 @@ describe('localFiles utilities', () => {
         });
 
         // Mock feature flags to return false
-        (isFeatureEnabled as jest.Mock).mockReturnValue(false);
+        (isFeatureEnabled as Mock).mockReturnValue(false);
 
         // Act
         const result = await loadLocalFile(zipFile);
@@ -220,7 +221,7 @@ describe('localFiles utilities', () => {
         expect(result.templates).toHaveLength(0);
 
         // Restore default mocked value
-        (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+        (isFeatureEnabled as Mock).mockReturnValue(true);
       });
 
       it('loads an ekb file (which is a zip)', async () => {
@@ -437,7 +438,7 @@ describe('localFiles utilities', () => {
         // Arrange
         const fileContent = 'points: {}';
         const file = createMockFile('config.YAML', fileContent, 'text/yaml');
-        global.FileReader = jest.fn(
+        global.FileReader = vi.fn(
           () => new (createMockFileReader(fileContent))()
         ) as any;
 
@@ -454,7 +455,7 @@ describe('localFiles utilities', () => {
         // Arrange
         const fileContent = 'points: {}';
         const file = createMockFile('config.YaMl', fileContent, 'text/yaml');
-        global.FileReader = jest.fn(
+        global.FileReader = vi.fn(
           () => new (createMockFileReader(fileContent))()
         ) as any;
 

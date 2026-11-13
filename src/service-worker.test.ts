@@ -1,6 +1,8 @@
 const mockClientsClaim = vi.fn();
 const mockPrecacheAndRoute = vi.fn();
-const mockCreateHandlerBoundToURL = vi.fn(() => 'bound-index-handler');
+const mockCreateHandlerBoundToURL = vi.fn(
+  (_url: string) => 'bound-index-handler'
+);
 const mockRegisterRoute = vi.fn();
 
 vi.mock('workbox-core', () => ({
@@ -9,8 +11,7 @@ vi.mock('workbox-core', () => ({
 
 vi.mock('workbox-precaching', () => ({
   precacheAndRoute: (...args: unknown[]) => mockPrecacheAndRoute(...args),
-  createHandlerBoundToURL: (...args: unknown[]) =>
-    mockCreateHandlerBoundToURL(...args),
+  createHandlerBoundToURL: (url: string) => mockCreateHandlerBoundToURL(url),
 }));
 
 vi.mock('workbox-routing', () => ({

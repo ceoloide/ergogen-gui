@@ -29,7 +29,12 @@ export const mockGitHubNetworkRequests = async (page: Page) => {
           contentType: 'text/yaml',
           body: `
 points:
-  key: 1
+  zones:
+    matrix:
+      columns:
+        mr_useful:
+      rows:
+        key:
 footprints:
   ceoloide/logo_mr_useful: {}
 `,
@@ -78,7 +83,12 @@ footprints:
           contentType: 'text/yaml',
           body: `
 points:
-  key: 2
+  zones:
+    matrix:
+      columns:
+        gamma:
+      rows:
+        key:
 footprints:
   unspecworks/pico_oneside: {}
 `,

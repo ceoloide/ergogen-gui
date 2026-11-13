@@ -3,8 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
 
 describe('ConflictResolutionDialog', () => {
-  const mockOnResolve = jest.fn();
-  const mockOnCancel = jest.fn();
+  const mockOnResolve = vi.fn();
+  const mockOnCancel = vi.fn();
   const injectionName = 'test/footprint';
   const injectionType = 'footprint';
 

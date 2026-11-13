@@ -10,7 +10,17 @@ import importPlugin from 'eslint-plugin-import';
 
 export default tseslint.config(
   {
-    ignores: ['build', 'node_modules', 'patch', 'public'],
+    ignores: [
+      'build',
+      'dist',
+      'node_modules',
+      '.tools',
+      '.generated',
+      'reports',
+      '**/*.timestamp-*.mjs',
+      'patch',
+      'public',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -24,6 +34,20 @@ export default tseslint.config(
     },
   },
   prettierConfig,
+  {
+    files: [
+      'scripts/**/*.{js,mjs}',
+      '*.{js,mjs,ts,mts}',
+      'tests/**/*.ts',
+      'e2e/**/*.ts',
+    ],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ['scripts/**/*.js'],
+    languageOptions: { sourceType: 'commonjs' },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
   {
     files: ['src/**/*.{ts,tsx}'],
     plugins: {
@@ -78,6 +102,10 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',
     },
+  },
+  {
+    files: ['scripts/ga/ga-config.test.mjs'],
+    languageOptions: { globals: globals.browser },
   },
   // Allow permissive typing in declaration files
   {

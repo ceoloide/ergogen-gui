@@ -2,10 +2,10 @@ import { renderHook, act } from '@testing-library/react';
 import { useInjectionConflictResolution } from './useInjectionConflictResolution';
 
 describe('useInjectionConflictResolution', () => {
-  const mockSetInjectionInput = jest.fn();
-  const mockSetConfigInput = jest.fn();
-  const mockGenerateNow = jest.fn();
-  const mockGetCurrentInjections = jest.fn();
+  const mockSetInjectionInput = vi.fn();
+  const mockSetConfigInput = vi.fn();
+  const mockGenerateNow = vi.fn();
+  const mockGetCurrentInjections = vi.fn();
 
   const defaultCallbacks = {
     setInjectionInput: mockSetInjectionInput,
@@ -15,7 +15,7 @@ describe('useInjectionConflictResolution', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockGetCurrentInjections.mockReturnValue([]);
   });
 

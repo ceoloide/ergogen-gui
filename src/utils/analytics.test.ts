@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import {
   trackEvent,
   initAnalytics,
@@ -18,7 +19,7 @@ describe('Analytics Utility', () => {
 
   beforeEach(() => {
     // Reset window.gtag before each test
-    window.gtag = jest.fn();
+    window.gtag = vi.fn();
     // Reset environment variable before each test
     vi.stubEnv('VITE_ERGOGEN_VERSION', '');
     vi.stubEnv('VITE_GTAG_ID', 'G-TEST12345');
@@ -320,7 +321,7 @@ describe('Analytics Utility', () => {
 
         // Assert
         const expectedLocation = `${window.location.origin}/new`;
-        const calls = (window.gtag as jest.Mock).mock.calls;
+        const calls = (window.gtag as Mock).mock.calls;
         expect(calls[0]).toEqual(['set', { page_location: expectedLocation }]);
         expect(calls[1][0]).toBe('event');
         expect(calls[1][2]).toEqual(
@@ -367,7 +368,7 @@ describe('Analytics Utility', () => {
 
       trackEvent('test_event');
 
-      expect((window.gtag as jest.Mock).mock.calls[1][2]).not.toHaveProperty(
+      expect((window.gtag as Mock).mock.calls[1][2]).not.toHaveProperty(
         'event_category'
       );
     });
@@ -412,7 +413,7 @@ describe('Analytics Utility', () => {
 
     it('should not call window.gtag when analytics is disabled', () => {
       setSendUsageMetricsEnabled(false);
-      const mockGtag = jest.fn();
+      const mockGtag = vi.fn();
       window.gtag = mockGtag;
 
       trackEvent('test_event');
@@ -453,7 +454,7 @@ describe('Analytics Utility', () => {
           'Unexpected key "secret_zone" within field \'points.zones.my_board\'!\n 1 | meta:\n 2 |   author: Jane Doe',
       });
 
-      expect((window.gtag as jest.Mock).mock.calls[1][2].error_message).toBe(
+      expect((window.gtag as Mock).mock.calls[1][2].error_message).toBe(
         'Unexpected key "*" within field \'*\'!'
       );
     });
@@ -463,9 +464,9 @@ describe('Analytics Utility', () => {
 
       trackEvent('generation_failed', { error_message: 'x'.repeat(300) });
 
-      expect(
-        (window.gtag as jest.Mock).mock.calls[1][2].error_message
-      ).toHaveLength(100);
+      expect((window.gtag as Mock).mock.calls[1][2].error_message).toHaveLength(
+        100
+      );
     });
 
     it('should scrub exception descriptions and keep only stack frames', () => {
@@ -481,7 +482,7 @@ describe('Analytics Utility', () => {
 
       trackError(err, false, 'unhandled_error');
 
-      const params = (window.gtag as jest.Mock).mock.calls[1][2];
+      const params = (window.gtag as Mock).mock.calls[1][2];
       expect(params.description).toBe(
         '[unhandled_error] Cannot read properties of undefined (reading `*`)'
       );

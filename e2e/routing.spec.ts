@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeShooter } from './utils/screenshots';
 import Absolem from '../src/examples/absolem';
 import { MULTI_CONFIG_STORAGE_KEY } from '../src/context/constants';

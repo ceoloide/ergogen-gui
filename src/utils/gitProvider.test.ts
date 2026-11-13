@@ -36,7 +36,7 @@ describe('gitProviderRegistry', () => {
 
     // Mock global fetch
     const originalFetch = global.fetch;
-    const mockFetch = jest.fn().mockResolvedValue({
+    const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve('test config content'),
     });
@@ -66,7 +66,7 @@ describe('gitProviderRegistry', () => {
     expect(provider).toBeDefined();
 
     const originalFetch = global.fetch;
-    const mockFetch = jest.fn().mockImplementation((url: string) => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/raw/quokka.yaml')) {
         return Promise.resolve({
           ok: true,
@@ -118,7 +118,7 @@ describe('gitProviderRegistry', () => {
     expect(provider).toBeDefined();
 
     const originalFetch = global.fetch;
-    const mockFetch = jest.fn().mockImplementation((url: string) => {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/raw/quokka.yaml')) {
         return Promise.resolve({
           ok: true,
@@ -203,7 +203,7 @@ describe('gitProviderRegistry', () => {
       expect(provider).toBeDefined();
 
       const originalFetch = global.fetch;
-      const mockFetch = jest.fn().mockResolvedValue({
+      const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('forgejo config content'),
       });

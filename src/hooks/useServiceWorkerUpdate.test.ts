@@ -1,9 +1,10 @@
+import type { Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useServiceWorkerUpdate } from '../App';
 import * as serviceWorkerRegistration from '../serviceWorkerRegistration';
 
 vi.mock('../serviceWorkerRegistration', () => ({
-  register: jest.fn(),
+  register: vi.fn(),
 }));
 
 vi.mock('../Ergogen', () => {
@@ -25,16 +26,16 @@ vi.mock('../pages/Welcome', () => {
 });
 
 describe('useServiceWorkerUpdate hook', () => {
-  let mockReload: jest.Mock;
+  let mockReload: Mock;
   let originalNavigator: any;
-  let mockAddEventListener: jest.Mock;
+  let mockAddEventListener: Mock;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.useFakeTimers();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
 
     // Mock window.location
-    mockReload = jest.fn();
+    mockReload = vi.fn();
     Object.defineProperty(window, 'location', {
       value: {
         reload: mockReload,
@@ -44,7 +45,7 @@ describe('useServiceWorkerUpdate hook', () => {
     });
 
     // Mock navigator.serviceWorker
-    mockAddEventListener = jest.fn();
+    mockAddEventListener = vi.fn();
     originalNavigator = global.navigator;
     Object.defineProperty(global, 'navigator', {
       value: {
@@ -58,7 +59,7 @@ describe('useServiceWorkerUpdate hook', () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
     Object.defineProperty(global, 'navigator', {
       value: originalNavigator,
       writable: true,
@@ -95,7 +96,7 @@ describe('useServiceWorkerUpdate hook', () => {
   });
 
   it('should handle update when click is triggered with a waiting registration', () => {
-    const mockPostMessage = jest.fn();
+    const mockPostMessage = vi.fn();
     const mockWaitingWorker = {
       postMessage: mockPostMessage,
     };
@@ -104,7 +105,7 @@ describe('useServiceWorkerUpdate hook', () => {
     } as unknown as ServiceWorkerRegistration;
 
     let onUpdateCallback: any = null;
-    (serviceWorkerRegistration.register as jest.Mock).mockImplementation(
+    (serviceWorkerRegistration.register as Mock).mockImplementation(
       (config) => {
         onUpdateCallback = config.onUpdate;
       }
@@ -151,13 +152,13 @@ describe('useServiceWorkerUpdate hook', () => {
 
     // Fast-forward safety timeout; should not trigger another reload since it was cleared or already reloaded
     act(() => {
-      jest.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(1000);
     });
     expect(mockReload).toHaveBeenCalledTimes(1);
   });
 
   it('should trigger reload via safety fallback timeout if controllerchange does not fire', () => {
-    const mockPostMessage = jest.fn();
+    const mockPostMessage = vi.fn();
     const mockWaitingWorker = {
       postMessage: mockPostMessage,
     };
@@ -166,7 +167,7 @@ describe('useServiceWorkerUpdate hook', () => {
     } as unknown as ServiceWorkerRegistration;
 
     let onUpdateCallback: any = null;
-    (serviceWorkerRegistration.register as jest.Mock).mockImplementation(
+    (serviceWorkerRegistration.register as Mock).mockImplementation(
       (config) => {
         onUpdateCallback = config.onUpdate;
       }
@@ -188,7 +189,7 @@ describe('useServiceWorkerUpdate hook', () => {
 
     // Advance fake timers by 1000ms
     act(() => {
-      jest.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(1000);
     });
 
     expect(mockReload).toHaveBeenCalledTimes(1);
@@ -200,7 +201,7 @@ describe('useServiceWorkerUpdate hook', () => {
     } as unknown as ServiceWorkerRegistration;
 
     let onUpdateCallback: any = null;
-    (serviceWorkerRegistration.register as jest.Mock).mockImplementation(
+    (serviceWorkerRegistration.register as Mock).mockImplementation(
       (config) => {
         onUpdateCallback = config.onUpdate;
       }
