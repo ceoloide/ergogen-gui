@@ -52,10 +52,11 @@
     "test": "pnpm test:unit && pnpm test:e2e",
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d dist",
-    "format": "prettier --write \"*.{js,ts,json,md}\" \"{src,e2e,patch}/**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "lint:js": "eslint --fix \"{src,e2e,patch}/**/*.{ts,tsx,js,jsx}\"",
+    "format": "prettier --write \"*.{js,ts,json,md}\" \"{src,e2e,patch,tests}/**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "lint:js": "eslint --fix \"{src,e2e,patch,tests}/**/*.{ts,tsx,js,jsx}\"",
     "lint:md": "markdownlint --fix \"**/*.md\"",
-    "lint": "pnpm lint:md && pnpm lint:js && pnpm knip",
+    "lint:workflows": "actionlint -shellcheck= -pyflakes=",
+    "lint": "pnpm lint:md && pnpm lint:js && pnpm knip && pnpm lint:workflows",
     "precommit": "pnpm format && pnpm lint && pnpm test:unit"
   },
   "browserslist": {

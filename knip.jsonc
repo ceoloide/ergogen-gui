@@ -11,6 +11,8 @@
   "ignore": [
     "src/ergogen.d.ts"
   ],
+  // Native release binary installed separately from the Node dependency graph.
+  "ignoreBinaries": ["actionlint"],
   "ignoreDependencies": [
     "@jscad/csg",
     "@jscad/stl-serializer",

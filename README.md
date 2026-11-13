@@ -54,6 +54,24 @@ To run the Ergogen GUI on your local machine, please follow these steps.
 
    This will start a development server and open the application in your default browser at `http://localhost:3000`.
 
+### Validation Tools for Contributors
+
+Install [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12)
+for your platform and put the executable on your `PATH`. It is required for
+`pnpm run lint`, `pnpm run precommit`, and commits that change workflows; running
+the application does not require it. CI installs the same version and verifies
+its archive checksum. There is no Docker requirement.
+
+```shell
+actionlint -version
+pnpm lint:workflows
+pnpm exec vitest run tests/workflow-security.test.ts
+```
+
+The workflow command runs actionlint's built-in checks, with its optional
+ShellCheck/Pyflakes integrations disabled. Vitest separately checks the
+repository-specific deployment policy.
+
 ## How to Use
 
 The Ergogen GUI is divided into three main sections: the configuration editor on the left, the file preview in the middle, and the downloads/outputs list on the right.

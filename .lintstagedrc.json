@@ -5,6 +5,8 @@
     "vitest related --run --passWithNoTests"
   ],
   "e2e/**/*.ts": ["eslint --fix", "prettier --write"],
+  "tests/**/*.ts": ["eslint --fix", "prettier --write"],
+  ".github/workflows/*.{yml,yaml}": ["pnpm lint:workflows"],
   "patch/**/*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
   "**/*.json": ["prettier --write"],
   "**/*.md": ["markdownlint --fix", "prettier --write"]
