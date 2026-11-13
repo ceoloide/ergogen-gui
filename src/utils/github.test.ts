@@ -1,24 +1,25 @@
+import type { Mock, MockedFunction } from 'vitest';
 import { fetchConfigFromUrl, checkRateLimit } from './github';
 import { parseGitmodules } from './gitProvider';
 import { isFeatureEnabled } from './featureFlags';
 
 vi.mock('./featureFlags', () => ({
-  isFeatureEnabled: jest.fn(() => true),
+  isFeatureEnabled: vi.fn(() => true),
 }));
 
 // Mock fetch globally
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('github utilities', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+    vi.clearAllMocks();
+    (isFeatureEnabled as Mock).mockReturnValue(true);
   });
 
   describe('fetchConfigFromUrl with submodules', () => {
     it('should fetch footprints from submodules when .gitmodules exists', async () => {
       // Arrange
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch from root (404)
       mockFetch.mockResolvedValueOnce(new Response('', { status: 404 }));
@@ -90,7 +91,7 @@ describe('github utilities', () => {
 
     it('should handle submodules with nested folders', async () => {
       // Arrange
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
       mockFetch.mockResolvedValueOnce(
@@ -172,7 +173,7 @@ describe('github utilities', () => {
 
     it('should skip submodules that are not in the footprints folder', async () => {
       // Arrange
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
       mockFetch.mockResolvedValueOnce(
@@ -217,7 +218,7 @@ describe('github utilities', () => {
 
     it('should handle missing .gitmodules gracefully', async () => {
       // Arrange
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
       mockFetch.mockResolvedValueOnce(
@@ -255,7 +256,7 @@ describe('github utilities', () => {
     });
 
     it('should skip outlines and templates when they are disabled by feature flags', async () => {
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Mock config.yaml fetch
       mockFetch.mockResolvedValueOnce(
@@ -270,7 +271,7 @@ describe('github utilities', () => {
       );
 
       // Disable outlines and templates
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      (isFeatureEnabled as Mock).mockImplementation((feature) => {
         if (feature === 'outlines' || feature === 'templates') return false;
         return true;
       });
@@ -352,7 +353,7 @@ describe('github utilities', () => {
   describe('fetchConfigFromUrl rate limit integration', () => {
     it('should throw error when rate limit is exceeded on all branches', async () => {
       // Arrange
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Mock all fetch calls to fail with 429 (raw content)
       mockFetch.mockResolvedValue(new Response(null, { status: 429 }));
@@ -365,7 +366,7 @@ describe('github utilities', () => {
 
     it('should return rate limit warning when approaching limit', async () => {
       // Arrange
-      const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+      const mockFetch = global.fetch as MockedFunction<typeof fetch>;
 
       // Default mock for any API call: return 404 with warning headers
       mockFetch.mockResolvedValue(

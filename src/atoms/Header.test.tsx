@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Header from './Header';
@@ -5,25 +6,25 @@ import { useConfigContext } from '../context/ConfigContext';
 
 // Mock ConfigContext
 vi.mock('../context/ConfigContext', () => ({
-  useConfigContext: jest.fn(),
+  useConfigContext: vi.fn(),
 }));
 
-const mockCreateZip = jest.fn();
+const mockCreateZip = vi.fn();
 vi.mock('../utils/zip', () => ({
   createZip: (...args: any[]) => mockCreateZip(...args),
 }));
 
-const mockCreateShareableUri = jest.fn().mockReturnValue('https://share.link');
+const mockCreateShareableUri = vi.fn().mockReturnValue('https://share.link');
 vi.mock('../utils/share', () => ({
   createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
 }));
 
-const mockTrackEvent = jest.fn();
+const mockTrackEvent = vi.fn();
 vi.mock('../utils/analytics', () => ({
   trackEvent: (...args: any[]) => mockTrackEvent(...args),
 }));
 
-const mockNavigate = jest.fn();
+const mockNavigate = vi.fn();
 const mockLocation = { pathname: '/' };
 vi.mock('react-router-dom', () => ({
   Link: ({ children, to, onClick, ...props }: any) => (
@@ -50,19 +51,19 @@ describe('Header', () => {
     isJscadConverting: false,
     showSettings: false,
     showSideNav: false,
-    setShowSettings: jest.fn(),
-    setShowSideNav: jest.fn(),
-    renameConfig: jest.fn().mockReturnValue(true),
-    duplicateConfig: jest.fn(),
-    deleteConfig: jest.fn(),
-    savePreviewConfig: jest.fn(),
+    setShowSettings: vi.fn(),
+    setShowSideNav: vi.fn(),
+    renameConfig: vi.fn().mockReturnValue(true),
+    duplicateConfig: vi.fn(),
+    deleteConfig: vi.fn(),
+    savePreviewConfig: vi.fn(),
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockContextValue.renameConfig.mockReturnValue(true);
-    (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
-    window.confirm = jest.fn().mockReturnValue(true);
+    (useConfigContext as Mock).mockReturnValue(mockContextValue);
+    window.confirm = vi.fn().mockReturnValue(true);
   });
 
   const renderComponent = () => {
@@ -77,7 +78,7 @@ describe('Header', () => {
   });
 
   it('renders Shared icon when configuration is in preview mode', () => {
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...mockContextValue,
       activeConfigName: 'Shared Config',
       isPreview: true,
@@ -160,7 +161,7 @@ describe('Header', () => {
   });
 
   it('triggers savePreviewConfig when clicking the save button in preview mode', () => {
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...mockContextValue,
       activeConfigName: 'Shared Config',
       isPreview: true,
@@ -174,7 +175,7 @@ describe('Header', () => {
   });
 
   it('triggers download archive on click', () => {
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...mockContextValue,
       results: { canonical: 'canonical_yaml' },
       configInput: 'points: {}',

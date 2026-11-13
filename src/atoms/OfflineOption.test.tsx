@@ -3,10 +3,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import OfflineOption from './OfflineOption';
 
 describe('OfflineOption', () => {
-  const mockOnInstall = jest.fn();
+  const mockOnInstall = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders "Offline App" title', () => {

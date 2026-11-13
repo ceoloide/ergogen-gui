@@ -9,6 +9,7 @@ vi.mock('./utils/analytics', () => ({
 
 vi.mock('@monaco-editor/react', () => ({
   loader: {
+    config: vi.fn(),
     init: vi.fn(
       () =>
         new Promise((resolve) => {

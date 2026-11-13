@@ -1,19 +1,20 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Ergogen from './Ergogen';
 import { useConfigContext } from './context/ConfigContext';
 
 vi.mock('./context/ConfigContext', () => ({
-  useConfigContext: jest.fn(),
+  useConfigContext: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+  useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/' }),
 }));
 
 vi.mock('react-hotkeys-hook', () => ({
-  useHotkeys: jest.fn(),
+  useHotkeys: vi.fn(),
 }));
 
 // Mock sub-components
@@ -49,17 +50,17 @@ vi.mock('./molecules/ResizablePanel', () => {
 });
 
 // Mock zip, share, and analytics utils
-const mockCreateZip = jest.fn();
+const mockCreateZip = vi.fn();
 vi.mock('./utils/zip', () => ({
   createZip: (...args: any[]) => mockCreateZip(...args),
 }));
 
-const mockCreateShareableUri = jest.fn().mockReturnValue('https://share.link');
+const mockCreateShareableUri = vi.fn().mockReturnValue('https://share.link');
 vi.mock('./utils/share', () => ({
   createShareableUri: (...args: any[]) => mockCreateShareableUri(...args),
 }));
 
-const mockTrackEvent = jest.fn();
+const mockTrackEvent = vi.fn();
 vi.mock('./utils/analytics', () => ({
   trackEvent: (...args: any[]) => mockTrackEvent(...args),
 }));
@@ -81,16 +82,16 @@ describe('Ergogen Subheader Buttons', () => {
     showSideNav: false,
     showConfig: true,
     showDownloads: false,
-    setShowSettings: jest.fn(),
-    setShowSideNav: jest.fn(),
-    setShowConfig: jest.fn(),
-    setShowDownloads: jest.fn(),
-    generateNow: jest.fn(),
+    setShowSettings: vi.fn(),
+    setShowSideNav: vi.fn(),
+    setShowConfig: vi.fn(),
+    setShowDownloads: vi.fn(),
+    generateNow: vi.fn(),
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (useConfigContext as jest.Mock).mockReturnValue(mockContextValue);
+    vi.clearAllMocks();
+    (useConfigContext as Mock).mockReturnValue(mockContextValue);
   });
 
   it('renders mobile share button and triggers share logic on click when showConfig is true', () => {
@@ -114,7 +115,7 @@ describe('Ergogen Subheader Buttons', () => {
   });
 
   it('renders mobile archive button and triggers download archive logic on click when showConfig is false', () => {
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...mockContextValue,
       showConfig: false,
       results: { canonical: 'canonical_yaml' },
@@ -151,11 +152,11 @@ describe('Ergogen preview_loaded tracking', () => {
     showSideNav: false,
     showConfig: true,
     showDownloads: false,
-    setShowSettings: jest.fn(),
-    setShowSideNav: jest.fn(),
-    setShowConfig: jest.fn(),
-    setShowDownloads: jest.fn(),
-    generateNow: jest.fn(),
+    setShowSettings: vi.fn(),
+    setShowSideNav: vi.fn(),
+    setShowConfig: vi.fn(),
+    setShowDownloads: vi.fn(),
+    generateNow: vi.fn(),
   };
 
   const countPreviewLoadedCalls = () =>
@@ -163,16 +164,16 @@ describe('Ergogen preview_loaded tracking', () => {
       .length;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('fires preview_loaded once when results first become available', () => {
     // Arrange
-    (useConfigContext as jest.Mock).mockReturnValue(baseContext);
+    (useConfigContext as Mock).mockReturnValue(baseContext);
     const { rerender } = render(<Ergogen />);
 
     // Act
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...baseContext,
       results: { demo: { svg: '<svg />' } },
     });
@@ -188,7 +189,7 @@ describe('Ergogen preview_loaded tracking', () => {
 
   it('does not re-fire preview_loaded when results regenerate for the same preview', () => {
     // Arrange
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...baseContext,
       results: { demo: { svg: '<svg />' } },
     });
@@ -198,7 +199,7 @@ describe('Ergogen preview_loaded tracking', () => {
     // Act: simulate several auto-generation / STL completion cycles, each
     // producing a new results object for the unchanged preview.
     for (let i = 0; i < 3; i++) {
-      (useConfigContext as jest.Mock).mockReturnValue({
+      (useConfigContext as Mock).mockReturnValue({
         ...baseContext,
         results: { demo: { svg: `<svg data-run="${i}" />` } },
       });
@@ -211,7 +212,7 @@ describe('Ergogen preview_loaded tracking', () => {
 
   it('fires preview_loaded again after results are cleared, e.g. when switching configs', () => {
     // Arrange: a config is loaded and its preview has been tracked.
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...baseContext,
       results: { demo: { svg: '<svg />' } },
     });
@@ -220,13 +221,13 @@ describe('Ergogen preview_loaded tracking', () => {
 
     // Act: selecting, creating or duplicating a config clears the results
     // before the new config generates, while Ergogen stays mounted.
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...baseContext,
       activeConfigId: '2',
       results: null,
     });
     rerender(<Ergogen />);
-    (useConfigContext as jest.Mock).mockReturnValue({
+    (useConfigContext as Mock).mockReturnValue({
       ...baseContext,
       activeConfigId: '2',
       results: { demo: { svg: '<svg data-config="2" />' } },

@@ -75,6 +75,8 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
+// Serve the pinned editor and workers from this build, including under a base path.
+loader.config({ paths: { vs: `${import.meta.env.BASE_URL}monaco/vs` } });
 loader.init().then((monaco) => {
   defineErgogenTheme(monaco);
 

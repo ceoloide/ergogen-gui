@@ -190,7 +190,7 @@ class GitHubProvider extends BaseGitProvider {
     return await res.text();
   }
 
-  protected async listDirectory(
+  async listDirectory(
     owner: string,
     repo: string,
     path: string,

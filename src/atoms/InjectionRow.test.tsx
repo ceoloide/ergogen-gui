@@ -12,8 +12,8 @@ const setup = (
       name: 'test-injection',
       content: 'test-content',
     },
-    setInjectionToEdit: jest.fn(),
-    deleteInjection: jest.fn(),
+    setInjectionToEdit: vi.fn(),
+    deleteInjection: vi.fn(),
     previewKey: '',
     'data-testid': 'injection-row',
   };
@@ -31,7 +31,7 @@ describe('InjectionRow', () => {
 
   it('calls deleteInjection when the delete link is clicked', () => {
     // Arrange
-    const deleteInjection = jest.fn();
+    const deleteInjection = vi.fn();
     const injection = {
       key: 0,
       type: 'footprint',
@@ -49,7 +49,7 @@ describe('InjectionRow', () => {
 
   it('calls setInjectionToEdit when the injection name is clicked', () => {
     // Arrange
-    const setInjectionToEdit = jest.fn();
+    const setInjectionToEdit = vi.fn();
     const injection = {
       key: 0,
       type: 'footprint',
@@ -93,7 +93,7 @@ describe('InjectionRow', () => {
       name: 'test-injection',
       content: 'test-content',
     };
-    const createObjectURL = jest
+    const createObjectURL = vi
       .fn()
       .mockReturnValue('blob:http://localhost/mock-url');
     global.URL.createObjectURL = createObjectURL;

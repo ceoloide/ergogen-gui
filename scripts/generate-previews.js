@@ -1,17 +1,29 @@
-
 const fs = require('fs');
 const path = require('path');
-const ergogen = require('ergogen');
 const { exampleOptions } = require('../src/examples/index.ts');
+
+// Use the engine prepared by `pnpm run build-ergogen` (patch/patch_ergogen.sh),
+// which includes the bundled footprint libraries, not the raw installed package.
+const engineDir = path.join(process.cwd(), 'node_modules', '.ergogen-engine');
+if (!fs.existsSync(path.join(engineDir, 'package.json'))) {
+  console.error(
+    `Ergogen engine not found in ${engineDir}. Run 'pnpm run build-ergogen' first.`
+  );
+  process.exit(1);
+}
+const ergogen = require(engineDir);
 
 const previewsDir = path.join(process.cwd(), 'public', 'images', 'previews');
 if (!fs.existsSync(previewsDir)) {
   fs.mkdirSync(previewsDir, { recursive: true });
 }
 
+/**
+ * Renders the preview of one example. Returns false when it failed.
+ */
 async function generatePreview(example) {
   if (example.label === 'Empty YAML configuration') {
-    return;
+    return true;
   }
 
   console.log(`Generating preview for ${example.label}...`);
@@ -19,13 +31,15 @@ async function generatePreview(example) {
   try {
     const output = await ergogen.process(example.value, {
       svg: true,
-      debug: true
+      debug: true,
     });
 
     const svgContent = output.outlines?.preview?.svg || output.demo.svg;
 
     if (svgContent) {
-      let content = Array.isArray(svgContent) ? svgContent.join('') : svgContent;
+      let content = Array.isArray(svgContent)
+        ? svgContent.join('')
+        : svgContent;
       if (typeof content === 'string') {
         content = content
           .replace(/width="[^"]+"/, 'width="284px"')
@@ -45,21 +59,34 @@ async function generatePreview(example) {
     }
   } catch (err) {
     console.error(`Error generating preview for ${example.label}:`, err);
+    return false;
   }
+  return true;
 }
 
 async function main() {
+  const failures = [];
   for (const group of exampleOptions) {
     for (const example of group.options) {
-      await generatePreview(example);
+      if (!(await generatePreview(example))) {
+        failures.push(example.label);
+      }
     }
   }
 
   console.log('Generated previews:');
   const files = fs.readdirSync(previewsDir);
-  files.forEach(file => {
+  files.forEach((file) => {
     console.log(file);
   });
+
+  if (failures.length > 0) {
+    console.error(`Failed to generate previews for: ${failures.join(', ')}`);
+    process.exitCode = 1;
+  }
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

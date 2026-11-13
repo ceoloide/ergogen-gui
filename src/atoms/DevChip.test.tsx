@@ -14,11 +14,11 @@ describe('DevChip', () => {
   };
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('renders the DEV chip with beaker icon', () => {
@@ -63,7 +63,7 @@ describe('DevChip', () => {
 
     // Act (Advance timers to trigger close)
     act(() => {
-      jest.advanceTimersByTime(250);
+      vi.advanceTimersByTime(250);
     });
 
     // Assert popover is closed

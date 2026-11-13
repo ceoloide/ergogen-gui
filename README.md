@@ -44,7 +44,7 @@ To run the Ergogen GUI on your local machine, please follow these steps.
     pnpm install
    ```
 
-   This command will also build a local copy of Ergogen from the patched source in the `patch/` directory.
+   This command prepares a checkout-owned Ergogen copy with the pinned footprint libraries; it does not patch the shared pnpm store.
 
 3. **Start the development server:**
 
@@ -54,23 +54,47 @@ To run the Ergogen GUI on your local machine, please follow these steps.
 
    This will start a development server and open the application in your default browser at `http://localhost:3000`.
 
-### Validation Tools for Contributors
+### Validation for Contributors and Agents
 
-Install [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12)
-for your platform and put the executable on your `PATH`. It is required for
-`pnpm run lint`, `pnpm run precommit`, and commits that change workflows; running
-the application does not require it. CI installs the same version and verifies
-its archive checksum. There is no Docker requirement.
+Use Node **24.22.3** (`.node-version`) and pnpm **11.12.0** (`packageManager`).
+Install locked dependencies with `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile`.
+
+Workflow validation requires native [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12),
+[ShellCheck 0.11.0](https://github.com/koalaman/shellcheck/releases/tag/v0.11.0) and
+[zizmor 1.32.0](https://github.com/zizmorcore/zizmor/releases/tag/v1.32.0) on `PATH`.
+On Linux x86_64, the shared installer downloads official releases, verifies pinned
+SHA-256 checksums and writes only to this checkout's ignored `.tools/bin`:
 
 ```shell
-actionlint -version
-pnpm lint:workflows
-pnpm exec vitest run tests/workflow-security.test.ts
+pnpm tools:install
+export PATH="$PWD/.tools/bin:$PATH"
+pnpm validate:fast
+pnpm validate
 ```
 
-The workflow command runs actionlint's built-in checks, with its optional
-ShellCheck/Pyflakes integrations disabled. Vitest separately checks the
-repository-specific deployment policy.
+On other platforms, install the matching native releases yourself. No Docker or
+Python is required. CI uses the same installer and commands.
+
+- `pnpm validate:fast`: check formatting, Markdown, ESLint, Knip, workflow syntax/security,
+  shell scripts, application/test/tooling types and the complete Vitest suite.
+  The suite includes maintained analytics scripts and repository workflow policy.
+- `pnpm validate`: all fast checks plus the production build.
+- `pnpm validate:extended`: fast checks plus a fresh production build and the complete Playwright suite.
+- `pnpm fix`: explicitly apply formatting and supported lint fixes. Acceptance
+  commands do not fix source files.
+- `pnpm test:e2e`: build a fresh production site and run Playwright against its own
+  strict loopback port. A build-identity check rejects stale or foreign servers.
+  Install browsers first with `pnpm exec playwright install chromium`.
+- `pnpm precommit`: the same non-mutating fast checks. Husky/lint-staged provide
+  quick staged-file fixes/checks; GitHub independently enforces validation.
+
+Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
+report, and traces/screenshots on failure even with zero retries. These outputs
+are ignored by Git and should accompany failure reports along with the tested
+commit and exact command. Browser runs own their server lifecycle and do not
+reuse your development server. The editor and its workers are bundled locally;
+acceptance blocks external requests except explicit provider fixtures. One legacy
+URL-import regression remains disabled and is tracked in [#227](https://github.com/ceoloide/ergogen-gui/issues/227).
 
 ## How to Use
 
@@ -249,53 +273,36 @@ The codebase is organized into the following main directories:
 
 ## Using a Custom Ergogen Version or Branch
 
-By default, the GUI uses the Ergogen version specified in `package.json`. You can override this at build or deploy time using the `ERGOGEN_VERSION` environment variable. This is useful for testing specific versions, branches, or forks without modifying the source code. The active version will be displayed in the application header and side navigation.
+Canonical CI and deployment use the `package.json` dependency and committed frozen
+lockfile. To change production Ergogen, update and review both files in a PR;
+a repository variable cannot silently replace the validated engine.
 
-### Local Development
-
-To use a custom version locally, set the `ERGOGEN_VERSION` variable before running the install or build commands:
+For a compatibility experiment, use an isolated checkout. pnpm 11 reads the
+manifest before its root preinstall hook, so explicitly patch it first:
 
 ```shell
-# Using a specific npm version
-ERGOGEN_VERSION=ergogen@4.2.0 pnpm install
-
-# Using a GitHub branch
-ERGOGEN_VERSION=github:mrzealot/ergogen#develop pnpm install
-
-# After installation, start as usual
-pnpm run dev
+export ERGOGEN_VERSION=github:ceoloide/ergogen#v4.3.0
+node scripts/preinstall.js
+PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
+pnpm dev
 ```
 
-### GitHub Pages Deployment
+The helper also accepts `ergogen@<version>`. Postinstall restores the original
+manifest; the experiment's lockfile and generated previews must not be committed.
+Keep `ERGOGEN_VERSION` set during the experiment: preparation rejects a mismatch
+between the requested and installed specifier. Restore canonical inputs and do a
+frozen install before reporting canonical acceptance.
 
-To use a custom Ergogen version for your GitHub Pages deployment:
+### Engine and Footprint Inputs
 
-1. Go to your repository on GitHub.
-2. Navigate to **Settings** > **Secrets and variables** > **Actions**.
-3. Select the **Variables** tab and click **New repository variable**.
-4. For the **Name**, enter `ERGOGEN_VERSION`.
-5. For the **Value**, enter your desired version (e.g., `ergogen@4.2.0` or `github:username/ergogen#branch`).
-6. Re-run your deployment workflow.
+`pnpm build-ergogen` copies the installed engine to `node_modules/.ergogen-engine`
+and adds the two footprint libraries at full commit SHAs recorded in
+`patch/patch_ergogen.sh`. Vite and Vitest alias `ergogen` and its subpaths to this
+copy. The installed package and global Git configuration remain untouched.
+A successful input stamp makes repeated preparation a no-op. Bump a footprint
+pin through a reviewed change and run full validation, including browser tests.
+For experiments, `CEOLOIDE_FOOTPRINTS_COMMIT` and `INFUSED_KIM_FOOTPRINTS_COMMIT`
+accept full SHAs; matching `*_FOOTPRINTS_URL` variables allow a mirror.
 
-The deployment workflow will automatically pick up this variable and use it during the build process.
-
-### Manual Override in package.json
-
-Alternatively, you can still manually modify `package.json`:
-
-1. Open `package.json`.
-2. Update the `ergogen` dependency:
-
-   ```json
-   "ergogen": "ergogen/ergogen#develop",
-   ```
-
-3. Run `pnpm install && pnpm run dev`.
-
-## Contributing
-
-Contributions are welcome! If you have a feature request, bug report, or want to contribute to the code, please feel free to open an issue or submit a pull request.
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
+Example preview SVGs are version-controlled. Regenerate them explicitly with
+`pnpm generate-previews` and review changes; ordinary builds do not rewrite them.

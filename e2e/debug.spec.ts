@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeShooter } from './utils/screenshots';
 
 test('minimal test: page loads and has welcome text', async ({ page }) => {

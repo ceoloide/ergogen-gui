@@ -3,7 +3,6 @@
 import { JscadWorkerRequest, JscadWorkerResponse } from './jscad.worker.types';
 import { Results } from '../types/results';
 
-// @ts-expect-error: Loading openjscad.js UMD module statically
 import '../../public/dependencies/openjscad.js';
 
 console.log('<-> JSCAD worker module starting...');

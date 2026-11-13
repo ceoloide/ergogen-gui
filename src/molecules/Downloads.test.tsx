@@ -3,13 +3,13 @@ import { render, screen } from '@testing-library/react';
 // Mock the worker factory to prevent worker creation in tests
 vi.mock('../workers/workerFactory', () => ({
   createErgogenWorker: () => ({
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
     onmessage: (_e: any) => {},
   }),
   createJscadWorker: () => ({
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
+    postMessage: vi.fn(),
+    terminate: vi.fn(),
     onmessage: (_e: any) => {},
   }),
 }));
@@ -50,7 +50,7 @@ vi.mock('../context/ConfigContext', async () => {
 import Downloads from './Downloads';
 
 describe('Downloads', () => {
-  const mockSetPreview = jest.fn();
+  const mockSetPreview = vi.fn();
   const mockResults = {
     demo: undefined,
     canonical: {},
@@ -72,35 +72,35 @@ describe('Downloads', () => {
     results: any = mockResults
   ) => ({
     configInput: '',
-    setConfigInput: jest.fn(),
+    setConfigInput: vi.fn(),
     injectionInput: undefined,
-    setInjectionInput: jest.fn(),
-    processInput: jest.fn(),
-    generateNow: jest.fn(),
+    setInjectionInput: vi.fn(),
+    processInput: vi.fn(),
+    generateNow: vi.fn(),
     error: null,
-    setError: jest.fn(),
-    clearError: jest.fn(),
+    setError: vi.fn(),
+    clearError: vi.fn(),
     deprecationWarning: null,
-    clearWarning: jest.fn(),
+    clearWarning: vi.fn(),
     results,
     resultsVersion: 1,
-    setResultsVersion: jest.fn(),
+    setResultsVersion: vi.fn(),
     showSettings: false,
-    setShowSettings: jest.fn(),
+    setShowSettings: vi.fn(),
     showConfig: true,
-    setShowConfig: jest.fn(),
+    setShowConfig: vi.fn(),
     showDownloads: true,
-    setShowDownloads: jest.fn(),
+    setShowDownloads: vi.fn(),
     debug,
-    setDebug: jest.fn(),
+    setDebug: vi.fn(),
     autoGen: false,
-    setAutoGen: jest.fn(),
+    setAutoGen: vi.fn(),
     autoGen3D: false,
-    setAutoGen3D: jest.fn(),
+    setAutoGen3D: vi.fn(),
     kicanvasPreview: false,
-    setKicanvasPreview: jest.fn(),
+    setKicanvasPreview: vi.fn(),
     stlPreview,
-    setStlPreview: jest.fn(),
+    setStlPreview: vi.fn(),
     isGenerating: false,
   });
 

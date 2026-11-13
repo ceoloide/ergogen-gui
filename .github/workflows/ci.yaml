@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: ["main"]
+    branches: ['main']
 
 # Pull request validation only needs to read the repository. Declaring this
 # explicitly avoids inheriting a write-scoped repository default token.
@@ -14,57 +14,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: '24.x'
+          node-version-file: .node-version
           cache: pnpm
-      - name: Install actionlint
-        env:
-          ACTIONLINT_VERSION: 1.7.12
-          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+      - name: Install validation tools
         run: |
-          actionlint_archive="$RUNNER_TEMP/actionlint.tar.gz"
-          actionlint_dir="$RUNNER_TEMP/actionlint"
-          mkdir -p "$actionlint_dir"
-          curl --fail --location --retry 3 \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \
-            --output "$actionlint_archive"
-          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$actionlint_archive" | sha256sum --check
-          tar -xzf "$actionlint_archive" -C "$actionlint_dir" actionlint
-          echo "$actionlint_dir" >> "$GITHUB_PATH"
-      - name: Configure Git to use HTTPS for GitHub
-        run: |
-          git config --global --unset-all url."https://github.com/".insteadOf 2>/dev/null || true
-          git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
-          git config --global --add url."https://github.com/".insteadOf "git+ssh://git@github.com/"
-          git config --global --add url."https://github.com/".insteadOf "git@github.com:"
-      - name: pnpm install
-        run: |
-          if [ -n "$ERGOGEN_VERSION" ]; then
-            echo "ERGOGEN_VERSION is set, running preinstall patch"
-            node scripts/preinstall.js
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
-          else
-            echo "ERGOGEN_VERSION is not set, running pnpm install --frozen-lockfile"
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
-          fi
-        env:
-          ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: pnpm build
-        run: pnpm run build
+          pnpm tools:install
+          echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
+      - name: Install locked dependencies
+        run: PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
+      - name: Validate
+        run: pnpm validate
         env:
           VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
-          VITE_ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
-      - name: Lint
-        run: pnpm run lint
-      - name: Unit Tests
-        run: pnpm run test:unit
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser acceptance
+        run: pnpm test:e2e
+      - name: Upload validation reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: validation-${{ github.sha }}
+          path: |
+            reports/
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 7

@@ -4,7 +4,7 @@ import InstallChip from './InstallChip';
 describe('InstallChip', () => {
   it('renders the chip with the correct accessible label', () => {
     // Arrange
-    const onInstall = jest.fn();
+    const onInstall = vi.fn();
 
     // Act
     render(<InstallChip onClick={onInstall} />);
@@ -17,7 +17,7 @@ describe('InstallChip', () => {
 
   it('calls onClick when the chip is clicked', () => {
     // Arrange
-    const onInstall = jest.fn();
+    const onInstall = vi.fn();
     render(<InstallChip onClick={onInstall} />);
 
     // Act
@@ -29,7 +29,7 @@ describe('InstallChip', () => {
 
   it('uses the provided data-testid', () => {
     // Arrange
-    const onInstall = jest.fn();
+    const onInstall = vi.fn();
 
     // Act
     render(<InstallChip onClick={onInstall} data-testid="custom-testid" />);
@@ -40,7 +40,7 @@ describe('InstallChip', () => {
 
   it('falls back to the default data-testid when not provided', () => {
     // Arrange
-    const onInstall = jest.fn();
+    const onInstall = vi.fn();
 
     // Act
     render(<InstallChip onClick={onInstall} />);

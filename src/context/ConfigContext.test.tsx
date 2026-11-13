@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 
@@ -6,21 +7,21 @@ import { useConfigContext } from './ConfigContext';
 
 // Mock the worker factory to prevent worker creation in tests
 const mockErgogenWorker = {
-  postMessage: jest.fn(),
-  terminate: jest.fn(),
+  postMessage: vi.fn(),
+  terminate: vi.fn(),
   onmessage: (_e: any) => {},
 };
 
 const mockJscadWorker = {
-  postMessage: jest.fn(),
-  terminate: jest.fn(),
+  postMessage: vi.fn(),
+  terminate: vi.fn(),
   onmessage: (_e: any) => {},
 };
 
 import { isFeatureEnabled } from '../utils/featureFlags';
 
 vi.mock('../utils/featureFlags', () => ({
-  isFeatureEnabled: jest.fn(() => true),
+  isFeatureEnabled: vi.fn(() => true),
 }));
 
 vi.mock('../workers/workerFactory', () => ({
@@ -34,17 +35,17 @@ import {
   setSendUsageMetricsEnabled,
 } from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
-  trackEvent: jest.fn(),
-  initAnalytics: jest.fn(),
-  setSendUsageMetricsEnabled: jest.fn(),
+  trackEvent: vi.fn(),
+  initAnalytics: vi.fn(),
+  setSendUsageMetricsEnabled: vi.fn(),
   getSendUsageMetricsEnabled: () => true,
   checkIsPWA: () => false,
 }));
 
 // Mock ergogen globally
 global.window.ergogen = {
-  process: jest.fn(),
-  inject: jest.fn(),
+  process: vi.fn(),
+  inject: vi.fn(),
 };
 
 import { ConfigContextProvider } from './ConfigContext';
@@ -108,12 +109,12 @@ describe('ConfigContextProvider', () => {
     window.history.replaceState({}, 'Test page', '/');
     mockErgogenWorker.postMessage.mockClear();
     mockJscadWorker.postMessage.mockClear();
-    (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+    (isFeatureEnabled as Mock).mockReturnValue(true);
     localStorage.clear();
   });
 
   it('should fetch config from github url parameter and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
@@ -155,7 +156,7 @@ describe('ConfigContextProvider', () => {
   });
 
   it('should fetch config from github url parameter without protocol and update the config', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/corney-island/main/ergogen/config.yaml'
@@ -197,7 +198,7 @@ describe('ConfigContextProvider', () => {
   });
 
   it('should load footprints from github url parameter and merge them', async () => {
-    const fetchSpy = jest.spyOn(window, 'fetch').mockImplementation((url) => {
+    const fetchSpy = vi.spyOn(window, 'fetch').mockImplementation((url) => {
       if (
         url ===
         'https://raw.githubusercontent.com/ceoloide/test-repo/main/config.yaml'
@@ -1069,7 +1070,7 @@ describe('ConfigContextProvider', () => {
       };
 
       // Disable outlines and templates
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      (isFeatureEnabled as Mock).mockImplementation((feature) => {
         if (feature === 'outlines' || feature === 'templates') return false;
         return true;
       });
@@ -1105,19 +1106,19 @@ describe('ConfigContextProvider', () => {
 
   describe('GA4 Keyboard Generation Tracking & Debouncing', () => {
     const getKeyboardGeneratedCalls = () => {
-      return (trackEvent as jest.Mock).mock.calls.filter(
+      return (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'keyboard_generated'
       );
     };
 
     beforeEach(() => {
-      jest.useFakeTimers();
-      (trackEvent as jest.Mock).mockClear();
+      vi.useFakeTimers();
+      (trackEvent as Mock).mockClear();
       mockInitialConfig('points: {}');
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should debounce tracking by 5 seconds and only send the latest event', async () => {
@@ -1149,7 +1150,7 @@ describe('ConfigContextProvider', () => {
 
       // Advance time slightly (e.g., 2 seconds) - event should not be tracked yet
       act(() => {
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
@@ -1170,13 +1171,13 @@ describe('ConfigContextProvider', () => {
 
       // Advance time by 4 seconds - still shouldn't fire because timer reset
       act(() => {
-        jest.advanceTimersByTime(4000);
+        vi.advanceTimersByTime(4000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
       // Advance time by 1 more second to reach 5 seconds of total delay for B
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
 
       // It should have tracked B, with previous_config_id of undefined (root), without raw config_name/config_author
@@ -1221,7 +1222,7 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run and complete
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
       const firstPayload = getKeyboardGeneratedCalls()[0][1];
@@ -1245,7 +1246,7 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(2);
       const secondPayload = getKeyboardGeneratedCalls()[1][1];
@@ -1281,7 +1282,7 @@ describe('ConfigContextProvider', () => {
 
       // Let debounce run
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
@@ -1301,7 +1302,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       // Should still be called only once!
       expect(getKeyboardGeneratedCalls().length).toBe(1);
@@ -1336,7 +1337,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
@@ -1361,7 +1362,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
 
       expect(getKeyboardGeneratedCalls().length).toBe(2);
@@ -1401,7 +1402,7 @@ describe('ConfigContextProvider', () => {
 
   describe('Settings Lifecycle Tracking', () => {
     beforeEach(() => {
-      (trackEvent as jest.Mock).mockClear();
+      (trackEvent as Mock).mockClear();
       localStorage.clear();
     });
 
@@ -1418,10 +1419,10 @@ describe('ConfigContextProvider', () => {
         </ConfigContextProvider>
       );
 
-      const settingsLoadedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      const settingsLoadedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'settings_loaded'
       );
-      const settingChangedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      const settingChangedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'setting_changed'
       );
 
@@ -1435,12 +1436,12 @@ describe('ConfigContextProvider', () => {
         capturedContext.setDebug(true);
       });
 
-      const updatedSettingsLoadedCalls = (
-        trackEvent as jest.Mock
-      ).mock.calls.filter((call) => call[0] === 'settings_loaded');
-      const updatedSettingChangedCalls = (
-        trackEvent as jest.Mock
-      ).mock.calls.filter((call) => call[0] === 'setting_changed');
+      const updatedSettingsLoadedCalls = (trackEvent as Mock).mock.calls.filter(
+        (call) => call[0] === 'settings_loaded'
+      );
+      const updatedSettingChangedCalls = (trackEvent as Mock).mock.calls.filter(
+        (call) => call[0] === 'setting_changed'
+      );
 
       expect(updatedSettingsLoadedCalls.length).toBe(1); // STILL 1!
       expect(updatedSettingChangedCalls.length).toBe(1);
@@ -1455,10 +1456,10 @@ describe('ConfigContextProvider', () => {
 
     it('should not initialize analytics while rendering, leaving bootstrap to the entry point', () => {
       // Arrange
-      (initAnalytics as jest.Mock).mockClear();
+      (initAnalytics as Mock).mockClear();
       let initCallsDuringRender = -1;
       const RenderProbe = () => {
-        initCallsDuringRender = (initAnalytics as jest.Mock).mock.calls.length;
+        initCallsDuringRender = (initAnalytics as Mock).mock.calls.length;
         return null;
       };
 
@@ -1476,7 +1477,7 @@ describe('ConfigContextProvider', () => {
 
     it('should record an explicit sendUsageMetrics toggle through the analytics consent API', () => {
       // Arrange
-      (setSendUsageMetricsEnabled as jest.Mock).mockClear();
+      (setSendUsageMetricsEnabled as Mock).mockClear();
       let capturedContext: any = null;
       const TestComponent = () => {
         capturedContext = useConfigContext();
@@ -1523,7 +1524,7 @@ describe('ConfigContextProvider', () => {
       act(() => {
         capturedContext.setSendUsageMetrics(false);
       });
-      (trackEvent as jest.Mock).mockClear();
+      (trackEvent as Mock).mockClear();
 
       act(() => {
         capturedContext.setSendUsageMetrics(true);
@@ -1545,13 +1546,13 @@ describe('ConfigContextProvider', () => {
 
   describe('Compilation Telemetry Debouncing (generation_completed & generation_failed)', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
-      (trackEvent as jest.Mock).mockClear();
+      vi.useFakeTimers();
+      (trackEvent as Mock).mockClear();
       mockInitialConfig('points: {}');
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should debounce generation_completed by 5 seconds during auto-generation', () => {
@@ -1572,10 +1573,10 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
       });
 
-      let completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      let completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(0);
@@ -1591,18 +1592,18 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(4000);
+        vi.advanceTimersByTime(4000);
       });
-      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(0);
 
       // Reach 5 seconds
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
-      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(1);
@@ -1626,9 +1627,9 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(3000);
+        vi.advanceTimersByTime(3000);
       });
-      let failedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      let failedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_failed'
       );
       expect(failedCalls.length).toBe(0);
@@ -1644,9 +1645,9 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
-      failedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      failedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_failed'
       );
       expect(failedCalls.length).toBe(1);
@@ -1679,7 +1680,7 @@ describe('ConfigContextProvider', () => {
         } as MessageEvent);
       });
       const countCompleted = () =>
-        (trackEvent as jest.Mock).mock.calls.filter(
+        (trackEvent as Mock).mock.calls.filter(
           (call) => call[0] === 'generation_completed'
         ).length;
       expect(countCompleted()).toBe(0);
@@ -1692,7 +1693,7 @@ describe('ConfigContextProvider', () => {
       // Assert: the compilation really happened, so it is reported once
       expect(countCompleted()).toBe(1);
       act(() => {
-        jest.advanceTimersByTime(10000);
+        vi.advanceTimersByTime(10000);
       });
       expect(countCompleted()).toBe(1);
     });
@@ -1715,7 +1716,7 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(2000);
+        vi.advanceTimersByTime(2000);
       });
 
       // User fixes error and generation succeeds
@@ -1729,13 +1730,13 @@ describe('ConfigContextProvider', () => {
       });
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
 
-      const failedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      const failedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_failed'
       );
-      const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      const completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
 
@@ -1765,7 +1766,7 @@ describe('ConfigContextProvider', () => {
       });
 
       // Fired immediately without waiting for timers
-      const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      const completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(1);
@@ -1788,7 +1789,7 @@ describe('ConfigContextProvider', () => {
           <TestComponent />
         </ConfigContextProvider>
       );
-      (trackEvent as jest.Mock).mockClear();
+      (trackEvent as Mock).mockClear();
 
       // Act 1: turn autoGen ON mid-session and trigger 3 quick successes
       act(() => {
@@ -1806,21 +1807,21 @@ describe('ConfigContextProvider', () => {
       });
 
       // Assert 1: 0 emitted before 5s debounce expires, then 1 after timer fires
-      let completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      let completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(0);
 
       act(() => {
-        jest.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(5000);
       });
-      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(1);
 
       // Act 2: turn autoGen OFF mid-session and trigger 1 manual generation
-      (trackEvent as jest.Mock).mockClear();
+      (trackEvent as Mock).mockClear();
       act(() => {
         capturedContext.setAutoGen(false);
       });
@@ -1834,7 +1835,7 @@ describe('ConfigContextProvider', () => {
       });
 
       // Assert 2: fires immediately without waiting for debounce timer
-      completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(1);
@@ -1853,7 +1854,7 @@ describe('ConfigContextProvider', () => {
           <TestComponent />
         </ConfigContextProvider>
       );
-      (trackEvent as jest.Mock).mockClear();
+      (trackEvent as Mock).mockClear();
       mockErgogenWorker.postMessage.mockClear();
 
       // Act: trigger manual generateNow and echo worker requestId
@@ -1879,7 +1880,7 @@ describe('ConfigContextProvider', () => {
       });
 
       // Assert: fires immediately even though autoGen is true
-      const completedCalls = (trackEvent as jest.Mock).mock.calls.filter(
+      const completedCalls = (trackEvent as Mock).mock.calls.filter(
         (call) => call[0] === 'generation_completed'
       );
       expect(completedCalls.length).toBe(1);

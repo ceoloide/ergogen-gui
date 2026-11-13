@@ -2,12 +2,10 @@
  * @jest-environment jsdom
  */
 
-/* eslint-disable react/prop-types */
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
-
-// Global alias for compatibility with Jest-centric test files
-globalThis.jest = vi as any;
+import type { ComponentProps } from 'react';
+import type { LinkProps } from 'react-router-dom';
 
 window.URL.createObjectURL = vi.fn();
 
@@ -20,16 +18,20 @@ if (typeof global.TextEncoder === 'undefined') {
 
 // Global mock for react-router-dom
 vi.mock('react-router-dom', () => ({
-  Link: ({ children, to, onClick, ...props }) => {
+  Link: ({ children, to, onClick, ...props }: LinkProps) => {
     return (
-      <a href={to} onClick={onClick} {...props}>
+      <a
+        href={typeof to === 'string' ? to : to.pathname}
+        onClick={onClick}
+        {...props}
+      >
         {children}
       </a>
     );
   },
   useNavigate: () => vi.fn(),
   Navigate: () => null,
-  Routes: ({ children }) => children,
+  Routes: ({ children }: ComponentProps<'div'>) => children,
   Route: () => null,
 }));
 

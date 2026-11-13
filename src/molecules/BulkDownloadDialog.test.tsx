@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import BulkDownloadDialog from './BulkDownloadDialog';
@@ -5,22 +6,22 @@ import { exportConfigsProgressively } from '../utils/zip';
 import { trackEvent } from '../utils/analytics';
 
 vi.mock('../utils/zip', () => ({
-  exportConfigsProgressively: jest.fn(),
+  exportConfigsProgressively: vi.fn(),
 }));
 
 vi.mock('../utils/analytics', () => ({
-  trackEvent: jest.fn(),
+  trackEvent: vi.fn(),
 }));
 
 describe('BulkDownloadDialog', () => {
-  const mockOnClose = jest.fn();
+  const mockOnClose = vi.fn();
   const mockConfigs = [
     { id: '1', name: 'Keyboard Alpha', config: 'points: {}' },
     { id: '2', name: 'Ergonomic Board', config: 'points: { ergonomic: true }' },
   ];
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders nothing when isOpen is false', () => {
@@ -115,7 +116,7 @@ describe('BulkDownloadDialog', () => {
   });
 
   it('triggers progressive export process on click proceed', async () => {
-    (exportConfigsProgressively as jest.Mock).mockResolvedValue(undefined);
+    (exportConfigsProgressively as Mock).mockResolvedValue(undefined);
 
     render(
       <BulkDownloadDialog
@@ -147,7 +148,7 @@ describe('BulkDownloadDialog', () => {
 
   it('shows progress bar and ratio during generation', async () => {
     let progressCallback: any = null;
-    (exportConfigsProgressively as jest.Mock).mockImplementation(
+    (exportConfigsProgressively as Mock).mockImplementation(
       (configs, injections, debug, stlPreview, onlyConfigs, onProgress) => {
         progressCallback = onProgress;
         return new Promise(() => {}); // never resolves to keep it in generating state
@@ -188,7 +189,7 @@ describe('BulkDownloadDialog', () => {
   });
 
   it('tracks bulk_download_completed when progressive export succeeds', async () => {
-    (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce(undefined);
+    (exportConfigsProgressively as Mock).mockResolvedValueOnce(undefined);
 
     render(
       <BulkDownloadDialog
@@ -217,7 +218,7 @@ describe('BulkDownloadDialog', () => {
   });
 
   it('tracks bulk_download_failed when progressive export rejects', async () => {
-    (exportConfigsProgressively as jest.Mock).mockRejectedValueOnce(
+    (exportConfigsProgressively as Mock).mockRejectedValueOnce(
       new Error('Zip generation failed')
     );
 
@@ -246,7 +247,7 @@ describe('BulkDownloadDialog', () => {
 
   it('tracks bulk_download_failed instead of false completion when every config compilation fails', async () => {
     // Arrange
-    (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce({
+    (exportConfigsProgressively as Mock).mockResolvedValueOnce({
       succeededCount: 0,
       failedCount: 2,
     });
@@ -283,7 +284,7 @@ describe('BulkDownloadDialog', () => {
 
   it('tracks bulk_download_partial, not a completed key event, when some configs fail', async () => {
     // Arrange
-    (exportConfigsProgressively as jest.Mock).mockResolvedValueOnce({
+    (exportConfigsProgressively as Mock).mockResolvedValueOnce({
       succeededCount: 1,
       failedCount: 1,
     });
@@ -320,7 +321,7 @@ describe('BulkDownloadDialog', () => {
   it('tracks bulk_download_cancelled with progress when a running export is cancelled', async () => {
     // Arrange: an export that reports progress and never finishes on its own
     let progressCallback: any = null;
-    (exportConfigsProgressively as jest.Mock).mockImplementation(
+    (exportConfigsProgressively as Mock).mockImplementation(
       (_configs, _injections, _debug, _stl, _only, onProgress) => {
         progressCallback = onProgress;
         return new Promise(() => {});
@@ -353,7 +354,7 @@ describe('BulkDownloadDialog', () => {
   });
 
   it('does not track bulk_download_cancelled when closing before an export starts', () => {
-    (trackEvent as jest.Mock).mockClear();
+    (trackEvent as Mock).mockClear();
     render(
       <BulkDownloadDialog
         isOpen={true}

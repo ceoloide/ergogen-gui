@@ -4,7 +4,7 @@ import UpdateChip from './UpdateChip';
 describe('UpdateChip', () => {
   it('renders the chip with the correct accessible label', () => {
     // Arrange
-    const onUpdate = jest.fn();
+    const onUpdate = vi.fn();
 
     // Act
     render(<UpdateChip onClick={onUpdate} />);
@@ -17,7 +17,7 @@ describe('UpdateChip', () => {
 
   it('calls onClick when the chip is clicked', () => {
     // Arrange
-    const onUpdate = jest.fn();
+    const onUpdate = vi.fn();
     render(<UpdateChip onClick={onUpdate} />);
 
     // Act
@@ -29,7 +29,7 @@ describe('UpdateChip', () => {
 
   it('uses the provided data-testid', () => {
     // Arrange
-    const onUpdate = jest.fn();
+    const onUpdate = vi.fn();
 
     // Act
     render(<UpdateChip onClick={onUpdate} data-testid="custom-testid" />);
@@ -40,7 +40,7 @@ describe('UpdateChip', () => {
 
   it('falls back to the default data-testid when not provided', () => {
     // Arrange
-    const onUpdate = jest.fn();
+    const onUpdate = vi.fn();
 
     // Act
     render(<UpdateChip onClick={onUpdate} />);
@@ -51,7 +51,7 @@ describe('UpdateChip', () => {
 
   it('changes text to "Updating version..." and disables the button when clicked', () => {
     // Arrange
-    const onUpdate = jest.fn();
+    const onUpdate = vi.fn();
     render(<UpdateChip onClick={onUpdate} />);
     const chip = screen.getByRole('button', { name: /update available/i });
 

@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import {
@@ -29,8 +30,8 @@ describe('createZip', () => {
 
   const createMockFolder = () => {
     const folder: any = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn(),
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn(),
     };
     folder.folder.mockImplementation((name: string) => {
       if (!mockFolders[name]) {
@@ -42,23 +43,21 @@ describe('createZip', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
 
     mockZip = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn().mockImplementation((name: string) => {
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn().mockImplementation((name: string) => {
         if (!mockFolders[name]) {
           mockFolders[name] = createMockFolder();
         }
         return mockFolders[name];
       }),
-      generateAsync: jest
-        .fn()
-        .mockResolvedValue(new Blob(['mock zip content'])),
+      generateAsync: vi.fn().mockResolvedValue(new Blob(['mock zip content'])),
     };
 
-    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+    (JSZip as unknown as Mock).mockImplementation(() => mockZip);
   });
 
   it('should include root files: config.yaml and demo.svg', async () => {
@@ -171,7 +170,7 @@ describe('createZip', () => {
     );
 
     // Reset mocks for next run
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
 
     // stlPreview = true
@@ -269,8 +268,8 @@ describe('downloadAllConfigs', () => {
 
   const createMockFolder = () => {
     const folder: any = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn(),
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn(),
     };
     folder.folder.mockImplementation((name: string) => {
       if (!mockFolders[name]) {
@@ -282,23 +281,23 @@ describe('downloadAllConfigs', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
 
     mockZip = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn().mockImplementation((name: string) => {
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn().mockImplementation((name: string) => {
         if (!mockFolders[name]) {
           mockFolders[name] = createMockFolder();
         }
         return mockFolders[name];
       }),
-      generateAsync: jest
+      generateAsync: vi
         .fn()
         .mockResolvedValue(new Blob(['mock config zip content'])),
     };
 
-    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+    (JSZip as unknown as Mock).mockImplementation(() => mockZip);
   });
 
   it('should include configs in root and package injections', async () => {
@@ -358,8 +357,8 @@ describe('exportConfigsProgressively', () => {
 
   const createMockFolder = () => {
     const folder: any = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn(),
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn(),
     };
     folder.folder.mockImplementation((name: string) => {
       if (!mockFolders[name]) {
@@ -371,21 +370,21 @@ describe('exportConfigsProgressively', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockFolders = {};
     mockZip = {
-      file: jest.fn().mockReturnThis(),
-      folder: jest.fn().mockImplementation((name: string) => {
+      file: vi.fn().mockReturnThis(),
+      folder: vi.fn().mockImplementation((name: string) => {
         if (!mockFolders[name]) {
           mockFolders[name] = createMockFolder();
         }
         return mockFolders[name];
       }),
-      generateAsync: jest
+      generateAsync: vi
         .fn()
         .mockResolvedValue(new Blob(['mock progressive zip'])),
     };
-    (JSZip as unknown as jest.Mock).mockImplementation(() => mockZip);
+    (JSZip as unknown as Mock).mockImplementation(() => mockZip);
   });
 
   it('returns failedCount when full-compilation configs fail and write error.txt', async () => {
@@ -402,7 +401,7 @@ describe('exportConfigsProgressively', () => {
       false,
       false,
       false, // onlyConfigs = false -> compiles each config
-      jest.fn(),
+      vi.fn(),
       () => false
     );
 

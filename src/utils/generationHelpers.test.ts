@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import {
   filterInjectionsByFeatureFlags,
   getSkippedInjectionsWarning,
@@ -7,12 +8,12 @@ import {
 import { isFeatureEnabled } from './featureFlags';
 
 vi.mock('./featureFlags', () => ({
-  isFeatureEnabled: jest.fn(() => true),
+  isFeatureEnabled: vi.fn(() => true),
 }));
 
 describe('generationHelpers', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('filterInjectionsByFeatureFlags', () => {
@@ -23,7 +24,7 @@ describe('generationHelpers', () => {
     });
 
     it('should pass through injections when feature flags are enabled', () => {
-      (isFeatureEnabled as jest.Mock).mockReturnValue(true);
+      (isFeatureEnabled as Mock).mockReturnValue(true);
       const injections = [
         ['outline', 'my-outline', 'content'],
         ['template', 'my-template', 'content'],
@@ -33,7 +34,7 @@ describe('generationHelpers', () => {
     });
 
     it('should filter out outlines when outlines feature is disabled', () => {
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      (isFeatureEnabled as Mock).mockImplementation((feature) => {
         return feature !== 'outlines';
       });
       const injections = [
@@ -49,7 +50,7 @@ describe('generationHelpers', () => {
     });
 
     it('should filter out templates when templates feature is disabled', () => {
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      (isFeatureEnabled as Mock).mockImplementation((feature) => {
         return feature !== 'templates';
       });
       const injections = [
@@ -181,7 +182,7 @@ describe('generationHelpers', () => {
     });
 
     it('should return warning when outlines feature is disabled and outlines are injected', () => {
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      (isFeatureEnabled as Mock).mockImplementation((feature) => {
         return feature !== 'outlines';
       });
       const injections = [
@@ -194,7 +195,7 @@ describe('generationHelpers', () => {
     });
 
     it('should return warning when templates feature is disabled and templates are injected', () => {
-      (isFeatureEnabled as jest.Mock).mockImplementation((feature) => {
+      (isFeatureEnabled as Mock).mockImplementation((feature) => {
         return feature !== 'templates';
       });
       const injections = [
@@ -207,7 +208,7 @@ describe('generationHelpers', () => {
     });
 
     it('should return combined warning when both are disabled and injected', () => {
-      (isFeatureEnabled as jest.Mock).mockImplementation(() => false);
+      (isFeatureEnabled as Mock).mockImplementation(() => false);
       const injections = [
         ['outline', 'my-outline', 'content'],
         ['template', 'my-template', 'content'],

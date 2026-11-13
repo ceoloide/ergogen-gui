@@ -298,7 +298,7 @@ describe('injections utilities', () => {
 
     it('skips invalid injection formats', () => {
       // Arrange
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const newInjections = [
         ['footprint', 'valid', 'content'],
         ['invalid'], // wrong length

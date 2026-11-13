@@ -1,2 +1,11 @@
 node_modules
 build
+dist
+.generated
+.tools
+reports
+coverage
+test-results
+playwright-report
+
+*.timestamp-*.mjs

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ interface Step {
   if?: string | boolean;
   'continue-on-error'?: boolean;
   with?: Record<string, string | number | boolean>;
+  env?: Record<string, string>;
 }
 
 interface Job {
@@ -47,13 +48,23 @@ describe('workflow validation tools', () => {
   it('runs actionlint from the shared lint command', () => {
     // Assert
     expect(packageJson.scripts['lint:workflows']).toBe(
-      'actionlint -shellcheck= -pyflakes='
+      'actionlint -shellcheck=shellcheck -pyflakes='
+    );
+    expect(packageJson.scripts['lint:security']).toBe(
+      'zizmor --offline .github/workflows'
     );
     expect(packageJson.scripts.lint).toContain('pnpm lint:workflows');
+    expect(packageJson.scripts.lint).toContain('pnpm lint:security');
   });
 });
 
 describe('HC-013a deployment policy', () => {
+  it('requires policy review when a new workflow is introduced', () => {
+    // Assert
+    expect(
+      readdirSync(resolve(projectRoot, '.github/workflows')).sort()
+    ).toEqual(['ci.yaml', 'deploy.yaml']);
+  });
   it('keeps deployment off PR events while retaining PR validation', () => {
     // Assert
     expect(deployment.on).toEqual({
@@ -92,18 +103,14 @@ describe('HC-013a deployment policy', () => {
     }
   });
 
-  it('requires PR build, lint and unit tests without conditional skips', () => {
+  it('requires shared PR validation without conditional skips', () => {
     // Arrange
     const job = ci.jobs['lint-and-test'];
 
     // Assert
     expect(job.if).toBeUndefined();
     expect(job['continue-on-error']).not.toBe(true);
-    for (const command of [
-      'pnpm run build',
-      'pnpm run lint',
-      'pnpm run test:unit',
-    ]) {
+    for (const command of ['pnpm validate', 'pnpm test:e2e']) {
       const step = job.steps.find((candidate) => candidate.run === command);
       expect(step).toBeDefined();
       expect(step?.if).toBeUndefined();
@@ -129,6 +136,11 @@ describe('HC-013a deployment policy', () => {
     ]);
     expect(deploy.steps.every((step) => step.run === undefined)).toBe(true);
     expect(deploy.steps.every((step) => step.if === undefined)).toBe(true);
+    expect(deploy['continue-on-error']).not.toBe(true);
+    expect(deploy.concurrency).toBeUndefined();
+    expect(
+      deploy.steps.every((step) => step['continue-on-error'] !== true)
+    ).toBe(true);
   });
 
   it('publishes the explicitly named artifact from this run', () => {
@@ -148,7 +160,13 @@ describe('HC-013a deployment policy', () => {
       path: './dist',
       'if-no-files-found': 'error',
     });
-    expect(publish?.with?.publish_dir).toBe('./dist');
+    expect(publish?.with).toEqual({
+      github_token: '${{ secrets.GITHUB_TOKEN }}',
+      publish_dir: './dist',
+      allow_empty_commit: true,
+      full_commit_message: '${{ github.event.head_commit.message }}',
+      force_orphan: true,
+    });
   });
 
   it('packages the SPA fallback and custom domain before upload', () => {
@@ -158,12 +176,22 @@ describe('HC-013a deployment policy', () => {
     );
 
     // Assert
-    for (const file of ['404.html', 'CNAME']) {
-      const index = build.steps.findIndex((step) =>
-        step.run?.includes('dist/' + file)
-      );
-      expect(index).toBeGreaterThanOrEqual(0);
-      expect(index).toBeLessThan(uploadIndex);
+    const fallback = build.steps.find(
+      (step) => step.run === 'cp ./dist/index.html ./dist/404.html'
+    );
+    const domain = build.steps.find(
+      (step) => step.run === 'echo "$CNAME_DOMAIN" > ./dist/CNAME'
+    );
+    expect(fallback).toBeDefined();
+    expect(fallback?.if).toBeUndefined();
+    expect(domain).toBeDefined();
+    expect(domain?.if).toBe(
+      "${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}"
+    );
+    expect(domain?.env).toEqual({ CNAME_DOMAIN: '${{ vars.CNAME_DOMAIN }}' });
+    for (const step of [fallback, domain]) {
+      expect(build.steps.indexOf(step!)).toBeLessThan(uploadIndex);
+      expect(step?.['continue-on-error']).not.toBe(true);
     }
   });
 

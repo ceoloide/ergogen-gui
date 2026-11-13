@@ -5,8 +5,8 @@ import ShareVersionCompatibilityDialog, {
 } from './ShareVersionCompatibilityDialog';
 
 describe('ShareVersionCompatibilityDialog', () => {
-  const mockOnAccept = jest.fn();
-  const mockOnCancel = jest.fn();
+  const mockOnAccept = vi.fn();
+  const mockOnCancel = vi.fn();
 
   beforeEach(() => {
     mockOnAccept.mockClear();
