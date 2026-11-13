@@ -14,6 +14,7 @@ interface Step {
 }
 
 interface Job {
+  'runs-on': string;
   permissions?: Record<string, string>;
   needs?: string | string[];
   if?: string;
@@ -59,6 +60,14 @@ describe('workflow validation tools', () => {
 });
 
 describe('HC-013a deployment policy', () => {
+  it('pins a runner supported by the locked browser toolchain', () => {
+    // Assert: ubuntu-latest advanced to an unsupported OS in real CI.
+    for (const workflow of [ci, deployment]) {
+      for (const job of Object.values(workflow.jobs)) {
+        expect(job['runs-on']).toBe('ubuntu-26.04');
+      }
+    }
+  });
   it('requires policy review when a new workflow is introduced', () => {
     // Assert
     expect(

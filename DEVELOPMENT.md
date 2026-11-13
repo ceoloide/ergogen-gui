@@ -352,7 +352,7 @@ tracked preview files.
 
 ## CI & Deployment Workflows
 
-GitHub Actions workflows live in `.github/workflows` and keep untrusted code away from write-scoped tokens:
+GitHub Actions workflows live in `.github/workflows`, pin Ubuntu 26.04 with Playwright 1.65.0, and keep untrusted code away from write-scoped tokens:
 
 - **`ci.yaml`** validates pull requests to `main` using the shared non-mutating `pnpm validate` command (format, lint, type checks, complete Vitest suite and production build) with a `contents: read` token and non-persisted checkout credentials.
 - **`deploy.yaml`** runs only on pushes to `main`, `workflow_dispatch` and `repository_dispatch` (never on pull requests). It has two jobs:
