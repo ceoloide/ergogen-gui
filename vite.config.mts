@@ -31,6 +31,22 @@ export default defineConfig(({ mode }) => {
     plugins: [
       {
         name: 'validation-build-identity',
+        // Browser tests tell builds apart, including after a service worker
+        // update. Builds without an ID (deployments) are unchanged.
+        transformIndexHtml() {
+          return env.VITE_BUILD_ID
+            ? [
+                {
+                  tag: 'meta',
+                  attrs: {
+                    name: 'ergogen-build-id',
+                    content: env.VITE_BUILD_ID,
+                  },
+                  injectTo: 'head' as const,
+                },
+              ]
+            : [];
+        },
         generateBundle() {
           if (env.VITE_BUILD_ID) {
             this.emitFile({

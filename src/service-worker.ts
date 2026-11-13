@@ -37,7 +37,10 @@ import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
 declare const self: ServiceWorkerGlobalScope;
 
-const publicUrl = import.meta.env.BASE_URL || '';
+// The app's path with a trailing slash, such as `/` or `/ergogen-gui/`. Vite's
+// BASE_URL already ends with a slash; resolving it against this worker's own
+// URL also covers a relative base.
+const basePath = new URL(import.meta.env.BASE_URL, self.location.href).pathname;
 
 // --------------------------------------------------------------------------
 // Core: claim clients and set up skip-waiting message handler
@@ -84,14 +87,14 @@ registerRoute(
 // Runtime – Public dependencies
 //
 // The large third-party bundles loaded via <script> tags (maker.js, bezier.js,
-// hull.js, kle.js, kicanvas.js) live under /dependencies/. They are NOT part
-// of the webpack bundle so they are not precached. We cache them on first
-// access so subsequent loads (including offline) are instant.
+// hull.js, kle.js, kicanvas.js) live under dependencies/. The precache above
+// already serves the files present at build time; this route caches any
+// other file there on first access so it also loads offline.
 // --------------------------------------------------------------------------
 
 registerRoute(
   ({ url }: { url: URL }) =>
-    url.pathname.startsWith(`${publicUrl}/dependencies/`),
+    url.pathname.startsWith(`${basePath}dependencies/`),
   new CacheFirst({
     cacheName: 'public-dependencies-v1',
     plugins: [
@@ -110,9 +113,9 @@ registerRoute(
 // --------------------------------------------------------------------------
 registerRoute(
   ({ url }: { url: URL }) =>
-    url.pathname.startsWith(`${publicUrl}/images/`) ||
-    url.pathname === `${publicUrl}/ergogen.png` ||
-    url.pathname === `${publicUrl}/favicon.ico`,
+    url.pathname.startsWith(`${basePath}images/`) ||
+    url.pathname === `${basePath}ergogen.png` ||
+    url.pathname === `${basePath}favicon.ico`,
   new CacheFirst({
     cacheName: 'public-images-v1',
     plugins: [
