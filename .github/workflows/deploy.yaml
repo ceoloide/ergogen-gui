@@ -2,6 +2,9 @@
 
 name: Build and deploy on GitHub Pages
 
+# Pull requests are validated by ci.yaml. This workflow only runs for trusted,
+# maintainer-controlled events so that pull request code can never reach the
+# write-scoped publish job or the production concurrency group.
 on:
   # Runs on pushes targeting the default branch
   push:
@@ -11,26 +14,31 @@ on:
   workflow_dispatch:
 
   repository_dispatch:
-  pull_request:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Default to a read-only token; only the publish job is granted write access.
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# Only runs on main publish, so only they join the production "pages" group; a manual run on another
+# branch builds in its own group and can never displace a queued production deployment.
 concurrency:
-  group: "pages"
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  # Installs dependencies and builds the site with a read-only token, then hands
+  # the result to the publish job as a short-lived artifact of this run.
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -68,12 +76,33 @@ jobs:
         run: cp ./dist/index.html ./dist/404.html
       - name: Conditionally create CNAME
         if: ${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}
-        run: echo "${{ vars.CNAME_DOMAIN }}" > ./dist/CNAME
+        run: echo "$CNAME_DOMAIN" > ./dist/CNAME
         env:
           CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: github-pages-site
+          path: ./dist
+          if-no-files-found: error
+          retention-days: 1
+
+  # Publishes the prebuilt site to the gh-pages branch. This is the only job with
+  # a write-scoped token, and it never checks out, installs or runs repository code.
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download site artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: github-pages-site
+          path: ./dist
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist

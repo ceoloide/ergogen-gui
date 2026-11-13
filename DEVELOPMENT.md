@@ -338,6 +338,17 @@ To allow developers and CI to override the default Ergogen version using the `ER
    - Executes after dependencies are successfully installed.
    - If `packages.json.bak` exists, it restores the original `package.json` and deletes the backup file, ensuring that the workspace remains clean and no modified `package.json` is committed.
 
+## CI & Deployment Workflows
+
+GitHub Actions workflows live in `.github/workflows` and keep untrusted code away from write-scoped tokens:
+
+- **`ci.yaml`** validates pull requests to `main` (install, build, lint, unit tests) with a `contents: read` token and non-persisted checkout credentials.
+- **`deploy.yaml`** runs only on pushes to `main`, `workflow_dispatch` and `repository_dispatch` (never on pull requests). It has two jobs:
+  1. `build` (`contents: read`): checks out without persisted credentials, installs, builds, adds `404.html` and (on `main`) `CNAME`, then uploads `dist` as a one-day `github-pages-site` artifact.
+  2. `deploy` (`contents: write`, `main` only): downloads that artifact and publishes it to the `gh-pages` branch with `peaceiris/actions-gh-pages`. It never checks out, installs or runs repository code.
+- **Concurrency**: runs on `main` share the `pages` group with `cancel-in-progress: false`, so production deploys are serialized and never cancelled mid-flight. Manual runs on other branches only build, in their own group.
+- **Regression tests**: `scripts/ci/workflow-security.test.mjs` parses both workflows and checks these invariants (triggers, effective permissions, checkout credentials, deploy gating, concurrency and artifact handoff), plus deliberately broken copies to prove the checks catch regressions. `scripts/ci/workflow-expressions.mjs` is a small evaluator for the expression subset the workflows use.
+
 ## Version Information & Custom Build Indicators
 
 To improve transparency and debuggability for users running custom repositories, branches, tags, or commit hashes of Ergogen, the application displays version information directly in the sidebar footer and highlights custom builds using dedicated badges:

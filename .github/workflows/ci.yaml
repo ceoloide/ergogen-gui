@@ -4,12 +4,19 @@ on:
   pull_request:
     branches: ["main"]
 
+# Pull request validation only needs to read the repository. Declaring this
+# explicitly avoids inheriting a write-scoped repository default token.
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
