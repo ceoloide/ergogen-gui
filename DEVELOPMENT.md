@@ -288,7 +288,5 @@ managed dimensions and metrics irreversibly, hence `--confirm`.
 
 ## Changelog
 
-`CHANGELOG.md` holds user-facing changes, newest first: features, notable fixes
-and workflow changes, not refactors or dependency bumps. Copy the shape of the
-latest entry: title, date, screenshot, a short problem and solution, and a **What
-changed** list, under 300 words.
+`CHANGELOG.md` holds user-facing changes, newest first. Its conventions live in
+the [changelog skill](.agents/skills/ergogen-gui-changelog/SKILL.md).

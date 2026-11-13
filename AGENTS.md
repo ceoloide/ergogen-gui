@@ -50,19 +50,3 @@ These rules apply to people and coding agents alike.
 - Keep `README.md` (users and self-hosters) and `DEVELOPMENT.md` (contributors)
   accurate when behavior, configuration or procedures change. Describe each
   procedure in one file and link to it from others.
-- Track follow-up work in GitHub issues on `ceoloide/ergogen-gui`, titled
-  `[TASK-NNN] Title` with the next unused number; never as a list in the docs. If
-  you cannot create the issue, give its text in your report.
-- Add a `CHANGELOG.md` entry for user-facing changes
-  ([style](DEVELOPMENT.md#changelog)).
-
-## Commits and pull requests
-
-- Keep commits small and self-contained, with tests, and explain why in the
-  message.
-- Never push to `main`; open a pull request from a topic branch. Stay within the
-  requested scope and do not merge without the owner's approval.
-- For functional changes, give the owner a chance to try the change locally
-  (`pnpm dev`, or a production preview) before merging.
-- Parallel work uses separate checkouts with clear file ownership; one owner
-  changes `package.json`, `pnpm-lock.yaml` and shared validation configuration.
