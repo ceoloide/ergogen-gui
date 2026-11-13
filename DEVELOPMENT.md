@@ -39,8 +39,6 @@ generated when unset) at base `/`, and serves it with `vite preview --strictPort
 `e2e/global-setup.ts` fails the run unless `build-id.txt` matches, so tests never
 reach a stale or foreign server. `CI` forbids `.only` and sets two workers. The
 fixture blocks external requests; provider tests route deterministic responses.
-One GitHub import regression is disabled pending
-[#227](https://github.com/ceoloide/ergogen-gui/issues/227).
 
 Other test suites worth knowing: `tests/engine-corpus.test.ts` runs the prepared
 engine on a small corpus (key count, outline size, KiCad 8 footprints, invalid

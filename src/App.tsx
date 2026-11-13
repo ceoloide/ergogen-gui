@@ -666,7 +666,11 @@ const AppContent = ({
               configInput ? (
                 <Ergogen pwaState={pwaState} />
               ) : (
-                <Navigate to="/new" replace />
+                // Keep the query so /new can still load ?github= and similar.
+                <Navigate
+                  to={{ pathname: '/new', search: location.search }}
+                  replace
+                />
               )
             }
           />

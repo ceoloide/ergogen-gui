@@ -100,77 +100,78 @@ test.describe('GitHub Loading', () => {
     await shoot('footprints-loaded');
   });
 
-  // Existing disabled regression: https://github.com/ceoloide/ergogen-gui/issues/227.
-  test.skip('should load config with URL parameter and footprints', async ({
+  test('should load config with URL parameter and footprints', async ({
     page,
   }) => {
     const shoot = makeShooter(page, test.info());
 
-    // Listen for console logs
     const logs: string[] = [];
-    const rateLimitLogs: string[] = [];
+    const loaderErrors: string[] = [];
+    const pageErrors: Error[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error));
     page.on('console', (msg) => {
       const text = msg.text();
       if (text.startsWith('[GitHub]')) {
         logs.push(text);
-        console.log(text);
       }
-      if (text.startsWith('[GitHub Rate Limit]')) {
-        rateLimitLogs.push(text);
-        console.log(text);
+      if (text.startsWith('[useConfigLoader] Failed')) {
+        loaderErrors.push(text);
       }
     });
 
-    // Navigate directly with the github URL parameter
+    // A fresh profile has no saved config, so / redirects to /new first.
     await page.goto('/?github=ceoloide/mr_useful');
     await shoot('loaded-with-url-param');
 
-    // Wait for config to be loaded and editor to be visible
-    await expect(page.getByTestId('config-editor')).toBeVisible({
-      timeout: 20000,
-    });
+    // The loaded config opens in the editor and the parameter is consumed.
+    const editor = page.getByTestId('config-editor');
+    await expect(editor).toBeVisible({ timeout: 20000 });
+    await expect(page).toHaveURL(/\/$/);
+    await expect(editor).toContainText('mr_useful');
+    await expect(editor).toContainText('ceoloide/logo_mr_useful');
     await shoot('config-editor-visible-url-param');
 
-    // Wait for logs
-    await expect
-      .poll(() => logs.some((log) => log.includes('Loaded footprint')))
-      .toBe(true);
-
-    // Verify GitHub activity in logs
-    expect(logs.length).toBeGreaterThan(0);
-    expect(logs.some((log) => log.includes('Starting fetch'))).toBe(true);
-    expect(logs.some((log) => log.includes('Loaded footprint'))).toBe(true);
-
-    // Open settings to verify footprints
-    const settingsButton = page.getByRole('button', {
-      name: 'Show settings panel',
+    // Ergogen generated outputs from the loaded config.
+    await expect(page.getByTestId('downloads-container-demo-dxf')).toBeVisible({
+      timeout: 20000,
     });
-    await settingsButton.click();
-    await shoot('settings-opened-url-param');
+    await shoot('outputs-generated-url-param');
 
+    expect(
+      logs.some((log) => log.includes('Starting fetch')),
+      logs.join('\n')
+    ).toBe(true);
+    expect(logs).toContain('[GitHub] Loaded footprint: logo_mr_useful');
+
+    // The submodule footprints are stored with their fetched content.
+    const storedInjections = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem('ergogen:injection') ?? '[]')
+    );
+    const fixtureFootprint =
+      'module.exports = { params: { designator: "LOGO" }, body: "" };';
+    expect(storedInjections).toEqual(
+      expect.arrayContaining([
+        ['footprint', 'ceoloide/logo_mr_useful', fixtureFootprint],
+        ['footprint', 'ceoloide/logo_mr_useful_2', fixtureFootprint],
+      ])
+    );
+
+    // The footprints are listed in the settings panel.
+    await page.getByRole('button', { name: 'Show settings panel' }).click();
     await expect(page.getByTestId('injections-container')).toBeVisible({
       timeout: 20000,
     });
-
-    const footprintRows = page.locator(
-      '[data-testid^="injections-container-"]'
-    );
-    const count = await footprintRows.count();
-
-    console.log(`Found ${count} footprint(s) from URL param`);
-    expect(count).toBeGreaterThan(0);
+    await expect(
+      page.getByTestId('injections-container-ceoloide/logo_mr_useful')
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('injections-container-ceoloide/logo_mr_useful_2')
+    ).toBeVisible();
     await shoot('footprints-loaded-url-param');
 
-    console.log('\n=== All GitHub Logs (URL Param) ===');
-    logs.forEach((log) => console.log(log));
-    console.log('=== End GitHub Logs ===\n');
-
-    // Output rate limit logs if any
-    if (rateLimitLogs.length > 0) {
-      console.log('\n=== Rate Limit Logs (URL Param) ===');
-      rateLimitLogs.forEach((log) => console.log(log));
-      console.log('=== End Rate Limit Logs ===\n');
-    }
+    await expect(page.getByTestId('error-banner')).toHaveCount(0);
+    expect(loaderErrors).toEqual([]);
+    expect(pageErrors).toEqual([]);
   });
 
   test('should accumulate footprints from sequential loads and reset conflict dialog', async ({

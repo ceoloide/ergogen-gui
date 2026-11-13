@@ -1,5 +1,18 @@
 # Changelog
 
+## Repository Links Work on First Visit
+
+November 13, 2026
+
+Previously, opening a link such as `?github=user/repo` in a browser that had never used the Web UI showed the welcome page instead of the repository, because the link's parameter was lost on the way to it.
+
+The welcome page now keeps the parameter, so the repository's configuration and footprints load, the editor opens and outputs are generated, just as they do for returning visitors.
+
+**What changed:**
+
+- **First-visit repository links**: `?github=`, `?codeberg=`, `?forgejo=` and `?gitea=` links load the repository even when no configuration is saved yet.
+- **Footprints included**: Footprints from the repository and its submodules are added to your library as part of the same load.
+
 ## Privacy Controls & Anti-Spam Telemetry Overhaul
 
 November 11, 2026
