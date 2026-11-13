@@ -48,8 +48,9 @@ A build ID also adds an `ergogen-build-id` meta tag to `index.html`.
 The update drill deploys `dist-subpath-next/` (the same base, another build ID)
 by copying it over the served copy, which `vite preview` reads on each request,
 then checks that the real worker waits, shows **Update Available** and activates.
-Playwright routes cannot stand in for that deployment: Chromium fetches the worker
-script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the
+Each drill changes the served copy, so it needs a fresh `pnpm test:e2e` run; do not
+use `--repeat-each` or retries. Playwright routes cannot stand in for that
+deployment: Chromium fetches the worker script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the
 `PLAYWRIGHT_*` variables in the config can pin ports and IDs.
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
