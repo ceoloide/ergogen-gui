@@ -337,6 +337,9 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
    * @type {ConfigOption | null}
    */
   const configContext = useConfigContext();
+  // Without a build-time GA4 tag ID, analytics never loads, so the Privacy
+  // switch would only suggest collection that cannot happen.
+  const hasAnalyticsTagId = Boolean(import.meta.env.VITE_GTAG_ID);
 
   // Track screen size changes
   useEffect(() => {
@@ -831,10 +834,15 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                         optionId={'sendUsageMetrics'}
                         label={'Send Usage Metrics'}
                         description={
-                          'Help improve Ergogen Web UI by sharing anonymous usage statistics.'
+                          hasAnalyticsTagId
+                            ? 'Help improve Ergogen Web UI by sharing anonymous usage statistics.'
+                            : 'Unavailable: this copy of Ergogen Web UI was built without an analytics tag ID, so no usage statistics are sent.'
                         }
                         setSelected={configContext.setSendUsageMetrics}
-                        checked={configContext.sendUsageMetrics}
+                        checked={
+                          hasAnalyticsTagId && configContext.sendUsageMetrics
+                        }
+                        disabled={!hasAnalyticsTagId}
                         aria-label="Send usage metrics"
                       />
                     </SettingsCard>

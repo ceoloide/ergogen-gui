@@ -262,9 +262,8 @@ with `pnpm generate-previews` and review the diff; builds never rewrite them.
   one (not FIFO); the latest `main` still deploys. Manual runs on other branches
   build in their own group and never publish.
 - Build variables come from repository variables; see the README configuration
-  section. Note that CI prefers `REACT_APP_GTAG_ID` over `VITE_GTAG_ID`, the
-  reverse of `vite.config.mts`
-  ([#230](https://github.com/ceoloide/ergogen-gui/issues/230)).
+  section. Both workflows prefer `VITE_GTAG_ID` over `REACT_APP_GTAG_ID`, like
+  `vite.config.mts`.
 - Actions are pinned by commit and updated by Dependabot with a seven-day
   cooldown. `tests/workflow-security.test.ts` asserts permissions, triggers,
   credentials, the artifact handoff, the shared validation step and the
@@ -299,8 +298,9 @@ from the same origin.
 `initAnalytics()` before rendering; the settings switch re-runs it.
 
 - **No tag ID, no analytics.** Without `VITE_GTAG_ID` (or `REACT_APP_GTAG_ID`) the
-  script is never loaded, and minification removes the loader. The settings switch
-  still renders from stored consent ([#230](https://github.com/ceoloide/ergogen-gui/issues/230)).
+  script is never loaded, and minification removes the loader. `src/Ergogen.tsx`
+  then shows the **Send Usage Metrics** switch off and disabled, with an
+  explanation, whatever consent is stored.
 - **Consent**, first match wins: a choice made this session whose storage write
   failed; the explicit key `ergogen:consent:sendUsageMetrics`; a stored `false` in
   the legacy `ergogen:config:sendUsageMetrics` or `ergogen:settings` (a stored

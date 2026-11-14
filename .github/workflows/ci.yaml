@@ -33,7 +33,7 @@ jobs:
       - name: Validate
         run: pnpm validate
         env:
-          VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
+          VITE_GTAG_ID: ${{ vars.VITE_GTAG_ID || vars.REACT_APP_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       - name: Install browser
         run: pnpm exec playwright install --with-deps chromium

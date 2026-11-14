@@ -1,5 +1,18 @@
 # Changelog
 
+## Clearer Usage Metrics Setting Without Analytics
+
+November 14, 2026
+
+Previously, a copy of the Web UI built without an analytics tag ID still showed **Send Usage Metrics** switched on, suggesting it collected data it never could. GitHub builds also picked the legacy `REACT_APP_GTAG_ID` variable over `VITE_GTAG_ID`, the opposite of a local build.
+
+The switch is now off and greyed out in such builds, with a note saying no usage statistics are sent. GitHub builds read `VITE_GTAG_ID` first and fall back to `REACT_APP_GTAG_ID`, just like local builds.
+
+**What changed:**
+
+- **Honest Privacy setting**: Builds without a tag ID show **Send Usage Metrics** as unavailable and explain why.
+- **Consistent tag ID**: Self-hosters who set both variables get the same analytics tag ID on GitHub and locally.
+
 ## Corrected Infused-Kim Diode Name
 
 November 14, 2026
