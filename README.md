@@ -102,7 +102,9 @@ backend, Google account or Git provider token is needed.
    unset. Add a GA tag ID only if you want analytics.
 4. Push to `main` or run **Build and deploy on GitHub Pages** manually. The deploy
    job requests `contents: write`; if an organization policy blocks it, or any step
-   fails, the run log shows where.
+   fails, the run log shows where. Each release is a commit on `gh-pages`, and the
+   site serves its build ID at `build-id.txt`. To serve an earlier release again,
+   see [Releases and rollback](DEVELOPMENT.md#releases-and-rollback).
 
 ## Configuration
 

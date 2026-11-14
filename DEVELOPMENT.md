@@ -61,7 +61,10 @@ responses. Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks
-workflow policy; `tests/build-version.test.ts` checks build-time engine identity;
+workflow policy; `tests/release-publication.test.ts` runs the deploy workflow's
+release and rollback steps against local Git repositories and smoke tests the
+result on a loopback server (see [Releases and rollback](#releases-and-rollback));
+`tests/build-version.test.ts` checks build-time engine identity;
 `tests/analytics-tag-id.test.ts` checks the build-time analytics tag ID.
 
 ### Semantic regression corpus
@@ -256,23 +259,98 @@ with `pnpm generate-previews` and review the diff; builds never rewrite them.
   [Pull request evidence](#pull-request-evidence)).
 - `deploy.yaml` runs on pushes to `main`, manual dispatch and
   `repository_dispatch`, never on pull requests. Its read-only `build` job
-  validates, builds, adds `404.html` and (on `main`, if `CNAME_DOMAIN` is set)
-  `CNAME`, then uploads `dist` as a one-day artifact. The `deploy` job, the only
-  one with `contents: write`, runs only on `main`, downloads the artifact and
-  publishes it to `gh-pages` with `peaceiris/actions-gh-pages`. It never checks
-  out or runs repository code.
+  validates and builds once, then uploads `dist` as a one-day artifact; the
+  `deploy` job publishes exactly that artifact to `gh-pages`, and a read-only
+  `smoke` job checks the public site. See
+  [Releases and rollback](#releases-and-rollback).
 - Production runs share the `pages` concurrency group without cancellation.
-  GitHub keeps one pending run per group, so a newer push replaces a queued older
-  one (not FIFO); the latest `main` still deploys. Manual runs on other branches
-  build in their own group and never publish.
+  GitHub keeps one pending run per group, so a newer run replaces a queued older
+  one (not FIFO). Manual runs on other branches build in their own group and
+  never publish.
 - Build variables come from repository variables; see the README configuration
   section. The analytics tag ID comes only from `VITE_GTAG_ID`, in both
   workflows and `vite.config.mts`.
 - Actions are pinned by commit and updated by Dependabot with a seven-day
   cooldown. `tests/workflow-security.test.ts` asserts permissions, triggers,
-  credentials, the artifact handoff, the shared validation step, the
-  publisher's allowed inputs, and that `ci.yaml` and the ruleset proposal match
+  credentials, the artifact handoff, the shared validation step, what the
+  write-scoped jobs may run, and that `ci.yaml` and the ruleset proposal match
   the evidence contract; update it with any workflow change.
+
+### Releases and rollback
+
+GitHub Pages serves the `gh-pages` branch (Settings > Pages, legacy build from
+`/ (root)`). Every release and rollback is a commit on it, made only by
+`deploy.yaml`:
+
+1. **Build** (read-only token). Validates and builds with
+   `VITE_BUILD_ID=<commit>.<run id>.<run attempt>`, which the site serves as
+   `build-id.txt` and the `ergogen-build-id` meta tag. It adds `404.html`,
+   `CNAME` (on `main`, if `CNAME_DOMAIN` is set) and `.nojekyll`, sets every file
+   to mode 0644, records the Git tree ID of `dist`, which names every path and
+   byte, and uploads `dist`.
+2. **Deploy** (the write token; no checkout, install or repository code, only
+   the artifact download and fixed shell in the workflow). It downloads the
+   artifact by the ID the build job reported, so only that upload from this run
+   arrives; the action fails on a digest mismatch. It then publishes only if all
+   of these hold, and otherwise publishes nothing:
+   - The downloaded files have the recorded tree ID and build ID.
+   - This run's commit is still the head of `main`. Otherwise it reports "Not
+     published", succeeds and leaves the newer run to publish, so a late or
+     re-run obsolete run never replaces a newer release.
+   - The push is a fast-forward of the `gh-pages` commit it read. A concurrent
+     change makes it fail instead of overwriting.
+
+   The commit has the validated tree, the previous release as parent and
+   trailers `Source-Commit`, `Build-Id`, `Artifact-Id`, `Artifact-Digest` and
+   `Workflow-Run`. It then checks that `gh-pages` points to that commit, which
+   means it holds exactly the validated bytes.
+
+3. **Smoke** (read-only token). Runs `scripts/ci/smoke-site.mts` against the
+   public URL: the custom domain from the release's `CNAME`, otherwise
+   `https://<owner>.github.io`, below `PUBLIC_URL`. It waits up to ten minutes
+   until `build-id.txt` names the release, then checks that the base path, the
+   client route `new` (through `404.html`) and every local file `index.html`
+   loads serve the bytes of the published commit. A failure means the release
+   is on `gh-pages` but not served correctly; roll back or fix forward.
+
+Concurrency cannot order runs, and a re-run or manual run that joins the `pages`
+group replaces any pending run, even a newer one. That run then shows as
+cancelled, and the site stays at the last release until someone re-runs all jobs
+of the latest run of `main`.
+
+Releases are public: `gh-pages` history records each one, and the site serves
+its build ID. To see what is served and where it came from:
+
+```shell
+curl -fsS https://<site>/build-id.txt     # <commit>.<run id>.<run attempt>
+git fetch origin gh-pages
+git log --format='%H %s%n%(trailers)' origin/gh-pages
+```
+
+**Rollback** serves an earlier release again. It is a production release: only
+the owner runs it, on `main`, choosing a `gh-pages` commit that `deploy.yaml`
+published (one with a `Source-Commit` trailer; the single commit left by the
+earlier publisher cannot be restored this way):
+
+```shell
+gh workflow run deploy.yaml --ref main -f rollback_to=<gh-pages commit SHA>
+gh run watch    # rollback, then smoke
+```
+
+The `rollback` job (write token, fixed shell only) checks that the commit is in
+`gh-pages` history and was published by this workflow, then fast-forwards
+`gh-pages` to a new commit with exactly that commit's tree and trailers
+`Source-Commit`, `Build-Id`, `Rollback-To`, `Requested-By` and `Workflow-Run`.
+It changes nothing if that tree is already served. The smoke job then checks the
+restored build. The next push to `main` releases normally and replaces the
+rollback; to return to the latest release without a new commit, re-run all jobs
+of the latest run of `main` (its one-day artifact may have expired).
+
+`tests/release-publication.test.ts` runs these exact workflow steps, read from
+`deploy.yaml`, against local Git repositories and a loopback server that
+answers like GitHub Pages, at the root and below a subpath. It covers
+out-of-order runs, altered, missing and extra files, a concurrent `gh-pages`
+change, byte identity, rollback and the smoke check.
 
 ### Pull request evidence
 

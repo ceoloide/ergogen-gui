@@ -32,7 +32,8 @@ export default defineConfig(({ mode }) => {
       {
         name: 'validation-build-identity',
         // Browser tests tell builds apart, including after a service worker
-        // update. Builds without an ID (deployments) are unchanged.
+        // update, and the deploy workflow names each release with one (see
+        // DEVELOPMENT.md). Builds without an ID are unchanged.
         transformIndexHtml() {
           return env.VITE_BUILD_ID
             ? [

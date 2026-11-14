@@ -4,7 +4,8 @@ name: Build and deploy on GitHub Pages
 
 # Pull requests are validated by ci.yaml. This workflow only runs for trusted,
 # maintainer-controlled events so that pull request code can never reach the
-# write-scoped publish job or the production concurrency group.
+# write-scoped publish jobs or the production concurrency group.
+# DEVELOPMENT.md ("Releases and rollback") describes what each job checks.
 on:
   # Runs on pushes targeting the default branch
   push:
@@ -12,10 +13,16 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: 'Roll back: full SHA of an earlier gh-pages release commit to serve again. Leave empty to build and release main.'
+        required: false
+        default: ''
+        type: string
 
   repository_dispatch:
 
-# Default to a read-only token; only the publish job is granted write access.
+# Default to a read-only token; only the publish jobs are granted write access.
 permissions:
   contents: read
 
@@ -23,17 +30,25 @@ permissions:
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 # Only runs on main can publish, so only they join the production "pages" group; a manual run on another
 # branch builds in its own group and can never displace a queued production deployment.
+# The group is not a queue: the publish job itself refuses a commit that is no longer the head of main.
 concurrency:
   group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
   # Installs dependencies and builds the site with a read-only token, then hands
-  # the result to the publish job as a short-lived artifact of this run.
+  # the result to the publish job as a short-lived artifact of this run, with
+  # the Git tree ID of its exact contents.
   build:
+    if: ${{ !inputs.rollback_to }}
     runs-on: ubuntu-26.04
     permissions:
       contents: read
+    outputs:
+      tree: ${{ steps.release.outputs.tree }}
+      build-id: ${{ steps.release.outputs.build-id }}
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -57,6 +72,7 @@ jobs:
         env:
           VITE_GTAG_ID: ${{ vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          VITE_BUILD_ID: ${{ github.sha }}.${{ github.run_id }}.${{ github.run_attempt }}
       - name: Create 404.html for SPA routing
         run: cp ./dist/index.html ./dist/404.html
       - name: Conditionally create CNAME
@@ -64,33 +80,253 @@ jobs:
         run: echo "$CNAME_DOMAIN" > ./dist/CNAME
         env:
           CNAME_DOMAIN: ${{ vars.CNAME_DOMAIN }}
+      - name: Disable Jekyll on GitHub Pages
+        run: touch ./dist/.nojekyll
+      # Artifacts do not keep file modes, so every file is made 0644 first. The
+      # tree ID then names every path and byte of the site.
+      - name: Record release tree
+        id: release
+        shell: bash
+        env:
+          SITE_DIR: dist
+          BUILD_ID: ${{ github.sha }}.${{ github.run_id }}.${{ github.run_attempt }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [ "$(cat "$SITE_DIR/build-id.txt")" = "$BUILD_ID" ] ||
+            fail "$SITE_DIR/build-id.txt does not name build $BUILD_ID."
+          [ -z "$(find "$SITE_DIR" ! -type f ! -type d)" ] ||
+            fail "$SITE_DIR may contain only regular files and folders."
+          find "$SITE_DIR" -type f -exec chmod 0644 {} +
+          index="$RUNNER_TEMP/release-tree"
+          git init -q "$index"
+          git -C "$SITE_DIR" --git-dir="$index/.git" --work-tree=. add --all --force .
+          tree=$(git --git-dir="$index/.git" write-tree)
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "build-id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "Validated site tree $tree, build $BUILD_ID" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload site artifact
+        id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: github-pages-site
           path: ./dist
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 1
 
-  # Publishes the prebuilt site to the gh-pages branch. This is the only job with
-  # a write-scoped token, and it never checks out, installs or runs repository code.
+  # Publishes the validated site to the gh-pages branch. With rollback, this and
+  # the rollback job are the only jobs with a write-scoped token; neither checks
+  # out, installs or runs repository code: the step below is fixed shell.
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')
     runs-on: ubuntu-26.04
     permissions:
       contents: write
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      commit: ${{ steps.publish.outputs.commit }}
+      build-id: ${{ steps.publish.outputs.build-id }}
     steps:
+      # By ID, so only the artifact the build job uploaded in this run can
+      # arrive; the action fails on a digest mismatch.
       - name: Download site artifact
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          name: github-pages-site
-          path: ./dist
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: ./site
+          digest-mismatch: error
+      # Publishes only the validated tree, only while this run's commit is the
+      # head of main, and only as a fast-forward of the gh-pages it read.
+      - name: Publish validated site
+        id: publish
+        shell: bash
+        env:
+          SITE_DIR: site
+          RELEASE_TREE: ${{ needs.build.outputs.tree }}
+          BUILD_ID: ${{ needs.build.outputs.build-id }}
+          ARTIFACT_ID: ${{ needs.build.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ needs.build.outputs.artifact-digest }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          PUBLISH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          fail() { echo "::error::$1 Nothing was published."; exit 1; }
+          [[ $SOURCE_COMMIT =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source commit '$SOURCE_COMMIT'."
+          [[ $RELEASE_TREE =~ ^[0-9a-f]{40}$ ]] || fail "The build job recorded no release tree."
+          [ -n "$BUILD_ID" ] || fail "The build job recorded no build ID."
+          [ -d "$SITE_DIR" ] || fail "The site artifact was not downloaded."
+          work="$RUNNER_TEMP/publish"
+          git init -q "$work"
+          export GIT_DIR="$work/.git" GIT_AUTHOR_NAME="github-actions[bot]"
+          export GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          auth=$(printf 'x-access-token:%s' "$PUBLISH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.$REMOTE_URL.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
+
+          find "$SITE_DIR" -type f -exec chmod 0644 {} +
+          git -C "$SITE_DIR" --work-tree=. add --all --force .
+          tree=$(git write-tree)
+          [ "$tree" = "$RELEASE_TREE" ] ||
+            fail "The downloaded site (tree $tree) is not the validated build (tree $RELEASE_TREE)."
+          [ "$(cat "$SITE_DIR/build-id.txt")" = "$BUILD_ID" ] ||
+            fail "The site does not carry build ID $BUILD_ID."
+
+          # Prints the commit a branch points to, or nothing if it does not exist.
+          head_of() {
+            local refs code=0
+            refs=$(git ls-remote --exit-code "$REMOTE_URL" "refs/heads/$1") || code=$?
+            [ "$code" = 0 ] || [ "$code" = 2 ] || return 1
+            printf '%s\n' "${refs%%[[:space:]]*}"
+          }
+          main=$(head_of main) || fail "Could not read main."
+          if [ "$main" != "$SOURCE_COMMIT" ]; then
+            echo "::notice::Not published: main is at ${main:-nothing}, not $SOURCE_COMMIT. Only the head of main is released."
+            echo "Not published: $SOURCE_COMMIT is no longer the head of main (${main:-none})." >> "$GITHUB_STEP_SUMMARY"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          parent=$(head_of gh-pages) || fail "Could not read gh-pages."
+          parents=()
+          if [ -n "$parent" ]; then
+            git fetch -q --depth=1 --no-tags "$REMOTE_URL" "+refs/heads/gh-pages:refs/remotes/origin/gh-pages"
+            parent=$(git rev-parse refs/remotes/origin/gh-pages)
+            parents=(-p "$parent")
+          fi
+          commit=$(git commit-tree "$tree" "${parents[@]}" -F - <<EOF
+          Release $SOURCE_COMMIT
+
+          Source-Commit: $SOURCE_COMMIT
+          Build-Id: $BUILD_ID
+          Artifact-Id: $ARTIFACT_ID
+          Artifact-Digest: sha256:$ARTIFACT_DIGEST
+          Workflow-Run: $RUN_URL
+          EOF
+          )
+          # Without force, the push fails if gh-pages moved since it was read.
+          git push -q "$REMOTE_URL" "$commit:refs/heads/gh-pages" ||
+            fail "gh-pages changed while this release was prepared."
+          # Past this point the push succeeded, so failures say what is served.
+          published=$(head_of gh-pages) || published="unknown"
+          if [ "$published" != "$commit" ]; then
+            echo "::error::Pushed release $commit, but gh-pages is at $published."
+            exit 1
+          fi
+          {
+            echo "published=true"
+            echo "commit=$commit"
+            echo "build-id=$BUILD_ID"
+          } >> "$GITHUB_OUTPUT"
+          echo "Published $SOURCE_COMMIT as gh-pages $commit (tree $tree, build $BUILD_ID)." >> "$GITHUB_STEP_SUMMARY"
+
+  # Serves an earlier release again: a new gh-pages commit with exactly the tree
+  # of the chosen release. Only a manual run on main with rollback_to starts it.
+  rollback:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.rollback_to
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    outputs:
+      published: ${{ steps.rollback.outputs.published }}
+      commit: ${{ steps.rollback.outputs.commit }}
+      build-id: ${{ steps.rollback.outputs.build-id }}
+    steps:
+      - name: Roll back to an earlier release
+        id: rollback
+        shell: bash
+        env:
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
+          REQUESTED_BY: ${{ github.triggering_actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+          REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          PUBLISH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          fail() { echo "::error::$1 Nothing was published."; exit 1; }
+          [[ $ROLLBACK_TO =~ ^[0-9a-f]{40}$ ]] ||
+            fail "rollback_to must be the full SHA of a gh-pages release commit."
+          work="$RUNNER_TEMP/rollback"
+          git init -q "$work"
+          export GIT_DIR="$work/.git" GIT_AUTHOR_NAME="github-actions[bot]"
+          export GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          auth=$(printf 'x-access-token:%s' "$PUBLISH_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.$REMOTE_URL.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
+
+          git fetch -q --no-tags "$REMOTE_URL" "+refs/heads/gh-pages:refs/remotes/origin/gh-pages" ||
+            fail "Could not read gh-pages."
+          tip=$(git rev-parse refs/remotes/origin/gh-pages)
+          if ! git cat-file -e "$ROLLBACK_TO^{commit}" 2>/dev/null ||
+            ! git merge-base --is-ancestor "$ROLLBACK_TO" "$tip"; then
+            fail "$ROLLBACK_TO is not a commit of gh-pages."
+          fi
+          source=$(git show -s --format='%(trailers:key=Source-Commit,valueonly,separator=%x2C)' "$ROLLBACK_TO")
+          [[ $source =~ ^[0-9a-f]{40}$ ]] ||
+            fail "$ROLLBACK_TO is not a release published by this workflow (no single Source-Commit)."
+          build_id=$(git show "$ROLLBACK_TO:build-id.txt" 2>/dev/null) ||
+            fail "$ROLLBACK_TO has no build-id.txt."
+          tree=$(git rev-parse "$ROLLBACK_TO^{tree}")
+          if [ "$tree" = "$(git rev-parse "$tip^{tree}")" ]; then
+            echo "::notice::gh-pages already serves the files of $ROLLBACK_TO."
+            echo "Not published: gh-pages already serves the files of $ROLLBACK_TO." >> "$GITHUB_STEP_SUMMARY"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          commit=$(git commit-tree "$tree" -p "$tip" -F - <<EOF
+          Roll back to release $ROLLBACK_TO
+
+          Source-Commit: $source
+          Build-Id: $build_id
+          Rollback-To: $ROLLBACK_TO
+          Requested-By: $REQUESTED_BY
+          Workflow-Run: $RUN_URL
+          EOF
+          )
+          git push -q "$REMOTE_URL" "$commit:refs/heads/gh-pages" ||
+            fail "gh-pages changed while the rollback was prepared."
+          published=$(git ls-remote "$REMOTE_URL" refs/heads/gh-pages) || published="unknown"
+          if [ "${published%%[[:space:]]*}" != "$commit" ]; then
+            echo "::error::Pushed rollback $commit, but gh-pages is at ${published%%[[:space:]]*}."
+            exit 1
+          fi
+          {
+            echo "published=true"
+            echo "commit=$commit"
+            echo "build-id=$build_id"
+          } >> "$GITHUB_OUTPUT"
+          echo "Rolled back to $ROLLBACK_TO (source $source, build $build_id) as gh-pages $commit, requested by $REQUESTED_BY." >> "$GITHUB_STEP_SUMMARY"
+
+  # Checks with a read-only token that the public site serves the release:
+  # its build ID and bytes at the base path, and a client route through the
+  # SPA fallback. A failure means the release is pushed but not served.
+  smoke:
+    needs: [deploy, rollback]
+    if: ${{ !cancelled() && (needs.deploy.outputs.published == 'true' || needs.rollback.outputs.published == 'true') }}
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          allow_empty_commit: true
-          full_commit_message: ${{ github.event.head_commit.message }}
-          force_orphan: true
+          persist-credentials: false
+      - name: Checkout published release
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.deploy.outputs.commit || needs.rollback.outputs.commit }}
+          path: published
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+      - name: Smoke test the public site
+        run: node scripts/ci/smoke-site.mts --site published --build-id "$BUILD_ID" --owner "$OWNER" --base "$PUBLIC_URL"
+        env:
+          BUILD_ID: ${{ needs.deploy.outputs.build-id || needs.rollback.outputs.build-id }}
+          OWNER: ${{ github.repository_owner }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
