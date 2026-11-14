@@ -1,0 +1,1 @@
+import{j as a}from"./vendor-C9A_qoZ1.js";const r=({pcb:e,previewKey:t,"aria-label":o,"data-testid":s})=>a.jsx("kicanvas-embed",{controls:"full",controlslist:"nodownload nooverlay",theme:"kicad","aria-label":o,"data-testid":s,children:a.jsx("kicanvas-source",{type:"board",children:e})},t);export{r as default};
