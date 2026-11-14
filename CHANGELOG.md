@@ -1,5 +1,18 @@
 # Changelog
 
+## Corrected Infused-Kim Diode Name
+
+November 14, 2026
+
+The bundled infused-kim diode was registered under the typo `infused-kimo/isde`.
+Its name is now `infused-kim/diode`. Replace the old name in your configuration
+before generating a PCB; the typo is no longer accepted.
+
+**What changed:**
+
+- **Correct footprint name**: Use `infused-kim/diode` in PCB footprint declarations.
+- **Configuration update required**: `infused-kimo/isde` is no longer registered.
+
 ## Example Previews and Offline Images Below a Subpath
 
 November 13, 2026

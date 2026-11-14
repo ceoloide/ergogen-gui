@@ -47,7 +47,6 @@ module.exports = {
   'infused-kim/conn_molex_pico_ezmate_1x02': require('./infused-kim/conn_molex_pico_ezmate_1x02.js'),
   'infused-kim/conn_molex_pico_ezmate_1x05': require('./infused-kim/conn_molex_pico_ezmate_1x05.js'),
   'infused-kim/diode': require('./infused-kim/diode.js'),
-  'infused-kimo/isde': require('./infused-kim/diode.js'), // Legacy alias.
   'infused-kim/icon_bat': require('./infused-kim/icon_bat.js'),
   'infused-kim/mounting_hole': require('./infused-kim/mounting_hole.js'),
   'infused-kim/nice_nano_pretty': require('./infused-kim/nice_nano_pretty.js'),

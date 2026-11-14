@@ -3,7 +3,9 @@ import { CONFIG_LOCAL_STORAGE_KEY } from '../src/context/constants';
 import { test, expect } from './fixtures';
 
 for (const name of ['infused-kim/diode', 'infused-kimo/isde']) {
-  test(`generates a downloadable PCB with ${name}`, async ({ page }) => {
+  test(`${name === 'infused-kim/diode' ? 'generates a downloadable PCB with' : 'rejects'} ${name}`, async ({
+    page,
+  }) => {
     const config = JSON.stringify({
       points: {
         zones: { matrix: { columns: { one: {}, two: {} }, rows: { row: {} } } },
@@ -30,6 +32,16 @@ for (const name of ['infused-kim/diode', 'infused-kimo/isde']) {
     const downloadButton = page.getByLabel('Download board.kicad_pcb', {
       exact: true,
     });
+    if (name === 'infused-kimo/isde') {
+      await expect(
+        page.getByText(
+          /Field "pcbs.board.footprints.diodes.what" should be one of/
+        )
+      ).toBeVisible({ timeout: 20000 });
+      await expect(downloadButton).toBeHidden();
+      await page.screenshot({ path: test.info().outputPath('rejected.png') });
+      return;
+    }
     await expect(downloadButton).toBeVisible({ timeout: 20000 });
     const [download] = await Promise.all([
       page.waitForEvent('download'),

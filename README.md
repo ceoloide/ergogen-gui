@@ -20,9 +20,8 @@ was created by [@MvEerd](https://github.com/MvEerd) and is maintained by
   public GitHub, Codeberg, Forgejo and Gitea repositories; and share links.
 - **Several configurations** saved in browser storage, and an installable PWA.
 
-Use `infused-kim/diode` for the bundled infused-kim diode footprint. The historical
-`infused-kimo/isde` name remains an alias for the same footprint, so existing
-configurations keep working.
+Use `infused-kim/diode` for the bundled infused-kim diode footprint. Replace the
+historical typo `infused-kimo/isde` in existing configurations; it is not supported.
 
 ## Privacy and network use
 
