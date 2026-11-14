@@ -463,22 +463,31 @@ This is a merge gate for ordinary pull requests, not confinement:
   `neutral`
   ([source](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
   Skipped tests in a job that runs fail the job and block, but a PR that skips
-  the whole job, for example with a job-level `if:` in its own `ci.yaml`, or
-  that replaces the job's steps, passes. The [assessor](#pull-request-evidence)
-  rejects such runs, but the ruleset does not run it.
+  the whole job, for example with a job-level `if:` in its own `ci.yaml`,
+  passes. The [assessor](#pull-request-evidence) rejects a skipped job and a
+  missing, skipped or failed required step, but the ruleset does not run it.
+- The check is reported by the GitHub Actions app from the workflow in the
+  pull request itself. A PR that keeps the job and step names but changes what
+  the steps run, and writes passing reports and evidence, passes both the
+  ruleset and the assessor, which check names, conclusions and reports, not the
+  commands. Only a trusted review of the PR's workflow and script changes
+  catches that.
 - The owner is an admin and can change or delete the ruleset at any time; "no
   bypass" only means the rules also apply to the owner's merges and pushes.
   Confining an agent would need a separate non-admin account and trusted
-  review, which this does not provide.
+  review, such as required code-owner approval from another identity, which
+  is out of scope here.
 
 `pnpm check:settings` only reads, and must run as the owner, because only
 admins can read a ruleset's bypass list. It exits 0 when the live ruleset
 contains every value of the proposal (GitHub adds defaults for unnamed
-parameters, which it ignores), has exactly its rules, applies them to `main`
-and not to `gh-pages`, cannot be bypassed by you, and the Actions defaults
-match; 1 with a list of differences, as before the cutover; and 2 if it cannot
-run. `tests/settings-check.test.ts` covers it with the recorded pre-cutover
-responses and one test per weakened setting.
+parameters, which it ignores), has exactly its rules, cannot be bypassed by
+you, and the Actions defaults match, and when, of the active rules GitHub
+applies from every repository and organization ruleset, `main` gets exactly
+the proposal's and `gh-pages` none; 1 with a list of differences, as before the
+cutover; and 2 if it cannot run. `tests/settings-check.test.ts` covers it with
+the recorded pre-cutover responses and one test per weakened setting or
+foreign rule.
 
 #### Cutover
 
@@ -491,20 +500,27 @@ cutover pull request has passed review. Each stage can be rolled back alone.
    ```shell
    repo=repos/ceoloide/ergogen-gui
    snap="$HOME/ergogen-gui-settings-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir "$snap"
+   git rev-parse HEAD > "$snap/reviewed-commit"   # the commit every later step runs from
+   git status --porcelain                         # expect no output
    gh api "$repo/rulesets?includes_parents=false" > "$snap/rulesets.json"
    gh api "$repo/actions/permissions/workflow" > "$snap/workflow-permissions.json"
    gh api "$repo/branches/main/protection"   # expect: Branch not protected (HTTP 404)
    pnpm check:settings                       # expect exit 1, three problems
    ```
 
-   Continue only if `rulesets.json` is `[]`, `workflow-permissions.json` is
+   Continue only if `reviewed-commit` is the head the cutover review approved,
+   the working tree has no changes, `rulesets.json` is `[]`,
+   `workflow-permissions.json` is
    `{"default_workflow_permissions":"write","can_approve_pull_request_reviews":true}`
    and `main` is not protected. Otherwise the rollback below would not restore
    the start state; review the difference first.
 
 2. **Baseline.** Record `gh pr view <number> --json mergeStateStatus` for the
    pull requests used in the [drill](#drill), and open the drill's failing pull
-   request now, so each later state can be compared with this one.
+   request now, so each later state can be compared with this one. Opening it
+   switches the checkout to `main`, which lacks this check and its proposals;
+   continue only once the drill commands have returned it to the reviewed
+   commit.
 3. **Actions defaults.**
 
    ```shell
@@ -548,9 +564,14 @@ step 4:
 | Passing `lint-and-test`, behind `main`                | `CLEAN`    | `BEHIND` or `BLOCKED`    |
 | Passing `lint-and-test`, up to date, threads resolved | `CLEAN`    | `CLEAN` (the cutover PR) |
 
-The failing pull request adds one failing test, and is closed once read:
+The failing pull request adds one failing test on top of the current `main`.
+Open it from the cutover checkout, in the shell of step 1 (in a new shell, set
+`snap` first), and only when `git status --porcelain` prints nothing: the
+commands switch branches, and the last ones return to the reviewed commit
+without discarding anything.
 
 ```shell
+git fetch origin main
 git switch -c drill/required-check origin/main
 cat > tests/drill.test.ts <<'TEST'
 import { expect, it } from 'vitest';
@@ -563,7 +584,15 @@ git add tests/drill.test.ts
 git commit -m 'test: fail on purpose for the branch rules drill (never merge)'
 git push -u origin drill/required-check
 gh pr create --base main --title 'Branch rules drill: failing check (never merge)' --body 'Must show BLOCKED once the ruleset is active. Close without merging.'
-# after lint-and-test has failed and the state was read:
+git status --porcelain                                # expect no output
+git switch --detach "$(cat "$snap/reviewed-commit")"  # refuses rather than discard changes
+git rev-parse HEAD                                    # expect the reviewed commit
+```
+
+Steps 3 and 4 run from there. Once `lint-and-test` has failed and the state
+after step 4 was read, close it:
+
+```shell
 gh pr close drill/required-check --delete-branch
 ```
 

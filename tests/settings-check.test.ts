@@ -227,10 +227,80 @@ describe('repository settings check', () => {
           ref_name: { include: ['~ALL'], exclude: [] },
         };
         responses[`${base}/rules/branches/gh-pages`] = [
-          { type: 'pull_request', ruleset_id: rulesetId },
+          {
+            type: 'pull_request',
+            ruleset_source_type: 'Repository',
+            ruleset_source: repo,
+            ruleset_id: rulesetId,
+          },
         ];
       },
-      'rules pull_request apply to gh-pages, which deploy.yaml pushes releases to',
+      `the pull_request rule of ruleset ${rulesetId} (Repository ${repo}) applies to gh-pages, which deploy.yaml pushes releases to`,
+    ],
+    [
+      'another repository ruleset that blocks updates to the default branch',
+      (responses) => {
+        (responses[`${base}/rules/branches/main`] as Json[]).push({
+          type: 'update',
+          ruleset_source_type: 'Repository',
+          ruleset_source: repo,
+          ruleset_id: 999,
+        });
+      },
+      `the update rule of ruleset 999 (Repository ${repo}) also applies to main`,
+    ],
+    [
+      'an organization ruleset that adds a status check to the default branch',
+      (responses) => {
+        (responses[`${base}/rules/branches/main`] as Json[]).push({
+          type: 'required_status_checks',
+          parameters: {
+            strict_required_status_checks_policy: false,
+            required_status_checks: [{ context: 'other' }],
+          },
+          ruleset_source_type: 'Organization',
+          ruleset_source: 'ceoloide',
+          ruleset_id: 77,
+        });
+      },
+      'the required_status_checks rule of ruleset 77 (Organization ceoloide) also applies to main',
+    ],
+    [
+      'another repository ruleset that blocks updates to the release branch',
+      (responses) => {
+        responses[`${base}/rules/branches/gh-pages`] = [
+          {
+            type: 'update',
+            ruleset_source_type: 'Repository',
+            ruleset_source: repo,
+            ruleset_id: 999,
+          },
+        ];
+      },
+      `the update rule of ruleset 999 (Repository ${repo}) applies to gh-pages, which deploy.yaml pushes releases to`,
+    ],
+    [
+      'an organization ruleset that covers the release branch',
+      (responses) => {
+        responses[`${base}/rules/branches/gh-pages`] = [
+          {
+            type: 'non_fast_forward',
+            ruleset_source_type: 'Organization',
+            ruleset_source: 'ceoloide',
+            ruleset_id: 77,
+          },
+        ];
+      },
+      'the non_fast_forward rule of ruleset 77 (Organization ceoloide) applies to gh-pages, which deploy.yaml pushes releases to',
+    ],
+    [
+      'a rule of the proposal ruleset reported for another source',
+      (responses) => {
+        const rules = responses[`${base}/rules/branches/main`] as Json[];
+        const deletion = rules.find((rule) => rule.type === 'deletion');
+        Object.assign(deletion as Json, { ruleset_source: 'someone/else' });
+      },
+      `the deletion rule of ruleset ${rulesetId} (Repository someone/else) also applies to main`,
     ],
     [
       'two rulesets with the proposal name',
@@ -263,6 +333,17 @@ describe('repository settings check', () => {
     // Assert
     expect(result.passed).toBe(false);
     expect(result.problems).toContain(problem);
+  });
+
+  it('cannot run on a branch rule without a ruleset ID', async () => {
+    // Arrange
+    const responses = applied();
+    delete (responses[`${base}/rules/branches/main`] as Json[])[0].ruleset_id;
+
+    // Act and assert
+    await expect(check(responses)).rejects.toThrow(
+      'rules for main[].ruleset_id is not a number'
+    );
   });
 
   it('cannot run on a response of an unexpected shape', async () => {

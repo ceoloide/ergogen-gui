@@ -162,31 +162,57 @@ export async function checkSettings(
       'ruleset'
     );
     problems.push(...rulesetProblems(live, proposal.ruleset));
+  }
 
-    // What GitHub actually applies to each branch, from every ruleset.
-    const appliedTo = async (branch: string) =>
-      list(
-        await reader.json(
-          `repos/${repo}/rules/branches/${encodeURIComponent(branch)}`
-        ),
-        `rules for ${branch}`
-      )
-        .filter((rule) => rule.ruleset_id === rulesetId)
-        .map((rule) => String(rule.type));
-    const onDefault = await appliedTo(defaultBranch);
+  // What GitHub actually applies to each branch: the active rules of every
+  // ruleset, from this repository and from its organization. A rule of any
+  // other ruleset could block merges or releases (`update`, for example), so
+  // only the proposal's rules may apply to the default branch, and none to the
+  // release branch. A full page cannot pass, so later pages need no reading.
+  const appliedTo = async (branch: string) => {
+    const where = `rules for ${branch}`;
+    return list(
+      await reader.json(
+        `repos/${repo}/rules/branches/${encodeURIComponent(branch)}`
+      ),
+      where
+    ).map((rule) => {
+      for (const [key, kind] of [
+        ['type', 'string'],
+        ['ruleset_id', 'number'],
+        ['ruleset_source_type', 'string'],
+        ['ruleset_source', 'string'],
+      ] as const) {
+        if (typeof rule[key] !== kind) {
+          throw new ApiShapeError(`${where}[].${key} is not a ${kind}`);
+        }
+      }
+      const ours =
+        rulesetId !== undefined &&
+        rule.ruleset_id === rulesetId &&
+        rule.ruleset_source_type === 'Repository' &&
+        rule.ruleset_source === repo;
+      const name = `the ${String(rule.type)} rule of ruleset ${String(rule.ruleset_id)} (${String(rule.ruleset_source_type)} ${String(rule.ruleset_source)})`;
+      return { type: String(rule.type), ours, name };
+    });
+  };
+  const onDefault = await appliedTo(defaultBranch);
+  if (rulesetId !== undefined) {
     for (const rule of proposal.ruleset.rules) {
-      if (!onDefault.includes(rule.type)) {
+      if (!onDefault.some(({ ours, type }) => ours && type === rule.type)) {
         problems.push(
           `the ${rule.type} rule does not apply to ${defaultBranch}`
         );
       }
     }
-    const onPublish = await appliedTo(publishBranch);
-    if (onPublish.length > 0) {
-      problems.push(
-        `rules ${onPublish.join(', ')} apply to ${publishBranch}, which deploy.yaml pushes releases to`
-      );
-    }
+  }
+  for (const { ours, name } of onDefault) {
+    if (!ours) problems.push(`${name} also applies to ${defaultBranch}`);
+  }
+  for (const { name } of await appliedTo(publishBranch)) {
+    problems.push(
+      `${name} applies to ${publishBranch}, which deploy.yaml pushes releases to`
+    );
   }
 
   problems.push(
