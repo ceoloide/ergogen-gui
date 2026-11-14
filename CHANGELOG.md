@@ -1,17 +1,17 @@
 # Changelog
 
-## Clearer Usage Metrics Setting Without Analytics
+## Usage Metrics Configuration
 
 November 14, 2026
 
-Previously, a copy of the Web UI built without an analytics tag ID still showed **Send Usage Metrics** switched on, suggesting it collected data it never could. GitHub builds also preferred the legacy `REACT_APP_GTAG_ID` variable over `VITE_GTAG_ID`, the opposite of a local build.
+Set `VITE_GTAG_ID` to your GA4 tag ID for GitHub and local builds. This is the only analytics tag setting.
 
-The switch is now off and greyed out in such builds, with a note saying no usage statistics are sent. `VITE_GTAG_ID` is now the only analytics setting, for GitHub and local builds alike; `REACT_APP_GTAG_ID` is no longer read.
+Builds without a tag ID show **Send Usage Metrics** off and disabled, with a note explaining that no usage statistics are sent. Your saved consent choice is preserved.
 
 **What changed:**
 
-- **Honest Privacy setting**: Builds without a tag ID show **Send Usage Metrics** as unavailable and explain why.
-- **One analytics setting**: Self-hosters set the tag ID with `VITE_GTAG_ID` only, and get the same ID on GitHub and locally. Rename a remaining `REACT_APP_GTAG_ID` to keep analytics on.
+- **Clear Privacy setting**: Builds without a tag ID show **Send Usage Metrics** as unavailable and explain why.
+- **One analytics setting**: Self-hosters configure analytics with `VITE_GTAG_ID` for both GitHub and local builds.
 
 ## Corrected Infused-Kim Diode Name
 
