@@ -298,10 +298,11 @@ pnpm assess:pr <number> [--json]
 
 It only reads, through `gh api`, and exits 0 only if all of these hold:
 
-- The PR is open and targets `main`, and its head and base did not change
-  while it was assessed.
+- The PR is open and targets `main`, and its state, target branch, head and
+  base did not change while it was assessed.
 - The newest `ci.yaml` `pull_request` run for that exact head completed with
   success, and every job of its latest attempt succeeded, with each required step.
+  No newer run or rerun started while it was assessed.
 - The only latest `lint-and-test` check on the head is that job, created by the
   GitHub Actions app (ID 15368), so a same-named check from another workflow or
   app fails the assessment.
@@ -317,6 +318,7 @@ error or an unexpected response shape). To triage a failure, open the run and jo
 links it prints, read the job summary, then download the artifact for the reports,
 the Playwright HTML report and traces. Artifacts expire after seven days; rerun
 the workflow to assess again. `--allow-closed` assesses a merged PR for audits only.
+A pass describes the moment it finished; it does not stop later pushes or merges.
 
 ### Branch rules
 
@@ -327,8 +329,14 @@ applied. It requires `lint-and-test` from the GitHub Actions app, up to date
 with `main`, plus a pull request with resolved conversations, and blocks force
 pushes and deletion, with no bypass and no required approval. The owner is the
 only collaborator, and GitHub does not count an author's approval of their own
-pull request. Tests keep it in line with the contract. Only the repository owner
-applies it, after review:
+pull request. Tests keep it in line with the contract. It would not enforce the
+whole contract: GitHub accepts a required check that concludes `success`,
+`skipped` or `neutral`
+([source](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
+Skipped tests in a job that runs fail the job and block, but a PR that skips the
+whole job, for example by adding a job-level `if:` to its own `ci.yaml`, would
+pass the ruleset. The assessor rejects that, but the ruleset does not run it.
+Only the repository owner applies it, after review:
 
 ```shell
 gh api --method POST repos/ceoloide/ergogen-gui/rulesets --input scripts/ci/ruleset-proposal.json

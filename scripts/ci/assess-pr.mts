@@ -136,29 +136,41 @@ export async function assessPullRequest(
   if (pr.baseRef !== 'main') problem(`PR targets ${pr.baseRef}, not main`);
 
   // 2. The newest run of the CI workflow file for exactly this head.
-  const runs = list(
-    await github.json(
-      `${api}/actions/workflows/${workflowPath.split('/').pop()}/runs` +
-        `?head_sha=${head}&event=pull_request&per_page=100`
-    ),
-    'workflow_runs',
-    'runs'
-  ).filter(
-    (run) =>
-      run.path === workflowPath &&
-      run.event === 'pull_request' &&
-      run.head_sha === head
-  );
-  if (runs.length === 0) {
+  const newestRun = async () => {
+    const runs = list(
+      await github.json(
+        `${api}/actions/workflows/${workflowPath.split('/').pop()}/runs` +
+          `?head_sha=${head}&event=pull_request&per_page=100`
+      ),
+      'workflow_runs',
+      'runs'
+    ).filter(
+      (run) =>
+        run.path === workflowPath &&
+        run.event === 'pull_request' &&
+        run.head_sha === head
+    );
+    if (runs.length === 0) return undefined;
+    return runs.reduce((newest, candidate) =>
+      field(candidate, 'id', 'number', 'run') >
+      field(newest, 'id', 'number', 'run')
+        ? candidate
+        : newest
+    );
+  };
+  /** What a rerun or a newer run changes: id, attempt, status, conclusion. */
+  const describeRun = (run: Json) =>
+    [
+      `run ${field(run, 'id', 'number', 'run')}`,
+      `attempt ${field(run, 'run_attempt', 'number', 'run')}`,
+      field(run, 'status', 'string', 'run'),
+      String(optionalString(run, 'conclusion')),
+    ].join(' ');
+  const run = await newestRun();
+  if (!run) {
     problem(`no ${workflowPath} pull_request run exists for head ${head}`);
     return finish(result);
   }
-  const run = runs.reduce((newest, candidate) =>
-    field(candidate, 'id', 'number', 'run') >
-    field(newest, 'id', 'number', 'run')
-      ? candidate
-      : newest
-  );
   const runId = field(run, 'id', 'number', 'run');
   const attempt = field(run, 'run_attempt', 'number', 'run');
   const runStartedAt = field(run, 'run_started_at', 'string', 'run');
@@ -346,13 +358,29 @@ export async function assessPullRequest(
     }
   }
 
-  // 8. The PR must not have moved while it was assessed.
+  // 8. Neither the newest run nor the PR may have changed while it was
+  // assessed: a rerun or newer run replaces this evidence, and a push,
+  // retarget or close changes what it was evidence for. With --allow-closed,
+  // a PR that merges or closes meanwhile is still audited.
+  const runAfter = await newestRun();
+  const runBefore = describeRun(run);
+  const runNow = runAfter ? describeRun(runAfter) : 'none';
+  if (runNow !== runBefore) {
+    problem(
+      `the newest run of ${head} changed during assessment (${runNow}, was ${runBefore}); assess again`
+    );
+  }
   const after = readPullRequest(
     await github.json(`${api}/pulls/${pullRequest}`)
   );
-  if (after.headSha !== head || after.baseSha !== pr.baseSha) {
+  if (
+    after.headSha !== head ||
+    after.baseSha !== pr.baseSha ||
+    after.baseRef !== pr.baseRef ||
+    (after.state !== pr.state && !allowClosed)
+  ) {
     problem(
-      `PR #${pullRequest} changed during assessment (head ${after.headSha}, base ${after.baseSha}); assess again`
+      `PR #${pullRequest} changed during assessment (head ${after.headSha}, base ${after.baseSha}, target ${after.baseRef}, ${after.state}); assess again`
     );
   }
   return finish(result);

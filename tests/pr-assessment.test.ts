@@ -24,7 +24,7 @@ const api = <T>(name: string) => JSON.parse(read(`github/${name}.json`)) as T;
 interface Pull {
   state: string;
   head: { sha: string };
-  base: { sha: string };
+  base: { sha: string; ref: string };
 }
 interface Run {
   id: number;
@@ -111,6 +111,8 @@ function scenario() {
     pull,
     pullAfter: undefined as Pull | undefined,
     runs: recorded('runs'),
+    /** The runs as read again at the end, or the error that read raises. */
+    runsAfter: undefined as { workflow_runs: Run[] } | Error | undefined,
     jobs,
     checks: recorded('check-runs'),
     artifacts,
@@ -133,7 +135,9 @@ function serve(
       requests.push(path);
       const answers = responses[path];
       if (!answers) throw new Error(`unexpected request ${path}`);
-      return structuredClone(answers.length > 1 ? answers.shift() : answers[0]);
+      const answer = answers.length > 1 ? answers.shift() : answers[0];
+      if (answer instanceof Error) throw answer;
+      return structuredClone(answer);
     },
     bytes: async (path) => {
       requests.push(path);
@@ -162,7 +166,7 @@ async function assess(world: Scenario, allowClosed = false) {
     {
       [`${at}/pulls/238`]: [world.pull, world.pullAfter ?? world.pull],
       [`${at}/actions/workflows/ci.yaml/runs?head_sha=${sha}&event=pull_request&per_page=100`]:
-        [world.runs],
+        [world.runs, world.runsAfter ?? world.runs],
       [`${at}/actions/runs/${selected.id}/attempts/${selected.run_attempt}/jobs?per_page=100`]:
         [world.jobs],
       [`${at}/commits/${sha}/check-runs?check_name=lint-and-test&filter=latest&per_page=100`]:
@@ -205,8 +209,10 @@ describe('PR assessment', () => {
     expect(result.reports.map((report) => report.summary?.tests)).toEqual([
       11, 24,
     ]);
-    // Reads only; the PR is read again last to detect a concurrent push.
+    // Reads only; the newest run and then the PR are read again last to
+    // detect a rerun, a push, a retarget or a close during the assessment.
     expect(requests.at(0)).toBe(requests.at(-1));
+    expect(requests.at(1)).toBe(requests.at(-2));
     expect(renderAssessment(result)).toContain(`PR #238 in ${repo}: PASSED`);
   });
 
@@ -407,6 +413,49 @@ describe('PR assessment', () => {
       },
       `PR #238 changed during assessment (head ${'d'.repeat(40)}`,
     ],
+    [
+      'a PR closed during the assessment',
+      (world) => {
+        world.pullAfter = structuredClone(world.pull);
+        world.pullAfter.state = 'closed';
+      },
+      'PR #238 changed during assessment',
+    ],
+    [
+      'a PR retargeted during the assessment to a branch at the same commit',
+      (world) => {
+        world.pullAfter = structuredClone(world.pull);
+        world.pullAfter.base.ref = 'release';
+      },
+      'PR #238 changed during assessment',
+    ],
+    [
+      'a rerun started during the assessment',
+      (world) => {
+        const runsAfter = structuredClone(world.runs);
+        Object.assign(runsAfter.workflow_runs[0], {
+          run_attempt: 2,
+          status: 'queued',
+          conclusion: null,
+        });
+        world.runsAfter = runsAfter;
+      },
+      `the newest run of ${head} changed during assessment (run ${runId} attempt 2 queued null, was run ${runId} attempt 1 completed success)`,
+    ],
+    [
+      'a newer run created during the assessment',
+      (world) => {
+        const runsAfter = structuredClone(world.runs);
+        runsAfter.workflow_runs.push({
+          ...runsAfter.workflow_runs[0],
+          id: runId + 1,
+          status: 'in_progress',
+          conclusion: null,
+        });
+        world.runsAfter = runsAfter;
+      },
+      `the newest run of ${head} changed during assessment (run ${runId + 1} attempt 1 in_progress null, was run ${runId} attempt 1 completed success)`,
+    ],
   ];
   it.each(cases)('fails for %s', async (_case, change, expected) => {
     // Arrange
@@ -479,6 +528,36 @@ describe('PR assessment', () => {
     expect(result.passed).toBe(false);
     expect(result.problems.join('\n')).toContain(
       `run ${runId + 1} attempt 1 concluded failure`
+    );
+  });
+
+  it('audits a PR that merges during the assessment', async () => {
+    // Arrange
+    const world = scenario();
+    world.pullAfter = structuredClone(world.pull);
+    world.pullAfter.state = 'closed';
+
+    // Act
+    const { result } = await assess(world, true);
+
+    // Assert
+    expect(result.problems).toEqual([]);
+    expect(result.passed).toBe(true);
+  });
+
+  it('cannot run when the final read of the runs fails', async () => {
+    // Arrange: an API error, then a changed shape, on the second read.
+    const failing = scenario();
+    failing.runsAfter = new Error('HTTP 502');
+    const reshaped = scenario();
+    const runsAfter = structuredClone(reshaped.runs);
+    delete runsAfter.workflow_runs[0].run_attempt;
+    reshaped.runsAfter = runsAfter;
+
+    // Act and assert
+    await expect(assess(failing)).rejects.toThrow('HTTP 502');
+    await expect(assess(reshaped)).rejects.toThrow(
+      'run.run_attempt is not a number'
     );
   });
 
