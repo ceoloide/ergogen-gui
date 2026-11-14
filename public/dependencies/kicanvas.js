@@ -3051,7 +3051,7 @@ function Dn(s, e, t) {
       , m = l / p
       , _ = h * new d(.5 / n,.5 / o).magnitude
       , b = m * new d(.5 / l,.5 / p).magnitude;
-    if (h == m) {
+    if (h == m || isNaN(h) || isNaN(m)) {
         if (s == t)
             return i.x = (s.x + e.x) / 2,
             i.y = (s.y + e.y) / 2,
@@ -4117,7 +4117,7 @@ var Dr = class {
             board_only: !1,
             exclude_from_pos_files: !1,
             exclude_from_bom: !1,
-            allow_solder_mask_bridges: !1,
+            allow_solder_mask_bridges: !1, allow_soldermask_bridges: !1, allow_soldermask_bridges: !1, allow_soldermask_bridges: !1,
             allow_missing_courtyard: !1
         };
         this.properties = {};
@@ -4128,7 +4128,7 @@ var Dr = class {
         this.models = [];
         this.embedded_fonts = !1;
         this.embedded_files = [];
-        Object.assign(this, V(e, a.start("footprint"), a.positional("library_link", R.string), a.pair("version", R.number), a.pair("generator", R.string), a.atom("locked"), a.atom("placed"), a.pair("layer", R.string), a.pair("tedit", R.string), a.pair("tstamp", R.string), a.pair("uuid", R.string), a.pair("sheetname", R.string), a.pair("sheetfile", R.string), a.item("at", K), a.pair("descr", R.string), a.pair("tags", R.string), a.pair("path", R.string), a.pair("autoplace_cost90", R.number), a.pair("autoplace_cost180", R.number), a.pair("solder_mask_margin", R.number), a.pair("solder_paste_margin", R.number), a.pair("solder_paste_ratio", R.number), a.pair("clearance", R.number), a.pair("zone_connect", R.number), a.pair("thermal_width", R.number), a.pair("thermal_gap", R.number), a.pair("net_tie_pad_groups", R.string), a.object("attr", this.attr, a.atom("through_hole"), a.atom("smd"), a.atom("virtual"), a.atom("board_only"), a.atom("exclude_from_pos_files"), a.atom("exclude_from_bom"), a.atom("allow_solder_mask_bridges"), a.atom("allow_missing_courtyard")), a.dict("properties", "property", R.item(gt, this)), a.collection("drawings", "fp_line", R.item(b2, this)), a.collection("drawings", "fp_circle", R.item(f2, this)), a.collection("drawings", "fp_arc", R.item(M2, this)), a.collection("drawings", "fp_poly", R.item(g2, this)), a.collection("drawings", "fp_rect", R.item(N2, this)), a.collection("drawings", "fp_text", R.item(ze, this)), a.collection("zones", "zone", R.item(Mt, this)), a.collection("models", "model", R.item(ei)), a.collection("pads", "pad", R.item(V2, this)), a.pair("embedded_fonts", R.boolean), a.list("embedded_files", R.item(Ge))));
+        Object.assign(this, V(e, a.start("footprint"), a.positional("library_link", R.string), a.pair("version", R.number), a.pair("generator", R.string), a.atom("locked"), a.atom("placed"), a.pair("layer", R.string), a.pair("tedit", R.string), a.pair("tstamp", R.string), a.pair("uuid", R.string), a.pair("sheetname", R.string), a.pair("sheetfile", R.string), a.item("at", K), a.pair("descr", R.string), a.pair("tags", R.string), a.pair("path", R.string), a.pair("autoplace_cost90", R.number), a.pair("autoplace_cost180", R.number), a.pair("solder_mask_margin", R.number), a.pair("solder_paste_margin", R.number), a.pair("solder_paste_ratio", R.number), a.pair("clearance", R.number), a.pair("zone_connect", R.number), a.pair("thermal_width", R.number), a.pair("thermal_gap", R.number), a.pair("net_tie_pad_groups", R.string), a.object("attr", this.attr, a.atom("through_hole"), a.atom("smd"), a.atom("virtual"), a.atom("board_only"), a.atom("exclude_from_pos_files"), a.atom("exclude_from_bom"), a.atom("allow_solder_mask_bridges"), a.atom("allow_soldermask_bridges"),a.atom("allow_soldermask_bridges"), a.atom("allow_soldermask_bridges"), a.atom("allow_soldermask_bridges"), a.atom("allow_missing_courtyard")), a.dict("properties", "property", R.item(gt, this)), a.collection("drawings", "fp_line", R.item(b2, this)), a.collection("drawings", "fp_circle", R.item(f2, this)), a.collection("drawings", "fp_arc", R.item(M2, this)), a.collection("drawings", "fp_poly", R.item(g2, this)), a.collection("drawings", "fp_rect", R.item(N2, this)), a.collection("drawings", "fp_text", R.item(ze, this)), a.collection("zones", "zone", R.item(Mt, this)), a.collection("models", "model", R.item(ei)), a.collection("pads", "pad", R.item(V2, this)), a.pair("embedded_fonts", R.boolean), a.list("embedded_files", R.item(Ge))));
         for (let r of this.pads)
             this.#e.set(r.number, r);
         for (let r of this.drawings)
