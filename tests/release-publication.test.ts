@@ -11,7 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer, type Server } from 'node:http';
+import { createServer, type RequestListener, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -259,28 +259,9 @@ const smokeCommand = (...args: string[]) =>
     }
   );
 
-/** Serves files like GitHub Pages: below a base path, 404.html with HTTP 404. */
-const servePages = async (root: () => string, base: string) => {
-  const server: Server = createServer((request, response) => {
-    const path = decodeURIComponent(
-      new URL(request.url ?? '/', 'http://pages').pathname
-    );
-    const inside = path.startsWith(base) ? path.slice(base.length) : undefined;
-    const candidates =
-      inside === undefined ? [] : [inside, join(inside, 'index.html')];
-    const file = candidates
-      .map((candidate) => join(root(), candidate))
-      .find(
-        (candidate) => existsSync(candidate) && statSync(candidate).isFile()
-      );
-    if (file) {
-      response.writeHead(200).end(readFileSync(file));
-    } else if (existsSync(join(root(), '404.html'))) {
-      response.writeHead(404).end(readFileSync(join(root(), '404.html')));
-    } else {
-      response.writeHead(404).end('Not Found');
-    }
-  });
+/** Serves requests on a loopback port, below a base path. */
+const serve = async (base: string, handler: RequestListener) => {
+  const server: Server = createServer(handler);
   await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('no port');
@@ -293,6 +274,47 @@ const servePages = async (root: () => string, base: string) => {
       }),
   };
 };
+
+/** What GitHub Pages answers for a path: the file, else 404.html with HTTP 404. */
+const pagesResponse = (root: string, base: string, requestUrl = '/') => {
+  const path = decodeURIComponent(new URL(requestUrl, 'http://pages').pathname);
+  const inside = path.startsWith(base) ? path.slice(base.length) : undefined;
+  const candidates =
+    inside === undefined ? [] : [inside, join(inside, 'index.html')];
+  const file = candidates
+    .map((candidate) => join(root, candidate))
+    .find((candidate) => existsSync(candidate) && statSync(candidate).isFile());
+  if (file) return { status: 200, body: readFileSync(file) };
+  if (existsSync(join(root, '404.html'))) {
+    return { status: 404, body: readFileSync(join(root, '404.html')) };
+  }
+  return { status: 404, body: Buffer.from('Not Found') };
+};
+
+/**
+ * Serves files like GitHub Pages. With `cdn`, it also caches like the Pages
+ * CDN: it keeps the first answer for each URL, query string included, even a
+ * 404, and ignores the request's cache headers.
+ */
+const servePages = (
+  root: () => string,
+  base: string,
+  options: { cdn?: boolean } = {}
+) => {
+  const cache = new Map<string, { status: number; body: Buffer }>();
+  return serve(base, (request, response) => {
+    const key = request.url ?? '/';
+    const answer =
+      (options.cdn ? cache.get(key) : undefined) ??
+      pagesResponse(root(), base, key);
+    if (options.cdn) cache.set(key, answer);
+    response.writeHead(answer.status).end(answer.body);
+  });
+};
+
+/** The smoke check's problems without each poll's own cache key. */
+const withoutPollKeys = (problems: string[]) =>
+  problems.map((problem) => problem.replace(/&poll=[\w-]+/g, ''));
 
 beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'ergogen-release-'));
@@ -619,13 +641,14 @@ describe('post-publication smoke check', () => {
       // Arrange: what GitHub Pages serves is whatever gh-pages holds.
       const served = join(workspace, 'served');
       const pages = await servePages(() => served, base);
-      const smoke = (release: string, buildId: string, timeoutMs = 0) =>
+      // By default one poll, with time to spare; otherwise polls every 400 ms.
+      const smoke = (release: string, buildId: string, timeoutMs?: number) =>
         smokeSite({
           site: checkoutRelease(release, join(workspace, 'published')),
           url: pages.url,
           buildId,
-          timeoutMs,
-          intervalMs: 10,
+          timeoutMs: timeoutMs ?? 10_000,
+          intervalMs: timeoutMs ? 400 : 60_000,
         });
       const publish = () => checkoutRelease(ghPages()!, served);
       try {
@@ -639,7 +662,7 @@ describe('post-publication smoke check', () => {
         expect(deploy(second).status).toBe(0);
         const secondRelease = ghPages()!;
         // Act / Assert: not served yet, so the check keeps failing.
-        expect(await smoke(secondRelease, second.buildId, 50)).toEqual([
+        expect(await smoke(secondRelease, second.buildId, 1_000)).toEqual([
           expect.stringContaining(`not build ${second.buildId}`),
         ]);
         publish();
@@ -672,12 +695,12 @@ describe('post-publication smoke check', () => {
         site,
         url: pages.url,
         buildId: 'id',
-        timeoutMs: 0,
-        intervalMs: 10,
+        timeoutMs: 10_000,
+        intervalMs: 60_000,
       });
 
       // Assert
-      expect(problems).toEqual([
+      expect(withoutPollKeys(problems)).toEqual([
         `${pages.url}new?release=id does not serve the release's 404.html`,
         `${pages.url}404.html?release=id returned HTTP 404`,
       ]);
@@ -700,13 +723,129 @@ describe('post-publication smoke check', () => {
         site,
         url: pages.url,
         buildId: 'id',
-        timeoutMs: 0,
+        timeoutMs: 10_000,
+        intervalMs: 60_000,
+      });
+
+      // Assert
+      expect(withoutPollKeys(problems)).toEqual([
+        `${pages.url}assets/index-id.js?release=id does not serve the release's assets/index-id.js`,
+      ]);
+    } finally {
+      await pages.close();
+    }
+  });
+
+  it('asks for fresh copies on every poll, past a CDN that caches each URL', async () => {
+    // Arrange: the CDN still holds the previous release when the check starts.
+    const previous = makeSite(join(workspace, 'previous'), 'previous');
+    const site = makeSite(join(workspace, 'published'), 'next');
+    const served = join(workspace, 'served');
+    cpSync(previous, served, { recursive: true });
+    const pages = await servePages(() => served, '/', { cdn: true });
+    const retries: string[] = [];
+
+    try {
+      // Act: the release reaches the origin after the first poll was cached.
+      const problems = await smokeSite({
+        site,
+        url: pages.url,
+        buildId: 'next',
+        timeoutMs: 2_000,
+        intervalMs: 10,
+        log: (line) => {
+          if (!retries.length) {
+            rmSync(served, { recursive: true });
+            cpSync(site, served, { recursive: true });
+          }
+          retries.push(line);
+        },
+      });
+
+      // Assert: the CDN still serves the first poll's URL from its cache, yet
+      // the second poll saw the release.
+      expect(problems).toEqual([]);
+      expect(retries).toHaveLength(1);
+      const firstPoll = /\((\S+) returned HTTP 200 "previous"/.exec(retries[0]);
+      expect(firstPoll, retries[0]).not.toBeNull();
+      expect(await (await fetch(firstPoll![1])).text()).toBe('previous');
+    } finally {
+      await pages.close();
+    }
+  });
+
+  it('gives up at the deadline when the host never answers', async () => {
+    // Arrange: a host that accepts requests and never responds.
+    const site = makeSite(join(workspace, 'published'), 'id');
+    const pages = await serve('/', () => {});
+
+    try {
+      // Act
+      const problems = await smokeSite({
+        site,
+        url: pages.url,
+        buildId: 'id',
+        timeoutMs: 100,
+        intervalMs: 10,
+      });
+
+      // Assert
+      expect(withoutPollKeys(problems)).toEqual([
+        `${pages.url}build-id.txt?release=id was still loading at the 100 ms deadline`,
+      ]);
+    } finally {
+      await pages.close();
+    }
+  });
+
+  it('gives up at the deadline when a response body never ends', async () => {
+    // Arrange: a host that sends the headers and part of the body only.
+    const site = makeSite(join(workspace, 'published'), 'id');
+    const pages = await serve('/', (_request, response) => {
+      response.writeHead(200, { 'content-length': '100' });
+      response.write('i');
+    });
+
+    try {
+      // Act
+      const problems = await smokeSite({
+        site,
+        url: pages.url,
+        buildId: 'id',
+        timeoutMs: 100,
+        intervalMs: 10,
+      });
+
+      // Assert
+      expect(withoutPollKeys(problems)).toEqual([
+        `${pages.url}build-id.txt?release=id was still loading at the 100 ms deadline`,
+      ]);
+    } finally {
+      await pages.close();
+    }
+  });
+
+  it('applies the deadline to the whole check, not to each request', async () => {
+    // Arrange: each answer is quick, but all of them together are not.
+    const site = makeSite(join(workspace, 'published'), 'id');
+    const pages = await serve('/', (request, response) => {
+      const answer = pagesResponse(site, '/', request.url);
+      setTimeout(() => response.writeHead(answer.status).end(answer.body), 60);
+    });
+
+    try {
+      // Act
+      const problems = await smokeSite({
+        site,
+        url: pages.url,
+        buildId: 'id',
+        timeoutMs: 200,
         intervalMs: 10,
       });
 
       // Assert
       expect(problems).toEqual([
-        `${pages.url}assets/index-id.js?release=id does not serve the release's assets/index-id.js`,
+        expect.stringMatching(/ was still loading at the 200 ms deadline$/),
       ]);
     } finally {
       await pages.close();

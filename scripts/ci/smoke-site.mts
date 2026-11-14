@@ -4,11 +4,13 @@
 //   node scripts/ci/smoke-site.mts --site <dir> --build-id <id> \
 //     (--url <base URL> | --owner <owner> [--base <path>])
 //
-// <dir> holds the published files (the gh-pages commit). Until the timeout, it
-// retries until the site serves that build ID, then checks that the base path
-// and a client route (through the SPA fallback) serve the release's own bytes,
-// as do index.html, 404.html, the service worker, the manifest and every local
-// file index.html references. It exits 0 when all checks pass and 1 otherwise.
+// <dir> holds the published files (the gh-pages commit). It polls until the
+// site serves that build ID, then checks that the base path and a client route
+// (through the SPA fallback) serve the release's own bytes, as do index.html,
+// 404.html, the service worker, the manifest and every local file index.html
+// references. The timeout is a hard deadline for the whole check, requests and
+// downloads included. It exits 0 when all checks pass and 1 otherwise.
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -75,7 +77,9 @@ export interface SmokeOptions {
   /** The base URL of the site, ending in "/". */
   url: string;
   buildId: string;
+  /** The hard deadline for the whole check, from its start. */
   timeoutMs: number;
+  /** The pause between polls. */
   intervalMs: number;
   log?: (line: string) => void;
 }
@@ -104,22 +108,46 @@ function checkPublishedFiles(site: string, buildId: string): string[] {
   return problems;
 }
 
-async function checkServedSite(options: SmokeOptions): Promise<string[]> {
+/** A request or download that was still running at the deadline. */
+class DeadlineError extends Error {}
+
+/**
+ * One poll of the public site. `pollKey` must be new for each poll: the
+ * GitHub Pages CDN caches every answer, a 404 included, for each URL (query
+ * string included) and ignores the request's cache headers, so a repeated
+ * URL could keep returning what an earlier poll saw.
+ */
+async function checkServedSite(
+  options: SmokeOptions,
+  pollKey: string,
+  signal: AbortSignal
+): Promise<string[]> {
   const base = new URL(options.url);
   const fetchFile = async (path: string) => {
-    // A query string bypasses CDN caches of an earlier release.
     const url = new URL(path, base);
     url.searchParams.set('release', options.buildId);
-    const response = await fetch(url, {
-      redirect: 'follow',
-      headers: { 'cache-control': 'no-cache' },
-    });
-    return {
-      url: url.href,
-      status: response.status,
-      host: new URL(response.url).host,
-      body: Buffer.from(await response.arrayBuffer()),
-    };
+    url.searchParams.set('poll', pollKey);
+    try {
+      // The signal also aborts reading the body.
+      const response = await fetch(url, {
+        redirect: 'follow',
+        headers: { 'cache-control': 'no-cache' },
+        signal,
+      });
+      return {
+        url: url.href,
+        status: response.status,
+        host: new URL(response.url).host,
+        body: Buffer.from(await response.arrayBuffer()),
+      };
+    } catch (error) {
+      if (signal.aborted) {
+        throw new DeadlineError(
+          `${url.href} was still loading at the ${options.timeoutMs} ms deadline`
+        );
+      }
+      throw error;
+    }
   };
 
   const buildId = await fetchFile('build-id.txt');
@@ -166,17 +194,21 @@ async function checkServedSite(options: SmokeOptions): Promise<string[]> {
   return problems;
 }
 
-/** Returns the problems that remain at the timeout; none means it passed. */
+/** Returns the problems that remain at the deadline; none means it passed. */
 export async function smokeSite(options: SmokeOptions): Promise<string[]> {
   const log = options.log ?? (() => {});
   const permanent = checkPublishedFiles(options.site, options.buildId);
   if (permanent.length) return permanent;
   const deadline = Date.now() + options.timeoutMs;
-  for (;;) {
+  const signal = AbortSignal.timeout(options.timeoutMs);
+  // Unique to this check and to each poll, so no cache can answer a poll.
+  const checkKey = randomUUID();
+  for (let poll = 1; ; poll++) {
     let problems: string[];
     try {
-      problems = await checkServedSite(options);
+      problems = await checkServedSite(options, `${checkKey}-${poll}`, signal);
     } catch (error) {
+      if (error instanceof DeadlineError) return [error.message];
       problems = [`could not reach ${options.url}: ${String(error)}`];
     }
     if (!problems.length || Date.now() + options.intervalMs > deadline) {

@@ -307,16 +307,21 @@ GitHub Pages serves the `gh-pages` branch (Settings > Pages, legacy build from
 
 3. **Smoke** (read-only token). Runs `scripts/ci/smoke-site.mts` against the
    public URL: the custom domain from the release's `CNAME`, otherwise
-   `https://<owner>.github.io`, below `PUBLIC_URL`. It waits up to ten minutes
-   until `build-id.txt` names the release, then checks that the base path, the
+   `https://<owner>.github.io`, below `PUBLIC_URL`. It polls until
+   `build-id.txt` names the release, then checks that the base path, the
    client route `new` (through `404.html`) and every local file `index.html`
-   loads serve the bytes of the published commit. A failure means the release
-   is on `gh-pages` but not served correctly; roll back or fix forward.
+   loads serve the bytes of the published commit. Each poll adds a query string
+   of its own to every request, because the Pages CDN caches each URL, even a
+   404, for ten minutes and ignores `no-cache` request headers; a repeated URL
+   could keep answering with what Pages served before this release. Ten minutes
+   is a hard deadline for the whole check: a request or download still running
+   then is aborted and the check fails. A failure means the release is on
+   `gh-pages` but not served correctly; roll back or fix forward.
 
 Concurrency cannot order runs, and a re-run or manual run that joins the `pages`
 group replaces any pending run, even a newer one. That run then shows as
-cancelled, and the site stays at the last release until someone re-runs all jobs
-of the latest run of `main`.
+cancelled, and the site stays at the last release until the next push to `main`
+or a fresh release of its head (see [Releasing main again](#releasing-main-again)).
 
 Releases are public: `gh-pages` history records each one, and the site serves
 its build ID. To see what is served and where it came from:
@@ -326,6 +331,17 @@ curl -fsS https://<site>/build-id.txt     # <commit>.<run id>.<run attempt>
 git fetch origin gh-pages
 git log --format='%H %s%n%(trailers)' origin/gh-pages
 ```
+
+Keeping every release has a cost the owner accepts: `gh-pages` only grows. A
+full clone of the repository fetches its whole history, and so does the
+rollback job, which needs it to find and verify the chosen release (publishing
+fetches only the latest release). Git
+stores each unchanged file once across releases, so a release adds roughly the
+files whose bytes changed: at least `index.html`, `404.html`, `build-id.txt`,
+the service worker and the hashed bundles of changed code. When this was
+written, one release tree was about 23 MB; that is an observation, not a
+budget. Shallow or single-branch clones (`git clone --single-branch`) skip
+`gh-pages`.
 
 **Rollback** serves an earlier release again. It is a production release: only
 the owner runs it, on `main`, choosing a `gh-pages` commit that `deploy.yaml`
@@ -345,9 +361,22 @@ It changes nothing if that tree is already served. The smoke job then checks the
 restored build below today's `PUBLIC_URL`, while the restored files keep the base
 path they were built with, so rollback assumes the base path has not changed
 since that release; after a base path change, fix forward instead. The next push
-to `main` releases normally and replaces the rollback; to return to the latest
-release without a new commit, re-run all jobs of the latest run of `main` (its
-one-day artifact may have expired).
+to `main` releases normally and replaces the rollback.
+
+#### Releasing main again
+
+To release the head of `main` again without a new commit, after a rollback or
+a cancelled run, start a fresh run of `main` without `rollback_to`:
+
+```shell
+gh workflow run deploy.yaml --ref main
+gh run watch    # build, deploy, then smoke
+```
+
+It validates, builds and publishes like a push, with a new build ID. Re-running
+all jobs of the latest run of `main` does the same, but GitHub allows re-runs
+only for 30 days after a run, and re-running only the failed or `deploy` job
+would need the build's one-day artifact, which may have expired.
 
 `tests/release-publication.test.ts` runs these exact workflow steps, read from
 `deploy.yaml`, against local Git repositories and a loopback server that
