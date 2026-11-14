@@ -34,7 +34,7 @@ makes these network requests:
   GitHub, Codeberg, Forgejo or Gitea host.
 - Google Analytics only when the build includes a tag ID (see
   [Configuration](#configuration)). Without one, no analytics script loads and the
-  "Send Usage Metrics" switch has no effect, even if it shows as on. With an ID,
+  "Send Usage Metrics" switch is off and disabled; a saved choice is kept. With an ID,
   metrics default to on in a browser tab and off in the installed app; a saved
   choice wins (an explicit one over a legacy opt-out), unreadable storage counts
   as an opt-out, and development builds and loopback hosts never send. Hits are not queued offline. DEVELOPMENT.md lists
@@ -117,17 +117,14 @@ installed specifier, so it can break a canonical frozen install. Use
 | Variable (first non-empty wins)                                        | Default                                                                                 | Effect                                                                                                                                                             |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `VITE_PUBLIC_URL`, `PUBLIC_URL`                                        | `/`                                                                                     | Base path, with a leading and trailing slash, such as `/ergogen-gui/` (see [Self-hosting](#self-hosting)).                                                         |
-| `VITE_GTAG_ID`, `REACT_APP_GTAG_ID`                                    | empty                                                                                   | GA4 tag ID. Empty disables analytics entirely.                                                                                                                     |
+| `VITE_GTAG_ID`                                                         | empty                                                                                   | GA4 tag ID. Empty disables analytics entirely and greys out **Send Usage Metrics**.                                                                                |
 | `VITE_FORCE_ANALYTICS`                                                 | unset                                                                                   | Literal `true` lifts the development/localhost block for diagnostics. It does not supply an ID or bypass consent.                                                  |
 | `VITE_FEATURE_TEMPLATES`, `REACT_APP_FEATURE_TEMPLATES`                | unset                                                                                   | Literal `true`/`false` forces custom templates on or off. Unset: on when the engine version is 4.3.0 or later.                                                     |
 | `VITE_FEATURE_OUTLINES`, `REACT_APP_FEATURE_OUTLINES`                  | unset                                                                                   | Same, for custom outlines.                                                                                                                                         |
 | `VITE_ERGOGEN_VERSION`, `ERGOGEN_VERSION`, `REACT_APP_ERGOGEN_VERSION` | The `package.json` specifier if it names a repository: `github:ceoloide/ergogen#v4.3.0` | Engine identity shown in the UI and written to share links. It does not install an engine. For a non-semver ref, feature checks use the installed package version. |
 
-GitHub Actions passes repository variables `PUBLIC_URL` as `VITE_PUBLIC_URL`, and
-`REACT_APP_GTAG_ID` (or, if that is empty, `VITE_GTAG_ID`) as `VITE_GTAG_ID`, so the
-legacy repository variable wins there
-([#230](https://github.com/ceoloide/ergogen-gui/issues/230)). `CNAME_DOMAIN`
-writes `dist/CNAME` on `main`.
+GitHub Actions passes repository variables `PUBLIC_URL` as `VITE_PUBLIC_URL` and
+`VITE_GTAG_ID` unchanged. `CNAME_DOMAIN` writes `dist/CNAME` on `main`.
 
 URL parameters change a running page: `?ff_templates=true|false` and
 `?ff_outlines=true|false` override the feature settings above;
