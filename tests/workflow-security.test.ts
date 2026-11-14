@@ -12,6 +12,7 @@ import {
 
 interface Step {
   name?: string;
+  shell?: string;
   id?: string;
   uses?: string;
   run?: string;
@@ -23,6 +24,7 @@ interface Step {
 
 interface Job {
   'runs-on': string;
+  outputs?: Record<string, string>;
   permissions?: Record<string, string>;
   needs?: string | string[];
   if?: string;
@@ -49,7 +51,8 @@ const readWorkflow = (name: string) =>
   ) as Workflow;
 const ci = readWorkflow('ci.yaml');
 const deployment = readWorkflow('deploy.yaml');
-const { build, deploy } = deployment.jobs;
+const { build, deploy, rollback, smoke } = deployment.jobs;
+const writeJobs = ['deploy', 'rollback'];
 const action = (job: Job, name: string) =>
   job.steps.find((step) => step.uses?.startsWith(name + '@'));
 
@@ -86,11 +89,25 @@ describe('HC-013a deployment policy', () => {
     // Assert
     expect(deployment.on).toEqual({
       push: { branches: ['main'] },
-      workflow_dispatch: null,
+      workflow_dispatch: {
+        inputs: {
+          rollback_to: {
+            description: expect.stringContaining('gh-pages release commit'),
+            required: false,
+            default: '',
+            type: 'string',
+          },
+        },
+      },
       repository_dispatch: null,
     });
     expect(ci.on).toEqual({ pull_request: { branches: ['main'] } });
-    expect(Object.keys(deployment.jobs).sort()).toEqual(['build', 'deploy']);
+    expect(Object.keys(deployment.jobs).sort()).toEqual([
+      'build',
+      'deploy',
+      'rollback',
+      'smoke',
+    ]);
   });
 
   it('uses read-only defaults and grants write only to publishing', () => {
@@ -99,7 +116,9 @@ describe('HC-013a deployment policy', () => {
       expect(workflow.permissions).toEqual({ contents: 'read' });
       for (const [name, job] of Object.entries(workflow.jobs)) {
         const access =
-          workflow === deployment && name === 'deploy' ? 'write' : 'read';
+          workflow === deployment && writeJobs.includes(name)
+            ? 'write'
+            : 'read';
         expect(job.permissions ?? workflow.permissions).toEqual({
           contents: access,
         });
@@ -151,61 +170,168 @@ describe('HC-013a deployment policy', () => {
     }
   });
 
-  it('requires the reviewed publish guard and successful build dependency', () => {
+  it('requires the reviewed publish guards and successful build dependency', () => {
     // Assert
     expect(deploy.needs).toBe('build');
-    // Deliberately assert the reviewed declaration; actionlint validates its
+    // Deliberately assert the reviewed declarations; actionlint validates their
     // syntax. We do not implement another GitHub expression interpreter.
     expect(deploy.if).toBe(
       "github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch')"
     );
+    expect(build.if).toBe('${{ !inputs.rollback_to }}');
+    expect(rollback.needs).toBeUndefined();
+    expect(rollback.if).toBe(
+      "github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.rollback_to"
+    );
   });
 
-  it('allows only artifact download and the publisher in the write-scoped job', () => {
-    // Assert
+  it('runs only fixed shell and the artifact download in write-scoped jobs', () => {
+    // Assert: no checkout, toolchain, install or repository script can run
+    // with the write token, and no step can be skipped or ignored.
     expect(deploy.steps.map((step) => step.uses?.split('@')[0])).toEqual([
       'actions/download-artifact',
-      'peaceiris/actions-gh-pages',
+      undefined,
     ]);
-    expect(deploy.steps.every((step) => step.run === undefined)).toBe(true);
-    expect(deploy.steps.every((step) => step.if === undefined)).toBe(true);
-    expect(deploy['continue-on-error']).not.toBe(true);
-    expect(deploy.concurrency).toBeUndefined();
-    expect(
-      deploy.steps.every((step) => step['continue-on-error'] !== true)
-    ).toBe(true);
+    expect(rollback.steps.map((step) => step.uses)).toEqual([undefined]);
+    for (const name of writeJobs) {
+      const job = deployment.jobs[name];
+      expect(job['continue-on-error']).not.toBe(true);
+      expect(job.concurrency).toBeUndefined();
+      for (const step of job.steps) {
+        expect(step.if).toBeUndefined();
+        expect(step['continue-on-error']).not.toBe(true);
+        if (step.run !== undefined) {
+          expect(step.shell).toBe('bash');
+          expect(step.run).not.toMatch(/\b(?:pnpm|npm|npx|node|\.\/)/);
+          expect(step.run).not.toContain('${{');
+          // The only push is a fast-forward of gh-pages, never forced.
+          expect(step.run.match(/git push.*/g)).toEqual([
+            'git push -q "$REMOTE_URL" "$commit:refs/heads/gh-pages" ||',
+          ]);
+        }
+      }
+    }
   });
 
-  it('publishes the explicitly named artifact from this run', () => {
+  it('passes the write token only to the publishing steps', () => {
+    // Arrange
+    const withSecrets = Object.entries(deployment.jobs).flatMap(([name, job]) =>
+      job.steps
+        .filter((step) => JSON.stringify(step).includes('secrets.'))
+        .map((step) => `${name}: ${step.name}`)
+    );
+
+    // Assert
+    expect(withSecrets).toEqual([
+      'deploy: Publish validated site',
+      'rollback: Roll back to an earlier release',
+    ]);
+  });
+
+  it('publishes only the artifact the build job uploaded in this run', () => {
     // Arrange
     const download = action(deploy, 'actions/download-artifact');
     const upload = action(build, 'actions/upload-artifact');
-    const publish = action(deploy, 'peaceiris/actions-gh-pages');
+    const publish = deploy.steps.find(
+      (step) => step.name === 'Publish validated site'
+    );
 
     // Assert
     // An exact input map also excludes cross-run and repository overrides.
     expect(download?.with).toEqual({
-      name: 'github-pages-site',
-      path: './dist',
+      'artifact-ids': '${{ needs.build.outputs.artifact-id }}',
+      path: './site',
+      'digest-mismatch': 'error',
     });
+    expect(upload?.id).toBe('upload');
     expect(upload?.with).toMatchObject({
       name: 'github-pages-site',
       path: './dist',
+      'include-hidden-files': true,
       'if-no-files-found': 'error',
     });
-    expect(publish?.with).toEqual({
-      github_token: '${{ secrets.GITHUB_TOKEN }}',
-      publish_dir: './dist',
-      allow_empty_commit: true,
-      full_commit_message: '${{ github.event.head_commit.message }}',
-      force_orphan: true,
+    expect(build.outputs).toEqual({
+      tree: '${{ steps.release.outputs.tree }}',
+      'build-id': '${{ steps.release.outputs.build-id }}',
+      'artifact-id': '${{ steps.upload.outputs.artifact-id }}',
+      'artifact-digest': '${{ steps.upload.outputs.artifact-digest }}',
+    });
+    expect(publish?.env).toEqual({
+      SITE_DIR: 'site',
+      RELEASE_TREE: '${{ needs.build.outputs.tree }}',
+      BUILD_ID: '${{ needs.build.outputs.build-id }}',
+      ARTIFACT_ID: '${{ needs.build.outputs.artifact-id }}',
+      ARTIFACT_DIGEST: '${{ needs.build.outputs.artifact-digest }}',
+      SOURCE_COMMIT: '${{ github.sha }}',
+      RUN_URL:
+        '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}',
+      REMOTE_URL: '${{ github.server_url }}/${{ github.repository }}.git',
+      PUBLISH_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
     });
   });
 
-  it('packages the SPA fallback and custom domain before upload', () => {
+  it('records who requested a rollback and passes it only fixed inputs', () => {
+    // Assert
+    expect(rollback.steps[0].env).toEqual({
+      ROLLBACK_TO: '${{ inputs.rollback_to }}',
+      REQUESTED_BY: '${{ github.triggering_actor }}',
+      RUN_URL:
+        '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}',
+      REMOTE_URL: '${{ github.server_url }}/${{ github.repository }}.git',
+      PUBLISH_TOKEN: '${{ secrets.GITHUB_TOKEN }}',
+    });
+  });
+
+  it('builds with a build ID that names the commit, run and attempt', () => {
     // Arrange
-    const uploadIndex = build.steps.indexOf(
-      action(build, 'actions/upload-artifact')!
+    const validate = build.steps.find((step) => step.run === 'pnpm validate');
+    const record = build.steps.find(
+      (step) => step.name === 'Record release tree'
+    );
+    const id =
+      '${{ github.sha }}.${{ github.run_id }}.${{ github.run_attempt }}';
+
+    // Assert
+    expect(validate?.env?.VITE_BUILD_ID).toBe(id);
+    expect(record?.id).toBe('release');
+    expect(record?.env).toEqual({ SITE_DIR: 'dist', BUILD_ID: id });
+  });
+
+  it('smoke tests the public site with a read-only token after each release', () => {
+    // Arrange
+    const checkouts = smoke.steps.filter((step) =>
+      step.uses?.startsWith('actions/checkout@')
+    );
+    const check = smoke.steps.at(-1);
+
+    // Assert
+    expect(smoke.needs).toEqual(['deploy', 'rollback']);
+    expect(smoke.if).toBe(
+      "${{ !cancelled() && (needs.deploy.outputs.published == 'true' || needs.rollback.outputs.published == 'true') }}"
+    );
+    expect(checkouts[1]?.with).toEqual({
+      ref: '${{ needs.deploy.outputs.commit || needs.rollback.outputs.commit }}',
+      path: 'published',
+      'persist-credentials': false,
+    });
+    expect(check?.run).toBe(
+      'node scripts/ci/smoke-site.mts --site published --build-id "$BUILD_ID" --owner "$OWNER" --base "$PUBLIC_URL"'
+    );
+    expect(check?.env).toEqual({
+      BUILD_ID:
+        '${{ needs.deploy.outputs.build-id || needs.rollback.outputs.build-id }}',
+      OWNER: '${{ github.repository_owner }}',
+      PUBLIC_URL: '${{ vars.PUBLIC_URL }}',
+    });
+  });
+
+  it('packages the SPA fallback, custom domain and Jekyll opt-out before recording the tree', () => {
+    // Arrange
+    const recordIndex = build.steps.findIndex(
+      (step) => step.name === 'Record release tree'
+    );
+    expect(recordIndex).toBeLessThan(
+      build.steps.indexOf(action(build, 'actions/upload-artifact')!)
     );
 
     // Assert
@@ -222,8 +348,12 @@ describe('HC-013a deployment policy', () => {
       "${{ github.ref == 'refs/heads/main' && vars.CNAME_DOMAIN }}"
     );
     expect(domain?.env).toEqual({ CNAME_DOMAIN: '${{ vars.CNAME_DOMAIN }}' });
-    for (const step of [fallback, domain]) {
-      expect(build.steps.indexOf(step!)).toBeLessThan(uploadIndex);
+    const jekyll = build.steps.find(
+      (step) => step.run === 'touch ./dist/.nojekyll'
+    );
+    expect(jekyll?.if).toBeUndefined();
+    for (const step of [fallback, domain, jekyll]) {
+      expect(build.steps.indexOf(step!)).toBeLessThan(recordIndex);
       expect(step?.['continue-on-error']).not.toBe(true);
     }
   });
