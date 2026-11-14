@@ -304,6 +304,10 @@ describe('patch_ergogen.sh engine preparation', () => {
     expect(Object.keys(engine.footprints)).toEqual(
       expect.arrayContaining(['mx', 'ceoloide/switch_mx', 'infused-kim/choc'])
     );
+    expect(engine.footprints['infused-kim/diode']).toBeDefined();
+    expect(engine.footprints['infused-kim/diode']).toBe(
+      engine.footprints['infused-kimo/isde']
+    );
     expect(
       existsSync(join(fixture.engine, 'src', 'footprints', 'ceoloide', '.git'))
     ).toBe(false);
