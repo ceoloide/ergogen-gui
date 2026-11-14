@@ -434,23 +434,166 @@ A pass describes the moment it finished; it does not stop later pushes or merges
 
 As of 2026-11-14, nothing enforces these checks: `main` has no branch protection
 or ruleset, so a failed or missing check, or a failed assessment, does not block
-a merge. `scripts/ci/ruleset-proposal.json` is a proposed ruleset, not yet
-applied. It requires `lint-and-test` from the GitHub Actions app, up to date
-with `main`, plus a pull request with resolved conversations, and blocks force
-pushes and deletion, with no bypass and no required approval. The owner is the
-only collaborator, and GitHub does not count an author's approval of their own
-pull request. Tests keep it in line with the contract. It would not enforce the
-whole contract: GitHub accepts a required check that concludes `success`,
-`skipped` or `neutral`
-([source](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
-Skipped tests in a job that runs fail the job and block, but a PR that skips the
-whole job, for example by adding a job-level `if:` to its own `ci.yaml`, would
-pass the ruleset. The assessor rejects that, but the ruleset does not run it.
-Only the repository owner applies it, after review:
+a merge. Two reviewed payloads describe the intended settings, and
+`pnpm check:settings` reports whether GitHub enforces them:
+
+- `scripts/ci/ruleset-proposal.json`, a ruleset for the default branch only. It
+  requires a pull request with resolved conversations and a successful
+  `lint-and-test` check from the GitHub Actions app on a branch that is up to
+  date with `main`, and it blocks force pushes and deletion, with no bypass. It
+  requires no approval: the owner is the only collaborator, and GitHub does not
+  count an author's approval of their own pull request. Tests keep it in line
+  with the contract.
+- `scripts/ci/workflow-permissions-proposal.json`: the default `GITHUB_TOKEN`
+  becomes read-only and Actions can no longer approve pull requests. Every job
+  in `ci.yaml` and `deploy.yaml` declares its own permissions (tests check this),
+  so `deploy` and `rollback` keep `contents: write`. GitHub's own
+  `pages-build-deployment` run, which serves `gh-pages`, also declares its own
+  (`contents: read`, `pages: write` in its logs).
+
+Once applied, nobody can push to `main`, the owner included; every change is a
+pull request merged after a fresh, passing run on the current `main` (use
+**Update branch**, `gh pr update-branch` or a rebase). The ruleset does not
+cover `gh-pages`, so releases and rollbacks are unchanged. Open pull requests
+without such a run become blocked, as intended.
+
+This is a merge gate for ordinary pull requests, not confinement:
+
+- GitHub accepts a required check that concludes `success`, `skipped` or
+  `neutral`
+  ([source](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
+  Skipped tests in a job that runs fail the job and block, but a PR that skips
+  the whole job, for example with a job-level `if:` in its own `ci.yaml`, or
+  that replaces the job's steps, passes. The [assessor](#pull-request-evidence)
+  rejects such runs, but the ruleset does not run it.
+- The owner is an admin and can change or delete the ruleset at any time; "no
+  bypass" only means the rules also apply to the owner's merges and pushes.
+  Confining an agent would need a separate non-admin account and trusted
+  review, which this does not provide.
+
+`pnpm check:settings` only reads, and must run as the owner, because only
+admins can read a ruleset's bypass list. It exits 0 when the live ruleset
+contains every value of the proposal (GitHub adds defaults for unnamed
+parameters, which it ignores), has exactly its rules, applies them to `main`
+and not to `gh-pages`, cannot be bypassed by you, and the Actions defaults
+match; 1 with a list of differences, as before the cutover; and 2 if it cannot
+run. `tests/settings-check.test.ts` covers it with the recorded pre-cutover
+responses and one test per weakened setting.
+
+#### Cutover
+
+Only the owner runs this, from a checkout of the reviewed commit, after the
+cutover pull request has passed review. Each stage can be rolled back alone.
+
+1. **Snapshot.** Save the start state outside the checkout and keep it until the
+   cutover is confirmed:
+
+   ```shell
+   repo=repos/ceoloide/ergogen-gui
+   snap="$HOME/ergogen-gui-settings-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir "$snap"
+   gh api "$repo/rulesets?includes_parents=false" > "$snap/rulesets.json"
+   gh api "$repo/actions/permissions/workflow" > "$snap/workflow-permissions.json"
+   gh api "$repo/branches/main/protection"   # expect: Branch not protected (HTTP 404)
+   pnpm check:settings                       # expect exit 1, three problems
+   ```
+
+   Continue only if `rulesets.json` is `[]`, `workflow-permissions.json` is
+   `{"default_workflow_permissions":"write","can_approve_pull_request_reviews":true}`
+   and `main` is not protected. Otherwise the rollback below would not restore
+   the start state; review the difference first.
+
+2. **Baseline.** Record `gh pr view <number> --json mergeStateStatus` for the
+   pull requests used in the [drill](#drill), and open the drill's failing pull
+   request now, so each later state can be compared with this one.
+3. **Actions defaults.**
+
+   ```shell
+   gh api --method PUT "$repo/actions/permissions/workflow" --input scripts/ci/workflow-permissions-proposal.json
+   pnpm check:settings   # expect exit 1, only the ruleset problem left
+   ```
+
+4. **Ruleset.**
+
+   ```shell
+   gh api --method POST "$repo/rulesets" --input scripts/ci/ruleset-proposal.json --jq .id > "$snap/ruleset-id"
+   pnpm check:settings   # expect: ENFORCED, exit 0
+   ```
+
+5. **Drill**, below, then merge the cutover pull request normally; that merge
+   and its release are the first under the new settings. Check that its
+   `deploy` job log lists `Contents: write` under "GITHUB_TOKEN Permissions" and
+   that the release passes. Then update the status at the top of this section.
+
+#### Drill
+
+The drill proves the gate without merging anything. `gh pr merge` is not a
+probe: it would merge a pull request that passes. Read the merge state instead:
 
 ```shell
-gh api --method POST repos/ceoloide/ergogen-gui/rulesets --input scripts/ci/ruleset-proposal.json
+gh pr view <number> --json mergeStateStatus,headRefOid
 ```
+
+Only `CLEAN`, `UNSTABLE` (a failing check that is not required) and
+`HAS_HOOKS` can be merged. `BLOCKED` means a required rule is not met and
+`BEHIND` that the branch must be updated first; GitHub does not document which
+of the two it reports when both apply. It computes the state lazily: repeat the
+command after `UNKNOWN`. Because `pnpm check:settings` confirmed that you
+cannot bypass the ruleset, these states apply to the owner too. Expected after
+step 4:
+
+| Pull request                                          | Before     | After                    |
+| ----------------------------------------------------- | ---------- | ------------------------ |
+| Failing `lint-and-test` (opened for the drill)        | `UNSTABLE` | `BLOCKED`                |
+| No `lint-and-test` run on its head                    | `CLEAN`    | `BLOCKED` or `BEHIND`    |
+| Passing `lint-and-test`, behind `main`                | `CLEAN`    | `BEHIND` or `BLOCKED`    |
+| Passing `lint-and-test`, up to date, threads resolved | `CLEAN`    | `CLEAN` (the cutover PR) |
+
+The failing pull request adds one failing test, and is closed once read:
+
+```shell
+git switch -c drill/required-check origin/main
+cat > tests/drill.test.ts <<'TEST'
+import { expect, it } from 'vitest';
+
+it('fails on purpose for the branch rules drill; never merge', () => {
+  expect(true).toBe(false);
+});
+TEST
+git add tests/drill.test.ts
+git commit -m 'test: fail on purpose for the branch rules drill (never merge)'
+git push -u origin drill/required-check
+gh pr create --base main --title 'Branch rules drill: failing check (never merge)' --body 'Must show BLOCKED once the ruleset is active. Close without merging.'
+# after lint-and-test has failed and the state was read:
+gh pr close drill/required-check --delete-branch
+```
+
+A pull request of this repository can still change `ci.yaml`, so the drill
+proves only that the required check gates merges, not that the check is honest;
+see the limits above.
+
+#### Rollback
+
+Rollback restores the snapshot. In a new shell, set `repo` and `snap` as in
+step 1 first. Remove the ruleset, restore the Actions defaults, then compare:
+
+```shell
+gh api --method DELETE "$repo/rulesets/$(cat "$snap/ruleset-id")"
+gh api --method PUT "$repo/actions/permissions/workflow" --input "$snap/workflow-permissions.json"
+diff <(gh api "$repo/rulesets?includes_parents=false") "$snap/rulesets.json"
+diff <(gh api "$repo/actions/permissions/workflow") "$snap/workflow-permissions.json"
+```
+
+Either of the first two commands alone undoes its stage. If no pull request
+can pass the required check for a reason outside the repository, such as a
+GitHub outage, delete the ruleset the same way, and later recreate it with
+step 4 (which records the new ID) and `pnpm check:settings`. The proposal file
+holds the whole ruleset, so nothing else needs saving.
+
+To change the required check itself (renaming the job, for example), change
+`contract.mts`, `ci.yaml` and the proposal in one pull request. That pull
+request cannot report the old check, so after review update the live ruleset
+from its checkout with `gh api --method PUT "$repo/rulesets/<id>" --input
+scripts/ci/ruleset-proposal.json`, run `pnpm check:settings`, and then merge it.
 
 ## Service worker
 

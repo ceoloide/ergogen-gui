@@ -1,0 +1,10 @@
+{
+  "repos/ceoloide/ergogen-gui": { "default_branch": "main" },
+  "repos/ceoloide/ergogen-gui/rulesets?includes_parents=false": [],
+  "repos/ceoloide/ergogen-gui/rules/branches/main": [],
+  "repos/ceoloide/ergogen-gui/rules/branches/gh-pages": [],
+  "repos/ceoloide/ergogen-gui/actions/permissions/workflow": {
+    "default_workflow_permissions": "write",
+    "can_approve_pull_request_reviews": true
+  }
+}
