@@ -72,18 +72,29 @@ offline and only read their fixtures.
   custom footprint), the custom footprint `footprints/corpus/probe_pad.js`, and
   two invalid configs (YAML syntax, missing outline). Expected values are worked
   out by hand in `tests/corpus/corpus.ts`, never copied from output.
-- **`tests/engine-corpus.test.ts`** generates through the app's own worker
-  handler and injection evaluator (`tests/corpus/inProcessWorker.ts` replaces
-  only the `Worker` transport). It checks key positions and rotations, outline
-  sizes and region counts, that DXF and SVG hold the same segments, footprint
-  placement and nets, Edge.Cuts against the board outline, error replies for
-  invalid input, and that a second run gives identical output.
+- **`tests/engine-corpus.test.ts`** starts with four quick checks that call
+  `ergogen.process` directly on a two-key config. Its corpus cases generate
+  through the app's own worker handler and injection evaluator
+  (`tests/corpus/inProcessWorker.ts` replaces only the `Worker` transport).
+  They check key positions and rotations, outline sizes and region counts, that
+  DXF and SVG hold the same segments, footprint placement and nets, Edge.Cuts
+  against the board outline, error replies for invalid input, and that a second
+  run gives identical output.
 - **`tests/export-corpus.test.ts`** runs `createZip` and
   `exportConfigsProgressively` with real JSZip (only the download and the
   worker transport are replaced). It checks archive names, the exact file list,
   file contents and geometry, that a single-config archive reloads as just its
   config and injections, that a configs-only archive holds no generated files,
-  and that a failed config gets `error.txt` instead of outputs.
+  and that a failed config gets `error.txt` instead of outputs. It counts the
+  switch and probe pad footprints separately before checking their placement.
+- **Shared engine:** all requests in one test file share one engine, so a
+  footprint injected once stays registered, unlike browser bulk export, which
+  starts a fresh worker per config. Bulk export therefore uses the probe pad
+  under its own name (`bulkProbePadInjection` in `tests/corpus/corpus.ts`), so
+  it fails if it does not pass its injections to the worker.
+  `tests/corpus-in-process-worker.test.ts` checks the adapter itself: a handler
+  that throws or does not reply reaches `onerror` at once, and a failed import
+  restores the globals it replaced.
 - **`tests/preview-consistency.test.ts`** regenerates the geometry of every
   tracked preview in `public/images/previews` and compares it with the file,
   ignoring path direction and start point, and requires one preview per

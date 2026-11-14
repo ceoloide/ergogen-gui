@@ -1,6 +1,6 @@
 # Semantic regression corpus: an asymmetric, column-staggered half with a
 # rotated and splayed thumb cluster. The expected geometry is written out by
-# hand in tests/corpus/expectations.ts; change both together, on purpose.
+# hand in tests/corpus/corpus.ts; change both together, on purpose.
 meta:
   name: corpus-staggered-thumbs
   version: '1'

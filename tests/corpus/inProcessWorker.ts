@@ -11,6 +11,12 @@ import type {
  * evaluates injections with the app's evaluator and calls the prepared engine,
  * and the handler's single `postMessage` reply is returned. Requests run one at
  * a time because the handler replies through the global `self.postMessage`.
+ *
+ * The worker module is imported once per test file, so every request and every
+ * `InProcessErgogenWorker` in a file share one engine, whereas bulk export in
+ * the browser starts a fresh worker per config. Footprints injected by one
+ * request stay registered for later ones; a test that must prove its own
+ * injections are passed uses a footprint name no other request injects.
  */
 type WorkerHandler = (event: MessageEvent<WorkerRequest>) => unknown;
 
@@ -19,21 +25,25 @@ let handlerPromise: Promise<WorkerHandler> | undefined;
 const loadWorkerHandler = (): Promise<WorkerHandler> => {
   handlerPromise ??= (async () => {
     // The module installs global handlers on import; keep only its message
-    // handler and restore the globals so other tests see a clean window.
+    // handler and restore the globals, even if the import fails, so other
+    // tests see a clean window.
     const previousOnMessage = self.onmessage;
     const previousOnError = self.onerror;
     const originalLog = console.log;
     console.log = () => undefined;
     try {
       await import('../../src/workers/ergogen.worker');
+      return self.onmessage as unknown as WorkerHandler;
     } finally {
       console.log = originalLog;
+      self.onmessage = previousOnMessage;
+      self.onerror = previousOnError;
     }
-    const handler = self.onmessage as unknown as WorkerHandler;
-    self.onmessage = previousOnMessage;
-    self.onerror = previousOnError;
-    return handler;
-  })();
+  })().catch((error: unknown) => {
+    // Let the next request try the import again.
+    handlerPromise = undefined;
+    throw error;
+  });
   return handlerPromise;
 };
 
@@ -103,11 +113,25 @@ export class InProcessErgogenWorker {
   private terminated = false;
 
   postMessage(request: WorkerRequest): void {
-    void runWorkerRequest(request).then((response) => {
-      if (!this.terminated) {
-        this.onmessage?.({ data: response } as MessageEvent<WorkerResponse>);
+    runWorkerRequest(request).then(
+      (response) => {
+        if (!this.terminated) {
+          this.onmessage?.({ data: response } as MessageEvent<WorkerResponse>);
+        }
+      },
+      // A handler that throws or does not reply reaches the caller as a
+      // worker error event at once, instead of waiting for its timeout.
+      (error: unknown) => {
+        if (!this.terminated) {
+          this.onerror?.(
+            new ErrorEvent('error', {
+              error,
+              message: error instanceof Error ? error.message : String(error),
+            })
+          );
+        }
       }
-    });
+    );
   }
 
   terminate(): void {

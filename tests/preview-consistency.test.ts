@@ -47,7 +47,7 @@ describe('tracked example previews', () => {
         svg: true,
         debug: true,
       });
-      const generated = output.outlines?.preview?.svg ?? output.demo.svg;
+      const generated = output.outlines?.preview?.svg || output.demo.svg;
       const tracked = svgOutlineGeometry(readFileSync(previewPath, 'utf8'));
       const expected = svgOutlineGeometry(generated);
       // Assert

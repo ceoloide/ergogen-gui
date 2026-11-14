@@ -25,6 +25,36 @@ export const probePadInjection: string[] = [
   fixtureText('footprints/corpus/probe_pad.js'),
 ];
 
+const replaceOnce = (text: string, from: string, to: string): string => {
+  if (text.split(from).length !== 2) {
+    throw new Error(`Expected exactly one "${from}" in the corpus fixture`);
+  }
+  return text.replace(from, to);
+};
+
+/**
+ * The same probe pad under a name and KiCad library that only bulk export
+ * uses. Tests in one file share one engine, and a footprint injected by an
+ * earlier request stays registered in it; with a name nothing else injects,
+ * bulk export only compiles if it passes its own injections.
+ */
+export const bulkProbePadInjection: string[] = [
+  'footprint',
+  'corpus/bulk_probe_pad',
+  replaceOnce(
+    probePadInjection[2],
+    '(footprint "corpus:probe_pad"',
+    '(footprint "corpus:bulk_probe_pad"'
+  ),
+];
+
+/** `staggeredThumbsConfig` placing `bulkProbePadInjection` instead. */
+export const bulkStaggeredThumbsConfig = replaceOnce(
+  staggeredThumbsConfig,
+  'what: corpus/probe_pad',
+  'what: corpus/bulk_probe_pad'
+);
+
 type ExpectedKey = {
   name: string;
   /** Column and row names, as used by the `{{colrow}}` switch net. */

@@ -3,6 +3,8 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseZipArchive } from '../src/utils/ergogenBundleLoader';
 import { createZip, exportConfigsProgressively } from '../src/utils/zip';
 import {
+  bulkProbePadInjection,
+  bulkStaggeredThumbsConfig,
   expectedKeys,
   expectedRectangleUnionSize,
   outlineRectangles,
@@ -17,6 +19,7 @@ import {
   dxfLineSegments,
   pcbEdgeCutsSize,
   pcbFootprints,
+  type PcbFootprint,
   readArchive,
   segmentDifferences,
   svgOutlineGeometry,
@@ -40,12 +43,20 @@ type Results = Parameters<typeof createZip>[0] & {
   pcbs: { board: string };
 };
 
+type ExpectedKey = (typeof expectedKeys)[number];
+
 const [, probePadName, probePadCode] = probePadInjection;
 const probePadPath = `footprints/${probePadName}.js`;
-const publicOutlineFiles = ['board', 'keycaps'].flatMap((name) => [
-  `outputs/outlines/${name}.dxf`,
-  `outputs/outlines/${name}.svg`,
-]);
+const [, bulkProbePadName, bulkProbePadCode] = bulkProbePadInjection;
+const bulkProbePadPath = `footprints/${bulkProbePadName}.js`;
+const switchLibrary = 'ceoloide:switch_mx';
+const outlineFiles = (names: string[]) =>
+  names.flatMap((name) => [
+    `outputs/outlines/${name}.dxf`,
+    `outputs/outlines/${name}.svg`,
+  ]);
+const publicOutlineFiles = outlineFiles(['board', 'keycaps']);
+const pcbPath = 'outputs/pcbs/board.kicad_pcb';
 
 /** The archive and file name from the most recent download. */
 const lastDownload = async (): Promise<
@@ -55,13 +66,31 @@ const lastDownload = async (): Promise<
   return { ...(await readArchive(blob)), filename };
 };
 
+/** Checks that footprints sit on the expected keys, in order, with nets. */
+const expectPlacedOnKeys = (
+  placed: PcbFootprint[],
+  netsOf: (key: ExpectedKey) => string[]
+) => {
+  placed.forEach((footprint, index) => {
+    const key = expectedKeys[index];
+    const label = `${footprint.reference} on ${key.name}`;
+    // KiCad y points down, Ergogen y points up.
+    expect(footprint.x, `${label} x`).toBeCloseTo(key.x, 3);
+    expect(footprint.y, `${label} y`).toBeCloseTo(-key.y, 3);
+    expect(footprint.rotation, `${label} rotation`).toBeCloseTo(key.r, 3);
+    expect(footprint.nets, `${label} nets`).toEqual(netsOf(key));
+  });
+};
+
 /**
  * Checks generated files in an archive against the hand-written corpus
  * expectations, so an archive cannot pass by echoing wrong engine output.
+ * `probeLibrary` is the KiCad library of the injected probe pad.
  */
 const expectCorpusOutputs = async (
   archive: ArchiveContents,
-  folder: string
+  folder: string,
+  probeLibrary: string
 ) => {
   for (const name of ['board', 'keycaps'] as const) {
     const { size, regions } = outlineRectangles[name];
@@ -81,17 +110,21 @@ const expectCorpusOutputs = async (
     ).toEqual({ missing: [], unexpected: [] });
   }
 
-  const pcb = await archive.text(`${folder}outputs/pcbs/board.kicad_pcb`);
+  const pcb = await archive.text(`${folder}${pcbPath}`);
   const footprints = pcbFootprints(pcb);
-  expect(footprints).toHaveLength(expectedKeys.length * 2);
-  footprints
-    .filter((footprint) => footprint.library === 'corpus:probe_pad')
-    .forEach((footprint, index) => {
-      const key = expectedKeys[index];
-      expect(footprint.x, `${footprint.reference} x`).toBeCloseTo(key.x, 3);
-      expect(footprint.y, `${footprint.reference} y`).toBeCloseTo(-key.y, 3);
-      expect(footprint.nets).toEqual([key.zoneColumn]);
-    });
+  // Count each library first: a library with no footprints would otherwise
+  // pass the placement checks by checking nothing.
+  const switches = footprints.filter((fp) => fp.library === switchLibrary);
+  const probes = footprints.filter((fp) => fp.library === probeLibrary);
+  expect(switches, `${switchLibrary} footprints`).toHaveLength(
+    expectedKeys.length
+  );
+  expect(probes, `${probeLibrary} footprints`).toHaveLength(
+    expectedKeys.length
+  );
+  expect(footprints, 'all footprints').toHaveLength(expectedKeys.length * 2);
+  expectPlacedOnKeys(switches, (key) => [key.colrow, 'GND'].sort());
+  expectPlacedOnKeys(probes, (key) => [key.zoneColumn]);
   const board = svgOutlineGeometry(
     await archive.text(`${folder}outputs/outlines/board.svg`)
   );
@@ -143,7 +176,35 @@ describe('single-configuration archive (createZip)', () => {
     );
     expect(await archive.text('config.yaml')).toBe(staggeredThumbsConfig);
     expect(await archive.text(probePadPath)).toBe(probePadCode);
-    await expectCorpusOutputs(archive, '');
+    await expectCorpusOutputs(archive, '', 'corpus:probe_pad');
+  });
+
+  it('rejects a PCB whose probe pads became switches at the same total', async () => {
+    // Arrange: a correct archive, with every probe pad in the PCB relabelled
+    // as a switch, so the total footprint count is unchanged.
+    await createZip(
+      results(),
+      staggeredThumbsConfig,
+      [probePadInjection],
+      false,
+      false
+    );
+    const archive = await lastDownload();
+    const pcb = await archive.text(pcbPath);
+    const relabelled = pcb.replaceAll(
+      '(footprint "corpus:probe_pad"',
+      `(footprint "${switchLibrary}"`
+    );
+    expect(pcbFootprints(relabelled)).toHaveLength(expectedKeys.length * 2);
+    const mutated: ArchiveContents = {
+      ...archive,
+      text: async (path) =>
+        path === pcbPath ? relabelled : archive.text(path),
+    };
+    // Act / Assert
+    await expect(
+      expectCorpusOutputs(mutated, '', 'corpus:probe_pad')
+    ).rejects.toThrow(`${switchLibrary} footprints`);
   });
 
   it('reloads as the same config and injections, never as outputs', async () => {
@@ -179,14 +240,17 @@ describe('single-configuration archive (createZip)', () => {
     const archive = await lastDownload();
     // Assert
     expect(archive.paths).toEqual(
-      expect.arrayContaining([
-        'outputs/outlines/_plate.dxf',
-        'outputs/outlines/_plate.svg',
+      [
+        'config.yaml',
+        probePadPath,
+        'outputs/demo.svg',
+        ...outlineFiles(['board', 'keycaps', '_plate']),
+        pcbPath,
         'outputs/debug/raw.txt',
         'outputs/debug/canonical.yaml',
         'outputs/debug/points.yaml',
         'outputs/debug/units.yaml',
-      ])
+      ].sort()
     );
     expect(await archive.text('outputs/debug/raw.txt')).toBe(
       staggeredThumbsConfig
@@ -204,16 +268,19 @@ describe('single-configuration archive (createZip)', () => {
   });
 });
 
+// Bulk export uses the probe pad under its own name (see
+// `bulkProbePadInjection`), so it fails unless it passes its injections to the
+// worker, even after the single-configuration cases registered `probe_pad`.
 describe('bulk archives (exportConfigsProgressively)', () => {
   const configs = [
-    { name: 'Staggered thumbs', config: staggeredThumbsConfig },
+    { name: 'Staggered thumbs', config: bulkStaggeredThumbsConfig },
     { name: 'Missing outline', config: unknownOutlineConfig },
   ];
 
   const exportAll = (onlyConfigs: boolean) =>
     exportConfigsProgressively(
       configs,
-      [probePadInjection],
+      [bulkProbePadInjection],
       false,
       false,
       onlyConfigs,
@@ -231,15 +298,15 @@ describe('bulk archives (exportConfigsProgressively)', () => {
       /^ergogen-config-all-\d{4}-\d{2}-\d{2}\.zip$/
     );
     expect(archive.paths).toEqual(
-      ['Missing outline.yaml', 'Staggered thumbs.yaml', probePadPath].sort()
+      ['Missing outline.yaml', 'Staggered thumbs.yaml', bulkProbePadPath].sort()
     );
     expect(await archive.text('Staggered thumbs.yaml')).toBe(
-      staggeredThumbsConfig
+      bulkStaggeredThumbsConfig
     );
     expect(await archive.text('Missing outline.yaml')).toBe(
       unknownOutlineConfig
     );
-    expect(await archive.text(probePadPath)).toBe(probePadCode);
+    expect(await archive.text(bulkProbePadPath)).toBe(bulkProbePadCode);
   });
 
   it('compiles each config into its own folder and records failures', async () => {
@@ -248,9 +315,13 @@ describe('bulk archives (exportConfigsProgressively)', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
     // Act
-    const summary = await exportAll(false);
+    let summary: Awaited<ReturnType<typeof exportAll>>;
+    try {
+      summary = await exportAll(false);
+    } finally {
+      consoleError.mockRestore();
+    }
     const archive = await lastDownload();
-    consoleError.mockRestore();
     // Assert
     expect(summary).toEqual({ succeededCount: 1, failedCount: 1 });
     expect(archive.filename).toMatch(
@@ -262,14 +333,14 @@ describe('bulk archives (exportConfigsProgressively)', () => {
         'Missing outline/config.yaml',
         'Missing outline/error.txt',
         `${valid}config.yaml`,
-        `${valid}${probePadPath}`,
+        `${valid}${bulkProbePadPath}`,
         `${valid}outputs/demo.svg`,
         ...publicOutlineFiles.map((path) => `${valid}${path}`),
         `${valid}outputs/pcbs/board.kicad_pcb`,
       ].sort()
     );
     expect(await archive.text(`${valid}config.yaml`)).toBe(
-      staggeredThumbsConfig
+      bulkStaggeredThumbsConfig
     );
     expect(await archive.text('Missing outline/config.yaml')).toBe(
       unknownOutlineConfig
@@ -277,6 +348,9 @@ describe('bulk archives (exportConfigsProgressively)', () => {
     expect(await archive.text('Missing outline/error.txt')).toBe(
       'Compilation failed: Error: Field "outlines.board.0.name" does not name an existing outline!'
     );
-    await expectCorpusOutputs(archive, valid);
+    expect(await archive.text(`${valid}${bulkProbePadPath}`)).toBe(
+      bulkProbePadCode
+    );
+    await expectCorpusOutputs(archive, valid, 'corpus:bulk_probe_pad');
   });
 });
