@@ -34,7 +34,7 @@ makes these network requests:
   GitHub, Codeberg, Forgejo or Gitea host.
 - Google Analytics only when the build includes a tag ID (see
   [Configuration](#configuration)). Without one, no analytics script loads and the
-  "Send Usage Metrics" switch has no effect, even if it shows as on. With an ID,
+  "Send Usage Metrics" switch is off and disabled; a saved choice is kept. With an ID,
   metrics default to on in a browser tab and off in the installed app; a saved
   choice wins (an explicit one over a legacy opt-out), unreadable storage counts
   as an opt-out, and development builds and loopback hosts never send. Hits are not queued offline. DEVELOPMENT.md lists

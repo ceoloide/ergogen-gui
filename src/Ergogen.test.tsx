@@ -1,6 +1,7 @@
 import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Ergogen from './Ergogen';
 import { useConfigContext } from './context/ConfigContext';
 
@@ -274,19 +275,22 @@ describe('Ergogen Privacy settings', () => {
     vi.unstubAllEnvs();
   });
 
-  it('disables Send Usage Metrics and explains why when the build has no tag ID', () => {
+  it('disables Send Usage Metrics and explains why when the build has no tag ID', async () => {
     // Arrange
     vi.stubEnv('VITE_GTAG_ID', '');
 
     // Act
     render(<Ergogen />);
-
-    // Assert
     const metricsSwitch = screen.getByRole('checkbox', {
       name: 'Send usage metrics',
     });
+    // user-event, unlike fireEvent, skips disabled controls as browsers do.
+    await userEvent.setup().click(metricsSwitch);
+
+    // Assert
     expect(metricsSwitch).toBeDisabled();
     expect(metricsSwitch).not.toBeChecked();
+    expect(settingsContext.setSendUsageMetrics).not.toHaveBeenCalled();
     expect(
       screen.getByText(/built without an analytics tag ID/)
     ).toBeInTheDocument();
