@@ -1,6 +1,7 @@
 import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Ergogen from './Ergogen';
 import { useConfigContext } from './context/ConfigContext';
 
@@ -236,5 +237,82 @@ describe('Ergogen preview_loaded tracking', () => {
 
     // Assert
     expect(countPreviewLoadedCalls()).toBe(2);
+  });
+});
+
+describe('Ergogen Privacy settings', () => {
+  const settingsContext = {
+    configs: [],
+    activeConfigId: '1',
+    activeConfigName: 'My Awesome Board',
+    isPreview: false,
+    results: null,
+    configInput: 'points: {}',
+    injectionInput: [],
+    debug: false,
+    stlPreview: false,
+    isGenerating: false,
+    isJscadConverting: false,
+    showSettings: true,
+    showSideNav: false,
+    showConfig: true,
+    showDownloads: false,
+    sendUsageMetrics: true,
+    setSendUsageMetrics: vi.fn(),
+    setShowSettings: vi.fn(),
+    setShowSideNav: vi.fn(),
+    setShowConfig: vi.fn(),
+    setShowDownloads: vi.fn(),
+    generateNow: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useConfigContext as Mock).mockReturnValue(settingsContext);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('disables Send Usage Metrics and explains why when the build has no tag ID', async () => {
+    // Arrange
+    vi.stubEnv('VITE_GTAG_ID', '');
+
+    // Act
+    render(<Ergogen />);
+    const metricsSwitch = screen.getByRole('checkbox', {
+      name: 'Send usage metrics',
+    });
+    // user-event, unlike fireEvent, skips disabled controls as browsers do.
+    await userEvent.setup().click(metricsSwitch);
+
+    // Assert
+    expect(metricsSwitch).toBeDisabled();
+    expect(metricsSwitch).not.toBeChecked();
+    expect(settingsContext.setSendUsageMetrics).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/built without an analytics tag ID/)
+    ).toBeInTheDocument();
+  });
+
+  it('keeps Send Usage Metrics usable when the build has a tag ID', () => {
+    // Arrange
+    vi.stubEnv('VITE_GTAG_ID', 'G-TEST12345');
+
+    // Act
+    render(<Ergogen />);
+    const metricsSwitch = screen.getByRole('checkbox', {
+      name: 'Send usage metrics',
+    });
+    fireEvent.click(metricsSwitch);
+
+    // Assert
+    expect(metricsSwitch).toBeEnabled();
+    expect(metricsSwitch).toBeChecked();
+    expect(settingsContext.setSendUsageMetrics).toHaveBeenCalledWith(false);
+    expect(
+      screen.queryByText(/built without an analytics tag ID/)
+    ).not.toBeInTheDocument();
   });
 });

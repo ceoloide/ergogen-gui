@@ -10,6 +10,7 @@ import { theme } from '../theme/theme';
  * @property {React.ReactNode} [description] - Optional detailed description of the option.
  * @property {boolean} checked - The checked state of the checkbox.
  * @property {Dispatch<SetStateAction<boolean>>} setSelected - A function to update the checked state.
+ * @property {boolean} [disabled] - Whether the switch is unavailable; the description should explain why.
  * @property {string} [aria-label] - An optional aria-label for the checkbox.
  */
 type Props = {
@@ -18,6 +19,7 @@ type Props = {
   description?: React.ReactNode;
   checked: boolean;
   setSelected: Dispatch<SetStateAction<boolean>>;
+  disabled?: boolean;
   'aria-label'?: string;
 };
 
@@ -37,11 +39,11 @@ const OptionContainer = styled.div`
 /**
  * A styled label for the option text wrapper.
  */
-const OptionLabel = styled.label`
+const OptionLabel = styled.label<{ $disabled: boolean }>`
   display: flex;
   flex-direction: column;
   flex: 1;
-  cursor: pointer;
+  cursor: ${(props) => (props.$disabled ? 'not-allowed' : 'pointer')};
   user-select: none;
   text-align: left;
 `;
@@ -77,13 +79,14 @@ const SwitchWrapper = styled.div`
 /**
  * A styled container for the Material Design switch.
  */
-const SwitchContainer = styled.label<{ $checked: boolean }>`
+const SwitchContainer = styled.label<{ $disabled: boolean }>`
   position: relative;
   display: inline-block;
   width: 36px;
   height: 20px;
   flex-shrink: 0;
-  cursor: pointer;
+  cursor: ${(props) => (props.$disabled ? 'not-allowed' : 'pointer')};
+  opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
 `;
 
 /**
@@ -138,20 +141,22 @@ const GenOption = ({
   description,
   setSelected,
   checked,
+  disabled = false,
   'aria-label': ariaLabel,
 }: Props): JSX.Element => {
   return (
     <OptionContainer>
-      <OptionLabel htmlFor={optionId}>
+      <OptionLabel htmlFor={optionId} $disabled={disabled}>
         <OptionTitle>{label}</OptionTitle>
         {description && <OptionDescription>{description}</OptionDescription>}
       </OptionLabel>
       <SwitchWrapper>
-        <SwitchContainer $checked={checked} htmlFor={optionId}>
+        <SwitchContainer $disabled={disabled} htmlFor={optionId}>
           <HiddenInput
             type="checkbox"
             id={optionId}
             checked={checked}
+            disabled={disabled}
             onChange={(e) => setSelected(e.target.checked)}
             data-testid={`option-${optionId}`}
             aria-label={ariaLabel}

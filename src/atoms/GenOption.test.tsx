@@ -42,4 +42,12 @@ describe('GenOption', () => {
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox).toBeChecked();
   });
+
+  it('disables the switch when disabled is set', () => {
+    // Arrange
+    render(<GenOption {...defaultProps} disabled={true} />);
+
+    // Assert
+    expect(screen.getByRole('checkbox')).toBeDisabled();
+  });
 });

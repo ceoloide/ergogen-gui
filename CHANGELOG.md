@@ -1,5 +1,18 @@
 # Changelog
 
+## Usage Metrics Configuration
+
+November 14, 2026
+
+Set `VITE_GTAG_ID` to your GA4 tag ID for GitHub and local builds. This is the only analytics tag setting.
+
+Builds without a tag ID show **Send Usage Metrics** off and disabled, with a note explaining that no usage statistics are sent. Your saved consent choice is preserved.
+
+**What changed:**
+
+- **Clear Privacy setting**: Builds without a tag ID show **Send Usage Metrics** as unavailable and explain why.
+- **One analytics setting**: Self-hosters configure analytics with `VITE_GTAG_ID` for both GitHub and local builds.
+
 ## Corrected Infused-Kim Diode Name
 
 November 14, 2026

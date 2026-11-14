@@ -127,6 +127,22 @@ describe('HC-013a deployment policy', () => {
     }
   });
 
+  it('builds with VITE_GTAG_ID as the only analytics tag variable', () => {
+    // Arrange: vite.config.mts reads only VITE_GTAG_ID, so GitHub builds must
+    // pass only the matching repository variable.
+    const validations = [
+      ci.jobs['lint-and-test'].steps.find(
+        (step) => step.run === 'pnpm validate'
+      ),
+      build.steps.find((step) => step.run === 'pnpm validate'),
+    ];
+
+    // Assert
+    for (const step of validations) {
+      expect(step?.env?.VITE_GTAG_ID).toBe('${{ vars.VITE_GTAG_ID }}');
+    }
+  });
+
   it('requires the reviewed publish guard and successful build dependency', () => {
     // Assert
     expect(deploy.needs).toBe('build');

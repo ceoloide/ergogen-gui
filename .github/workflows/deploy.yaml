@@ -55,7 +55,7 @@ jobs:
       - name: Validate production build
         run: pnpm validate
         env:
-          VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
+          VITE_GTAG_ID: ${{ vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       - name: Create 404.html for SPA routing
         run: cp ./dist/index.html ./dist/404.html

@@ -116,9 +116,7 @@ export default defineConfig(({ mode }) => {
           env.REACT_APP_ERGOGEN_VERSION ||
           defaultEngineVersion
       ),
-      'import.meta.env.VITE_GTAG_ID': JSON.stringify(
-        env.VITE_GTAG_ID || env.REACT_APP_GTAG_ID || ''
-      ),
+      'import.meta.env.VITE_GTAG_ID': JSON.stringify(env.VITE_GTAG_ID || ''),
       'import.meta.env.VITE_FEATURE_TEMPLATES': JSON.stringify(
         env.VITE_FEATURE_TEMPLATES || env.REACT_APP_FEATURE_TEMPLATES || ''
       ),
