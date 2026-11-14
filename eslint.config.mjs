@@ -49,6 +49,11 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {
+    // Ergogen injections: the app's evaluator supplies `module` and `require`.
+    files: ['tests/corpus/footprints/**/*.js'],
+    languageOptions: { sourceType: 'commonjs', globals: globals.commonjs },
+  },
+  {
     files: ['src/**/*.{ts,tsx}'],
     plugins: {
       'react-hooks': reactHooks,

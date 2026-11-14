@@ -58,10 +58,59 @@ including those made by service workers; provider tests route deterministic
 responses. Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
 
-Other test suites worth knowing: `tests/engine-corpus.test.ts` runs the prepared
-engine on a small corpus (key count, outline size, KiCad 8 footprints, invalid
-footprint rejection); `tests/workflow-security.test.ts` checks workflow policy;
-`tests/build-version.test.ts` checks build-time engine identity.
+Other test suites worth knowing: `tests/workflow-security.test.ts` checks
+workflow policy; `tests/build-version.test.ts` checks build-time engine identity.
+
+### Semantic regression corpus
+
+These Vitest suites catch wrong generated output, not only crashes, by checking
+geometry and structure instead of byte snapshots. They run the prepared engine
+offline and only read their fixtures.
+
+- **Inputs** in `tests/corpus/`: `staggered-thumbs.yaml` (column stagger, a
+  rotated and splayed thumb cluster, a private `_plate` outline, a vendor and a
+  custom footprint), the custom footprint `footprints/corpus/probe_pad.js`, and
+  two invalid configs (YAML syntax, missing outline). Expected values are worked
+  out by hand in `tests/corpus/corpus.ts`, never copied from output.
+- **`tests/engine-corpus.test.ts`** starts with four quick checks that call
+  `ergogen.process` directly on a two-key config. Its corpus cases generate
+  through the app's own worker handler and injection evaluator
+  (`tests/corpus/inProcessWorker.ts` replaces only the `Worker` transport).
+  They check key positions and rotations, outline sizes and region counts, that
+  DXF and SVG hold the same segments, footprint placement and nets, Edge.Cuts
+  against the board outline, error replies for invalid input, and that a second
+  run gives identical output.
+- **`tests/export-corpus.test.ts`** runs `createZip` and
+  `exportConfigsProgressively` with real JSZip (only the download and the
+  worker transport are replaced). It checks archive names, the exact file list,
+  file contents and geometry, that a single-config archive reloads as just its
+  config and injections, that a configs-only archive holds no generated files,
+  and that a failed config gets `error.txt` instead of outputs. It counts the
+  switch and probe pad footprints separately before checking their placement.
+- **Shared engine:** all requests in one test file share one engine, so a
+  footprint injected once stays registered, unlike browser bulk export, which
+  starts a fresh worker per config. Bulk export therefore uses the probe pad
+  under its own name (`bulkProbePadInjection` in `tests/corpus/corpus.ts`), so
+  it fails if it does not pass its injections to the worker.
+  `tests/corpus-in-process-worker.test.ts` checks the adapter itself: a handler
+  that throws or does not reply reaches `onerror` at once, and a failed import
+  restores the globals it replaced.
+- **`tests/preview-consistency.test.ts`** regenerates the geometry of every
+  tracked preview in `public/images/previews` and compares it with the file,
+  ignoring path direction and start point, and requires one preview per
+  example. It covers these previews only, not other generated files.
+- **`tests/corpus-inspect.test.ts`** checks the SVG reader the suites share: the
+  viewBox must be four finite numbers that frame the paths exactly, and only
+  closed chains count as regions.
+
+Only documented volatile data is ignored: the KiCad 8 title-block date (see
+`withoutPcbGenerationDate`) and the date in archive names, matched by pattern.
+
+When a change is meant to alter output, such as an engine or footprint pin
+update, first check the new output yourself (open it in the app or KiCad). Then
+update the hand-worked values in `tests/corpus/corpus.ts` or the affected
+assertion, and explain the change in the pull request. For a stale preview, run
+`pnpm generate-previews` and review the SVG diff.
 
 ## Source layout
 

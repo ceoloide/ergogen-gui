@@ -1,0 +1,73 @@
+# Semantic regression corpus: an asymmetric, column-staggered half with a
+# rotated and splayed thumb cluster. The expected geometry is written out by
+# hand in tests/corpus/corpus.ts; change both together, on purpose.
+meta:
+  name: corpus-staggered-thumbs
+  version: '1'
+  author: ergogen-gui corpus
+units:
+  kx: 19
+  ky: 19
+points:
+  zones:
+    matrix:
+      key:
+        spread: kx
+        padding: ky
+      columns:
+        pinky: {}
+        ring:
+          key.stagger: 4
+        middle:
+          key.stagger: 3
+      rows:
+        bottom: {}
+        top: {}
+    thumb:
+      anchor:
+        ref: matrix_middle_bottom
+        shift: [5, -22]
+        rotate: -15
+      key:
+        spread: 22
+      columns:
+        near: {}
+        far:
+          key.splay: -20
+      rows:
+        cluster: {}
+outlines:
+  # One closed region per key: the caps never touch.
+  keycaps:
+    - what: rectangle
+      where: true
+      size: [18, 17]
+  # Private outline (leading underscore): exported only in debug mode.
+  _plate:
+    - what: rectangle
+      where: true
+      size: [14, 14]
+  # Overlapping rectangles merge into a single board region.
+  board:
+    - what: rectangle
+      where: true
+      size: [kx + 4, ky + 4]
+pcbs:
+  board:
+    template: kicad8
+    outlines:
+      edge:
+        outline: board
+        layer: Edge.Cuts
+    footprints:
+      switches:
+        what: ceoloide/switch_mx
+        where: true
+        params:
+          from: '{{colrow}}'
+          to: GND
+      probes:
+        what: corpus/probe_pad
+        where: true
+        params:
+          net: '{{zone.name}}_{{col.name}}'
