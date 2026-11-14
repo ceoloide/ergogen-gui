@@ -88,6 +88,9 @@ offline and only read their fixtures.
   tracked preview in `public/images/previews` and compares it with the file,
   ignoring path direction and start point, and requires one preview per
   example. It covers these previews only, not other generated files.
+- **`tests/corpus-inspect.test.ts`** checks the SVG reader the suites share: the
+  viewBox must be four finite numbers that frame the paths exactly, and only
+  closed chains count as regions.
 
 Only documented volatile data is ignored: the KiCad 8 title-block date (see
 `withoutPcbGenerationDate`) and the date in archive names, matched by pattern.

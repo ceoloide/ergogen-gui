@@ -138,6 +138,20 @@ describe('staggered thumb corpus through the app worker', () => {
     }
   );
 
+  it('fails the region count when one keycap outline is left open', () => {
+    // Arrange: drop the closing side of the first keycap rectangle.
+    const svg = results().outlines.keycaps.svg;
+    const opened = svg.replace(/ L [-\d.]+ [-\d.]+ Z/, '');
+    expect(opened).not.toBe(svg);
+    const expected = expectedRectangleUnionSize(outlineRectangles.keycaps.size);
+    // Act
+    const geometry = svgOutlineGeometry(opened);
+    // Assert: the size still matches, so only the region count notices.
+    expect(geometry.width).toBeCloseTo(expected.width, 2);
+    expect(geometry.height).toBeCloseTo(expected.height, 2);
+    expect(geometry.regions).toBe(outlineRectangles.keycaps.regions - 1);
+  });
+
   it.each(Object.keys(outlineRectangles))(
     'writes the same %s geometry to DXF and SVG',
     (name) => {

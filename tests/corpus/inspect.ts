@@ -60,7 +60,7 @@ export const segmentDifferences = (
 export type OutlineGeometry = {
   width: number;
   height: number;
-  /** Closed regions (makerjs chains). */
+  /** Closed regions: makerjs chains that end where they start. */
   regions: number;
   /** Paths that are neither lines nor arcs; the corpus expects none. */
   otherPaths: number;
@@ -73,7 +73,8 @@ export type OutlineGeometry = {
 
 /**
  * Reads the geometry of an Ergogen SVG outline with makerjs, which is also
- * what produced it. The viewBox must match the measured path extents.
+ * what produced it. The viewBox must be four finite numbers, with a positive
+ * size, that frame the paths exactly (origin included, in SVG coordinates).
  */
 export const svgOutlineGeometry = (svg: string): OutlineGeometry => {
   const pathData = [...svg.matchAll(/<path[^>]*\sd="([^"]*)"/g)]
@@ -101,23 +102,41 @@ export const svgOutlineGeometry = (svg: string): OutlineGeometry => {
       }
     },
   });
-  const viewBox = svg
-    .match(/viewBox="([^"]+)"/)?.[1]
-    .split(/\s+/)
-    .map(Number);
+  // makerjs imports SVG with y negated (model y points up), so the drawing's
+  // SVG-space box runs from -high to -low on y.
+  const drawn = {
+    x: extents.low[0],
+    y: -extents.high[1],
+    width: extents.width,
+    height: extents.height,
+  };
+  const viewBoxText = svg.match(/viewBox="([^"]*)"/)?.[1];
+  const viewBox =
+    viewBoxText
+      ?.trim()
+      .split(/[\s,]+/)
+      .map(Number) ?? [];
+  const [x, y, width, height] = viewBox;
   if (
-    !viewBox ||
-    Math.abs(viewBox[2] - extents.width) > TOLERANCE ||
-    Math.abs(viewBox[3] - extents.height) > TOLERANCE
+    viewBox.length !== 4 ||
+    !viewBox.every(Number.isFinite) ||
+    width <= 0 ||
+    height <= 0 ||
+    Math.abs(x - drawn.x) > TOLERANCE ||
+    Math.abs(y - drawn.y) > TOLERANCE ||
+    Math.abs(width - drawn.width) > TOLERANCE ||
+    Math.abs(height - drawn.height) > TOLERANCE
   ) {
     throw new Error(
-      `SVG viewBox ${viewBox?.join(' ')} does not match its paths (${extents.width} x ${extents.height})`
+      `SVG viewBox "${viewBoxText ?? '(none)'}" does not frame its paths (${drawn.x} ${drawn.y} ${drawn.width} ${drawn.height})`
     );
   }
   return {
     width: extents.width,
     height: extents.height,
-    regions: (makerjs.model.findChains(model) as makerjs.IChain[]).length,
+    regions: (makerjs.model.findChains(model) as makerjs.IChain[]).filter(
+      (chain) => chain.endless
+    ).length,
     otherPaths,
     segments: fromOrigin(segments),
   };
