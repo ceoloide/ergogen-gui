@@ -1,0 +1,26 @@
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 43552613099,
+      "name": "CI",
+      "path": ".github/workflows/ci.yaml",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "f5d30bd0ab85e91863ac259e94b3a7ce853640b9",
+      "head_branch": "t3/semantic-regression-corpus",
+      "run_number": 43,
+      "run_attempt": 1,
+      "run_started_at": "2026-11-14T03:37:44Z",
+      "created_at": "2026-11-14T03:37:44Z",
+      "html_url": "https://github.com/ceoloide/ergogen-gui/actions/runs/43552613099",
+      "workflow_id": 314445731,
+      "check_suite_id": 117929332985,
+      "pull_requests": [],
+      "head_repository": {
+        "full_name": "ceoloide/ergogen-gui"
+      }
+    }
+  ]
+}

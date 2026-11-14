@@ -36,7 +36,7 @@ export default tseslint.config(
   prettierConfig,
   {
     files: [
-      'scripts/**/*.{js,mjs}',
+      'scripts/**/*.{js,mjs,ts,mts}',
       '*.{js,mjs,ts,mts}',
       'tests/**/*.ts',
       'e2e/**/*.ts',

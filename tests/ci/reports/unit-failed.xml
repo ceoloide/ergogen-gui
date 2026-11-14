@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="2" failures="1" errors="0" time="0.417">
+    <testsuite name="fail.test.ts" timestamp="2026-11-14T11:17:52.749Z" hostname="runner" tests="1" failures="1" errors="0" skipped="0" time="0.016366602">
+        <testcase classname="fail.test.ts" name="fails" time="0.01450892">
+            <failure message="expected 1 to be 2 // Object.is equality" type="AssertionError">
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ fail.test.ts:2:29
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="pass.test.ts" timestamp="2026-11-14T11:17:52.757Z" hostname="runner" tests="1" failures="0" errors="0" skipped="0" time="0.003612475">
+        <testcase classname="pass.test.ts" name="passes" time="0.002167781">
+        </testcase>
+    </testsuite>
+</testsuites>

@@ -14,7 +14,7 @@
   ],
   "patch/**/*.{ts,tsx,js,jsx}": ["prettier --write"],
   "**/*.md": ["markdownlint --fix", "prettier --write"],
-  "scripts/**/*.{js,mjs}": ["eslint --fix", "prettier --write"],
+  "scripts/**/*.{js,mjs,mts}": ["eslint --fix", "prettier --write"],
   "**/*.sh": ["shellcheck"],
   "./*.{js,mjs,ts,mts}": ["eslint --fix", "prettier --write"],
   ".github/dependabot.yml": ["prettier --write", "zizmor --offline"],

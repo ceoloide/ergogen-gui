@@ -8,10 +8,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
     "types": ["node", "vite/client", "vitest/globals"]
   },
   "include": [
     "tests/**/*.ts",
+    "scripts/ci/**/*.ts",
+    "scripts/ci/**/*.mts",
     "e2e/**/*.ts",
     "*.config.ts",
     "*.config.mts",

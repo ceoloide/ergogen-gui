@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="2" failures="1" errors="0" time="0.41">
+    <testsuite name="broken.test.ts" timestamp="2026-11-14T11:17:54.311Z" hostname="runner" tests="1" failures="1" errors="0" skipped="0" time="0">
+        <testcase classname="broken.test.ts" name="broken.test.ts" time="0">
+            <failure message="Failed to load url ./does-not-exist (resolved id: ./does-not-exist) in /work/broken.test.ts. Does the file exist?" type="Error">
+Error: Failed to load url ./does-not-exist (resolved id: ./does-not-exist) in /work/broken.test.ts. Does the file exist?
+ ❯ loadAndTransform /repo/node_modules/.pnpm/vite@5.4.21_@types+node@24.10.1_terser@5.44.1/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
+            </failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="pass.test.ts" timestamp="2026-11-14T11:17:54.320Z" hostname="runner" tests="1" failures="0" errors="0" skipped="0" time="0.003531599">
+        <testcase classname="pass.test.ts" name="passes" time="0.00202775">
+        </testcase>
+    </testsuite>
+</testsuites>

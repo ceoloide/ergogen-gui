@@ -1,0 +1,26 @@
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 43472356159,
+      "name": "CI",
+      "path": ".github/workflows/ci.yaml",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_sha": "7ee6fd1e77e952c3ad5bca921b9d0d581d8ba45f",
+      "head_branch": "fix/deploy-workflow-least-privilege",
+      "run_number": 32,
+      "run_attempt": 1,
+      "run_started_at": "2026-11-13T17:23:39Z",
+      "created_at": "2026-11-13T17:23:39Z",
+      "html_url": "https://github.com/ceoloide/ergogen-gui/actions/runs/43472356159",
+      "workflow_id": 314445731,
+      "check_suite_id": 117715490714,
+      "pull_requests": [],
+      "head_repository": {
+        "full_name": "ceoloide/ergogen-gui"
+      }
+    }
+  ]
+}
