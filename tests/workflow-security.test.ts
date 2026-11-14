@@ -3,8 +3,16 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import yaml from 'js-yaml';
+import {
+  artifactName,
+  githubActionsAppId,
+  requiredJob,
+  requiredSteps,
+} from '../scripts/ci/contract.mts';
 
 interface Step {
+  name?: string;
+  id?: string;
   uses?: string;
   run?: string;
   if?: string | boolean;
@@ -217,5 +225,111 @@ describe('HC-013a deployment policy', () => {
         "${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}",
       'cancel-in-progress': false,
     });
+  });
+});
+
+describe('HC-014 validation evidence contract', () => {
+  const job = ci.jobs[requiredJob];
+  const step = (name: string) => job.steps.find((s) => s.name === name);
+
+  it('runs pull request validation as the one required job', () => {
+    // Assert: the job id is the check name that branch rules require.
+    expect(Object.keys(ci.jobs)).toEqual([requiredJob]);
+  });
+
+  it('runs every required step in order and unconditionally where needed', () => {
+    // Arrange
+    const names = job.steps.map((s) => s.name);
+    const positions = requiredSteps.map((name) => names.indexOf(name));
+
+    // Assert
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    for (const name of requiredSteps) {
+      expect(step(name)?.['continue-on-error']).not.toBe(true);
+    }
+    expect(step('Validate')?.id).toBe('validate');
+    expect(step('Browser acceptance')?.id).toBe('browser');
+  });
+
+  it('checks reports after failures too and passes the real step outcomes', () => {
+    // Arrange
+    const check = step('Check test reports');
+
+    // Assert
+    expect(check?.if).toBe('${{ !cancelled() }}');
+    expect(check?.run).toBe('pnpm test:reports');
+    expect(packageJson.scripts['test:reports']).toBe(
+      'node scripts/ci/check-reports.mts'
+    );
+    expect(check?.env).toEqual({
+      STEP_OUTCOME_VALIDATE: '${{ steps.validate.outcome }}',
+      STEP_OUTCOME_BROWSER: '${{ steps.browser.outcome }}',
+    });
+  });
+
+  it('names the reports artifact after the PR head and the attempt', () => {
+    // Arrange
+    const upload = step('Upload validation reports');
+
+    // Assert: github.sha would be the temporary merge commit instead.
+    expect(upload?.uses?.startsWith('actions/upload-artifact@')).toBe(true);
+    expect(upload?.if).toBe('${{ !cancelled() }}');
+    expect(upload?.with?.name).toBe(
+      artifactName(
+        '${{ github.event.pull_request.head.sha }}',
+        '${{ github.run_attempt }}'
+      )
+    );
+    expect(String(upload?.with?.path).split('\n')).toContain('reports/');
+  });
+});
+
+describe('HC-015 branch ruleset proposal', () => {
+  const proposal = JSON.parse(
+    readFileSync(
+      resolve(projectRoot, 'scripts/ci/ruleset-proposal.json'),
+      'utf8'
+    )
+  ) as {
+    enforcement: string;
+    bypass_actors: unknown[];
+    conditions: { ref_name: { include: string[] } };
+    rules: { type: string; parameters?: Record<string, unknown> }[];
+  };
+  const rule = (type: string) =>
+    proposal.rules.find((candidate) => candidate.type === type)?.parameters;
+
+  it('requires the contract check from the GitHub Actions app only', () => {
+    // Assert
+    expect(rule('required_status_checks')).toEqual({
+      strict_required_status_checks_policy: true,
+      do_not_enforce_on_create: false,
+      required_status_checks: [
+        { context: requiredJob, integration_id: githubActionsAppId },
+      ],
+    });
+  });
+
+  it('never needs an approval the sole owner cannot give on their own PR', () => {
+    // Assert
+    expect(rule('pull_request')).toMatchObject({
+      required_approving_review_count: 0,
+      require_code_owner_review: false,
+      require_last_push_approval: false,
+    });
+  });
+
+  it('protects the default branch with no bypass', () => {
+    // Assert
+    expect(proposal.enforcement).toBe('active');
+    expect(proposal.bypass_actors).toEqual([]);
+    expect(proposal.conditions.ref_name.include).toEqual(['~DEFAULT_BRANCH']);
+    expect(proposal.rules.map((candidate) => candidate.type).sort()).toEqual([
+      'deletion',
+      'non_fast_forward',
+      'pull_request',
+      'required_status_checks',
+    ]);
   });
 });

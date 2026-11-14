@@ -1,0 +1,16 @@
+{
+  "number": 238,
+  "state": "closed",
+  "draft": false,
+  "head": {
+    "sha": "f5d30bd0ab85e91863ac259e94b3a7ce853640b9",
+    "ref": "t3/semantic-regression-corpus",
+    "repo": {
+      "full_name": "ceoloide/ergogen-gui"
+    }
+  },
+  "base": {
+    "sha": "c6eb0718b66629dbf27dd7f1784baeeb9931e2e1",
+    "ref": "main"
+  }
+}

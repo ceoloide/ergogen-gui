@@ -17,7 +17,8 @@ uses the same installer and commands.
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, all Vitest tests. Never edits files. |
 | `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                |
-| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build and all Playwright tests.                                                          |
+| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                     |
+| `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                |
 | `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                          |
 | `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                        |
 | `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                            |
@@ -28,8 +29,9 @@ tests and configuration files use `tsconfig.tooling.json`. Husky/lint-staged run
 quick fixes on staged files; GitHub enforces validation independently.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
-report and traces/screenshots of failures (no retries). Attach them, with the
-commit and exact command, to failure reports. All outputs are Git-ignored.
+report and traces/screenshots of failures (no retries). `pnpm test:reports` writes
+`reports/evidence.json`. Attach them, with the commit and exact command, to
+failure reports. All outputs are Git-ignored.
 
 ### Browser tests
 
@@ -248,8 +250,9 @@ with `pnpm generate-previews` and review the diff; builds never rewrite them.
 ## CI and deployment
 
 - `ci.yaml` runs on pull requests to `main` with a read-only token and
-  unpersisted checkout credentials: `pnpm validate`, then Playwright, then uploads
-  `reports/` and Playwright output as `validation-<sha>`.
+  unpersisted checkout credentials: `pnpm validate`, then Playwright, then
+  `pnpm test:reports`, then uploads `reports/` and Playwright output (see
+  [Pull request evidence](#pull-request-evidence)).
 - `deploy.yaml` runs on pushes to `main`, manual dispatch and
   `repository_dispatch`, never on pull requests. Its read-only `build` job
   validates, builds, adds `404.html` and (on `main`, if `CNAME_DOMAIN` is set)
@@ -267,8 +270,77 @@ with `pnpm generate-previews` and review the diff; builds never rewrite them.
   ([#230](https://github.com/ceoloide/ergogen-gui/issues/230)).
 - Actions are pinned by commit and updated by Dependabot with a seven-day
   cooldown. `tests/workflow-security.test.ts` asserts permissions, triggers,
-  credentials, the artifact handoff, the shared validation step and the
-  publisher's allowed inputs; update it with any workflow change.
+  credentials, the artifact handoff, the shared validation step, the
+  publisher's allowed inputs, and that `ci.yaml` and the ruleset proposal match
+  the evidence contract; update it with any workflow change.
+
+### Pull request evidence
+
+`scripts/ci/contract.mts` defines what a passing pull request run is: the one
+job `lint-and-test` of `ci.yaml`, its four named steps, and two JUnit reports that
+each hold at least one test with no failures, errors or skipped tests (Vitest and
+Playwright exit 0 when tests are skipped). The browser report must include every
+Playwright project. Test counts are deliberately not pinned.
+
+In CI, `pnpm test:reports` runs even after a failed step. It fails the job when
+the reports break the contract, and writes the identities, step outcomes, counts
+and failed tests to the job summary and `reports/evidence.json`. The artifact is
+`validation-<PR head>-attempt-<n>`; `github.sha` is not the head but the merge
+commit GitHub tested (head merged into the base at that time).
+
+Everything a pull request run produces comes from code that pull request can
+change. To assess it, run this from an up-to-date `main` checkout, never from the
+PR branch:
+
+```shell
+pnpm assess:pr <number> [--json]
+```
+
+It only reads, through `gh api`, and exits 0 only if all of these hold:
+
+- The PR is open and targets `main`, and its state, target branch, head and
+  base did not change while it was assessed.
+- The newest `ci.yaml` `pull_request` run for that exact head completed with
+  success, and every job of its latest attempt succeeded, with each required step.
+  No newer run or rerun started while it was assessed.
+- The only latest `lint-and-test` check on the head is that job, created by the
+  GitHub Actions app (ID 15368), so a same-named check from another workflow or
+  app fails the assessment.
+- The artifact of that run and attempt exists, was created during the attempt,
+  matches its published SHA-256 digest, and its reports meet the contract when
+  checked again with `main`'s code.
+- Its evidence names this PR, head, run and attempt, and the tested commit is a
+  merge of the head into the PR's current base. If the base has moved, update
+  the branch.
+
+It exits 1 with a list of problems otherwise, and 2 if it cannot run (a GitHub API
+error or an unexpected response shape). To triage a failure, open the run and job
+links it prints, read the job summary, then download the artifact for the reports,
+the Playwright HTML report and traces. Artifacts expire after seven days; rerun
+the workflow to assess again. `--allow-closed` assesses a merged PR for audits only.
+A pass describes the moment it finished; it does not stop later pushes or merges.
+
+### Branch rules
+
+As of 2026-11-14, nothing enforces these checks: `main` has no branch protection
+or ruleset, so a failed or missing check, or a failed assessment, does not block
+a merge. `scripts/ci/ruleset-proposal.json` is a proposed ruleset, not yet
+applied. It requires `lint-and-test` from the GitHub Actions app, up to date
+with `main`, plus a pull request with resolved conversations, and blocks force
+pushes and deletion, with no bypass and no required approval. The owner is the
+only collaborator, and GitHub does not count an author's approval of their own
+pull request. Tests keep it in line with the contract. It would not enforce the
+whole contract: GitHub accepts a required check that concludes `success`,
+`skipped` or `neutral`
+([source](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
+Skipped tests in a job that runs fail the job and block, but a PR that skips the
+whole job, for example by adding a job-level `if:` to its own `ci.yaml`, would
+pass the ruleset. The assessor rejects that, but the ruleset does not run it.
+Only the repository owner applies it, after review:
+
+```shell
+gh api --method POST repos/ceoloide/ergogen-gui/rulesets --input scripts/ci/ruleset-proposal.json
+```
 
 ## Service worker
 

@@ -1,0 +1,20 @@
+{
+  "total_count": 1,
+  "check_runs": [
+    {
+      "id": 132047237194,
+      "name": "lint-and-test",
+      "head_sha": "7ee6fd1e77e952c3ad5bca921b9d0d581d8ba45f",
+      "status": "completed",
+      "conclusion": "failure",
+      "details_url": "https://github.com/ceoloide/ergogen-gui/actions/runs/43472356159/job/132047237194",
+      "app": {
+        "id": 15368,
+        "slug": "github-actions"
+      },
+      "check_suite": {
+        "id": 117715490714
+      }
+    }
+  ]
+}
