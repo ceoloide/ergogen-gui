@@ -85,7 +85,7 @@ describe('prepared engine semantic corpus', () => {
     await expect(ergogen.process(invalid, { svg: true })).rejects.toThrow();
   });
 
-  it('compiles the infused-kim diode under both names into identical PCBs', async () => {
+  it('compiles the infused-kim diode and rejects the typo name', async () => {
     // Arrange
     const config = structuredClone(twoKeys);
     config.pcbs.board.template = 'kicad5';
@@ -94,13 +94,12 @@ describe('prepared engine semantic corpus', () => {
     // Act
     const current = await ergogen.process(config);
     config.pcbs.board.footprints.keys.what = 'infused-kimo/isde';
-    const legacy = await ergogen.process(config);
 
     // Assert
     expect(current.pcbs.board.match(/\(module /g)).toHaveLength(2);
     expect(current.pcbs.board).toContain('GND');
-    expect(withoutPcbGenerationDate(current.pcbs.board)).toBe(
-      withoutPcbGenerationDate(legacy.pcbs.board)
+    await expect(ergogen.process(config)).rejects.toThrow(
+      'Field "pcbs.board.footprints.keys.what" should be one of'
     );
   });
 });
