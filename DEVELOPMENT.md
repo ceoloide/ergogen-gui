@@ -446,10 +446,11 @@ a merge. Two reviewed payloads describe the intended settings, and
   with the contract.
 - `scripts/ci/workflow-permissions-proposal.json`: the default `GITHUB_TOKEN`
   becomes read-only and Actions can no longer approve pull requests. Every job
-  in `ci.yaml` and `deploy.yaml` declares its own permissions (tests check this),
-  so `deploy` and `rollback` keep `contents: write`. GitHub's own
-  `pages-build-deployment` run, which serves `gh-pages`, also declares its own
-  (`contents: read`, `pages: write` in its logs).
+  in `ci.yaml` and `deploy.yaml` runs with explicit permissions, its own or the
+  workflow's (tests check this), so `deploy` and `rollback` keep
+  `contents: write`. GitHub's own `pages-build-deployment` run, which serves
+  `gh-pages`, also declares its own (`contents: read`, `pages: write` in its
+  logs).
 
 Once applied, nobody can push to `main`, the owner included; every change is a
 pull request merged after a fresh, passing run on the current `main` (use
@@ -500,6 +501,7 @@ cutover pull request has passed review. Each stage can be rolled back alone.
    ```shell
    repo=repos/ceoloide/ergogen-gui
    snap="$HOME/ergogen-gui-settings-$(date -u +%Y%m%dT%H%M%SZ)"; mkdir "$snap"
+   echo "$snap"                                   # record this path
    git rev-parse HEAD > "$snap/reviewed-commit"   # the commit every later step runs from
    git status --porcelain                         # expect no output
    gh api "$repo/rulesets?includes_parents=false" > "$snap/rulesets.json"
@@ -514,6 +516,15 @@ cutover pull request has passed review. Each stage can be rolled back alone.
    `{"default_workflow_permissions":"write","can_approve_pull_request_reviews":true}`
    and `main` is not protected. Otherwise the rollback below would not restore
    the start state; review the difference first.
+
+   A later step in a new shell must reuse this directory. Set both variables
+   again with the path that `echo "$snap"` printed, and do not rerun the `snap=`
+   line or `mkdir` above, which would start a new, empty directory:
+
+   ```shell
+   repo=repos/ceoloide/ergogen-gui
+   snap='<existing directory step 1 printed>'
+   ```
 
 2. **Baseline.** Record `gh pr view <number> --json mergeStateStatus` for the
    pull requests used in the [drill](#drill), and open the drill's failing pull
@@ -564,11 +575,22 @@ step 4:
 | Passing `lint-and-test`, behind `main`                | `CLEAN`    | `BEHIND` or `BLOCKED`    |
 | Passing `lint-and-test`, up to date, threads resolved | `CLEAN`    | `CLEAN` (the cutover PR) |
 
+The drill opens only the failing pull request. For the two middle rows, use an
+open pull request that already fits, if any; `statusCheckRollup` shows whether
+`lint-and-test` ran on `headRefOid` and how it concluded:
+
+```shell
+gh pr view <number> --json statusCheckRollup,headRefOid,baseRefOid
+```
+
+If no open pull request fits a row, record that row as unavailable rather than
+opening one for it; the drill then does not cover that row.
+
 The failing pull request adds one failing test on top of the current `main`.
 Open it from the cutover checkout, in the shell of step 1 (in a new shell, set
-`snap` first), and only when `git status --porcelain` prints nothing: the
-commands switch branches, and the last ones return to the reviewed commit
-without discarding anything.
+`snap` to the recorded directory first, as step 1 shows), and only when
+`git status --porcelain` prints nothing: the commands switch branches, and the
+last ones return to the reviewed commit without discarding anything.
 
 ```shell
 git fetch origin main
@@ -602,8 +624,9 @@ see the limits above.
 
 #### Rollback
 
-Rollback restores the snapshot. In a new shell, set `repo` and `snap` as in
-step 1 first. Remove the ruleset, restore the Actions defaults, then compare:
+Rollback restores the snapshot. In a new shell, first set `repo` and `snap`
+again as step 1 shows, with the recorded directory; do not rerun its `snap=`
+line. Remove the ruleset, restore the Actions defaults, then compare:
 
 ```shell
 gh api --method DELETE "$repo/rulesets/$(cat "$snap/ruleset-id")"
