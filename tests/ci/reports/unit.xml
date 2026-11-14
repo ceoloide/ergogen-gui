@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="11" failures="0" errors="0" time="25.047">
+    <testsuite name="src/index.test.tsx" timestamp="2026-11-14T03:38:58.474Z" hostname="runnervmccnms" tests="1" failures="0" errors="0" skipped="0" time="0.092346158">
+        <testcase classname="src/index.test.tsx" name="application entry point &gt; initializes analytics before React renders, so the first page_view is never dropped" time="0.091342596">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/service-worker.test.ts" timestamp="2026-11-14T03:38:58.475Z" hostname="runnervmccnms" tests="10" failures="0" errors="0" skipped="0" time="0.04729624">
+        <testcase classname="src/service-worker.test.ts" name="Service Worker registration and route wiring &gt; does not intercept Google Analytics hits or scripts, so nothing is queued for later replay" time="0.003106061">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service Worker registration and route wiring &gt; deletes the legacy offline analytics queue on activation and waits for it" time="0.001671419">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service Worker registration and route wiring &gt; routes SPA navigations to index.html while skipping internal paths and static files" time="0.001013447">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service Worker registration and route wiring &gt; calls skipWaiting when receiving SKIP_WAITING message" time="0.000295836">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service worker runtime routes below &apos;/&apos; &gt; caches images, the logo and the favicon of this app" time="0.001444296">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service worker runtime routes below &apos;/&apos; &gt; caches script dependencies of this app" time="0.000628026">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service worker runtime routes below &apos;/&apos; &gt; serves navigations from the precached index.html of this base" time="0.000240252">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service worker runtime routes below &apos;/ergogen-gui/&apos; &gt; caches images, the logo and the favicon of this app" time="0.001087739">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service worker runtime routes below &apos;/ergogen-gui/&apos; &gt; caches script dependencies of this app" time="0.001372719">
+        </testcase>
+        <testcase classname="src/service-worker.test.ts" name="Service worker runtime routes below &apos;/ergogen-gui/&apos; &gt; serves navigations from the precached index.html of this base" time="0.000189917">
+        </testcase>
+    </testsuite>
+</testsuites>

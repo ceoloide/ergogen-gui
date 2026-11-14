@@ -1,0 +1,21 @@
+{
+  "total_count": 1,
+  "artifacts": [
+    {
+      "id": 14096694474,
+      "name": "validation-8dbd3992c61ea57d564efe5f18b66d465a200960",
+      "size_in_bytes": 336965,
+      "expired": false,
+      "created_at": "2026-11-14T03:41:20Z",
+      "expires_at": "2026-11-21T03:41:19Z",
+      "digest": "sha256:86d3295c26ba435605e8262f98f665534164f1ea5ab47f86cfd21959e87827a6",
+      "workflow_run": {
+        "id": 43552613099,
+        "repository_id": 777513471,
+        "head_repository_id": 777513471,
+        "head_branch": "t3/semantic-regression-corpus",
+        "head_sha": "f5d30bd0ab85e91863ac259e94b3a7ce853640b9"
+      }
+    }
+  ]
+}

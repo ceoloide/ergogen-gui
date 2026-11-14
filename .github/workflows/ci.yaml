@@ -31,6 +31,7 @@ jobs:
           pnpm tools:install
           echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
       - name: Validate
+        id: validate
         run: pnpm validate
         env:
           VITE_GTAG_ID: ${{ vars.REACT_APP_GTAG_ID || vars.VITE_GTAG_ID }}
@@ -38,12 +39,25 @@ jobs:
       - name: Install browser
         run: pnpm exec playwright install --with-deps chromium
       - name: Browser acceptance
+        id: browser
         run: pnpm test:e2e
+      # Fails the job when a report is missing, empty, failed or skipped a
+      # test, and records the tested commits in the step summary and in
+      # reports/evidence.json. It runs after failures too, so the summary and
+      # the artifact always describe what happened.
+      - name: Check test reports
+        if: ${{ !cancelled() }}
+        run: pnpm test:reports
+        env:
+          STEP_OUTCOME_VALIDATE: ${{ steps.validate.outcome }}
+          STEP_OUTCOME_BROWSER: ${{ steps.browser.outcome }}
+      # Named after the PR head (github.sha is the temporary merge commit) and
+      # the attempt, so reruns never mix reports. See scripts/ci/contract.mts.
       - name: Upload validation reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: validation-${{ github.sha }}
+          name: validation-${{ github.event.pull_request.head.sha }}-attempt-${{ github.run_attempt }}
           path: |
             reports/
             playwright-report/

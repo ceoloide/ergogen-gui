@@ -1,0 +1,14 @@
+<testsuites id="" name="" tests="2" failures="0" skipped="1" errors="0" time="0.862387">
+<testsuite name="probe.spec.ts" timestamp="2026-11-14T11:17:58.619Z" hostname="chromium" tests="2" failures="0" skipped="1" time="0.008" errors="0">
+<testcase name="passes" classname="probe.spec.ts" time="0.008">
+</testcase>
+<testcase name="is skipped" classname="probe.spec.ts">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

@@ -1,0 +1,14 @@
+{
+  "sha": "8dbd3992c61ea57d564efe5f18b66d465a200960",
+  "parents": [
+    {
+      "sha": "c6eb0718b66629dbf27dd7f1784baeeb9931e2e1"
+    },
+    {
+      "sha": "f5d30bd0ab85e91863ac259e94b3a7ce853640b9"
+    }
+  ],
+  "commit": {
+    "message": "Merge f5d30bd0ab85e91863ac259e94b3a7ce853640b9 into c6eb0718b66629dbf27dd7f1784baeeb9931e2e1"
+  }
+}

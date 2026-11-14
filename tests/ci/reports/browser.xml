@@ -1,0 +1,92 @@
+<testsuites id="" name="" tests="24" failures="0" skipped="0" errors="0" time="105.368319">
+<testsuite name="app.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="1" failures="0" skipped="0" time="2.306" errors="0">
+<testcase name="renders editor and preview" classname="app.spec.ts" time="2.306">
+</testcase>
+</testsuite>
+<testsuite name="base-path.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="1" failures="0" skipped="0" time="2.883" errors="0">
+<testcase name="Base path › a deep link and the base open the welcome page with real example previews" classname="base-path.spec.ts" time="2.883">
+</testcase>
+</testsuite>
+<testsuite name="debug.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="1" failures="0" skipped="0" time="1.413" errors="0">
+<testcase name="minimal test: page loads and has welcome text" classname="debug.spec.ts" time="1.413">
+</testcase>
+</testsuite>
+<testsuite name="ergogen.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="7" failures="0" skipped="0" time="51.037" errors="0">
+<testcase name="Ergogen Configuration Processing › loads A. dux configuration from local storage and displays outputs" classname="ergogen.spec.ts" time="2.383">
+</testcase>
+<testcase name="Ergogen Configuration Processing › loads A. dux demo.dxf preview" classname="ergogen.spec.ts" time="5.328">
+</testcase>
+<testcase name="Ergogen Configuration Processing › loads A. dux KiCad PCB" classname="ergogen.spec.ts" time="12.003">
+</testcase>
+<testcase name="Ergogen Configuration Processing › loads A. dux JSCAD preview when stlPreview is false" classname="ergogen.spec.ts" time="7.824">
+</testcase>
+<testcase name="Ergogen Configuration Processing › hides A. dux JSCAD preview when stlPreview is true and debug is false" classname="ergogen.spec.ts" time="2.138">
+</testcase>
+<testcase name="Ergogen Configuration Processing › loads A. dux JSCAD preview when stlPreview is true and debug is true" classname="ergogen.spec.ts" time="7.446">
+</testcase>
+<testcase name="Ergogen Configuration Processing › loads A. dux STL previews" classname="ergogen.spec.ts" time="13.915">
+</testcase>
+</testsuite>
+<testsuite name="github-loading.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="3" failures="0" skipped="0" time="11.957" errors="0">
+<testcase name="GitHub Loading › should load config and footprints from ceoloide/mr_useful" classname="github-loading.spec.ts" time="4.368">
+<system-out>
+<![CDATA[[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+Found 10 footprint(s)
+]]>
+</system-out>
+</testcase>
+<testcase name="GitHub Loading › should load config with URL parameter and footprints" classname="github-loading.spec.ts" time="2.953">
+</testcase>
+<testcase name="GitHub Loading › should accumulate footprints from sequential loads and reset conflict dialog" classname="github-loading.spec.ts" time="4.636">
+<system-out>
+<![CDATA[[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+[GitHub Rate Limit] Limit: unknown, Remaining: unknown, Used: unknown, Reset: unknown
+Sequential loading test completed successfully
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="responsive.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="1" failures="0" skipped="0" time="2.707" errors="0">
+<testcase name="Responsive Layout › should show/hide panels correctly on mobile" classname="responsive.spec.ts" time="2.707">
+</testcase>
+</testsuite>
+<testsuite name="routing.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="6" failures="0" skipped="0" time="11.474" errors="0">
+<testcase name="Routing and Welcome Page › new user is redirected to /new" classname="routing.spec.ts" time="1.631">
+</testcase>
+<testcase name="Routing and Welcome Page › existing user is routed to /" classname="routing.spec.ts" time="1.574">
+</testcase>
+<testcase name="Routing and Welcome Page › &quot;Add&quot; (new config) button requires existing config" classname="routing.spec.ts" time="1.475">
+</testcase>
+<testcase name="Routing and Welcome Page › &quot;Add&quot; (new config) button navigates to /new" classname="routing.spec.ts" time="2.493">
+</testcase>
+<testcase name="Routing and Welcome Page › clicking &quot;Empty Configuration&quot; creates an empty config and navigates to /" classname="routing.spec.ts" time="2.195">
+</testcase>
+<testcase name="Routing and Welcome Page › clicking an example loads the config and navigates to /" classname="routing.spec.ts" time="2.106">
+</testcase>
+</testsuite>
+<testsuite name="service-worker.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium" tests="1" failures="0" skipped="0" time="6.405" errors="0">
+<testcase name="Service worker › caches example previews, the logo and the favicon at runtime and serves them offline" classname="service-worker.spec.ts" time="6.405">
+</testcase>
+</testsuite>
+<testsuite name="base-path.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium-subpath" tests="1" failures="0" skipped="0" time="2.402" errors="0">
+<testcase name="Base path › a deep link and the base open the welcome page with real example previews" classname="base-path.spec.ts" time="2.402">
+</testcase>
+</testsuite>
+<testsuite name="service-worker.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium-subpath" tests="1" failures="0" skipped="0" time="5.762" errors="0">
+<testcase name="Service worker › caches example previews, the logo and the favicon at runtime and serves them offline" classname="service-worker.spec.ts" time="5.762">
+</testcase>
+</testsuite>
+<testsuite name="service-worker-update.spec.ts" timestamp="2026-11-14T03:40:19.918Z" hostname="chromium-subpath-update" tests="1" failures="0" skipped="0" time="9.967" errors="0">
+<testcase name="Service worker update › a new deployment waits behind the update chip and activates when applied" classname="service-worker-update.spec.ts" time="9.967">
+</testcase>
+</testsuite>
+</testsuites>
