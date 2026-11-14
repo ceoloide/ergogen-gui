@@ -81,6 +81,7 @@ describe('Service Worker registration and route wiring', () => {
       writable: true,
       value: {
         __WB_MANIFEST: [{ url: 'index.html', revision: '1' }],
+        location: new URL('https://ergogen.ceoloide.com/service-worker.js'),
         skipWaiting: mockSkipWaiting,
         addEventListener: vi.fn((type: string, handler: any) => {
           if (type === 'message') {
@@ -181,5 +182,79 @@ describe('Service Worker registration and route wiring', () => {
     expect(messageHandlers.length).toBe(1);
     messageHandlers[0]({ data: { type: 'SKIP_WAITING' } });
     expect(mockSkipWaiting).toHaveBeenCalledTimes(1);
+  });
+});
+
+type RouteMatcher = (options: { request: Request; url: URL }) => boolean;
+
+describe.each([
+  { base: '/', app: 'https://ergogen.ceoloide.com/' },
+  { base: '/ergogen-gui/', app: 'https://ceoloide.github.io/ergogen-gui/' },
+])('Service worker runtime routes below $base', ({ base, app }) => {
+  const originalSelf = (globalThis as Record<string, unknown>).self;
+  let matchers: Record<string, RouteMatcher>;
+  const matches = (cacheName: string, path: string) =>
+    matchers[cacheName]({
+      request: { mode: 'no-cors' } as Request,
+      url: new URL(path, app),
+    });
+
+  beforeAll(async () => {
+    // Arrange: load the worker as built for this base, served below it
+    vi.resetModules();
+    mockRegisterRoute.mockClear();
+    vi.stubEnv('BASE_URL', base);
+    Object.defineProperty(globalThis, 'self', {
+      configurable: true,
+      writable: true,
+      value: {
+        __WB_MANIFEST: [],
+        location: new URL('service-worker.js', app),
+        addEventListener: vi.fn(),
+      },
+    });
+    await import('./service-worker');
+    matchers = Object.fromEntries(
+      mockRegisterRoute.mock.calls
+        .filter(([, handler]) => handler?.options?.cacheName)
+        .map(([matcher, handler]) => [handler.options.cacheName, matcher])
+    );
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+    Object.defineProperty(globalThis, 'self', {
+      configurable: true,
+      writable: true,
+      value: originalSelf,
+    });
+  });
+
+  it('caches images, the logo and the favicon of this app', () => {
+    // Act / Assert
+    expect(matches('public-images-v1', 'images/previews/absolem.svg')).toBe(
+      true
+    );
+    expect(matches('public-images-v1', 'ergogen.png')).toBe(true);
+    expect(matches('public-images-v1', 'favicon.ico')).toBe(true);
+    expect(matches('public-images-v1', '/other-app/images/a.svg')).toBe(false);
+    expect(matches('public-images-v1', 'icons/icon-192.png')).toBe(false);
+  });
+
+  it('caches script dependencies of this app', () => {
+    // Act / Assert
+    expect(matches('public-dependencies-v1', 'dependencies/maker.js')).toBe(
+      true
+    );
+    expect(
+      matches('public-dependencies-v1', '/other-app/dependencies/maker.js')
+    ).toBe(false);
+  });
+
+  it('serves navigations from the precached index.html of this base', () => {
+    // Assert
+    expect(mockCreateHandlerBoundToURL).toHaveBeenLastCalledWith(
+      `${base}index.html`
+    );
   });
 });

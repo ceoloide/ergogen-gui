@@ -1,5 +1,18 @@
 # Changelog
 
+## Example Previews and Offline Images Below a Subpath
+
+November 13, 2026
+
+Previously, a copy of the Web UI hosted below a path, such as a GitHub project page at `/ergogen-gui/`, showed broken example previews on the welcome page. At any address, example previews and the logo were also never saved for offline use.
+
+Example previews now load from the app's own address, and the service worker saves previews, the logo and the icon the first time they are shown, so later visits show them even without a network.
+
+**What changed:**
+
+- **Subpath hosting**: Builds with `VITE_PUBLIC_URL=/ergogen-gui/` show every example preview and work offline like a build at a domain root.
+- **Offline images**: Example previews, the logo and the icon appear when you open the app offline after a previous visit.
+
 ## Repository Links Work on First Visit
 
 November 13, 2026

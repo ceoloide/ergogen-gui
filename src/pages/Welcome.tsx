@@ -1029,7 +1029,7 @@ const Welcome = () => {
               data-testid={`example-${example.label.toLowerCase().replace(/\s+/g, '-')}`}
             >
               <ExampleImage
-                src={`/images/previews/${example.label.toLowerCase().replace(/[\s()]/g, '_')}.svg`}
+                src={`${import.meta.env.BASE_URL}images/previews/${example.label.toLowerCase().replace(/[\s()]/g, '_')}.svg`}
                 alt={`${example.label} preview`}
               />
               <ExampleName>{example.label}</ExampleName>

@@ -70,14 +70,21 @@ which fetches them with Git.
 `dist/` is a static site. Publish the whole folder to any HTTPS static host. No
 backend, Google account or Git provider token is needed.
 
-- **Serve at the domain root.** `/` is the only supported base path today; see
-  [base path](#base-path-limitation).
-- **SPA fallback:** an initial request for a client route such as `/new` must
-  return `index.html` (the GitHub workflow copies it to `404.html`).
+- **Base path:** serve at a domain root, or below a path such as a GitHub project
+  page. For a path, build with its leading and trailing slash, for example
+  `VITE_PUBLIC_URL=/ergogen-gui/ pnpm build`; the app then lives at
+  `/ergogen-gui/`. To try it locally, run
+  `VITE_PUBLIC_URL=/ergogen-gui/ pnpm exec vite preview` and open
+  `http://localhost:4173/ergogen-gui/`.
+- **SPA fallback:** an initial request for a client route such as `/new` (or
+  `/ergogen-gui/new`) must return `index.html` (the GitHub workflow copies it to
+  `404.html`).
 - **Service worker:** registers only in production builds, from the same origin,
-  over HTTPS or on localhost. It precaches about 21 MB (about 16 MB is the editor)
-  in the background on first visit, and the app shows an update button when a new
-  build is deployed.
+  over HTTPS or on localhost, and controls only the base path. It precaches about
+  21 MB (about 16 MB is the editor) in the background on first visit and caches
+  example previews and the logo when they are first shown, so later visits work
+  offline. When a new build is deployed, the app shows an **Update Available**
+  button; clicking it reloads into the new build.
 
 ### GitHub Pages from a fork
 
@@ -85,12 +92,11 @@ backend, Google account or Git provider token is needed.
 2. Under **Settings > Pages**, deploy from the `gh-pages` branch, `/ (root)`. The
    branch appears after the first successful run.
 3. Choose the address with repository variables (**Settings > Secrets and
-   variables > Actions > Variables**). For the supported root path, use a custom
-   domain (`CNAME_DOMAIN`, plus the matching DNS and Pages domain settings) or a
-   `<user>.github.io` repository, and leave `PUBLIC_URL` unset. A project page at
-   `https://<user>.github.io/<repo>/` needs `PUBLIC_URL=/<repo>/` and has the
-   [base path limitation](#base-path-limitation). Add a GA tag ID only if you want
-   analytics.
+   variables > Actions > Variables**). A project page at
+   `https://<user>.github.io/<repo>/` needs `PUBLIC_URL=/<repo>/`. For a domain
+   root, use a custom domain (`CNAME_DOMAIN`, plus the matching DNS and Pages
+   domain settings) or a `<user>.github.io` repository, and leave `PUBLIC_URL`
+   unset. Add a GA tag ID only if you want analytics.
 4. Push to `main` or run **Build and deploy on GitHub Pages** manually. The deploy
    job requests `contents: write`; if an organization policy blocks it, or any step
    fails, the run log shows where.
@@ -98,15 +104,6 @@ backend, Google account or Git provider token is needed.
 Do not publish with the `deploy` package script (`pnpm deploy` is also a pnpm
 built-in): it pushes your local build without the workflow's `404.html` and `CNAME`
 ([#231](https://github.com/ceoloide/ergogen-gui/issues/231)).
-
-### Base path limitation
-
-`VITE_PUBLIC_URL` sets Vite's `base`, and asset links in the built HTML follow it.
-Two parts do not: example previews on the welcome page request `/images/...`, and
-the service worker's runtime cache routes add a second slash (`//images/`), so they
-never match at any base. A subpath build loads but shows broken example previews
-and caches less offline. Use a domain root or custom domain until
-[#229](https://github.com/ceoloide/ergogen-gui/issues/229) is fixed.
 
 ## Configuration
 
@@ -120,7 +117,7 @@ installed specifier, so it can break a canonical frozen install. Use
 
 | Variable (first non-empty wins)                                        | Default                                                                                 | Effect                                                                                                                                                             |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `VITE_PUBLIC_URL`, `PUBLIC_URL`                                        | `/`                                                                                     | Base path. Only `/` is supported (see above).                                                                                                                      |
+| `VITE_PUBLIC_URL`, `PUBLIC_URL`                                        | `/`                                                                                     | Base path, with a leading and trailing slash, such as `/ergogen-gui/` (see [Self-hosting](#self-hosting)).                                                         |
 | `VITE_GTAG_ID`, `REACT_APP_GTAG_ID`                                    | empty                                                                                   | GA4 tag ID. Empty disables analytics entirely.                                                                                                                     |
 | `VITE_FORCE_ANALYTICS`                                                 | unset                                                                                   | Literal `true` lifts the development/localhost block for diagnostics. It does not supply an ID or bypass consent.                                                  |
 | `VITE_FEATURE_TEMPLATES`, `REACT_APP_FEATURE_TEMPLATES`                | unset                                                                                   | Literal `true`/`false` forces custom templates on or off. Unset: on when the engine version is 4.3.0 or later.                                                     |

@@ -36,6 +36,9 @@ src/workers/*.tmp.ts
 /.tools/
 /reports/
 /dist/
+/dist-subpath/
+/dist-subpath-next/
+/dist-subpath-served/
 /.generated/
 
 *.timestamp-*.mjs

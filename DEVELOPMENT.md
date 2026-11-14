@@ -33,12 +33,30 @@ commit and exact command, to failure reports. All outputs are Git-ignored.
 
 ### Browser tests
 
-`playwright.config.mts` picks a free loopback port (or `PLAYWRIGHT_TEST_PORT`),
-builds the production app with a unique `VITE_BUILD_ID` (`PLAYWRIGHT_BUILD_ID`,
-generated when unset) at base `/`, and serves it with `vite preview --strictPort`.
-`e2e/global-setup.ts` fails the run unless `build-id.txt` matches, so tests never
-reach a stale or foreign server. `CI` forbids `.only` and sets two workers. The
-fixture blocks external requests; provider tests route deterministic responses.
+`playwright.config.mts` builds production apps with unique `VITE_BUILD_ID`s and
+serves each with `vite preview --strictPort` on its own free loopback port. Every
+project's metadata names its server and build; `e2e/global-setup.ts` fails the run
+unless each `build-id.txt` matches, so tests never reach a stale or foreign server.
+A build ID also adds an `ergogen-build-id` meta tag to `index.html`.
+
+| Project                   | Build and server                                           | Tests                                             |
+| ------------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
+| `chromium`                | `dist/` at base `/`                                        | All except the update drill.                      |
+| `chromium-subpath`        | `dist-subpath/` at `/ergogen-gui/`                         | `base-path.spec.ts` and `service-worker.spec.ts`. |
+| `chromium-subpath-update` | A fresh copy, `dist-subpath-served/`, of the subpath build | `service-worker-update.spec.ts`.                  |
+
+The update drill deploys `dist-subpath-next/` (the same base, another build ID)
+by copying it over the served copy, which `vite preview` reads on each request,
+then checks that the real worker waits, shows **Update Available** and activates.
+Each drill changes the served copy, so it needs a fresh `pnpm test:e2e` run; do not
+use `--repeat-each` or retries. Playwright routes cannot stand in for that
+deployment: Chromium fetches the worker script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the
+`PLAYWRIGHT_*` variables in the config can pin ports and IDs.
+
+`CI` forbids `.only` and sets two workers. The fixture blocks external requests,
+including those made by service workers; provider tests route deterministic
+responses. Service worker tests check images by their natural width, because a
+missing file below the base returns `index.html` with HTTP 200.
 
 Other test suites worth knowing: `tests/engine-corpus.test.ts` runs the prepared
 engine on a small corpus (key count, outline size, KiCad 8 footprints, invalid
@@ -214,10 +232,11 @@ from the same origin.
   TypeScript worker alone is about 7 MB, hence the 8 MiB per-file limit). This is
   what makes offline start and editor language support work, at a large first
   download.
-- **Runtime**: navigations fall back to the precached `index.html`. Google Fonts
-  use stale-while-revalidate (CSS) and cache-first (font files). The routes for
-  `dependencies/` and images join `BASE_URL` with another `/`, so they never match;
-  images are therefore not cached offline ([#229](https://github.com/ceoloide/ergogen-gui/issues/229)).
+- **Runtime**: navigations fall back to the precached `index.html`. Images under
+  `images/`, `ergogen.png` and `favicon.ico` are cached on first use
+  (cache-first), as is any file under `dependencies/` missing from the precache.
+  These routes match below the build's base path. Google Fonts use
+  stale-while-revalidate (CSS) and cache-first (font files).
 - **Analytics** requests are not intercepted, and activation deletes the
   `workbox-background-sync` database that older builds used to queue hits.
 - **Updates**: a changed `service-worker.js` installs as waiting; the header
