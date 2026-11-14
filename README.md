@@ -58,8 +58,8 @@ cd ergogen-gui
 PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
 ```
 
-The environment prefix is required: the engine's Git subdependencies are blocked
-otherwise, and pnpm 11 does not apply the same setting from `.npmrc`. Install also
+The environment prefix is required: without it pnpm blocks the engine's Git
+subdependencies, and pnpm 11 ignores this setting in `.npmrc`. Install also
 prepares a checkout-owned copy of Ergogen with the pinned footprint libraries,
 which fetches them with Git.
 
@@ -104,10 +104,6 @@ backend, Google account or Git provider token is needed.
 4. Push to `main` or run **Build and deploy on GitHub Pages** manually. The deploy
    job requests `contents: write`; if an organization policy blocks it, or any step
    fails, the run log shows where.
-
-Do not publish with the `deploy` package script (`pnpm deploy` is also a pnpm
-built-in): it pushes your local build without the workflow's `404.html` and `CNAME`
-([#231](https://github.com/ceoloide/ergogen-gui/issues/231)).
 
 ## Configuration
 
@@ -210,5 +206,5 @@ Ergogen is by [@MrZealot](https://github.com/MrZealot); this GUI was started by
 [KiCanvas](https://kicanvas.org) and share links use
 [lz-string](https://github.com/pieroxy/lz-string).
 
-The [package metadata](package.json) declares the MIT license. The repository does
-not yet contain a license file ([#232](https://github.com/ceoloide/ergogen-gui/issues/232)).
+This repository's code is released under the [MIT license](LICENSE). Ergogen, the
+footprint libraries and other dependencies keep their own licenses.
