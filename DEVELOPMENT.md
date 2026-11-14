@@ -342,9 +342,12 @@ The `rollback` job (write token, fixed shell only) checks that the commit is in
 `gh-pages` to a new commit with exactly that commit's tree and trailers
 `Source-Commit`, `Build-Id`, `Rollback-To`, `Requested-By` and `Workflow-Run`.
 It changes nothing if that tree is already served. The smoke job then checks the
-restored build. The next push to `main` releases normally and replaces the
-rollback; to return to the latest release without a new commit, re-run all jobs
-of the latest run of `main` (its one-day artifact may have expired).
+restored build below today's `PUBLIC_URL`, while the restored files keep the base
+path they were built with, so rollback assumes the base path has not changed
+since that release; after a base path change, fix forward instead. The next push
+to `main` releases normally and replaces the rollback; to return to the latest
+release without a new commit, re-run all jobs of the latest run of `main` (its
+one-day artifact may have expired).
 
 `tests/release-publication.test.ts` runs these exact workflow steps, read from
 `deploy.yaml`, against local Git repositories and a loopback server that
