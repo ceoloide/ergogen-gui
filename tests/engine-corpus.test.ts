@@ -84,6 +84,25 @@ describe('prepared engine semantic corpus', () => {
     // Act / Assert
     await expect(ergogen.process(invalid, { svg: true })).rejects.toThrow();
   });
+
+  it('compiles the infused-kim diode under both names into identical PCBs', async () => {
+    // Arrange
+    const config = structuredClone(twoKeys);
+    config.pcbs.board.template = 'kicad5';
+    config.pcbs.board.footprints.keys.what = 'infused-kim/diode';
+
+    // Act
+    const current = await ergogen.process(config);
+    config.pcbs.board.footprints.keys.what = 'infused-kimo/isde';
+    const legacy = await ergogen.process(config);
+
+    // Assert
+    expect(current.pcbs.board.match(/\(module /g)).toHaveLength(2);
+    expect(current.pcbs.board).toContain('GND');
+    expect(withoutPcbGenerationDate(current.pcbs.board)).toBe(
+      withoutPcbGenerationDate(legacy.pcbs.board)
+    );
+  });
 });
 
 type CorpusResults = {
