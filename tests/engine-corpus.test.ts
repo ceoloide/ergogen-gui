@@ -1,5 +1,25 @@
 import * as ergogen from 'ergogen';
 import { beforeAll, describe, expect, it } from 'vitest';
+import type { WorkerResponse } from '../src/workers/ergogen.worker.types';
+import {
+  expectedKeys,
+  expectedRectangleUnionSize,
+  invalidSyntaxConfig,
+  outlineRectangles,
+  probePadInjection,
+  staggeredThumbsConfig,
+  unknownOutlineConfig,
+} from './corpus/corpus';
+import { generate } from './corpus/inProcessWorker';
+import {
+  dxfLineSegments,
+  pcbDeclaredNets,
+  pcbEdgeCutsSize,
+  pcbFootprints,
+  segmentDifferences,
+  svgOutlineGeometry,
+  withoutPcbGenerationDate,
+} from './corpus/inspect';
 
 // A small semantic fixture exercises the same prepared engine as the browser,
 // including a vendor footprint that the unmodified dependency does not expose.
@@ -64,4 +84,173 @@ describe('prepared engine semantic corpus', () => {
     // Act / Assert
     await expect(ergogen.process(invalid, { svg: true })).rejects.toThrow();
   });
+});
+
+type CorpusResults = {
+  points: Record<string, { x: number; y: number; r: number }>;
+  outlines: Record<string, { svg: string; dxf: string }>;
+  pcbs: { board: string };
+};
+
+const successfulResults = (response: WorkerResponse): CorpusResults => {
+  if (response.type !== 'success') {
+    throw new Error(`Generation failed: ${response.error}`);
+  }
+  return response.results as CorpusResults;
+};
+
+describe('staggered thumb corpus through the app worker', () => {
+  let response: WorkerResponse;
+  // A failed generation fails every case with the engine's message, rather
+  // than failing the hook and reporting the cases as skipped.
+  const results = () => successfulResults(response);
+
+  beforeAll(async () => {
+    // Act: the real worker handler, injection evaluator and prepared engine.
+    response = await generate(staggeredThumbsConfig, [probePadInjection]);
+  }, 20000);
+
+  it('places every key at its hand-derived position', () => {
+    // Assert
+    expect(Object.keys(results().points)).toEqual(
+      expectedKeys.map((key) => key.name)
+    );
+    for (const key of expectedKeys) {
+      const point = results().points[key.name];
+      expect(point.x, `${key.name} x`).toBeCloseTo(key.x, 3);
+      expect(point.y, `${key.name} y`).toBeCloseTo(key.y, 3);
+      expect(point.r, `${key.name} rotation`).toBeCloseTo(key.r, 3);
+    }
+  });
+
+  it.each(Object.entries(outlineRectangles))(
+    'draws outline %s as the union of rotated key rectangles',
+    (name, { size, regions }) => {
+      // Arrange
+      const expected = expectedRectangleUnionSize(size);
+      // Act
+      const geometry = svgOutlineGeometry(results().outlines[name].svg);
+      // Assert
+      expect(geometry.width, `${name} width`).toBeCloseTo(expected.width, 2);
+      expect(geometry.height, `${name} height`).toBeCloseTo(expected.height, 2);
+      expect(geometry.regions, `${name} closed regions`).toBe(regions);
+      expect(geometry.otherPaths, `${name} non-line paths`).toBe(0);
+    }
+  );
+
+  it.each(Object.keys(outlineRectangles))(
+    'writes the same %s geometry to DXF and SVG',
+    (name) => {
+      // Act
+      const svg = svgOutlineGeometry(results().outlines[name].svg);
+      const dxf = dxfLineSegments(results().outlines[name].dxf);
+      // Assert
+      expect(
+        segmentDifferences(dxf, svg.segments),
+        `${name} DXF segments compared with SVG`
+      ).toEqual({ missing: [], unexpected: [] });
+    }
+  );
+
+  it('places one switch and one custom probe pad on every key', () => {
+    // Act
+    const footprints = pcbFootprints(results().pcbs.board);
+    // Assert: KiCad y points down, Ergogen y points up.
+    for (const [library, designator] of [
+      ['ceoloide:switch_mx', 'S'],
+      ['corpus:probe_pad', 'P'],
+    ]) {
+      const placed = footprints.filter((fp) => fp.library === library);
+      expect(placed.map((fp) => fp.reference)).toEqual(
+        expectedKeys.map((_, index) => `${designator}${index + 1}`)
+      );
+      placed.forEach((footprint, index) => {
+        const key = expectedKeys[index];
+        const label = `${footprint.reference} on ${key.name}`;
+        expect(footprint.x, `${label} x`).toBeCloseTo(key.x, 3);
+        expect(footprint.y, `${label} y`).toBeCloseTo(-key.y, 3);
+        expect(footprint.rotation, `${label} rotation`).toBeCloseTo(key.r, 3);
+      });
+    }
+    expect(footprints).toHaveLength(expectedKeys.length * 2);
+  });
+
+  it('connects each footprint to its declared parametric nets', () => {
+    // Act
+    const footprints = pcbFootprints(results().pcbs.board);
+    const declared = pcbDeclaredNets(results().pcbs.board);
+    // Assert
+    const switches = footprints.filter(
+      (fp) => fp.library === 'ceoloide:switch_mx'
+    );
+    const probes = footprints.filter((fp) => fp.library === 'corpus:probe_pad');
+    expect(switches.map((fp) => fp.nets)).toEqual(
+      expectedKeys.map((key) => [key.colrow, 'GND'].sort())
+    );
+    expect(probes.map((fp) => fp.nets)).toEqual(
+      expectedKeys.map((key) => [key.zoneColumn])
+    );
+    for (const net of footprints.flatMap((fp) => fp.nets)) {
+      expect(declared, `net ${net} is declared`).toContain(net);
+    }
+  });
+
+  it('cuts the PCB edge to the board outline', () => {
+    // Act
+    const edge = pcbEdgeCutsSize(results().pcbs.board);
+    const board = svgOutlineGeometry(results().outlines.board.svg);
+    // Assert
+    expect(edge.segments).toBe(board.segments.length);
+    expect(edge.width).toBeCloseTo(board.width, 2);
+    expect(edge.height).toBeCloseTo(board.height, 2);
+  });
+
+  it('repeats identical output apart from the documented PCB date', async () => {
+    // Act
+    const again = successfulResults(
+      await generate(staggeredThumbsConfig, [probePadInjection])
+    );
+    // Assert
+    expect(again.points).toEqual(results().points);
+    expect(again.outlines).toEqual(results().outlines);
+    expect(results().pcbs.board).toMatch(/\(date "\d{4}-\d{2}-\d{2}"\)/);
+    expect(withoutPcbGenerationDate(again.pcbs.board)).toBe(
+      withoutPcbGenerationDate(results().pcbs.board)
+    );
+  });
+});
+
+describe('invalid corpus inputs through the app worker', () => {
+  it.each([
+    [
+      'invalid YAML syntax',
+      invalidSyntaxConfig,
+      [],
+      'Input is not valid YAML, JSON, or JS Code!',
+    ],
+    [
+      'a reference to a missing outline',
+      unknownOutlineConfig,
+      [],
+      'Field "outlines.board.0.name" does not name an existing outline!',
+    ],
+    [
+      'a custom footprint that throws while loading',
+      staggeredThumbsConfig,
+      [['footprint', 'corpus/broken', "throw new Error('broken footprint');"]],
+      'broken footprint',
+    ],
+  ])(
+    'reports %s instead of returning output',
+    async (_, config, injections, message) => {
+      // Act
+      const response = await generate(config, injections as string[][]);
+      // Assert
+      expect(response).toEqual({
+        type: 'error',
+        error: expect.stringContaining(message),
+        requestId: 'corpus',
+      });
+    }
+  );
 });

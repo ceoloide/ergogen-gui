@@ -1,0 +1,5 @@
+# Invalid YAML: the flow sequence is never closed.
+points:
+  zones:
+    matrix:
+      columns: [one, two

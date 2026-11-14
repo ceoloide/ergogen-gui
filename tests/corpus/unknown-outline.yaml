@@ -1,0 +1,13 @@
+# Valid YAML, invalid Ergogen: the board outline reuses an outline that does
+# not exist.
+points:
+  zones:
+    matrix:
+      columns:
+        one: {}
+      rows:
+        row: {}
+outlines:
+  board:
+    - what: outline
+      name: missing_outline
