@@ -42,9 +42,14 @@ included. Turning it off for a whole project would also report dozens of errors
 inside dependencies (for example `lib.dom` against `lib.webworker`, workbox and
 react-router declarations). So `pnpm typecheck` also runs
 `pnpm typecheck:declarations` (`scripts/ci/check-declarations.mts`): it builds
-each project from its own configuration with only `skipLibCheck` off and reports
-the TypeScript diagnostics of our declaration files alone (`src/*.d.ts`,
-`scripts/ci/jsdom.d.ts`). Our files are the `*.d.ts` files Git lists, tracked or
+each project from its own configuration with only `skipLibCheck` off, checks
+every declaration file and reports the diagnostics that involve ours
+(`src/*.d.ts`, `scripts/ci/jsdom.d.ts`): those reported in our files, and those
+reported in a dependency whose related information points into our files.
+TypeScript reports a conflict between two declarations on whichever comes later
+in the program, so a conflict with a dependency loaded after our file is
+reported in the dependency. Checking every declaration file takes most of the
+command's time, about 26 seconds locally. Our files are the `*.d.ts` files Git lists, tracked or
 untracked, outside `node_modules`; one that belongs to neither project fails the
 check. Code that uses the declarations is type-checked by `tsc` as usual.
 
@@ -228,10 +233,21 @@ Local probes on 2026-11-15 compared it with the previous gates in two
   the declaration check.
 - A syntax error in a declaration file, and misuse of the declarations by app
   and tooling code, still fail both gates.
+- A conflict with a dependency declaration loaded later in the program is
+  reported in the dependency. The first version of the check asked only for the
+  diagnostics of our files and passed such a conflict: a `WindowEventMap`
+  property in `src/jscad.d.ts` that conflicts with `vite/client`. The check now
+  also keeps diagnostics whose related information points into our files, so
+  this conflict fails and names `src/jscad.d.ts(3,3)` under the `vite` error
+  (TS2717). Checking every declaration file raised the local run time of
+  `pnpm typecheck:declarations` from about 6 to 26 seconds and its peak memory
+  from 0.8 to 1.6 GB.
 - Dependency errors stay excluded: with `skipLibCheck` off, every error `tsc`
   reports for either project is inside `node_modules`, and the new check
   passes. The dependencies were not changed. `tests/declaration-check.test.ts`
-  repeats this with a temporary project whose synthetic dependency has errors.
+  repeats this with a temporary project whose synthetic dependency has errors,
+  and checks a conflict between an own and a dependency declaration in both
+  orders.
 - The mutants, logs and hash manifests are kept outside the repository; the pull
   request names their location and the CI run of its final head.
 

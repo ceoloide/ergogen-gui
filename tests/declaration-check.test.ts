@@ -123,6 +123,78 @@ describe('pnpm typecheck:declarations', { timeout: processTimeout }, () => {
     expect(result.output).not.toContain('fake-dependency');
   });
 
+  describe('conflict between an own declaration and a dependency', () => {
+    // TypeScript reports a conflicting redeclaration on whichever declaration
+    // comes later in the program, and points to the earlier one only in the
+    // diagnostic's related information.
+    const conflictingDependency = () => {
+      write(
+        'node_modules/fake-globals/package.json',
+        JSON.stringify({ name: 'fake-globals', types: 'index.d.ts' })
+      );
+      write(
+        'node_modules/fake-globals/index.d.ts',
+        'interface Settings { level: string }\n'
+      );
+    };
+
+    it('fails when the dependency declaration comes later', () => {
+      // Arrange: the `types` option loads the dependency after the project's
+      // own files, so TypeScript reports the error in the dependency.
+      conflictingDependency();
+      write(
+        'tsconfig.json',
+        JSON.stringify({
+          compilerOptions: {
+            strict: true,
+            skipLibCheck: true,
+            noEmit: true,
+            lib: ['es2022'],
+            types: ['fake-globals'],
+          },
+          include: ['types'],
+        })
+      );
+      write('types/own.d.ts', 'interface Settings { level: number }\n');
+      expect(tsc()).toEqual({ status: 0, output: '' });
+      const strict = tsc('--skipLibCheck', 'false');
+      expect(strict.output).toContain(
+        'node_modules/fake-globals/index.d.ts(1,22): error TS2717'
+      );
+
+      // Act
+      const result = check();
+
+      // Assert
+      expect(result.status).toBe(1);
+      expect(result.output).toContain(
+        'node_modules/fake-globals/index.d.ts(1,22): error TS2717'
+      );
+      expect(result.output).toContain(
+        "types/own.d.ts(1,22): message TS6203: 'level' was also declared here."
+      );
+    });
+
+    it('fails when the dependency declaration comes first', () => {
+      // Arrange: a reference loads the dependency before the own file, so
+      // TypeScript reports the error in the own file.
+      conflictingDependency();
+      write(
+        'types/own.d.ts',
+        '/// <reference types="fake-globals" />\n' +
+          'interface Settings { level: number }\n'
+      );
+      expect(tsc()).toEqual({ status: 0, output: '' });
+
+      // Act
+      const result = check();
+
+      // Assert
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('types/own.d.ts(2,22): error TS2717');
+    });
+  });
+
   it('fails when an own declaration file belongs to no checked project', () => {
     // Arrange: an untracked file outside the project's include.
     write('other/stray.d.ts', 'declare const stray: string;\n');

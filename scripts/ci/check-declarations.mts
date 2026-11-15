@@ -8,10 +8,17 @@
 // parses them. Turning `skipLibCheck` off would instead check every dependency
 // declaration too and report their errors. TypeScript has no option to check
 // only some declaration files, so this script builds each project from its
-// own configuration with only `skipLibCheck` turned off, and asks the compiler
-// for the diagnostics of our files alone. Errors inside dependency
-// declarations stay out of scope; errors in our files, such as an initializer
-// in an ambient context or a conflicting declaration, fail the check.
+// own configuration with only `skipLibCheck` turned off, checks every
+// declaration file and keeps the diagnostics that involve ours. Errors inside
+// dependency declarations stay out of scope; errors in our files, such as an
+// initializer in an ambient context or a conflicting declaration, fail the
+// check.
+//
+// A diagnostic involves our files when it is reported in one of them or when
+// its related information points into one. TypeScript reports a conflict
+// between two declarations on whichever comes later in the program, so a
+// conflict between our file and a dependency loaded after it is reported in
+// the dependency and names our declaration only as related information.
 //
 // Our files are the declaration files Git lists, tracked or untracked but not
 // ignored, outside any node_modules folder. Each must belong to at least one
@@ -36,6 +43,20 @@ const formatHost: ts.FormatDiagnosticsHost = {
   getCurrentDirectory: () => root,
   getNewLine: () => '\n',
 };
+
+// Prints each diagnostic with its related locations indented below it, so a
+// diagnostic reported in a dependency still names the declaration of ours
+// that it involves.
+const formatDiagnostics = (diagnostics: readonly ts.Diagnostic[]) =>
+  diagnostics
+    .map(
+      (diagnostic) =>
+        ts.formatDiagnostic(diagnostic, formatHost) +
+        (diagnostic.relatedInformation ?? [])
+          .map((related) => `  ${ts.formatDiagnostic(related, formatHost)}`)
+          .join('')
+    )
+    .join('');
 
 const ownDeclarationFiles = (): Set<string> => {
   const listed = execFileSync(
@@ -83,15 +104,24 @@ const checkProject = (configPath: string, ownFiles: Set<string>) => {
     projectReferences: parsed.projectReferences,
     configFileParsingDiagnostics: parsed.errors,
   });
-  const checked = program
-    .getSourceFiles()
-    .filter((file) => ownFiles.has(resolve(file.fileName)));
+  const isOwn = (file: ts.SourceFile | undefined) =>
+    file !== undefined && ownFiles.has(resolve(file.fileName));
+  const checked = program.getSourceFiles().filter(isOwn);
+  const involvesOwnFile = (diagnostic: ts.Diagnostic) =>
+    isOwn(diagnostic.file) ||
+    (diagnostic.relatedInformation ?? []).some((related) =>
+      isOwn(related.file)
+    );
   const diagnostics = [
     ...parsed.errors,
-    ...checked.flatMap((file) => [
-      ...program.getSyntacticDiagnostics(file),
-      ...program.getSemanticDiagnostics(file),
-    ]),
+    ...checked.flatMap((file) => program.getSyntacticDiagnostics(file)),
+    // tsc already checks every other file, so walking the declaration files,
+    // ours and those of dependencies, finds every diagnostic that involves ours.
+    ...program
+      .getSourceFiles()
+      .filter((file) => file.isDeclarationFile)
+      .flatMap((file) => program.getSemanticDiagnostics(file))
+      .filter(involvesOwnFile),
   ];
   return {
     checked: checked.map((file) => resolve(file.fileName)),
@@ -120,7 +150,7 @@ projects.forEach((project, index) => {
   console.log(`${project}: ${names.join(', ') || 'no declaration files'}`);
   if (diagnostics.length > 0) {
     failed = true;
-    process.stderr.write(ts.formatDiagnostics(diagnostics, formatHost));
+    process.stderr.write(formatDiagnostics(diagnostics));
   }
 });
 for (const file of [...ownFiles].sort()) {
