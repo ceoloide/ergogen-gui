@@ -37,6 +37,10 @@ validation independently. Each maintained file gets the checks that apply to it:
 | Markdown, including `.agents/`                                                     | Prettier, markdownlint                                                       |
 | JSON, `index.html`, `pnpm-workspace.yaml`                                          | Prettier                                                                     |
 
+TypeScript only parses the hand-written declaration files (`src/*.d.ts`,
+`scripts/ci/jsdom.d.ts`): with `skipLibCheck` it reports their syntax errors but
+not type errors inside them. Code that uses the declarations is type-checked.
+
 Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
 files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
 `tests/ci/*.xml` and `tests/corpus/*.yaml`, and Git-ignored output such as
@@ -164,7 +168,9 @@ were not committed.
   [run 43670475998](https://github.com/ceoloide/ergogen-gui/actions/runs/43670475998)
   installed and built `40061af` the same way.
 
-**#220, static and type checks: pass after this pull request's coverage fix.**
+**#220, static and type checks: pass for the covered files after this pull
+request's coverage fix; type checking of hand-written declarations is still
+open.**
 
 - One deliberate error per category: `pnpm format:check` named all 27 mutated
   files, from every group in the coverage table that Prettier checks; `pnpm lint:js` the 12
@@ -172,8 +178,12 @@ were not committed.
   files; `pnpm typecheck` both projects. Before the fix, `index.html`,
   `pnpm-workspace.yaml`, `patch/*.js`, `.husky/pre-commit` and `.agents/`
   escaped.
-- Limit: with `skipLibCheck`, `tsc` reports syntax errors in hand-written
-  `.d.ts` files but not type errors; code that uses the declarations is checked.
+- Open: with `skipLibCheck`, `tsc` only parses the five hand-written `.d.ts`
+  files. An initializer on an ambient `declare const` in `src/ergogen.d.ts` and
+  in `scripts/ci/jsdom.d.ts` passed `pnpm typecheck`; only an unclosed
+  `declare module`, a syntax error, failed it. That proves parsing, not type
+  checking. Code that uses the declarations is checked. This part of #220 stays
+  open until those files are type-checked or explicitly excluded.
 - Every probe exited nonzero and left the mutated bytes alone; a clean
   `pnpm validate:fast` exited 0 and changed no tracked or untracked file. No
   diagnostic baseline or suppression list is needed. #218 closed with #217.
@@ -200,17 +210,33 @@ ruleset limit.**
   failed [run 43665718955](https://github.com/ceoloide/ergogen-gui/actions/runs/43665718955)
   (#246) still uploaded `unit.xml` and `evidence.json` naming its failed test.
 
-**#222, isolated production-browser runs: no collisions; one load-dependent
-failure remains open.**
+**#222, isolated production-browser runs: no collisions; the update drill
+failure is explained and fixed; a slow STL preview under load stays open.**
 
 - Six pairs of full runs in the two copies at once (load 11 to 14 on 4 cores):
   each run used its own free ports, each server served its own copy's build and
   every build ID matched. The load exposed failures that were not collisions:
   the update prompt missed an update the browser found first (4 of 8 runs, fixed
   here), the GitHub loading test checked a transient bar too late (1 of 4, fixed
-  here) and the STL preview took over 20 s (1 of 12). With the fixes, 3 of 4 runs
-  passed; in the fourth the update drill found a second waiting worker after
-  updating. That case is still open (see #222).
+  here) and the STL preview took over 20 s (1 of 12). With those fixes, 3 of 4
+  runs passed; in the fourth the update chip was still visible 5 s after the
+  update had reloaded into the next build.
+- That failure came from the browser-test fixture, not the app. Its trace shows
+  a second install notice in the old page 328 ms after the click, and the
+  reloaded page showing the chip without one, so a worker was already waiting
+  when it registered. Instrumented runs (DevTools worker version ids, page
+  worker states, a logging proxy) showed why: after the fixture aborted the
+  worker's Google Fonts requests and that worker stopped, Chromium forced a new,
+  byte-identical worker on every navigation (`ForceUpdateOnReloadIfModified`).
+  It did so in every routed run and in none with the routes removed or only
+  continuing. Normally that worker activates at once; the failing trace fits one
+  that stayed waiting. The instrumented runs did not reproduce the chip itself
+  (12 runs at load 10 to 14 passed). The drill now counts installed workers:
+  `pnpm exec playwright test e2e/service-worker-update.spec.ts` found 5 before
+  the fixture change and 2 after it.
+- After the fix, one more pair of full runs at once (load up to 11.5): the
+  update drill passed in both; one run failed only the A. dux STL preview after
+  its 20 s wait, so that load failure (2 of 14 runs) stays open.
 - A foreign server on the root port failed the run in 2 s, before any build
   ("is already used"); a server built with another ID failed global setup
   ("reached the wrong build … expected probe-root, got foreign-build").
@@ -221,7 +247,8 @@ failure remains open.**
 - Every failure kept its error, a screenshot and a valid `trace.zip` with
   actions, screencast and network log; for locator assertions the trace marks
   the failed expectation. The network logs show only loopback requests and
-  Google Fonts aborted by the fixture.
+  Google Fonts that were aborted by the fixture or, in the update drill, failed
+  to resolve.
 
 ## Source layout
 
