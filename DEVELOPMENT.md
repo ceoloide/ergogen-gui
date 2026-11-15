@@ -132,6 +132,92 @@ update the hand-worked values in `tests/corpus/corpus.ts` or the affected
 assertion, and explain the change in the pull request. For a stale preview, run
 `pnpm generate-previews` and review the SVG diff.
 
+### Acceptance record (HC-001 to HC-004)
+
+On 2026-11-15 (UTC) the validation work that #217 landed was checked against
+the acceptance criteria of #219, #220, #221 and #222, on `8573027`: `main` at
+`40061af` plus the fixes in the same pull request as this record. Local runs used
+Linux x86_64 with 4 cores, Node 24.22.3, pnpm 11.12.0, the committed lockfile,
+actionlint 1.7.12, ShellCheck 0.11.0 and zizmor 1.32.0. Deliberate errors were
+restored byte for byte and the tree was clean afterwards. Logs and probe scripts
+were not committed.
+
+**#219, reproducible isolated preparation: all criteria pass.**
+
+- Two `git archive` copies, each with its own `HOME` and the shared pnpm store,
+  installed (frozen) and prepared at the same time: both passed in 22 s without
+  downloading a package, and produced the same engine (399 files; only the
+  checkout path in its stamp differs) and, from one `VITE_BUILD_ID`, the same
+  `dist/` (162 files).
+- Every archived file was unchanged after install, a second
+  `pnpm build-ergogen` ("up to date"), the build and the browser tests.
+  `~/.gitconfig`, the repository's Git configuration, a third checkout's engine
+  and pnpm state, and the shared store's `ergogen` files were unchanged: content,
+  inodes, and link counts once the copies were deleted. No copy's `HOME` gained
+  a `.gitconfig`.
+- On GitHub, the build job of
+  [run 43670475998](https://github.com/ceoloide/ergogen-gui/actions/runs/43670475998)
+  installed and built `40061af` the same way.
+
+**#220, static and type checks: pass after this pull request's coverage fix.**
+
+- One deliberate error per category: `pnpm format:check` named all 27 mutated
+  files, from every group in the coverage table that Prettier checks; `pnpm lint:js` the 12
+  ESLint groups; `pnpm lint:md` 3 Markdown files; `pnpm lint:shell` 3 shell
+  files; `pnpm typecheck` both projects. Before the fix, `index.html`,
+  `pnpm-workspace.yaml`, `patch/*.js`, `.husky/pre-commit` and `.agents/`
+  escaped.
+- Limit: with `skipLibCheck`, `tsc` reports syntax errors in hand-written
+  `.d.ts` files but not type errors; code that uses the declarations is checked.
+- Every probe exited nonzero and left the mutated bytes alone; a clean
+  `pnpm validate:fast` exited 0 and changed no tracked or untracked file. No
+  diagnostic baseline or suppression list is needed. #218 closed with #217.
+
+**#221, shared validation commands: all criteria pass, with the documented
+ruleset limit.**
+
+- The merge commit `d1fd408` that
+  [run 43668208717](https://github.com/ceoloide/ergogen-gui/actions/runs/43668208717)
+  tested has the tree of `40061af` and passed 724 unit and 26 browser tests in
+  all three projects. On `8573027`, local `pnpm validate:extended` passed
+  728 unit and 26 browser tests and changed no file; this pull request's CI
+  run checks the same tree.
+- Each broken input failed its gate: an unterminated expression and an unquoted
+  `run:` variable (actionlint with ShellCheck); template injection, default
+  checkout credentials and an unpinned action (zizmor); shell errors
+  (ShellCheck); a write token, a skipped or ignored validation step and a skipped
+  job (`tests/workflow-security.test.ts`); a type error (`pnpm typecheck`, also
+  through `pnpm validate:fast`); a failing test (`pnpm test:unit`). actionlint
+  does not check event payload property names, and zizmor accepts an explicit
+  `persist-credentials: true`.
+- The policy tests and `pnpm assess:pr` reject a skipped job or step; the ruleset
+  alone accepts a skipped whole job (see [Branch rules](#branch-rules)). The
+  failed [run 43665718955](https://github.com/ceoloide/ergogen-gui/actions/runs/43665718955)
+  (#246) still uploaded `unit.xml` and `evidence.json` naming its failed test.
+
+**#222, isolated production-browser runs: no collisions; one load-dependent
+failure remains open.**
+
+- Six pairs of full runs in the two copies at once (load 11 to 14 on 4 cores):
+  each run used its own free ports, each server served its own copy's build and
+  every build ID matched. The load exposed failures that were not collisions:
+  the update prompt missed an update the browser found first (4 of 8 runs, fixed
+  here), the GitHub loading test checked a transient bar too late (1 of 4, fixed
+  here) and the STL preview took over 20 s (1 of 12). With the fixes, 3 of 4 runs
+  passed; in the fourth the update drill found a second waiting worker after
+  updating. That case is still open (see #222).
+- A foreign server on the root port failed the run in 2 s, before any build
+  ("is already used"); a server built with another ID failed global setup
+  ("reached the wrong build … expected probe-root, got foreign-build").
+- Deleting the deployed Ergogen worker (the server then returns `index.html`)
+  and disabling the worker's debug outputs each failed the DXF preview test; a
+  base path hard-coded in the welcome previews failed `base-path.spec.ts` below
+  `/ergogen-gui/` only.
+- Every failure kept its error, a screenshot and a valid `trace.zip` with
+  actions, screencast and network log; for locator assertions the trace marks
+  the failed expectation. The network logs show only loopback requests and
+  Google Fonts aborted by the fixture.
+
 ## Source layout
 
 Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
