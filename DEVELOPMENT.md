@@ -453,11 +453,12 @@ GitHub still enforces them:
   `gh-pages`, also declares its own (`contents: read`, `pages: write` in its
   logs).
 
-Nobody can push to `main`, the owner included; every change is a pull request
-merged after a fresh, passing run on the current `main` (use **Update branch**,
-`gh pr update-branch` or a rebase). The ruleset does not cover `gh-pages`, so
-releases and rollbacks are unchanged. Open pull requests without such a run are
-blocked, as intended.
+Nobody can push to `main`, the owner included. While the ruleset is active,
+merges require an up-to-date pull request whose required `lint-and-test` check
+GitHub accepts (use **Update branch**, `gh pr update-branch` or a rebase); see
+the limitations below. The ruleset does not cover `gh-pages`, so releases and
+rollbacks are unchanged. Open pull requests without such a check are blocked, as
+intended.
 
 This is a merge gate for ordinary pull requests, not confinement:
 
