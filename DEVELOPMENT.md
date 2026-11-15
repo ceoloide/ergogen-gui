@@ -72,7 +72,13 @@ files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
 `dist*`, `reports/` and `.tools/`.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
-report and traces/screenshots of failures (no retries). `E2E_SCREENSHOTS=1` also
+report and traces/screenshots of failures (no retries). A failed test also gets a
+`readiness` attachment (`e2e/utils/readiness.ts`): how busy the machine's CPUs were
+during the test, how many generation requests the Ergogen worker received and
+finished, and the app's worker milestones. A request still running at near 100%
+CPU points to a starved machine; a finished generation without the expected
+outputs points to the app. The console prints its first 300 characters, the HTML
+report all of it. `E2E_SCREENSHOTS=1` also
 saves a full-page screenshot at each test step in `e2e/screenshots/`; it is off
 by default because these check nothing and took 13% of traced test time under
 load. `pnpm test:reports` writes `reports/evidence.json`. Attach them, with the commit and exact command, to
@@ -117,6 +123,16 @@ worker on every later navigation without comparing the script, as DevTools'
 drill; their connection to the original second-chip failure remains inferred
 (see the [acceptance record](#acceptance-record-hc-001-to-hc-004)). Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
+
+Waits for generated outputs start at page load, so they also cover app start-up
+and worker start-up, which are CPU-bound. One A. dux page uses 7 to 8 s of CPU
+in browser threads and shows its STL rows after 3.3 s on an otherwise quiet
+4-core machine; with four
+other CPU-bound processes the STL rows took 8.6 to 9.9 s, close to the STL test's
+10 s wait: the Ergogen and JSCAD workers were busy 2.3 to 2.8 times longer for
+1.1 to 1.25 times their CPU time. Two
+parallel tests and other load can therefore exceed these waits without any
+change in the app; the `readiness` attachment shows which case a failure is.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks
 workflow policy; `tests/release-publication.test.ts` runs the deploy workflow's
