@@ -207,6 +207,8 @@ type ContextProps = {
 type ProcessOptions = {
   pointsonly: boolean;
   isManual?: boolean;
+  /** Skips the request if it repeats the one behind the current results. */
+  skipIfCurrent?: boolean;
 };
 
 /**
@@ -608,6 +610,13 @@ const ConfigContextProvider = ({
   const [info, setInfo] = useState<string | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
+  // The worker request behind the current or pending results, or null once
+  // they are cleared.
+  const currentRequestRef = useRef<string | null>(null);
+  const clearResults = useCallback(() => {
+    currentRequestRef.current = null;
+    setResults(null);
+  }, []);
   const [settings, setSettings] = useLocalStorage<AppSettings>(
     'ergogen:settings',
     getDefaultSettings()
@@ -1173,6 +1182,20 @@ const ConfigContextProvider = ({
         return;
       }
       const inputInjection = filterInjectionsByFeatureFlags(injectionInput);
+      // Everything the worker output depends on. Auto-generation skips a
+      // request that repeats the current one: on load and when the settings
+      // panel closes, an immediate generation has already made it, and
+      // repeating it would replace finished STL files with pending ones.
+      const request = JSON.stringify([
+        targetInput,
+        inputInjection,
+        options.pointsonly,
+        debug,
+      ]);
+      if (options.skipIfCurrent && request === currentRequestRef.current) {
+        return;
+      }
+      currentRequestRef.current = request;
       const [, parsedConfig] = parseConfig(targetInput);
 
       setError(null);
@@ -1242,10 +1265,23 @@ const ConfigContextProvider = ({
   );
 
   /**
-   * A debounced version of runGeneration for auto-generation.
+   * A debounced version of runGeneration for auto-generation. It does not
+   * repeat the request behind the current results.
    */
   const processInput = useMemo(
-    () => debounce(runGeneration, 300),
+    () =>
+      debounce(
+        (
+          textInput: string | undefined,
+          injectionInput: string[][] | undefined,
+          options: ProcessOptions = { pointsonly: true }
+        ) =>
+          runGeneration(textInput, injectionInput, {
+            ...options,
+            skipIfCurrent: true,
+          }),
+        300
+      ),
     [runGeneration]
   );
 
@@ -1344,7 +1380,7 @@ const ConfigContextProvider = ({
   const selectConfig = useCallback(
     (id: string | null) => {
       resetLineage();
-      setResults(null);
+      clearResults();
       if (id === null) {
         setActiveConfigId(null);
         activeConfigIdRef.current = null;
@@ -1369,13 +1405,13 @@ const ConfigContextProvider = ({
         }
       }
     },
-    [resetLineage]
+    [resetLineage, clearResults]
   );
 
   const createNewConfig = useCallback(
     (content: string, name?: string) => {
       resetLineage();
-      setResults(null);
+      clearResults();
       const nextUntitledNum = getNextIndexForPattern(
         configsRef.current,
         /^Untitled\s+(\d+)$/
@@ -1409,7 +1445,7 @@ const ConfigContextProvider = ({
       saveMultiConfigToStorage(updatedConfigs, newId);
       return newId;
     },
-    [resetLineage]
+    [resetLineage, clearResults]
   );
 
   const renameConfig = useCallback(
@@ -1451,7 +1487,7 @@ const ConfigContextProvider = ({
   const duplicateConfig = useCallback(
     (id: string) => {
       resetLineage();
-      setResults(null);
+      clearResults();
       const found = configsRef.current.find((c) => c.id === id);
       if (found) {
         const newId = generateUUID();
@@ -1481,7 +1517,7 @@ const ConfigContextProvider = ({
         });
       }
     },
-    [resetLineage]
+    [resetLineage, clearResults]
   );
 
   const deleteConfig = useCallback(
@@ -1498,7 +1534,7 @@ const ConfigContextProvider = ({
       const isLastConfig = configsRef.current.length <= 1;
 
       if (isLastConfig || isDeletingActive) {
-        setResults(null);
+        clearResults();
         setActiveConfigId(null);
         activeConfigIdRef.current = null;
         setConfigInputState('');
@@ -1516,18 +1552,18 @@ const ConfigContextProvider = ({
         stored_configs_count: remainingConfigs.length,
       });
     },
-    [resetLineage]
+    [resetLineage, clearResults]
   );
 
   const loadPreview = useCallback(
     (config: string) => {
       resetLineage();
-      setResults(null);
+      clearResults();
       setIsPreview(true);
       setPreviewConfig(config);
       setConfigInputState(config);
     },
-    [resetLineage]
+    [resetLineage, clearResults]
   );
 
   const savePreviewConfig = useCallback(() => {

@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { createServer, type Server } from 'node:net';
 import { randomUUID } from 'node:crypto';
-import { resolveNoHostName } from './e2e/utils/hostNames';
+import { reachNoHostName } from './e2e/utils/hostNames';
 
 // Reserve distinct available loopback ports. strictPort makes a subsequent
 // collision fail explicitly; Playwright must never silently reuse a different
@@ -100,7 +100,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: updateURL,
-        launchOptions: { args: [resolveNoHostName] },
+        launchOptions: { args: reachNoHostName },
       },
     },
   ],

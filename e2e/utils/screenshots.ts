@@ -21,11 +21,16 @@ function safeSlug(s: string) {
  *   e2e/screenshots/<spec-file-base>/
  *
  * Filenames follow: <test-title-slug>-<counter>-<label>.png
+ *
+ * Only with E2E_SCREENSHOTS=1: these screenshots check nothing, and under
+ * load a full-page screenshot can take seconds of a test's time. Failures
+ * keep a screenshot and a trace either way.
  */
 export function makeShooter(
   page: Page,
   info: TestInfo
 ): (label: string) => Promise<void> {
+  if (process.env.E2E_SCREENSHOTS !== '1') return async () => {};
   const specBase = path.basename(info.file, path.extname(info.file));
   const folder = path.join(SCREENSHOTS_ROOT, specBase);
   ensureDir(folder);
