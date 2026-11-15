@@ -66,9 +66,10 @@
     "lint:shell": "shellcheck scripts/*.sh patch/*.sh .husky/pre-commit",
     "fix": "pnpm format && pnpm lint:js --fix && pnpm lint:md --fix",
     "typecheck:tooling": "tsc --project tsconfig.tooling.json",
+    "typecheck:declarations": "node scripts/ci/check-declarations.mts tsconfig.json tsconfig.tooling.json",
     "validate:fast": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit",
     "validate": "pnpm validate:fast && pnpm build",
-    "typecheck": "tsc --project tsconfig.json && pnpm typecheck:tooling",
+    "typecheck": "tsc --project tsconfig.json && pnpm typecheck:tooling && pnpm typecheck:declarations",
     "validate:extended": "pnpm validate:fast && pnpm test:e2e && pnpm test:reports",
     "predev": "pnpm run build-ergogen",
     "pretest:unit": "pnpm build-ergogen"

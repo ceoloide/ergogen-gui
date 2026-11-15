@@ -13,15 +13,15 @@ Install exactly as in the README (Node from `.node-version`, pnpm from
 on Linux x86_64 run `pnpm tools:install` and add `$PWD/.tools/bin` to `PATH`. CI
 uses the same installer and commands.
 
-| Command                                          | Checks                                                                                                                           |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, all Vitest tests. Never edits files. |
-| `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                |
-| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                     |
-| `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                |
-| `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                          |
-| `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                        |
-| `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                            |
+| Command                                          | Checks                                                                                                                                                     |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects and our declaration files, all Vitest tests. Never edits files. |
+| `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                                          |
+| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                                               |
+| `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                                          |
+| `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                                                    |
+| `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                                                  |
+| `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                                                      |
 
 A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
 does. Husky/lint-staged run quick fixes on staged files; GitHub enforces
@@ -37,9 +37,34 @@ validation independently. Each maintained file gets the checks that apply to it:
 | Markdown, including `.agents/`                                                     | Prettier, markdownlint                                                       |
 | JSON, `index.html`, `pnpm-workspace.yaml`                                          | Prettier                                                                     |
 
-TypeScript only parses the hand-written declaration files (`src/*.d.ts`,
-`scripts/ci/jsdom.d.ts`): with `skipLibCheck` it reports their syntax errors but
-not type errors inside them. Code that uses the declarations is type-checked.
+Both projects set `skipLibCheck`, so `tsc` only parses declaration files, ours
+included. Turning it off for a whole project would also report dozens of errors
+inside dependencies (for example `lib.dom` against `lib.webworker`, workbox and
+react-router declarations). So `pnpm typecheck` also runs
+`pnpm typecheck:declarations` (`scripts/ci/check-declarations.mts`): it builds
+each project from its own configuration with only `skipLibCheck` off, checks
+every declaration file and reports the diagnostics that involve ours
+(`src/*.d.ts`, `scripts/ci/jsdom.d.ts`) in one of three ways:
+
+- reported in one of our files;
+- reported in a dependency, with related information that points into our
+  files: TypeScript reports a conflict between two declarations on whichever
+  comes later in the program, so a conflict with a dependency loaded after our
+  file is reported in the dependency;
+- reported in a dependency on the name of a symbol that our files also declare:
+  an interface we merge with a dependency's, such as `Window`, can break what
+  the merged interface extends, and TypeScript reports that on the first
+  declaration, which may be the dependency's, without related information. The
+  output names our declaration below the error.
+
+This is a bounded rule, not a complete record of which errors our files cause:
+an error that our declaration causes but that TypeScript reports on another
+symbol, with no related information pointing to us, is still treated as a
+dependency error and filtered out. Checking every declaration file takes most of
+the command's time, about 26 seconds locally. Our files are the `*.d.ts`,
+`*.d.mts` and `*.d.cts` files Git lists, tracked or untracked, outside
+`node_modules`; one that belongs to neither project fails the check. Code that
+uses the declarations is type-checked by `tsc` as usual.
 
 Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
 files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
@@ -195,10 +220,63 @@ open.**
   in `scripts/ci/jsdom.d.ts` passed `pnpm typecheck`; only an unclosed
   `declare module`, a syntax error, failed it. That proves parsing, not type
   checking. Code that uses the declarations is checked. This part of #220 stays
-  open until those files are type-checked or explicitly excluded.
+  open until those files are type-checked or explicitly excluded. The
+  follow-up below type-checks them.
 - Every probe exited nonzero and left the mutated bytes alone; a clean
   `pnpm validate:fast` exited 0 and changed no tracked or untracked file. No
   diagnostic baseline or suppression list is needed. #218 closed with #217.
+
+**#220 follow-up, hand-written declarations: type-checked.** A later change on
+top of `bd8f581` (#248) added `pnpm typecheck:declarations` to `pnpm typecheck`.
+Local probes on 2026-11-15 compared it with the previous gates in two
+`git archive` copies that shared the installed dependencies:
+
+- One semantic error per file passed the previous `pnpm typecheck` and failed
+  the new one, naming the file, position and code: an initializer on a
+  `declare const` in `src/ergogen.d.ts` (TS1039, in both projects) and on a
+  declared class property in `scripts/ci/jsdom.d.ts` (TS1039), an unknown type
+  in `src/jscad.d.ts` (TS2304), a `Window` property that conflicts with
+  `lib.dom` in `src/gtag.d.ts` (TS2717) and a missing `react` export in
+  `src/vite-env.d.ts` (TS2305). A new, untracked `src/` declaration file with
+  an error failed the same way; a new one outside both projects failed as
+  uncovered.
+- Prettier's parser rejects an initializer on a `declare const`, so the previous
+  `pnpm validate:fast` already caught those at `pnpm format:check`. The other
+  errors passed all of its static checks. The new `pnpm validate:fast` stops at
+  the declaration check.
+- A syntax error in a declaration file, and misuse of the declarations by app
+  and tooling code, still fail both gates.
+- A conflict with a dependency declaration loaded later in the program is
+  reported in the dependency. The first version of the check asked only for the
+  diagnostics of our files and passed such a conflict: a `WindowEventMap`
+  property in `src/jscad.d.ts` that conflicts with `vite/client`. The check now
+  also keeps diagnostics whose related information points into our files, so
+  this conflict fails and names `src/jscad.d.ts(3,3)` under the `vite` error
+  (TS2717). Checking every declaration file raised the local run time of
+  `pnpm typecheck:declarations` from about 6 to 26 seconds and its peak memory
+  from 0.8 to 1.6 GB.
+- Dependency errors stay excluded: with `skipLibCheck` off, every error `tsc`
+  reports for either project is inside `node_modules`, and the new check
+  passes. The dependencies were not changed. `tests/declaration-check.test.ts`
+  repeats this with a temporary project whose synthetic dependency has errors,
+  and checks a conflict between an own and a dependency declaration in both
+  orders.
+- An interface of ours that merges with a dependency's interface and breaks what
+  it extends is reported on the first declaration, without related
+  information. A `Window` property `onscroll: string` added to `src/gtag.d.ts`
+  conflicts with `GlobalEventHandlers`; `tsc` with `skipLibCheck` off reports it
+  only in `lib.dom.d.ts` (TS2430), so the previous version of the check passed
+  it. The check now also keeps a diagnostic reported on the name of a symbol
+  that our files declare, fails this mutant and names the `src/gtag.d.ts`
+  declaration under the `lib.dom` error. Dependency-only errors, including the
+  `react-use` TS2430, stay excluded; the test project covers both orders and a
+  dependency-only TS2430.
+- Remaining limit: an error that our declaration causes but that TypeScript
+  reports on another symbol, with no related information pointing to us, is
+  still filtered out as a dependency error. This part of #220 stays open until
+  this bounded coverage is accepted.
+- The mutants, logs and hash manifests are kept outside the repository; the pull
+  request names their location and the CI run of its final head.
 
 **#221, shared validation commands: all criteria pass, with the documented
 ruleset limit.**
