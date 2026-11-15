@@ -124,14 +124,13 @@ drill; their connection to the original second-chip failure remains inferred
 (see the [acceptance record](#acceptance-record-hc-001-to-hc-004)). Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
 
-Waits for generated outputs start at page load, so they also cover app start-up
-and worker start-up, which are CPU-bound. One A. dux page uses 7 to 8 s of CPU
-in browser threads and shows its STL rows after 3.3 s on an otherwise quiet
-4-core machine; with four
-other CPU-bound processes the STL rows took 8.6 to 9.9 s, close to the STL test's
-10 s wait: the Ergogen and JSCAD workers were busy 2.3 to 2.8 times longer for
-1.1 to 1.25 times their CPU time. Two
-parallel tests and other load can therefore exceed these waits without any
+Waits for generated outputs start once `page.goto` resolves, before the
+workers have started, so they also cover CPU-bound worker start-up. One A. dux
+page uses 7 to 8 s of CPU in browser threads. Its STL rows appeared 2.2 s into
+the STL test's 10 s wait on an otherwise quiet 4-core machine, and 5.8 to 7.1 s
+into it with four other CPU-bound processes running: the Ergogen and JSCAD
+workers were busy 2.3 to 2.8 times longer for 1.1 to 1.25 times their CPU time.
+Two parallel tests and other load can therefore exceed these waits without any
 change in the app; the `readiness` attachment shows which case a failure is.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks
