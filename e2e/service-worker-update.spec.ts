@@ -16,6 +16,17 @@ test.describe('Service worker update', () => {
       test.info().project.metadata;
     const buildMeta = page.locator('meta[name="ergogen-build-id"]');
     const updateChip = page.getByRole('button', { name: /^Update available/ });
+    // Chromium's ids of the worker versions that install during the drill
+    const installedVersions = new Set<string>();
+    const devTools = await context.newCDPSession(page);
+    devTools.on('ServiceWorker.workerVersionUpdated', ({ versions }) => {
+      for (const version of versions) {
+        if (['installed', 'activating', 'activated'].includes(version.status)) {
+          installedVersions.add(version.versionId);
+        }
+      }
+    });
+    await devTools.send('ServiceWorker.enable');
     await page.goto('new');
     await waitForServiceWorkerControl(page);
     await page.reload();
@@ -63,5 +74,8 @@ test.describe('Service worker update', () => {
     expect(documentResponse?.fromServiceWorker()).toBe(true);
     await expect(buildMeta).toHaveAttribute('content', nextBuildId);
     await expect(page.getByText('Ergogen Web UI')).toBeVisible();
+    // Only the two builds installed: a third worker would wait behind a new
+    // update chip (#222)
+    expect(installedVersions.size).toBe(2);
   });
 });

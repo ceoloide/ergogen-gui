@@ -63,7 +63,8 @@ A build ID also adds an `ergogen-build-id` meta tag to `index.html`.
 
 The update drill deploys `dist-subpath-next/` (the same base, another build ID)
 by copying it over the served copy, which `vite preview` reads on each request,
-then checks that the real worker waits, shows **Update Available** and activates.
+then checks that the real worker waits, shows **Update Available** and activates,
+and that no other worker installs.
 Each drill changes the served copy, so it needs a fresh `pnpm test:e2e` run; do not
 use `--repeat-each` or retries. Playwright routes cannot stand in for that
 deployment: Chromium fetches the worker script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the
@@ -71,7 +72,11 @@ deployment: Chromium fetches the worker script for update checks outside the pag
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
 including those made by service workers; provider tests route deterministic
-responses. Service worker tests check images by their natural width, because a
+responses. The update drill's browser resolves no host name instead, so its
+worker's requests to Google Fonts fail there and the fixture lets them through:
+once a worker's request is aborted through DevTools, Chromium installs a new
+worker on every later navigation without comparing the script, as DevTools'
+**Update on reload** does, and one of those can wait behind a second update chip. Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks

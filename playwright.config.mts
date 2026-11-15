@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { createServer, type Server } from 'node:net';
 import { randomUUID } from 'node:crypto';
+import { resolveNoHostName } from './e2e/utils/hostNames';
 
 // Reserve distinct available loopback ports. strictPort makes a subsequent
 // collision fail explicitly; Playwright must never silently reuse a different
@@ -94,7 +95,13 @@ export default defineConfig({
         nextBuildDir: 'dist-subpath-next',
         servedDir: 'dist-subpath-served',
       },
-      use: { ...devices['Desktop Chrome'], baseURL: updateURL },
+      // Its worker's requests to other hosts fail here, not in the fixture
+      // (see e2e/fixtures.ts).
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: updateURL,
+        launchOptions: { args: [resolveNoHostName] },
+      },
     },
   ],
   // Playwright starts these in order: the root build also prepares the engine.
