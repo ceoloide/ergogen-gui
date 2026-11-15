@@ -393,6 +393,10 @@ Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
   results (configuration, injections, points-only, debug). Each new result
   marks STL files pending again and an STL preview without a file falls back to
   the demo outline, so a repeated request used to undo a finished conversion.
+- Opening configurations saved by an older version (a single legacy
+  configuration or storage version 1) queues background previews for saved
+  configurations without one, except the configuration the load-time
+  generation is for: its own results set its preview.
 - Ergogen keeps injected footprints, templates and outlines in a module-level
   registry. Closing the settings panel therefore terminates and recreates the
   Ergogen worker, then regenerates, so renamed or deleted injections cannot
