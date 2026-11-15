@@ -18,7 +18,6 @@ export default tseslint.config(
       '.generated',
       'reports',
       '**/*.timestamp-*.mjs',
-      'patch',
       'public',
     ],
   },
@@ -44,7 +43,8 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['scripts/**/*.js'],
+    // CommonJS: Node scripts, and the footprint index copied into the engine.
+    files: ['scripts/**/*.js', 'patch/**/*.js'],
     languageOptions: { sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },

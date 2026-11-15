@@ -24,9 +24,23 @@ uses the same installer and commands.
 | `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                            |
 
 A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
-does. Application code uses the strict root `tsconfig.json`; browser tests, policy
-tests and configuration files use `tsconfig.tooling.json`. Husky/lint-staged run
-quick fixes on staged files; GitHub enforces validation independently.
+does. Husky/lint-staged run quick fixes on staged files; GitHub enforces
+validation independently. Each maintained file gets the checks that apply to it:
+
+| Files                                                                              | Checks                                                                       |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/`                                                                             | Prettier, ESLint, TypeScript (strict `tsconfig.json`)                        |
+| `tests/`, `e2e/`, `scripts/ci/`, root `*.config.mts`                               | Prettier, ESLint, TypeScript (`tsconfig.tooling.json`)                       |
+| JavaScript: other `scripts/`, `patch/*.js`, `eslint.config.mjs`, corpus footprints | Prettier, ESLint (JavaScript is not type-checked)                            |
+| `scripts/*.sh`, `patch/*.sh`, `.husky/pre-commit`                                  | ShellCheck                                                                   |
+| `.github/` workflows and configuration                                             | Prettier, zizmor; workflows also actionlint, which runs ShellCheck on `run:` |
+| Markdown, including `.agents/`                                                     | Prettier, markdownlint                                                       |
+| JSON, `index.html`, `pnpm-workspace.yaml`                                          | Prettier                                                                     |
+
+Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
+files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
+`tests/ci/*.xml` and `tests/corpus/*.yaml`, and Git-ignored output such as
+`dist*`, `reports/` and `.tools/`.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
 report and traces/screenshots of failures (no retries). `pnpm test:reports` writes
