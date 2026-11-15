@@ -74,8 +74,8 @@ files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
 report and traces/screenshots of failures (no retries). `E2E_SCREENSHOTS=1` also
 saves a full-page screenshot at each test step in `e2e/screenshots/`; it is off
-by default because these check nothing and took 13% of test time under load. `pnpm test:reports` writes
-`reports/evidence.json`. Attach them, with the commit and exact command, to
+by default because these check nothing and took 13% of traced test time under
+load. `pnpm test:reports` writes `reports/evidence.json`. Attach them, with the commit and exact command, to
 failure reports. All outputs are Git-ignored.
 
 ### Browser tests
@@ -102,9 +102,15 @@ deployment: Chromium fetches the worker script for update checks outside the pag
 `PLAYWRIGHT_*` variables in the config can pin ports and IDs.
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
-including those made by service workers; provider tests route deterministic
-responses. The update drill's browser resolves no host name instead, so its
-worker's requests to Google Fonts fail there and the fixture lets them through:
+including those made by service workers and dedicated workers; provider tests
+route deterministic responses (`e2e/utils/githubMocks.ts` answers every
+`api.github.com` and `raw.githubusercontent.com` request, including unknown
+endpoints), so browser tests use no GitHub API quota and need no token.
+Playwright routes do not see WebSockets; the app opens none, so a new one would
+need its own block. The update drill's browser resolves no host name and ignores
+proxies from the environment instead (a proxy would resolve host names itself),
+so its worker's requests to Google Fonts fail there and the fixture lets them
+through:
 once a worker's request is aborted through DevTools, Chromium installs a new
 worker on every later navigation without comparing the script, as DevTools'
 **Update on reload** does. Those extra installations can interfere with the
@@ -306,8 +312,9 @@ ruleset limit.**
 
 **#222, isolated production-browser runs: no collisions; in the update drill,
 extra-worker installation reproduced and fixed; its connection to the original
-second-chip failure remains inferred; a slow STL preview under load stays
-open.**
+second-chip failure remains inferred. One cause of the STL preview failure under
+load, a repeated generation, was found and fixed; A. dux tests still time out on
+a saturated machine (see the last item).**
 
 - Six pairs of full runs in the two copies at once (load 11 to 14 on 4 cores):
   each run used its own free ports, each server served its own copy's build and
@@ -333,7 +340,27 @@ open.**
   the fixture change and 2 after it.
 - After the fix, one more pair of full runs at once (load up to 11.5): the
   update drill passed in both; one run failed only the A. dux STL preview after
-  its 20 s wait, so that load failure (2 of 14 runs) stays open.
+  its 20 s wait (2 of 14 runs).
+- Follow-up on top of `c51d4a8`: a probe that logged the page's worker messages
+  reproduced the STL timeout in 1 of 8 repeats. Every load generated A. dux
+  twice; the second result arrived 72 ms after the test clicked the finished
+  STL, marked it pending and sent the preview back to the demo outline. With
+  auto-generation no longer repeating a request, 16 of 16 repeats generated
+  once and passed. Slow generation remains: full runs whose load averages
+  peaked at 10 to 26 on 4 cores failed 1 to 7 tests on timeouts, before and
+  after the fix, mostly A. dux tests. Before it, the 3 retained A. dux traces
+  show the repeated request and a 60 s test timeout after the first outputs
+  appeared; after it, the 6 retained A. dux traces show one request, the
+  Ergogen worker starting 19 to 40 s after navigation and no outputs within
+  the 10 or 20 s waits. The same work found the update drill's worker requests
+  reaching an environment proxy (9 `CONNECT`s to `fonts.googleapis.com` through
+  a local recording proxy, 0 after the fix). A NetLog of every browser in a
+  full run showed TCP connections only to the loopback test servers; all 35
+  GitHub requests were answered by the provider tests' routes. The NetLog
+  covers browsers only: `pnpm install` downloads Git-hosted packages from
+  `codeload.github.com` and `build-ergogen` fetches the footprint libraries
+  with Git when its inputs change, neither through the REST API. Logs, traces
+  and scripts are kept outside the repository; the pull request names them.
 - A foreign server on the root port failed the run in 2 s, before any build
   ("is already used"); a server built with another ID failed global setup
   ("reached the wrong build … expected probe-root, got foreign-build").
@@ -361,6 +388,11 @@ Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
 - `ergogen.worker.ts` runs Ergogen; `jscad.worker.ts` turns its output into 3D
   previews and STL. `src/workers/workerFactory.ts` creates both, so tests can mock
   `Worker`.
+- A configuration is generated at once when it opens; auto-generation (debounced
+  300 ms) skips a request identical to the one behind the current or pending
+  results (configuration, injections, points-only, debug). Each new result
+  marks STL files pending again and an STL preview without a file falls back to
+  the demo outline, so a repeated request used to undo a finished conversion.
 - Ergogen keeps injected footprints, templates and outlines in a module-level
   registry. Closing the settings panel therefore terminates and recreates the
   Ergogen worker, then regenerates, so renamed or deleted injections cannot

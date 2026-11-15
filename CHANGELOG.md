@@ -6,8 +6,7 @@ November 15, 2026
 
 Opening a configuration generated it twice. If you opened an STL preview
 while the second run was finishing, the preview jumped back to the demo outline
-and the STL files briefly showed as pending again. A large configuration also
-took longer to finish.
+and the STL files briefly showed as pending again.
 
 The app now generates a configuration once when it opens, and again only when
 something that affects the output changes or you click **Generate**.
@@ -16,8 +15,8 @@ something that affects the output changes or you click **Generate**.
 
 - **STL previews**: Stay open once their files are ready, instead of returning
   to the demo outline.
-- **Faster start**: Each configuration is generated once on load, which saves
-  a full generation and STL conversion.
+- **Less work on open**: Each configuration is generated once on load, which
+  saves a second generation and STL conversion.
 
 ## Reliable Update Button
 
