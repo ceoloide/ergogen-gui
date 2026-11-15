@@ -44,14 +44,27 @@ react-router declarations). So `pnpm typecheck` also runs
 `pnpm typecheck:declarations` (`scripts/ci/check-declarations.mts`): it builds
 each project from its own configuration with only `skipLibCheck` off, checks
 every declaration file and reports the diagnostics that involve ours
-(`src/*.d.ts`, `scripts/ci/jsdom.d.ts`): those reported in our files, and those
-reported in a dependency whose related information points into our files.
-TypeScript reports a conflict between two declarations on whichever comes later
-in the program, so a conflict with a dependency loaded after our file is
-reported in the dependency. Checking every declaration file takes most of the
-command's time, about 26 seconds locally. Our files are the `*.d.ts` files Git lists, tracked or
-untracked, outside `node_modules`; one that belongs to neither project fails the
-check. Code that uses the declarations is type-checked by `tsc` as usual.
+(`src/*.d.ts`, `scripts/ci/jsdom.d.ts`) in one of three ways:
+
+- reported in one of our files;
+- reported in a dependency, with related information that points into our
+  files: TypeScript reports a conflict between two declarations on whichever
+  comes later in the program, so a conflict with a dependency loaded after our
+  file is reported in the dependency;
+- reported in a dependency on the name of a symbol that our files also declare:
+  an interface we merge with a dependency's, such as `Window`, can break what
+  the merged interface extends, and TypeScript reports that on the first
+  declaration, which may be the dependency's, without related information. The
+  output names our declaration below the error.
+
+This is a bounded rule, not a complete record of which errors our files cause:
+an error that our declaration causes but that TypeScript reports on another
+symbol, with no related information pointing to us, is still treated as a
+dependency error and filtered out. Checking every declaration file takes most of
+the command's time, about 26 seconds locally. Our files are the `*.d.ts`,
+`*.d.mts` and `*.d.cts` files Git lists, tracked or untracked, outside
+`node_modules`; one that belongs to neither project fails the check. Code that
+uses the declarations is type-checked by `tsc` as usual.
 
 Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
 files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
@@ -248,6 +261,20 @@ Local probes on 2026-11-15 compared it with the previous gates in two
   repeats this with a temporary project whose synthetic dependency has errors,
   and checks a conflict between an own and a dependency declaration in both
   orders.
+- An interface of ours that merges with a dependency's interface and breaks what
+  it extends is reported on the first declaration, without related
+  information. A `Window` property `onscroll: string` added to `src/gtag.d.ts`
+  conflicts with `GlobalEventHandlers`; `tsc` with `skipLibCheck` off reports it
+  only in `lib.dom.d.ts` (TS2430), so the previous version of the check passed
+  it. The check now also keeps a diagnostic reported on the name of a symbol
+  that our files declare, fails this mutant and names the `src/gtag.d.ts`
+  declaration under the `lib.dom` error. Dependency-only errors, including the
+  `react-use` TS2430, stay excluded; the test project covers both orders and a
+  dependency-only TS2430.
+- Remaining limit: an error that our declaration causes but that TypeScript
+  reports on another symbol, with no related information pointing to us, is
+  still filtered out as a dependency error. This part of #220 stays open until
+  this bounded coverage is accepted.
 - The mutants, logs and hash manifests are kept outside the repository; the pull
   request names their location and the CI run of its final head.
 

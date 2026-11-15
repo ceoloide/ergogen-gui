@@ -73,7 +73,9 @@ beforeEach(() => {
   write(
     'node_modules/fake-dependency/index.d.ts',
     'export declare const version: string = "1.0.0";\n' +
-      'export interface Options { level: MissingLevel }\n'
+      'export interface Options { level: MissingLevel }\n' +
+      'export interface Base { level: string }\n' +
+      'export interface Broken extends Base { level: number }\n'
   );
   write(
     'types/own.d.ts',
@@ -92,6 +94,9 @@ describe('pnpm typecheck:declarations', { timeout: processTimeout }, () => {
       'node_modules/fake-dependency/index.d.ts(1,40): error TS1039'
     );
     expect(strict.output).toContain("Cannot find name 'MissingLevel'");
+    expect(strict.output).toContain(
+      "node_modules/fake-dependency/index.d.ts(4,18): error TS2430: Interface 'Broken' incorrectly extends interface 'Base'."
+    );
 
     // Act
     const result = check();
@@ -192,6 +197,81 @@ describe('pnpm typecheck:declarations', { timeout: processTimeout }, () => {
       // Assert
       expect(result.status).toBe(1);
       expect(result.output).toContain('types/own.d.ts(2,22): error TS2717');
+    });
+  });
+
+  describe('own declaration that breaks a dependency interface it merges with', () => {
+    // TypeScript reports an interface that no longer matches the interface it
+    // extends on the first declaration of the merged interface, without
+    // related information. When that is the dependency's declaration, only
+    // the merged interface's own declaration ties the error to our file.
+    const extendingDependency = () => {
+      write(
+        'node_modules/fake-globals/package.json',
+        JSON.stringify({ name: 'fake-globals', types: 'index.d.ts' })
+      );
+      write(
+        'node_modules/fake-globals/index.d.ts',
+        'interface Base { level: string }\n' +
+          'interface Settings extends Base {}\n'
+      );
+    };
+
+    it('fails when the dependency declaration comes first', () => {
+      // Arrange: a reference loads the dependency before the own file, so
+      // TypeScript reports the error in the dependency.
+      extendingDependency();
+      write(
+        'types/own.d.ts',
+        '/// <reference types="fake-globals" />\n' +
+          'interface Settings { level: number }\n'
+      );
+      expect(tsc()).toEqual({ status: 0, output: '' });
+      const strict = tsc('--skipLibCheck', 'false');
+      expect(strict.output).toContain(
+        "node_modules/fake-globals/index.d.ts(2,11): error TS2430: Interface 'Settings' incorrectly extends interface 'Base'."
+      );
+      expect(strict.output).not.toContain('types/own.d.ts');
+
+      // Act
+      const result = check();
+
+      // Assert
+      expect(result.status).toBe(1);
+      expect(result.output).toContain(
+        'node_modules/fake-globals/index.d.ts(2,11): error TS2430'
+      );
+      expect(result.output).toContain(
+        "types/own.d.ts(2,11): own declaration of 'Settings'"
+      );
+    });
+
+    it('fails when the dependency declaration comes later', () => {
+      // Arrange: the `types` option loads the dependency after the project's
+      // own files, so TypeScript reports the error in the own file.
+      extendingDependency();
+      write(
+        'tsconfig.json',
+        JSON.stringify({
+          compilerOptions: {
+            strict: true,
+            skipLibCheck: true,
+            noEmit: true,
+            lib: ['es2022'],
+            types: ['fake-globals'],
+          },
+          include: ['types'],
+        })
+      );
+      write('types/own.d.ts', 'interface Settings { level: number }\n');
+      expect(tsc()).toEqual({ status: 0, output: '' });
+
+      // Act
+      const result = check();
+
+      // Assert
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('types/own.d.ts(1,11): error TS2430');
     });
   });
 
