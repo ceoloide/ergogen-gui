@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import net from 'node:net';
 import { test, expect } from './fixtures';
 import { makeShooter } from './utils/screenshots';
 import { waitForServiceWorkerControl } from './utils/baseAssets';
@@ -77,5 +78,46 @@ test.describe('Service worker update', () => {
     // Only the two builds installed: no third, unexpected worker installation
     // (#222). Such a worker would not necessarily wait or show the chip.
     expect(installedVersions.size).toBe(2);
+  });
+
+  test('its browser ignores a proxy set in the environment', async ({
+    browser,
+    launchOptions,
+  }) => {
+    // Arrange: a local proxy that records what it is asked to reach and
+    // forwards nothing. A proxy resolves host names itself, so the browser's
+    // resolver rules alone would let worker requests reach other hosts.
+    const proxyRequests: string[] = [];
+    const proxy = net.createServer((socket) =>
+      socket.once('data', (data) => {
+        proxyRequests.push(data.toString().split('\r\n')[0]);
+        socket.destroy();
+      })
+    );
+    await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+    const { port } = proxy.address() as net.AddressInfo;
+    const proxyURL = `http://127.0.0.1:${port}`;
+    const proxied = await browser.browserType().launch({
+      ...launchOptions,
+      env: { ...process.env, http_proxy: proxyURL, https_proxy: proxyURL },
+    });
+
+    try {
+      // Act
+      const page = await proxied.newPage();
+      const outcome = await page.evaluate(() =>
+        fetch('https://fonts.googleapis.com/css').then(
+          () => 'loaded',
+          () => 'failed'
+        )
+      );
+
+      // Assert
+      expect(outcome).toBe('failed');
+      expect(proxyRequests).toEqual([]);
+    } finally {
+      await proxied.close();
+      proxy.close();
+    }
   });
 });
