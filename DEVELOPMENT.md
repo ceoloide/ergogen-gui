@@ -13,15 +13,15 @@ Install exactly as in the README (Node from `.node-version`, pnpm from
 on Linux x86_64 run `pnpm tools:install` and add `$PWD/.tools/bin` to `PATH`. CI
 uses the same installer and commands.
 
-| Command                                          | Checks                                                                                                                           |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, all Vitest tests. Never edits files. |
-| `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                |
-| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                     |
-| `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                |
-| `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                          |
-| `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                        |
-| `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                            |
+| Command                                          | Checks                                                                                                                                                     |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm validate:fast` (= `pnpm precommit`)        | Prettier, Markdown, ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects and our declaration files, all Vitest tests. Never edits files. |
+| `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                                          |
+| `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                                               |
+| `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                                          |
+| `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                                                    |
+| `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                                                  |
+| `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                                                      |
 
 A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
 does. Husky/lint-staged run quick fixes on staged files; GitHub enforces
@@ -37,9 +37,16 @@ validation independently. Each maintained file gets the checks that apply to it:
 | Markdown, including `.agents/`                                                     | Prettier, markdownlint                                                       |
 | JSON, `index.html`, `pnpm-workspace.yaml`                                          | Prettier                                                                     |
 
-TypeScript only parses the hand-written declaration files (`src/*.d.ts`,
-`scripts/ci/jsdom.d.ts`): with `skipLibCheck` it reports their syntax errors but
-not type errors inside them. Code that uses the declarations is type-checked.
+Both projects set `skipLibCheck`, so `tsc` only parses declaration files, ours
+included. Turning it off for a whole project would also report dozens of errors
+inside dependencies (for example `lib.dom` against `lib.webworker`, workbox and
+react-router declarations). So `pnpm typecheck` also runs
+`pnpm typecheck:declarations` (`scripts/ci/check-declarations.mts`): it builds
+each project from its own configuration with only `skipLibCheck` off and reports
+the TypeScript diagnostics of our declaration files alone (`src/*.d.ts`,
+`scripts/ci/jsdom.d.ts`). Our files are the `*.d.ts` files Git lists, tracked or
+untracked, outside `node_modules`; one that belongs to neither project fails the
+check. Code that uses the declarations is type-checked by `tsc` as usual.
 
 Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
 files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
@@ -195,10 +202,38 @@ open.**
   in `scripts/ci/jsdom.d.ts` passed `pnpm typecheck`; only an unclosed
   `declare module`, a syntax error, failed it. That proves parsing, not type
   checking. Code that uses the declarations is checked. This part of #220 stays
-  open until those files are type-checked or explicitly excluded.
+  open until those files are type-checked or explicitly excluded. The
+  follow-up below type-checks them.
 - Every probe exited nonzero and left the mutated bytes alone; a clean
   `pnpm validate:fast` exited 0 and changed no tracked or untracked file. No
   diagnostic baseline or suppression list is needed. #218 closed with #217.
+
+**#220 follow-up, hand-written declarations: type-checked.** A later change on
+top of `bd8f581` (#248) added `pnpm typecheck:declarations` to `pnpm typecheck`.
+Local probes on 2026-11-15 compared it with the previous gates in two
+`git archive` copies that shared the installed dependencies:
+
+- One semantic error per file passed the previous `pnpm typecheck` and failed
+  the new one, naming the file, position and code: an initializer on a
+  `declare const` in `src/ergogen.d.ts` (TS1039, in both projects) and on a
+  declared class property in `scripts/ci/jsdom.d.ts` (TS1039), an unknown type
+  in `src/jscad.d.ts` (TS2304), a `Window` property that conflicts with
+  `lib.dom` in `src/gtag.d.ts` (TS2717) and a missing `react` export in
+  `src/vite-env.d.ts` (TS2305). A new, untracked `src/` declaration file with
+  an error failed the same way; a new one outside both projects failed as
+  uncovered.
+- Prettier's parser rejects an initializer on a `declare const`, so the previous
+  `pnpm validate:fast` already caught those at `pnpm format:check`. The other
+  errors passed all of its static checks. The new `pnpm validate:fast` stops at
+  the declaration check.
+- A syntax error in a declaration file, and misuse of the declarations by app
+  and tooling code, still fail both gates.
+- Dependency errors stay excluded: with `skipLibCheck` off, every error `tsc`
+  reports for either project is inside `node_modules`, and the new check
+  passes. The dependencies were not changed. `tests/declaration-check.test.ts`
+  repeats this with a temporary project whose synthetic dependency has errors.
+- The mutants, logs and hash manifests are kept outside the repository; the pull
+  request names their location and the CI run of its final head.
 
 **#221, shared validation commands: all criteria pass, with the documented
 ruleset limit.**

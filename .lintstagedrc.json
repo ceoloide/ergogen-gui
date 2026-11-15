@@ -14,7 +14,7 @@
   ],
   "patch/**/*.{ts,tsx,js,jsx}": ["eslint --fix", "prettier --write"],
   "**/*.md": ["markdownlint --fix", "prettier --write"],
-  "scripts/**/*.{js,mjs,mts}": ["eslint --fix", "prettier --write"],
+  "scripts/**/*.{ts,js,mjs,mts}": ["eslint --fix", "prettier --write"],
   "**/*.sh": ["shellcheck"],
   ".husky/pre-commit": ["shellcheck"],
   "index.html": ["prettier --write"],
