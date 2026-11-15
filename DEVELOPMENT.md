@@ -432,10 +432,11 @@ A pass describes the moment it finished; it does not stop later pushes or merges
 
 ### Branch rules
 
-As of 2026-11-14, nothing enforces these checks: `main` has no branch protection
-or ruleset, so a failed or missing check, or a failed assessment, does not block
-a merge. Two reviewed payloads describe the intended settings, and
-`pnpm check:settings` reports whether GitHub enforces them:
+Since 2026-11-15 (UTC), GitHub enforces these settings: the ruleset
+`main: require CI` (ID 27290096) gates merges into `main`, and the Actions
+token defaults are read-only (see the [cutover record](#cutover-record)). Two
+reviewed payloads hold the settings, and `pnpm check:settings` reports whether
+GitHub still enforces them:
 
 - `scripts/ci/ruleset-proposal.json`, a ruleset for the default branch only. It
   requires a pull request with resolved conversations and a successful
@@ -452,11 +453,11 @@ a merge. Two reviewed payloads describe the intended settings, and
   `gh-pages`, also declares its own (`contents: read`, `pages: write` in its
   logs).
 
-Once applied, nobody can push to `main`, the owner included; every change is a
-pull request merged after a fresh, passing run on the current `main` (use
-**Update branch**, `gh pr update-branch` or a rebase). The ruleset does not
-cover `gh-pages`, so releases and rollbacks are unchanged. Open pull requests
-without such a run become blocked, as intended.
+Nobody can push to `main`, the owner included; every change is a pull request
+merged after a fresh, passing run on the current `main` (use **Update branch**,
+`gh pr update-branch` or a rebase). The ruleset does not cover `gh-pages`, so
+releases and rollbacks are unchanged. Open pull requests without such a run are
+blocked, as intended.
 
 This is a merge gate for ordinary pull requests, not confinement:
 
@@ -492,8 +493,12 @@ foreign rule.
 
 #### Cutover
 
-Only the owner runs this, from a checkout of the reviewed commit, after the
-cutover pull request has passed review. Each stage can be rolled back alone.
+These steps applied the settings on 2026-11-15; the
+[cutover record](#cutover-record) lists what each one returned. Run them again
+only to re-apply the settings after a [rollback](#rollback), with a new
+snapshot. Only the owner runs them, from a clean checkout of the reviewed
+commit that holds the proposals: the head of `main`, after the pull request that
+last changed them has merged. Each stage can be rolled back alone.
 
 1. **Snapshot.** Save the start state outside the checkout and keep it until the
    cutover is confirmed:
@@ -510,7 +515,7 @@ cutover pull request has passed review. Each stage can be rolled back alone.
    pnpm check:settings                       # expect exit 1, three problems
    ```
 
-   Continue only if `reviewed-commit` is the head the cutover review approved,
+   Continue only if `reviewed-commit` is the reviewed head of `main`,
    the working tree has no changes, `rulesets.json` is `[]`,
    `workflow-permissions.json` is
    `{"default_workflow_permissions":"write","can_approve_pull_request_reviews":true}`
@@ -529,9 +534,8 @@ cutover pull request has passed review. Each stage can be rolled back alone.
 2. **Baseline.** Record `gh pr view <number> --json mergeStateStatus` for the
    pull requests used in the [drill](#drill), and open the drill's failing pull
    request now, so each later state can be compared with this one. Opening it
-   switches the checkout to `main`, which lacks this check and its proposals;
-   continue only once the drill commands have returned it to the reviewed
-   commit.
+   switches the checkout to a new branch; continue only once the drill commands
+   have returned it to the reviewed commit.
 3. **Actions defaults.**
 
    ```shell
@@ -546,10 +550,12 @@ cutover pull request has passed review. Each stage can be rolled back alone.
    pnpm check:settings   # expect: ENFORCED, exit 0
    ```
 
-5. **Drill**, below, then merge the cutover pull request normally; that merge
-   and its release are the first under the new settings. Check that its
-   `deploy` job log lists `Contents: write` under "GITHUB_TOKEN Permissions" and
-   that the release passes. Then update the status at the top of this section.
+5. **Drill**, below. Its passing row needs a real pull request that is up to
+   date with `main`; read its state before anything merges. The owner then
+   merges it as usual. That merge and its release are the first under the new
+   settings: check that its `deploy` job log lists `Contents: write` under
+   "GITHUB_TOKEN Permissions" and that its `smoke` job passes. Then update the
+   status at the top of this section and the record.
 
 #### Drill
 
@@ -568,12 +574,12 @@ command after `UNKNOWN`. Because `pnpm check:settings` confirmed that you
 cannot bypass the ruleset, these states apply to the owner too. Expected after
 step 4:
 
-| Pull request                                          | Before     | After                    |
-| ----------------------------------------------------- | ---------- | ------------------------ |
-| Failing `lint-and-test` (opened for the drill)        | `UNSTABLE` | `BLOCKED`                |
-| No `lint-and-test` run on its head                    | `CLEAN`    | `BLOCKED` or `BEHIND`    |
-| Passing `lint-and-test`, behind `main`                | `CLEAN`    | `BEHIND` or `BLOCKED`    |
-| Passing `lint-and-test`, up to date, threads resolved | `CLEAN`    | `CLEAN` (the cutover PR) |
+| Pull request                                          | Before     | After                 |
+| ----------------------------------------------------- | ---------- | --------------------- |
+| Failing `lint-and-test` (opened for the drill)        | `UNSTABLE` | `BLOCKED`             |
+| No `lint-and-test` run on its head                    | `CLEAN`    | `BLOCKED` or `BEHIND` |
+| Passing `lint-and-test`, behind `main`                | `CLEAN`    | `BEHIND` or `BLOCKED` |
+| Passing `lint-and-test`, up to date, threads resolved | `CLEAN`    | `CLEAN` (step 5)      |
 
 The drill opens only the failing pull request. For the two middle rows, use an
 open pull request that already fits, if any; `statusCheckRollup` shows whether
@@ -621,6 +627,49 @@ gh pr close drill/required-check --delete-branch
 A pull request of this repository can still change `ci.yaml`, so the drill
 proves only that the required check gates merges, not that the check is honest;
 see the limits above.
+
+#### Cutover record
+
+The settings were applied as the owner on 2026-11-15 (UTC), from `main` at
+`81604c2`. The pull request that added the proposals and this runbook (#245)
+had already merged, so the reviewed commit was the head of `main`, not an
+unmerged cutover branch as an earlier version of these steps assumed.
+
+- **Snapshot**, in `ergogen-gui-settings-20261115T015515Z` in the owner's
+  home directory: no rulesets, `main` not protected, Actions defaults `write`
+  and able to approve pull requests; `pnpm check:settings` exited 1 with three
+  problems. [Rollback](#rollback) uses this directory until the settings are
+  applied again; keep it.
+- **Actions defaults**: `read`, cannot approve pull requests; the check then
+  reported only the missing ruleset.
+- **Ruleset** 27290096, `main: require CI`: active on the default branch only,
+  no bypass actors, and the owner can never bypass it. It blocks deletion and
+  force pushes, requires a pull request with resolved threads and no approvals,
+  and requires `lint-and-test` from the GitHub Actions app (ID 15368) on a
+  branch that is up to date with `main`. GitHub applies exactly these four rules
+  to `main` and none to `gh-pages`. `pnpm check:settings` reported `ENFORCED`
+  and exited 0, again after the drill.
+
+Drill results (merge states read with `gh pr view`):
+
+| Pull request                                                           | Before                     | After                                         |
+| ---------------------------------------------------------------------- | -------------------------- | --------------------------------------------- |
+| #246, failing `lint-and-test`, head `187f8e8` on `81604c2`             | `UNSTABLE` (check running) | `BLOCKED` while pending and after the failure |
+| #93, no `lint-and-test` on its head, 235 commits behind `main`         | `CLEAN`                    | `BEHIND`                                      |
+| #209, passing `lint-and-test` from July 2026, 20 commits behind `main` | `CLEAN`                    | `BEHIND`                                      |
+| Passing, up to date, threads resolved                                  | —                          | Pending                                       |
+
+- #246 failed only on purpose: in run 43665718955, format, lint and types
+  passed, and `tests/drill.test.ts` was the one failed unit test (724 passed).
+  It was closed without merging and its branch deleted.
+- #93 and #209 show that the ruleset now blocks both, but #93 is behind `main`
+  as well as missing the check, and GitHub reports one state. The drill
+  therefore did not isolate the missing-check row from the stale one.
+- The passing row is pending: the pull request that adds this record must reach
+  `CLEAN` with its own passing run before it merges. Its result, and the first
+  release under the new defaults (step 5), are tracked in #226. The last release
+  before the cutover (run 43655577978) already listed `Contents: write` for
+  `deploy`, from the job's own permissions.
 
 #### Rollback
 

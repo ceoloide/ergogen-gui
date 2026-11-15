@@ -180,7 +180,9 @@ browsers and chat apps truncate long URLs.
 Issues and pull requests are welcome. [DEVELOPMENT.md](DEVELOPMENT.md) covers
 architecture, validation and engine preparation; [AGENTS.md](AGENTS.md) lists the
 rules for every change. User-facing changes are summarized in
-[CHANGELOG.md](CHANGELOG.md).
+[CHANGELOG.md](CHANGELOG.md). Changes reach `main` only through pull requests
+whose `lint-and-test` check passed on a branch up to date with `main`; see
+[Branch rules](DEVELOPMENT.md#branch-rules).
 
 Validation also needs native [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12),
 [ShellCheck 0.11.0](https://github.com/koalaman/shellcheck/releases/tag/v0.11.0) and
