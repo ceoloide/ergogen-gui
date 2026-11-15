@@ -1,3 +1,4 @@
+import type { MockInstance } from 'vitest';
 import { register } from './serviceWorkerRegistration';
 
 type Listener = () => void;
@@ -62,11 +63,25 @@ const registerOnLoad = async (
     expect(navigator.serviceWorker.register).toHaveBeenCalled()
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
+  // Only this test's page registers: no earlier test's load listener ran.
+  expect(navigator.serviceWorker.register).toHaveBeenCalledTimes(1);
   return onUpdate;
 };
 
 describe('service worker registration', () => {
+  // register() listens for the window load event and never stops listening,
+  // so each test removes the window listeners it added. The spy only records:
+  // it calls the real method.
+  let addEventListenerSpy: MockInstance<Window['addEventListener']>;
+  beforeEach(() => {
+    addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+  });
+
   afterEach(() => {
+    addEventListenerSpy.mock.calls.forEach(([type, listener, options]) =>
+      window.removeEventListener(type, listener, options)
+    );
+    addEventListenerSpy.mockRestore();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     delete (navigator as { serviceWorker?: unknown }).serviceWorker;
