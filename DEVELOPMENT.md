@@ -210,8 +210,10 @@ ruleset limit.**
   failed [run 43665718955](https://github.com/ceoloide/ergogen-gui/actions/runs/43665718955)
   (#246) still uploaded `unit.xml` and `evidence.json` naming its failed test.
 
-**#222, isolated production-browser runs: no collisions; the update drill
-failure is explained and fixed; a slow STL preview under load stays open.**
+**#222, isolated production-browser runs: no collisions; in the update drill,
+extra-worker installation reproduced and fixed; its connection to the original
+second-chip failure remains inferred; a slow STL preview under load stays
+open.**
 
 - Six pairs of full runs in the two copies at once (load 11 to 14 on 4 cores):
   each run used its own free ports, each server served its own copy's build and
@@ -221,8 +223,9 @@ failure is explained and fixed; a slow STL preview under load stays open.**
   here) and the STL preview took over 20 s (1 of 12). With those fixes, 3 of 4
   runs passed; in the fourth the update chip was still visible 5 s after the
   update had reloaded into the next build.
-- That failure came from the browser-test fixture, not the app. Its trace shows
-  a second install notice in the old page 328 ms after the click, and the
+- Extra-worker installation reproduced and fixed; its connection to that
+  second-chip failure remains inferred. The failing trace shows a second
+  install notice in the old page 328 ms after the click, and the
   reloaded page showing the chip without one, so a worker was already waiting
   when it registered. Instrumented runs (DevTools worker version ids, page
   worker states, a logging proxy) showed why: after the fixture aborted the

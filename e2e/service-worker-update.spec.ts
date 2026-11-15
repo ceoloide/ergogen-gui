@@ -74,8 +74,8 @@ test.describe('Service worker update', () => {
     expect(documentResponse?.fromServiceWorker()).toBe(true);
     await expect(buildMeta).toHaveAttribute('content', nextBuildId);
     await expect(page.getByText('Ergogen Web UI')).toBeVisible();
-    // Only the two builds installed: a third worker would wait behind a new
-    // update chip (#222)
+    // Only the two builds installed: no third, unexpected worker installation
+    // (#222). Such a worker would not necessarily wait or show the chip.
     expect(installedVersions.size).toBe(2);
   });
 });
