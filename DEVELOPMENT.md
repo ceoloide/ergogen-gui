@@ -43,7 +43,7 @@ not type errors inside them. Code that uses the declarations is type-checked.
 
 Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
 files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
-`tests/ci/*.xml` and `tests/corpus/*.yaml`, and Git-ignored output such as
+`tests/ci/reports/*.xml` and `tests/corpus/*.yaml`, and Git-ignored output such as
 `dist*`, `reports/` and `.tools/`.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
@@ -80,7 +80,9 @@ responses. The update drill's browser resolves no host name instead, so its
 worker's requests to Google Fonts fail there and the fixture lets them through:
 once a worker's request is aborted through DevTools, Chromium installs a new
 worker on every later navigation without comparing the script, as DevTools'
-**Update on reload** does, and one of those can wait behind a second update chip. Service worker tests check images by their natural width, because a
+**Update on reload** does. Those extra installations can interfere with the
+drill; their connection to the original second-chip failure remains inferred
+(see the [acceptance record](#acceptance-record-hc-001-to-hc-004)). Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks
@@ -144,12 +146,22 @@ assertion, and explain the change in the pull request. For a stale preview, run
 ### Acceptance record (HC-001 to HC-004)
 
 On 2026-11-15 (UTC) the validation work that #217 landed was checked against
-the acceptance criteria of #219, #220, #221 and #222, on `8573027`: `main` at
-`40061af` plus the fixes in the same pull request as this record. Local runs used
-Linux x86_64 with 4 cores, Node 24.22.3, pnpm 11.12.0, the committed lockfile,
+the acceptance criteria of #219, #220, #221 and #222. The initial probes ran on
+`8573027`: `main` at `40061af` plus the first fixes in the same pull request as
+this record. Later commits removed a leaked listener in a unit test (`40b3a71`)
+and stopped the update drill's fixture from forcing extra workers (`d0257cc`);
+local `pnpm validate:extended` ran again on `eda77a5`. The final head,
+`0b60eed`, changed only this record and a test comment. Local runs used Linux
+x86_64 with 4 cores, Node 24.22.3, pnpm 11.12.0, the committed lockfile,
 actionlint 1.7.12, ShellCheck 0.11.0 and zizmor 1.32.0. Deliberate errors were
-restored byte for byte and the tree was clean afterwards. Logs and probe scripts
-were not committed.
+restored byte for byte and the tree was clean afterwards.
+
+Two kinds of evidence back this record. CI
+[run 43707582696](https://github.com/ceoloide/ergogen-gui/actions/runs/43707582696)
+on `0b60eed` and the committed regression tests can be checked by anyone. The
+probe, concurrency and instrumented results below were observed during
+implementation and are reported as observed: their logs, scripts, traces and
+temporary checkouts were not kept, so they cannot be inspected again.
 
 **#219, reproducible isolated preparation: all criteria pass.**
 
@@ -194,9 +206,11 @@ ruleset limit.**
 - The merge commit `d1fd408` that
   [run 43668208717](https://github.com/ceoloide/ergogen-gui/actions/runs/43668208717)
   tested has the tree of `40061af` and passed 724 unit and 26 browser tests in
-  all three projects. On `8573027`, local `pnpm validate:extended` passed
-  728 unit and 26 browser tests and changed no file; this pull request's CI
-  run checks the same tree.
+  all three projects. Local `pnpm validate:extended` on `eda77a5` passed 728
+  unit and 26 browser tests and changed no file. `0b60eed` differs from
+  `eda77a5` only in this record and a test comment, so no behavior code
+  changed. Its CI run 43707582696 passed 728 unit tests in 61 files and 26
+  browser tests in all three projects, none skipped, and uploaded its reports.
 - Each broken input failed its gate: an unterminated expression and an unquoted
   `run:` variable (actionlint with ShellCheck); template injection, default
   checkout credentials and an unpinned action (zizmor); shell errors
