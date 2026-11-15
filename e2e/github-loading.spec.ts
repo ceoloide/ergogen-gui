@@ -37,13 +37,13 @@ test.describe('GitHub Loading', () => {
     await githubInput.fill('ceoloide/mr_useful');
     await shoot('after-github-input-filled');
 
-    // Click the load button
+    // Verify loading bar appears during GitHub loading. Wait from before the
+    // click: the mocked load can finish before a later check starts.
+    const loadingBarShown = page
+      .getByTestId('loading-bar')
+      .waitFor({ state: 'visible', timeout: 20000 });
     await loadButton.click();
-    await shoot('after-load-button-clicked');
-
-    // Verify loading bar appears during GitHub loading
-    const loadingBar = page.getByTestId('loading-bar');
-    await expect(loadingBar).toBeVisible({ timeout: 20000 });
+    await loadingBarShown;
     await shoot('loading-bar-visible');
 
     // Wait for the config to be loaded (should navigate to home)

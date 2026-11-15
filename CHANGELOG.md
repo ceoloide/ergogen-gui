@@ -1,5 +1,22 @@
 # Changelog
 
+## Reliable Update Button
+
+November 15, 2026
+
+After a new version was published, the **Update Available** button sometimes
+never appeared, most often on a slow or busy device. The browser had already
+found the new version while the page was still loading, and the app missed it,
+so the tab kept running the old version.
+
+The app now also checks for a new version that is already installing or waiting
+when it starts, so the button appears whenever an update is ready.
+
+**What changed:**
+
+- **Update button**: Appears even when the browser finds the update before the
+  page has finished loading.
+
 ## Usage Metrics Configuration
 
 November 14, 2026

@@ -24,9 +24,27 @@ uses the same installer and commands.
 | `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                            |
 
 A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
-does. Application code uses the strict root `tsconfig.json`; browser tests, policy
-tests and configuration files use `tsconfig.tooling.json`. Husky/lint-staged run
-quick fixes on staged files; GitHub enforces validation independently.
+does. Husky/lint-staged run quick fixes on staged files; GitHub enforces
+validation independently. Each maintained file gets the checks that apply to it:
+
+| Files                                                                              | Checks                                                                       |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/`                                                                             | Prettier, ESLint, TypeScript (strict `tsconfig.json`)                        |
+| `tests/`, `e2e/`, `scripts/ci/`, root `*.config.mts`                               | Prettier, ESLint, TypeScript (`tsconfig.tooling.json`)                       |
+| JavaScript: other `scripts/`, `patch/*.js`, `eslint.config.mjs`, corpus footprints | Prettier, ESLint (JavaScript is not type-checked)                            |
+| `scripts/*.sh`, `patch/*.sh`, `.husky/pre-commit`                                  | ShellCheck                                                                   |
+| `.github/` workflows and configuration                                             | Prettier, zizmor; workflows also actionlint, which runs ShellCheck on `run:` |
+| Markdown, including `.agents/`                                                     | Prettier, markdownlint                                                       |
+| JSON, `index.html`, `pnpm-workspace.yaml`                                          | Prettier                                                                     |
+
+TypeScript only parses the hand-written declaration files (`src/*.d.ts`,
+`scripts/ci/jsdom.d.ts`): with `skipLibCheck` it reports their syntax errors but
+not type errors inside them. Code that uses the declarations is type-checked.
+
+Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
+files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
+`tests/ci/reports/*.xml` and `tests/corpus/*.yaml`, and Git-ignored output such as
+`dist*`, `reports/` and `.tools/`.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
 report and traces/screenshots of failures (no retries). `pnpm test:reports` writes
@@ -49,7 +67,8 @@ A build ID also adds an `ergogen-build-id` meta tag to `index.html`.
 
 The update drill deploys `dist-subpath-next/` (the same base, another build ID)
 by copying it over the served copy, which `vite preview` reads on each request,
-then checks that the real worker waits, shows **Update Available** and activates.
+then checks that the real worker waits, shows **Update Available** and activates,
+and that no other worker installs.
 Each drill changes the served copy, so it needs a fresh `pnpm test:e2e` run; do not
 use `--repeat-each` or retries. Playwright routes cannot stand in for that
 deployment: Chromium fetches the worker script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the
@@ -57,7 +76,13 @@ deployment: Chromium fetches the worker script for update checks outside the pag
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
 including those made by service workers; provider tests route deterministic
-responses. Service worker tests check images by their natural width, because a
+responses. The update drill's browser resolves no host name instead, so its
+worker's requests to Google Fonts fail there and the fixture lets them through:
+once a worker's request is aborted through DevTools, Chromium installs a new
+worker on every later navigation without comparing the script, as DevTools'
+**Update on reload** does. Those extra installations can interfere with the
+drill; their connection to the original second-chip failure remains inferred
+(see the [acceptance record](#acceptance-record-hc-001-to-hc-004)). Service worker tests check images by their natural width, because a
 missing file below the base returns `index.html` with HTTP 200.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks
@@ -117,6 +142,130 @@ update, first check the new output yourself (open it in the app or KiCad). Then
 update the hand-worked values in `tests/corpus/corpus.ts` or the affected
 assertion, and explain the change in the pull request. For a stale preview, run
 `pnpm generate-previews` and review the SVG diff.
+
+### Acceptance record (HC-001 to HC-004)
+
+On 2026-11-15 (UTC) the validation work that #217 landed was checked against
+the acceptance criteria of #219, #220, #221 and #222. The initial probes ran on
+`8573027`: `main` at `40061af` plus the first fixes in the same pull request as
+this record. Later commits removed a leaked listener in a unit test (`40b3a71`)
+and stopped the update drill's fixture from forcing extra workers (`d0257cc`);
+local `pnpm validate:extended` ran again on `eda77a5`. The final head,
+`0b60eed`, changed only this record and a test comment. Local runs used Linux
+x86_64 with 4 cores, Node 24.22.3, pnpm 11.12.0, the committed lockfile,
+actionlint 1.7.12, ShellCheck 0.11.0 and zizmor 1.32.0. Deliberate errors were
+restored byte for byte and the tree was clean afterwards.
+
+Two kinds of evidence back this record. CI
+[run 43707582696](https://github.com/ceoloide/ergogen-gui/actions/runs/43707582696)
+on `0b60eed` and the committed regression tests can be checked by anyone. The
+probe, concurrency and instrumented results below were observed during
+implementation and are reported as observed: their logs, scripts, traces and
+temporary checkouts were not kept, so they cannot be inspected again.
+
+**#219, reproducible isolated preparation: all criteria pass.**
+
+- Two `git archive` copies, each with its own `HOME` and the shared pnpm store,
+  installed (frozen) and prepared at the same time: both passed in 22 s without
+  downloading a package, and produced the same engine (399 files; only the
+  checkout path in its stamp differs) and, from one `VITE_BUILD_ID`, the same
+  `dist/` (162 files).
+- Every archived file was unchanged after install, a second
+  `pnpm build-ergogen` ("up to date"), the build and the browser tests.
+  `~/.gitconfig`, the repository's Git configuration, a third checkout's engine
+  and pnpm state, and the shared store's `ergogen` files were unchanged: content,
+  inodes, and link counts once the copies were deleted. No copy's `HOME` gained
+  a `.gitconfig`.
+- On GitHub, the build job of
+  [run 43670475998](https://github.com/ceoloide/ergogen-gui/actions/runs/43670475998)
+  installed and built `40061af` the same way.
+
+**#220, static and type checks: pass for the covered files after this pull
+request's coverage fix; type checking of hand-written declarations is still
+open.**
+
+- One deliberate error per category: `pnpm format:check` named all 27 mutated
+  files, from every group in the coverage table that Prettier checks; `pnpm lint:js` the 12
+  ESLint groups; `pnpm lint:md` 3 Markdown files; `pnpm lint:shell` 3 shell
+  files; `pnpm typecheck` both projects. Before the fix, `index.html`,
+  `pnpm-workspace.yaml`, `patch/*.js`, `.husky/pre-commit` and `.agents/`
+  escaped.
+- Open: with `skipLibCheck`, `tsc` only parses the five hand-written `.d.ts`
+  files. An initializer on an ambient `declare const` in `src/ergogen.d.ts` and
+  in `scripts/ci/jsdom.d.ts` passed `pnpm typecheck`; only an unclosed
+  `declare module`, a syntax error, failed it. That proves parsing, not type
+  checking. Code that uses the declarations is checked. This part of #220 stays
+  open until those files are type-checked or explicitly excluded.
+- Every probe exited nonzero and left the mutated bytes alone; a clean
+  `pnpm validate:fast` exited 0 and changed no tracked or untracked file. No
+  diagnostic baseline or suppression list is needed. #218 closed with #217.
+
+**#221, shared validation commands: all criteria pass, with the documented
+ruleset limit.**
+
+- The merge commit `d1fd408` that
+  [run 43668208717](https://github.com/ceoloide/ergogen-gui/actions/runs/43668208717)
+  tested has the tree of `40061af` and passed 724 unit and 26 browser tests in
+  all three projects. Local `pnpm validate:extended` on `eda77a5` passed 728
+  unit and 26 browser tests and changed no file. `0b60eed` differs from
+  `eda77a5` only in this record and a test comment, so no behavior code
+  changed. Its CI run 43707582696 passed 728 unit tests in 61 files and 26
+  browser tests in all three projects, none skipped, and uploaded its reports.
+- Each broken input failed its gate: an unterminated expression and an unquoted
+  `run:` variable (actionlint with ShellCheck); template injection, default
+  checkout credentials and an unpinned action (zizmor); shell errors
+  (ShellCheck); a write token, a skipped or ignored validation step and a skipped
+  job (`tests/workflow-security.test.ts`); a type error (`pnpm typecheck`, also
+  through `pnpm validate:fast`); a failing test (`pnpm test:unit`). actionlint
+  does not check event payload property names, and zizmor accepts an explicit
+  `persist-credentials: true`.
+- The policy tests and `pnpm assess:pr` reject a skipped job or step; the ruleset
+  alone accepts a skipped whole job (see [Branch rules](#branch-rules)). The
+  failed [run 43665718955](https://github.com/ceoloide/ergogen-gui/actions/runs/43665718955)
+  (#246) still uploaded `unit.xml` and `evidence.json` naming its failed test.
+
+**#222, isolated production-browser runs: no collisions; in the update drill,
+extra-worker installation reproduced and fixed; its connection to the original
+second-chip failure remains inferred; a slow STL preview under load stays
+open.**
+
+- Six pairs of full runs in the two copies at once (load 11 to 14 on 4 cores):
+  each run used its own free ports, each server served its own copy's build and
+  every build ID matched. The load exposed failures that were not collisions:
+  the update prompt missed an update the browser found first (4 of 8 runs, fixed
+  here), the GitHub loading test checked a transient bar too late (1 of 4, fixed
+  here) and the STL preview took over 20 s (1 of 12). With those fixes, 3 of 4
+  runs passed; in the fourth the update chip was still visible 5 s after the
+  update had reloaded into the next build.
+- Extra-worker installation reproduced and fixed; its connection to that
+  second-chip failure remains inferred. The failing trace shows a second
+  install notice in the old page 328 ms after the click, and the
+  reloaded page showing the chip without one, so a worker was already waiting
+  when it registered. Instrumented runs (DevTools worker version ids, page
+  worker states, a logging proxy) showed why: after the fixture aborted the
+  worker's Google Fonts requests and that worker stopped, Chromium forced a new,
+  byte-identical worker on every navigation (`ForceUpdateOnReloadIfModified`).
+  It did so in every routed run and in none with the routes removed or only
+  continuing. Normally that worker activates at once; the failing trace fits one
+  that stayed waiting. The instrumented runs did not reproduce the chip itself
+  (12 runs at load 10 to 14 passed). The drill now counts installed workers:
+  `pnpm exec playwright test e2e/service-worker-update.spec.ts` found 5 before
+  the fixture change and 2 after it.
+- After the fix, one more pair of full runs at once (load up to 11.5): the
+  update drill passed in both; one run failed only the A. dux STL preview after
+  its 20 s wait, so that load failure (2 of 14 runs) stays open.
+- A foreign server on the root port failed the run in 2 s, before any build
+  ("is already used"); a server built with another ID failed global setup
+  ("reached the wrong build … expected probe-root, got foreign-build").
+- Deleting the deployed Ergogen worker (the server then returns `index.html`)
+  and disabling the worker's debug outputs each failed the DXF preview test; a
+  base path hard-coded in the welcome previews failed `base-path.spec.ts` below
+  `/ergogen-gui/` only.
+- Every failure kept its error, a screenshot and a valid `trace.zip` with
+  actions, screencast and network log; for locator assertions the trace marks
+  the failed expectation. The network logs show only loopback requests and
+  Google Fonts that were aborted by the fixture or, in the update drill, failed
+  to resolve.
 
 ## Source layout
 
@@ -737,7 +886,8 @@ from the same origin.
 - **Analytics** requests are not intercepted, and activation deletes the
   `workbox-background-sync` database that older builds used to queue hits.
 - **Updates**: a changed `service-worker.js` installs as waiting; the header
-  shows `UpdateChip`; clicking it posts `SKIP_WAITING` and reloads (with a
+  shows `UpdateChip`, also when the browser found the update during navigation,
+  before the page registered; clicking it posts `SKIP_WAITING` and reloads (with a
   one-second fallback reload). `?force_update` and `?force_install` show the update
   and install controls for testing.
 

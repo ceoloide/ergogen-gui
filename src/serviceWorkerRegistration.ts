@@ -63,11 +63,25 @@ async function registerValidSW(swUrl: string, config?: Config): Promise<void> {
   try {
     const registration = await navigator.serviceWorker.register(swUrl);
 
-    registration.addEventListener('updatefound', () => {
-      const installingWorker = registration.installing;
-      if (installingWorker === null) return;
+    let watchedWorker: ServiceWorker | null = null;
+    const watch = (installingWorker: ServiceWorker | null) => {
+      if (installingWorker === null || installingWorker === watchedWorker) {
+        return;
+      }
+      watchedWorker = installingWorker;
       waitForActivation(installingWorker, registration, config);
-    });
+    };
+    registration.addEventListener('updatefound', () =>
+      watch(registration.installing)
+    );
+
+    // The browser checks for updates on navigation, so it can find one before
+    // this page registers: updatefound has then already fired.
+    if (registration.waiting && navigator.serviceWorker.controller) {
+      config?.onUpdate?.(registration);
+    } else {
+      watch(registration.installing);
+    }
   } catch (error) {
     console.error('[SW] Error during service worker registration:', error);
   }
