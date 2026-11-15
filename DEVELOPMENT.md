@@ -751,7 +751,8 @@ from the same origin.
 - **Analytics** requests are not intercepted, and activation deletes the
   `workbox-background-sync` database that older builds used to queue hits.
 - **Updates**: a changed `service-worker.js` installs as waiting; the header
-  shows `UpdateChip`; clicking it posts `SKIP_WAITING` and reloads (with a
+  shows `UpdateChip`, also when the browser found the update during navigation,
+  before the page registered; clicking it posts `SKIP_WAITING` and reloads (with a
   one-second fallback reload). `?force_update` and `?force_install` show the update
   and install controls for testing.
 
