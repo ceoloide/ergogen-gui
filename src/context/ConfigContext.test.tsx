@@ -1104,6 +1104,141 @@ describe('ConfigContextProvider', () => {
     });
   });
 
+  describe('auto-generation', () => {
+    // Requests for the active configuration; background preview requests for
+    // other saved configurations are left out.
+    const generationRequests = () =>
+      mockErgogenWorker.postMessage.mock.calls
+        .map(([message]) => message)
+        .filter(
+          (message) =>
+            message?.type === 'generate' &&
+            !String(message.requestId).startsWith('background-preview-')
+        );
+
+    let capturedContext: any = null;
+    const CaptureContext = () => {
+      capturedContext = useConfigContext();
+      return null;
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockInitialConfig('points: {}');
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    // A second, identical generation replaced the results of the first and
+    // marked their STL files pending again, so an STL preview opened in
+    // between fell back to the demo outline (#222).
+    it('generates once on load instead of repeating the initial request', () => {
+      // Arrange and act
+      render(
+        <ConfigContextProvider>
+          <CaptureContext />
+        </ConfigContextProvider>
+      );
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Assert
+      expect(generationRequests()).toHaveLength(1);
+      expect(generationRequests()[0]).toEqual(
+        expect.objectContaining({ inputConfig: { points: {} } })
+      );
+    });
+
+    it('generates again after the configuration changes', () => {
+      // Arrange
+      render(
+        <ConfigContextProvider>
+          <CaptureContext />
+        </ConfigContextProvider>
+      );
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Act
+      act(() => {
+        capturedContext.setConfigInput('points: {zones: {}}');
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Assert
+      expect(generationRequests()).toHaveLength(2);
+      expect(generationRequests()[1]).toEqual(
+        expect.objectContaining({
+          inputConfig: { points: { zones: {} } },
+        })
+      );
+    });
+
+    it('generates again when debug output is switched on', () => {
+      // Arrange
+      render(
+        <ConfigContextProvider>
+          <CaptureContext />
+        </ConfigContextProvider>
+      );
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Act
+      act(() => {
+        capturedContext.setDebug(true);
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Assert
+      expect(generationRequests()).toHaveLength(2);
+      expect(generationRequests()[1]).toEqual(
+        expect.objectContaining({ options: { debug: true, svg: true } })
+      );
+    });
+
+    it('generates a configuration again after its results were cleared', () => {
+      // Arrange
+      render(
+        <ConfigContextProvider>
+          <CaptureContext />
+        </ConfigContextProvider>
+      );
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Act: leave the configuration, then return to the same content.
+      act(() => {
+        capturedContext.selectConfig(null);
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      act(() => {
+        capturedContext.selectConfig('test-active-id');
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Assert
+      expect(generationRequests()).toHaveLength(2);
+      expect(generationRequests()[1]).toEqual(
+        expect.objectContaining({ inputConfig: { points: {} } })
+      );
+    });
+  });
+
   describe('GA4 Keyboard Generation Tracking & Debouncing', () => {
     const getKeyboardGeneratedCalls = () => {
       return (trackEvent as Mock).mock.calls.filter(
