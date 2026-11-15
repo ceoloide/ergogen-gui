@@ -72,7 +72,9 @@ files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
 `dist*`, `reports/` and `.tools/`.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
-report and traces/screenshots of failures (no retries). `pnpm test:reports` writes
+report and traces/screenshots of failures (no retries). `E2E_SCREENSHOTS=1` also
+saves a full-page screenshot at each test step in `e2e/screenshots/`; it is off
+by default because these check nothing and took 13% of test time under load. `pnpm test:reports` writes
 `reports/evidence.json`. Attach them, with the commit and exact command, to
 failure reports. All outputs are Git-ignored.
 
