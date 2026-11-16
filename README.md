@@ -23,6 +23,15 @@ was created by [@MvEerd](https://github.com/MvEerd) and is maintained by
 Use `infused-kim/diode` for the bundled infused-kim diode footprint. Replace the
 historical typo `infused-kimo/isde` in existing configurations; it is not supported.
 
+**Briefs 56**, under **Miscellaneous**, is a 56-key unibody example inspired by
+Dygma Sonsei. It uses Ergogen's default `u` (19 mm) spread and padding for
+Choc v2 / MX, column stagger and a relative thumb fan. The outer two thumbs
+align with the matrix; the inner pair approximates the reference's custom
+keycaps. Separate key, body, central shape and combined preview outlines are
+included. The body is approximately 296 × 139 mm. The key outlines use
+18 mm caps with 1.5 mm corner radii; check physical keycap clearance before
+fabrication.
+
 ## Privacy and network use
 
 Configurations stay in browser storage unless you share or export them. The app
