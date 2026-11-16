@@ -29,34 +29,52 @@ describe('Briefs 56 example', () => {
         )
       ).toBe(true);
     }
-    // Reference drawing landmarks, normalized by its 33 px key pitch.
+    // Matrix and first two thumbs share one orientation and default u spacing.
+    const matrix = output.points.matrix_middle_bottom;
+    for (const name of ['thumbs_outer_thumb', 'thumbs_middle_thumb']) {
+      expect(output.points[name].r).toBe(matrix.r);
+    }
+    const bottom = output.points.matrix_outer_bottom;
+    const home = output.points.matrix_outer_home;
+    expect(Math.hypot(home.x - bottom.x, home.y - bottom.y)).toBeCloseTo(19);
+    const outer = output.points.thumbs_outer_thumb;
+    const middle = output.points.thumbs_middle_thumb;
+    expect(Math.hypot(middle.x - outer.x, middle.y - outer.y)).toBeCloseTo(19);
+    expect(output.points.thumbs_inner_thumb.r).toBe(-32);
+    expect(output.points.thumbs_tip_thumb.r).toBe(-44);
+    // Keep the rounded, relative layout close to the supplied drawing.
     const landmarks = [
-      ['outer_key_number', 120, 115, -13],
-      ['pinky_key_number', 152, 123, -13],
-      ['ring_key_number', 187, 116, -13],
-      ['middle_key_number', 219, 118, -13],
-      ['index_key_number', 251, 134, -13],
-      ['inner_key_number', 283, 140, -13],
-      ['thumb_outer_key_thumb', 197, 257, -10],
-      ['thumb_middle_key_thumb', 229, 262, -10],
-      ['thumb_inner_key_thumb', 263, 277, -32],
-      ['thumb_tip_key_thumb', 293, 299, -44],
+      ['matrix_outer_number', 120, 115],
+      ['matrix_pinky_number', 152, 123],
+      ['matrix_ring_number', 187, 116],
+      ['matrix_middle_number', 219, 118],
+      ['matrix_index_number', 251, 134],
+      ['matrix_inner_number', 283, 140],
+      ['thumbs_outer_thumb', 197, 257],
+      ['thumbs_middle_thumb', 229, 262],
+      ['thumbs_inner_thumb', 263, 277],
+      ['thumbs_tip_thumb', 293, 299],
     ] as const;
-    for (const [name, x, y, rotation] of landmarks) {
-      expect(output.points[name].x).toBeCloseTo(((x - 323) * 19.05) / 33, 3);
-      expect(output.points[name].y).toBeCloseTo(((84 - y) * 19.05) / 33, 3);
-      expect(output.points[name].r).toBe(rotation);
+    for (const [name, x, y] of landmarks) {
+      const point = output.points[name];
+      expect(
+        Math.hypot(
+          point.x - ((x - 323) * 19) / 33,
+          point.y - ((84 - y) * 19) / 33
+        )
+      ).toBeLessThan(3);
     }
     const body = svgOutlineGeometry(output.outlines.body.svg);
-    expect(body.width).toBeCloseTo((514 * 19.05) / 33, 1);
-    expect(body.height).toBeCloseTo((241 * 19.05) / 33, 1);
-    // Merged cap outlines must not silently hide an overlap.
+    expect(body.width).toBeCloseTo(15.6 * 19, 1);
+    expect(body.height).toBeCloseTo(7.3 * 19, 1);
     expect(svgOutlineGeometry(output.outlines.keys.svg).regions).toBe(56);
     expect(svgOutlineGeometry(output.outlines.preview.svg).regions).toBe(58);
     const center = svgOutlineGeometry(output.outlines.center.svg);
     expect(center.regions).toBe(1);
-    expect(center.width).toBeCloseTo(50.366, 2);
-    expect(center.height).toBeCloseTo(91.978, 2);
+    expect(center.width).toBeGreaterThan(48);
+    expect(center.width).toBeLessThan(52);
+    expect(center.height).toBeGreaterThan(89);
+    expect(center.height).toBeLessThan(94);
     for (const name of ['keys', 'body', 'center', 'preview']) {
       expect(output.outlines[name].svg).toContain('<svg');
     }

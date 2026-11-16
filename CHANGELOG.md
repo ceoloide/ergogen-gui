@@ -6,16 +6,20 @@ November 15, 2026
 
 The built-in examples now include **Briefs 56**, a unibody layout based on the
 Dygma Sonsei reference drawing. Choose it under **Miscellaneous** to start with
-56 keys with 19.05 mm along-column pitch for Choc v2 / MX and traced thumb
-positions.
+56 keys using Ergogen's default 19 mm spacing, with column stagger and a
+thumb fan anchored to the matrix.
+
+![Briefs 56 key layout with outer body and central outline.](./public/images/changelog/briefs-56.png)
 
 **What changed:**
 
-- **Key layout**: Six columns of four keys and four thumb keys per side.
+- **Key layout**: Six columns of four keys and four thumb keys per side. The
+  outer two thumbs align with the matrix; the inner pair approximates the
+  reference's custom keycaps.
 - **Outlines**: Separate outer body and central shape, plus a combined preview.
-- **Editable geometry**: Changing `pitch` rescales the entire layout and
-  outlines. The independent `cap` size draws the visible keys; it is not a
-  physical keycap clearance specification.
+- **Editable geometry**: Built-in `u` units, column stagger and relative thumb
+  anchors make the layout easy to adjust. The drawn caps are visual guides,
+  not a physical keycap clearance specification.
 
 ## Steadier Previews After Opening a Configuration
 

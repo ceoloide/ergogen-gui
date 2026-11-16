@@ -23,14 +23,13 @@ was created by [@MvEerd](https://github.com/MvEerd) and is maintained by
 Use `infused-kim/diode` for the bundled infused-kim diode footprint. Replace the
 historical typo `infused-kimo/isde` in existing configurations; it is not supported.
 
-**Briefs 56**, under **Miscellaneous**, is a 56-key unibody example traced from
-the Dygma Sonsei layout. It uses 19.05 mm along-column pitch for Choc v2 / MX,
-with traced stagger and thumb positions, and includes key, outer body, central
-shape and combined preview outlines. The body is approximately 297 × 139 mm
-(the drawing is labelled 299 × 140 mm). The 16 mm key shapes represent visible
-caps, not clearance envelopes: full-size 18 mm caps overlap near the thumbs.
-Changing `pitch` rescales the layout and outlines; `cap` changes only the drawn
-key size. These outlines are a design starting point, not fabrication files.
+**Briefs 56**, under **Miscellaneous**, is a 56-key unibody example inspired by
+Dygma Sonsei. It uses Ergogen's default `u` (19 mm) spread and padding for
+Choc v2 / MX, column stagger and a relative thumb fan. The outer two thumbs
+align with the matrix; the inner pair approximates the reference's custom
+keycaps. Separate key, body, central shape and combined preview outlines are
+included. The body is approximately 296 × 139 mm. The drawn caps (`u - 3`)
+are visual guides; check physical keycap clearance before fabrication.
 
 ## Privacy and network use
 
