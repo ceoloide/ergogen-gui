@@ -157,6 +157,8 @@ test.describe('Build view', () => {
         name: 'mirror_thumb_far_cluster, mirror of thumb_far_cluster',
       })
     ).toBeVisible();
+    // The checked layout can render before ConfigContext persists the edit.
+    await expect.poll(() => savedConfig(page)).toContain('  mirror:\n    ref:');
     const saved = await savedConfig(page);
     expect(saved).toContain(
       '          stagger: -3\n        col1:\n        inner:'

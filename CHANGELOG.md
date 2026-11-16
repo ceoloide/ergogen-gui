@@ -4,6 +4,8 @@
 
 November 16, 2026
 
+![Build view with a mirrored keyboard, thumb cluster and scoped inspector.](./public/images/changelog/2026-11-16-build-view.png)
+
 Shaping a layout meant editing numbers in YAML and regenerating to see the
 result, and it was easy to lose track of which level of the config a value came
 from.
@@ -42,7 +44,6 @@ use `hull` are redrawn the next time they are generated.
   method chooses different notches.
 - **Opting out**: Add `symmetric: false` to a `hull` to get the previous outline
   back exactly.
-
 
 ## Steadier Previews After Opening a Configuration
 
