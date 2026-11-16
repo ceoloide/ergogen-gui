@@ -70,6 +70,66 @@ describe('prepared engine semantic corpus', () => {
     expect(output.outlines.keys.svg).toContain('viewBox="0 0 37 18"');
   });
 
+  it('draws a mirrored hull around a mirrored board', async () => {
+    // Arrange: a large key next to a small one, mirrored. The engine's older
+    // hull gave only one of the two halves a notch between those keys.
+    const mirroredBoard = (hullOptions: { symmetric?: boolean }) => ({
+      points: {
+        zones: {
+          matrix: {
+            columns: {
+              wide: {
+                key: { width: 72, height: 72 },
+                rows: { middle: { skip: true }, top: { skip: true } },
+              },
+              narrow: { key: { spread: 45 } },
+            },
+            rows: { bottom: {}, middle: {}, top: {} },
+          },
+        },
+        mirror: 100,
+      },
+      outlines: {
+        board: [
+          {
+            what: 'hull',
+            concavity: 15,
+            ...hullOptions,
+            points: [
+              'matrix_wide_bottom',
+              'matrix_narrow_top',
+              'mirror_matrix_wide_bottom',
+              'mirror_matrix_narrow_top',
+            ],
+          },
+        ],
+      },
+    });
+    // Compares the outline with its own reflection about its centre line.
+    const differencesFromMirrorImage = (dxf: string) => {
+      const segments = dxfLineSegments(dxf);
+      const width = Math.max(...segments.flat().map(([x]) => x));
+      const mirrored = segments.map(([start, end]) => [
+        [width - start[0], start[1]],
+        [width - end[0], end[1]],
+      ]) as typeof segments;
+      return segmentDifferences(segments, mirrored);
+    };
+
+    // Act
+    const byDefault = await ergogen.process(mirroredBoard({}));
+    const optedOut = await ergogen.process(mirroredBoard({ symmetric: false }));
+
+    // Assert
+    expect(differencesFromMirrorImage(byDefault.outlines.board.dxf)).toEqual({
+      missing: [],
+      unexpected: [],
+    });
+    expect(
+      differencesFromMirrorImage(optedOut.outlines.board.dxf).missing
+    ).not.toEqual([]);
+  });
+
   it('compiles the pinned vendor footprint into a KiCad 8 PCB', () => {
     // Assert
     expect(output.pcbs.board).toContain('(version 20240108)');

@@ -25,7 +25,7 @@ importers:
         version: 8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)
       ergogen:
         specifier: github:ceoloide/ergogen#v4.3.0
-        version: https://codeload.github.com/ceoloide/ergogen/tar.gz/37bcf42b621d217a92aceb7e51a310fd898fb7b8
+        version: https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -2537,8 +2537,8 @@ packages:
     resolution: {integrity: sha512-xUtoPkMggbz0MPyPiIWr1Kp4aeWJjDZ6SMvURhimjdZgsRuDplF5/s9hcgGhyXMhs+6vpnuoiZ2kFiu3FMnS8Q==}
     engines: {node: '>=18'}
 
-  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/37bcf42b621d217a92aceb7e51a310fd898fb7b8:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/ceoloide/ergogen/tar.gz/37bcf42b621d217a92aceb7e51a310fd898fb7b8}
+  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07:
+    resolution: {gitHosted: true, integrity: sha512-BYtQarWpdMaMj0RGxDQfoz2dOtm6F3ewO7Wwmzlq76vqRQM7iW3CjVUPGDAXAV9rifVIYD8Ve9qw7920f5EkeA==, tarball: https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07}
     version: 4.3.0
     hasBin: true
 
@@ -3035,8 +3035,8 @@ packages:
     resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
     engines: {node: '>= 6'}
 
-  hull.js@https://codeload.github.com/andriiheonia/hull/tar.gz/ffcf93dbd4df5a8c59f0541af5a9926d01528c5d:
-    resolution: {gitHosted: true, integrity: sha512-Xn+qT9hLlaI+n4z640yYrI6OJA81pkaP34yOVkHs9nJ5FM5LNU8tRaAUfIjFuoKLO2J0Kqi0PiRc0bvdIc/j9Q==, tarball: https://codeload.github.com/andriiheonia/hull/tar.gz/ffcf93dbd4df5a8c59f0541af5a9926d01528c5d}
+  hull.js@https://codeload.github.com/ceoloide/hull/tar.gz/4a8a9147f9f4fcbaf0c8a91a4e8f1b6092b2ca18:
+    resolution: {gitHosted: true, integrity: sha512-o1DHNMh1t+5/EG4KcgHnSGJ5HuL2uqMvmvIyY1mABBao4gfQssCFQRqPBgcqH97iMCcpFUGe53D5U1u+h/pnsw==, tarball: https://codeload.github.com/ceoloide/hull/tar.gz/4a8a9147f9f4fcbaf0c8a91a4e8f1b6092b2ca18}
     version: 1.0.13
 
   human-signals@2.1.0:
@@ -7839,10 +7839,10 @@ snapshots:
 
   environment@1.1.0: {}
 
-  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/37bcf42b621d217a92aceb7e51a310fd898fb7b8:
+  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07:
     dependencies:
       fs-extra: 11.3.6
-      hull: hull.js@https://codeload.github.com/andriiheonia/hull/tar.gz/ffcf93dbd4df5a8c59f0541af5a9926d01528c5d
+      hull: hull.js@https://codeload.github.com/ceoloide/hull/tar.gz/4a8a9147f9f4fcbaf0c8a91a4e8f1b6092b2ca18
       js-yaml: 4.1.1
       jszip: 3.10.1
       kle-serial: '@ijprest/kle-serial@https://codeload.github.com/ergogen/kle-serial/tar.gz/61f29f317d87bbfed0b0b7e646e1b91d4384ac02'
@@ -8512,7 +8512,7 @@ snapshots:
       - supports-color
     optional: true
 
-  hull.js@https://codeload.github.com/andriiheonia/hull/tar.gz/ffcf93dbd4df5a8c59f0541af5a9926d01528c5d:
+  hull.js@https://codeload.github.com/ceoloide/hull/tar.gz/4a8a9147f9f4fcbaf0c8a91a4e8f1b6092b2ca18:
     dependencies:
       monotone-convex-hull-2d: 1.0.1
       robust-segment-intersect: 1.0.1
