@@ -1,3 +1,4 @@
+import yaml from 'js-yaml';
 import { applyPatch } from './yamlPatch';
 
 const expectText = (result: ReturnType<typeof applyPatch>) => {
@@ -197,6 +198,21 @@ points.zones.matrix.rows.bottom:
     expect(added).toBe(
       json.replace('"padding": 17', '"padding": 17, width: u-2')
     );
+  });
+
+  it('refills an empty list inside a multiline flow mapping', () => {
+    // Arrange
+    const json = JSON.stringify({ hull: { points: [] } }, null, 2);
+
+    // Act
+    const result = expectText(
+      applyPatch(json, [
+        { type: 'set', path: ['hull', 'points'], value: ['a', 'b'] },
+      ])
+    );
+
+    // Assert
+    expect(yaml.load(result)).toEqual({ hull: { points: ['a', 'b'] } });
   });
 
   it('replaces an explicit null and keeps CRLF line endings', () => {

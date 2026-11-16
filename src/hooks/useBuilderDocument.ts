@@ -254,7 +254,8 @@ export const useBuilderDocument = (active: boolean): BuilderDocument => {
       // checked layout still describes the synced text.
       let after = result.text;
       const synced = applyPatch(after, syncManagedHull(after, checked.layout));
-      if (synced.ok) after = synced.text;
+      if (!synced.ok) return { reason: synced.reason, changed: false };
+      after = synced.text;
       record({ before, after, label });
       setNotice(null);
       setDraft(null);

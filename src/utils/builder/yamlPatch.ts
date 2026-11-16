@@ -510,7 +510,12 @@ const refillEmptyList = (
 };
 
 /** Replaces the value of an existing `key: value` pair. */
-const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
+const replaceValue = (
+  text: string,
+  map: YAMLMap,
+  pair: Pair,
+  value: PatchValue
+): string => {
   const valueNode = pair.value as YamlNode | null;
   const keyNode = pair.key as YamlNode;
   if (isAlias(valueNode)) {
@@ -534,7 +539,7 @@ const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
   if (!valueNode?.range) {
     return refuse('Unexpected value layout.');
   }
-  const refilled = refillEmptyList(text, pair, value);
+  const refilled = map.flow ? null : refillEmptyList(text, pair, value);
   if (refilled !== null) return refilled;
   const [from, to] = valueNode.range;
   if (isCollection(valueNode) && !valueNode.flow) {
@@ -704,7 +709,7 @@ const applySet = (
   operation: Extract<PatchOperation, { type: 'set' }>
 ): string => {
   if (location.kind === 'value') {
-    return replaceValue(text, location.pair, operation.value);
+    return replaceValue(text, location.map, location.pair, operation.value);
   }
   if (location.emptyPair) {
     return fillEmptyPair(text, location.emptyPair, {

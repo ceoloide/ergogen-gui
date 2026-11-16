@@ -266,6 +266,25 @@ describe('Builder', () => {
     expect(currentText()).toBe(extended);
   });
 
+  it('refuses the whole edit when the managed hull cannot be synced', async () => {
+    // Arrange
+    const initial = BUILDER_STARTER_CONFIG.replace(
+      '      points:\n',
+      '      points: &boardKeys\n'
+    );
+    await renderBuilder(initial);
+
+    // Act
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete column' })
+    );
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(/anchor/);
+    expect(currentText()).toBe(initial);
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  });
+
   it('refuses an edit while the YAML has changed since the layout', async () => {
     // Arrange: typing in the editor updates the realtime text first
     const user = userEvent.setup();
