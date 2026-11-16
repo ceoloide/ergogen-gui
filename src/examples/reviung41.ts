@@ -54,18 +54,12 @@ points:
             mirror.column_net: P4
       rows:
         bottom:
-          key:
-            padding: U
           row_net: P21
           mirror.row_net: P18
         home:
-          key:
-            padding: U
           row_net: P20
           mirror.row_net: P15
         top:
-          key:
-            padding: U
           row_net: P19
           mirror.row_net: P14
     thumb_middle:
