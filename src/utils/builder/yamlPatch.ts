@@ -1,0 +1,601 @@
+/**
+ * Text-preserving edits of an Ergogen YAML configuration.
+ *
+ * The builder never re-serializes a whole document. Each operation finds the
+ * exact source range of the value it changes (with the `yaml` package's
+ * concrete ranges) and splices new text into it, so comments, blank lines,
+ * quoting and flow/block style elsewhere stay byte for byte. Ergogen expands
+ * dotted keys (`matrix.columns.pinky: …`) before reading a config, so paths are
+ * matched against both dotted and nested spellings.
+ *
+ * Every splice is then checked: the edited text must parse with js-yaml (the
+ * parser the engine uses), and after Ergogen's own key expansion it must equal
+ * the old configuration with exactly the intended change. Anything else is
+ * refused with a reason instead of risking a silent corruption.
+ */
+import yaml from 'js-yaml';
+import {
+  parseDocument,
+  isAlias,
+  isMap,
+  isScalar,
+  isCollection,
+  Pair,
+  YAMLMap,
+  Node as YamlNode,
+} from 'yaml';
+import { unnest } from './unnest';
+
+export type PatchValue =
+  | string
+  | number
+  | boolean
+  | null
+  | PatchValue[]
+  | { [key: string]: PatchValue };
+
+export type PatchOperation =
+  | {
+      type: 'set';
+      path: string[];
+      value: PatchValue;
+      /** For a new key: insert it right after this sibling key. */
+      after?: string;
+    }
+  | { type: 'delete'; path: string[] };
+
+type PatchResult = { ok: true; text: string } | { ok: false; reason: string };
+
+/** Keys whose meaning depends on preprocessing the builder cannot follow. */
+const PREPROCESSOR_KEYS = ['$extends', '$params', '$args', '$skip'];
+
+class PatchRefusal extends Error {}
+
+const refuse = (reason: string): never => {
+  throw new PatchRefusal(reason);
+};
+
+const formatPath = (path: string[]) => path.join('.');
+
+const roundNumber = (value: number) => {
+  if (!Number.isFinite(value)) {
+    return refuse('Only finite numbers can be written.');
+  }
+  const rounded = Math.round(value * 10000) / 10000;
+  return Object.is(rounded, -0) ? 0 : rounded;
+};
+
+const loadsAs = (source: string, expected: string) => {
+  try {
+    const block = yaml.load(`k: ${source}`) as { k?: unknown } | null;
+    const flow = yaml.load(`[${source}]`) as unknown[] | null;
+    return block?.k === expected && Array.isArray(flow) && flow[0] === expected;
+  } catch {
+    return false;
+  }
+};
+
+/** Serializes a scalar or a list in flow style, valid in any context. */
+const formatFlow = (value: PatchValue): string => {
+  if (value === null) return 'null';
+  if (typeof value === 'number') return String(roundNumber(value));
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'string') {
+    const plain =
+      value.trim() === value && value !== '' && loadsAs(value, value);
+    return plain ? value : JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(formatFlow).join(', ')}]`;
+  }
+  const entries = Object.entries(value).map(
+    ([key, item]) => `${formatKey(key)}: ${formatFlow(item)}`
+  );
+  return `{${entries.join(', ')}}`;
+};
+
+const formatKey = (key: string) =>
+  /^[A-Za-z0-9_$][A-Za-z0-9_$.-]*$/.test(key) && loadsAs(key, key)
+    ? key
+    : JSON.stringify(key);
+
+const isPlainObject = (
+  value: PatchValue | undefined
+): value is { [key: string]: PatchValue } =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isListOfObjects = (value: PatchValue) =>
+  Array.isArray(value) && value.some((item) => isPlainObject(item));
+
+/**
+ * Serializes `key: value` as block lines at the given indentation. Mappings
+ * become nested blocks, lists of mappings become block sequences, and other
+ * values stay in flow style. A null value is written as an empty `key:`.
+ */
+const formatBlockEntry = (
+  key: string,
+  value: PatchValue,
+  indent: string,
+  unit: string
+): string[] => {
+  const head = `${indent}${formatKey(key)}:`;
+  if (value === null) return [head];
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value);
+    if (!entries.length) return [`${head} {}`];
+    return [
+      head,
+      ...entries.flatMap(([childKey, childValue]) =>
+        formatBlockEntry(childKey, childValue, indent + unit, unit)
+      ),
+    ];
+  }
+  if (Array.isArray(value) && isListOfObjects(value)) {
+    const lines = [head];
+    for (const item of value) {
+      if (isPlainObject(item)) {
+        const itemLines = Object.entries(item).flatMap(([k, v]) =>
+          formatBlockEntry(k, v, `${indent}${unit}  `, unit)
+        );
+        const first = itemLines[0] ?? `${indent}${unit}  {}`;
+        lines.push(
+          `${indent}${unit}- ${first.trimStart()}`,
+          ...itemLines.slice(1)
+        );
+      } else {
+        lines.push(`${indent}${unit}- ${formatFlow(item)}`);
+      }
+    }
+    return lines;
+  }
+  return [`${head} ${formatFlow(value)}`];
+};
+
+const lineStart = (text: string, offset: number) =>
+  text.lastIndexOf('\n', offset - 1) + 1;
+
+const columnOf = (text: string, offset: number) =>
+  offset - lineStart(text, offset);
+
+/** The offset just after the line holding `offset - 1`, or the text end. */
+const afterLine = (text: string, offset: number) => {
+  if (offset > 0 && text[offset - 1] === '\n') return offset;
+  const newline = text.indexOf('\n', offset);
+  return newline === -1 ? text.length : newline + 1;
+};
+
+const detectEol = (text: string) => (text.includes('\r\n') ? '\r\n' : '\n');
+
+/** Indentation step used by the document's block mappings (default two). */
+const detectIndentUnit = (text: string) => {
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length - 1; i++) {
+    const current = lines[i];
+    if (!/^\s*[^\s#-][^#]*:\s*(#.*)?$/.test(current)) continue;
+    const next = lines.slice(i + 1).find((line) => line.trim() !== '');
+    if (!next) continue;
+    const step =
+      next.length -
+      next.trimStart().length -
+      (current.length - current.trimStart().length);
+    if (step > 0 && step <= 8) return ' '.repeat(step);
+  }
+  return '  ';
+};
+
+const keyText = (pair: Pair): string | null => {
+  const key = pair.key;
+  if (isScalar(key) && key.value !== null && key.value !== undefined) {
+    return String(key.value);
+  }
+  return null;
+};
+
+const assertEditableMap = (map: YAMLMap, at: string) => {
+  for (const pair of map.items) {
+    const key = keyText(pair);
+    if (key === null) {
+      return refuse(`"${at}" has a complex or merge key; edit it in YAML.`);
+    }
+    if (key === '<<') {
+      return refuse(`"${at}" uses a YAML merge key; edit it in YAML.`);
+    }
+    if (PREPROCESSOR_KEYS.includes(key)) {
+      return refuse(`"${at}" uses ${key}; edit it in YAML.`);
+    }
+  }
+};
+
+type Location =
+  | {
+      kind: 'value';
+      map: YAMLMap;
+      pair: Pair;
+    }
+  | {
+      kind: 'missing';
+      /** The deepest existing map, or the pair whose empty value must become one. */
+      map?: YAMLMap;
+      emptyPair?: Pair;
+      remaining: string[];
+      siblingPrefix: boolean;
+    };
+
+/**
+ * Finds where `path` lives, following dotted keys (`a.b: 1` counts as
+ * `a: {b: 1}`). Refuses aliases, merge keys, preprocessor keys and paths that
+ * two spellings both define.
+ */
+const locate = (root: YAMLMap, path: string[]): Location => {
+  let map = root;
+  let index = 0;
+  for (;;) {
+    const at = formatPath(path.slice(0, index)) || 'the document';
+    assertEditableMap(map, at);
+    const remaining = path.slice(index);
+    const candidates = map.items.filter((pair) => {
+      const segments = (keyText(pair) as string).split('.');
+      return (
+        segments.length <= remaining.length &&
+        segments.every((segment, i) => segment === remaining[i])
+      );
+    });
+    if (candidates.length > 1) {
+      return refuse(
+        `"${formatPath(path)}" is written in more than one place (dotted and nested keys); edit it in YAML.`
+      );
+    }
+    if (!candidates.length) {
+      const siblingPrefix = map.items.some(
+        (pair) => (keyText(pair) as string).split('.')[0] === remaining[0]
+      );
+      return { kind: 'missing', map, remaining, siblingPrefix };
+    }
+    const pair = candidates[0];
+    const consumed = (keyText(pair) as string).split('.').length;
+    index += consumed;
+    if (index === path.length) {
+      return { kind: 'value', map, pair };
+    }
+    const value = pair.value as YamlNode | null;
+    if (isAlias(value)) {
+      return refuse(
+        `"${formatPath(path.slice(0, index))}" is a YAML alias; edit it in YAML.`
+      );
+    }
+    if (value === null || (isScalar(value) && value.value === null)) {
+      return {
+        kind: 'missing',
+        emptyPair: pair,
+        remaining: path.slice(index),
+        siblingPrefix: false,
+      };
+    }
+    if (!isMap(value)) {
+      return refuse(
+        `"${formatPath(path.slice(0, index))}" is not a mapping; edit it in YAML.`
+      );
+    }
+    if (value.anchor) {
+      return refuse(
+        `"${formatPath(path.slice(0, index))}" has a YAML anchor that other keys may share; edit it in YAML.`
+      );
+    }
+    map = value;
+  }
+};
+
+const nestedValue = (remaining: string[], value: PatchValue): PatchValue =>
+  remaining
+    .slice(1)
+    .reduceRight<PatchValue>((inner, key) => ({ [key]: inner }), value);
+
+/** Inserts `remaining = value` as a new entry of a block or flow map. */
+const insertIntoMap = (
+  text: string,
+  map: YAMLMap,
+  remaining: string[],
+  value: PatchValue,
+  dotted: boolean,
+  after: string | undefined
+): string => {
+  const eol = detectEol(text);
+  const key = dotted ? remaining.join('.') : remaining[0];
+  const entryValue = dotted ? value : nestedValue(remaining, value);
+  const [start, valueEnd] = map.range as [number, number, number];
+
+  if (map.flow) {
+    const close = text.lastIndexOf('}', valueEnd - 1);
+    if (close < start) return refuse('Unexpected flow mapping layout.');
+    if (after !== undefined) {
+      return refuse('Cannot insert in order into a flow mapping.');
+    }
+    const before = text.slice(start + 1, close);
+    const separator = before.trim() === '' ? '' : ', ';
+    const insertion = `${separator}${formatKey(key)}: ${formatFlow(entryValue)}`;
+    const trimmedEnd = start + 1 + before.trimEnd().length;
+    const trailingSpace = before.slice(before.trimEnd().length);
+    return (
+      text.slice(0, trimmedEnd) + insertion + trailingSpace + text.slice(close)
+    );
+  }
+
+  const firstKey = map.items[0]?.key as YamlNode | undefined;
+  if (!firstKey?.range) return refuse('Unexpected empty block mapping.');
+  const indent = ' '.repeat(columnOf(text, firstKey.range[0]));
+  if (
+    text.slice(lineStart(text, firstKey.range[0]), firstKey.range[0]).trim()
+  ) {
+    return refuse('A mapping that starts mid-line cannot be extended safely.');
+  }
+  let position = afterLine(text, valueEnd);
+  if (after !== undefined) {
+    const sibling = map.items.find((pair) => keyText(pair) === after);
+    if (!sibling) return refuse(`Cannot find "${after}" to insert after.`);
+    const siblingValue = sibling.value as YamlNode | null;
+    const siblingEnd = siblingValue?.range
+      ? siblingValue.range[1]
+      : (sibling.key as YamlNode).range![1];
+    position = afterLine(text, siblingEnd);
+  }
+  const unit = detectIndentUnit(text);
+  const lines = formatBlockEntry(key, entryValue, indent, unit);
+  const prefix = position === text.length && !text.endsWith('\n') ? eol : '';
+  return (
+    text.slice(0, position) +
+    prefix +
+    lines.join(eol) +
+    eol +
+    text.slice(position)
+  );
+};
+
+/**
+ * Writes `entries` as block children under `key:` whose value is empty or an
+ * explicit null (`null` or `~`, which is removed first).
+ */
+const fillEmptyPair = (
+  text: string,
+  pair: Pair,
+  entries: { [key: string]: PatchValue }
+): string => {
+  const eol = detectEol(text);
+  const keyNode = pair.key as YamlNode;
+  const keyStart = keyNode.range![0];
+  const keyEnd = keyNode.range![1];
+  if (text.slice(lineStart(text, keyStart), keyStart).trim() !== '') {
+    return refuse('A key that starts mid-line cannot be extended safely.');
+  }
+  let source = text;
+  const valueNode = pair.value as YamlNode | null;
+  if (valueNode && isScalar(valueNode) && valueNode.range) {
+    const [from, to] = valueNode.range;
+    if (to > from) {
+      const lineEnd = text.indexOf('\n', to);
+      const rest = text.slice(to, lineEnd === -1 ? text.length : lineEnd);
+      if (rest.trim() !== '' && !rest.trim().startsWith('#')) {
+        return refuse('Cannot add nested values inside a flow mapping.');
+      }
+      source = text.slice(0, from).replace(/[ \t]+$/, '') + text.slice(to);
+    }
+  }
+  const indent = ' '.repeat(columnOf(source, keyStart));
+  const unit = detectIndentUnit(source);
+  const position = afterLine(source, keyEnd);
+  const lines = Object.entries(entries).flatMap(([key, value]) =>
+    formatBlockEntry(key, value, indent + unit, unit)
+  );
+  const prefix =
+    position === source.length && !source.endsWith('\n') ? eol : '';
+  return (
+    source.slice(0, position) +
+    prefix +
+    lines.join(eol) +
+    eol +
+    source.slice(position)
+  );
+};
+
+/** Replaces the value of an existing `key: value` pair. */
+const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
+  const valueNode = pair.value as YamlNode | null;
+  const keyNode = pair.key as YamlNode;
+  if (isAlias(valueNode)) {
+    return refuse('The value is a YAML alias; edit it in YAML.');
+  }
+  if (valueNode?.anchor) {
+    return refuse('The value has a YAML anchor; edit it in YAML.');
+  }
+  const isEmpty =
+    !valueNode || (isScalar(valueNode) && valueNode.value === null);
+  if (isPlainObject(value) && Object.keys(value).length) {
+    if (!isEmpty) {
+      return refuse('Replacing a structured value is not supported here.');
+    }
+    return fillEmptyPair(text, pair, value);
+  }
+  if (isListOfObjects(value)) {
+    return refuse('Replacing a list of mappings is not supported here.');
+  }
+  const replacement = formatFlow(value);
+  if (!valueNode?.range) {
+    return refuse('Unexpected value layout.');
+  }
+  const [from, to] = valueNode.range;
+  if (isCollection(valueNode) && !valueNode.flow) {
+    // A block list or map: replace everything after the colon.
+    const colon = text.indexOf(':', keyNode.range![1]);
+    const newline = text.slice(from, to).endsWith('\n') ? detectEol(text) : '';
+    return (
+      text.slice(0, colon + 1) + ' ' + replacement + newline + text.slice(to)
+    );
+  }
+  if (from === to) {
+    const needsSpace = text[from - 1] === ':';
+    return (
+      text.slice(0, from) +
+      (needsSpace ? ' ' : '') +
+      replacement +
+      text.slice(to)
+    );
+  }
+  return text.slice(0, from) + replacement + text.slice(to);
+};
+
+/** Removes a `key: value` pair, including its trailing comment line. */
+const deletePair = (text: string, map: YAMLMap, pair: Pair): string => {
+  if (map.flow) return refuse('Cannot remove entries from a flow mapping.');
+  const keyNode = pair.key as YamlNode;
+  const start = lineStart(text, keyNode.range![0]);
+  if (text.slice(start, keyNode.range![0]).trim() !== '') {
+    return refuse('A key that starts mid-line cannot be removed safely.');
+  }
+  const valueNode = pair.value as YamlNode | null;
+  const end = afterLine(
+    text,
+    valueNode?.range ? valueNode.range[1] : keyNode.range![1]
+  );
+  return text.slice(0, start) + text.slice(end);
+};
+
+const parseRoot = (text: string): YAMLMap => {
+  const doc = parseDocument(text, { uniqueKeys: true });
+  if (doc.errors.length) {
+    return refuse(`The YAML has an error: ${doc.errors[0].message}`);
+  }
+  if (!isMap(doc.contents)) {
+    return refuse('Only YAML or JSON mappings can be edited visually.');
+  }
+  return doc.contents;
+};
+
+const applyOne = (text: string, operation: PatchOperation): string => {
+  const root = parseRoot(text);
+  const location = locate(root, operation.path);
+  if (operation.type === 'delete') {
+    if (location.kind !== 'value') return text;
+    return deletePair(text, location.map, location.pair);
+  }
+  if (location.kind === 'value') {
+    return replaceValue(text, location.pair, operation.value);
+  }
+  if (location.emptyPair) {
+    return fillEmptyPair(text, location.emptyPair, {
+      [location.remaining[0]]: nestedValue(location.remaining, operation.value),
+    });
+  }
+  const map = location.map as YAMLMap;
+  if (!map.items.length) {
+    return refuse('Cannot add to an empty mapping; edit it in YAML.');
+  }
+  return insertIntoMap(
+    text,
+    map,
+    location.remaining,
+    operation.value,
+    location.siblingPrefix && location.remaining.length > 1,
+    location.remaining.length === 1 ? operation.after : undefined
+  );
+};
+
+/* Semantic check ---------------------------------------------------------- */
+
+type Plain = unknown;
+
+const loadExpanded = (text: string): Plain => {
+  const parsed = yaml.load(text);
+  return unnest(parsed);
+};
+
+const clone = (value: Plain): Plain =>
+  value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+
+const expectMutation = (config: Plain, operation: PatchOperation): Plain => {
+  const result = clone(config) as Record<string, unknown>;
+  let parent: Record<string, unknown> = result;
+  const path = operation.path;
+  for (const segment of path.slice(0, -1)) {
+    const next = parent[segment];
+    if (typeof next !== 'object' || next === null || Array.isArray(next)) {
+      if (operation.type === 'delete') return result;
+      parent[segment] = {};
+    }
+    parent = parent[segment] as Record<string, unknown>;
+  }
+  const last = path[path.length - 1];
+  if (operation.type === 'delete') {
+    delete parent[last];
+    return result;
+  }
+  const value = clone(normalizeValue(operation.value));
+  if (operation.after !== undefined && !(last in parent)) {
+    const entries = Object.entries(parent);
+    const index = entries.findIndex(([key]) => key === operation.after);
+    entries.splice(index + 1, 0, [last, value]);
+    for (const key of Object.keys(parent)) delete parent[key];
+    for (const [key, entry] of entries) parent[key] = entry;
+  } else {
+    parent[last] = value;
+  }
+  return result;
+};
+
+const normalizeValue = (value: PatchValue): PatchValue => {
+  if (typeof value === 'number') return roundNumber(value);
+  if (Array.isArray(value)) return value.map(normalizeValue);
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, normalizeValue(v)])
+    );
+  }
+  return value;
+};
+
+const sameValue = (a: Plain, b: Plain) =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Applies operations in order to `text` and returns the edited text, or the
+ * reason the edit was refused. The input is never partially changed.
+ */
+export const applyPatch = (
+  text: string,
+  operations: PatchOperation[]
+): PatchResult => {
+  let current = text;
+  try {
+    for (const operation of operations) {
+      if (!operation.path.length) return { ok: false, reason: 'Empty path.' };
+      const before = loadExpanded(current);
+      const next = applyOne(current, operation);
+      let after: Plain;
+      try {
+        after = loadExpanded(next);
+      } catch (error) {
+        return {
+          ok: false,
+          reason: `The edit would break the YAML (${(error as Error).message.split('\n')[0]}), so it was not applied.`,
+        };
+      }
+      if (!sameValue(after, expectMutation(before, operation))) {
+        return {
+          ok: false,
+          reason: `Changing "${formatPath(operation.path)}" here would also change other values, so it was not applied; edit it in YAML.`,
+        };
+      }
+      current = next;
+    }
+  } catch (error) {
+    if (error instanceof PatchRefusal) {
+      return { ok: false, reason: error.message };
+    }
+    if (error instanceof yaml.YAMLException) {
+      return {
+        ok: false,
+        reason: `The YAML has an error: ${error.message.split('\n')[0]}`,
+      };
+    }
+    throw error;
+  }
+  return { ok: true, text: current };
+};

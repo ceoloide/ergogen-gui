@@ -9,6 +9,7 @@ import {
 import styled from 'styled-components';
 import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useLocation } from 'react-router-dom';
 
 import ConfigEditor from './molecules/ConfigEditor';
 import InjectionEditor from './molecules/InjectionEditor';
@@ -16,6 +17,7 @@ import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
 import ResizablePanel from './molecules/ResizablePanel';
+import Builder from './organisms/Builder';
 import { Preview } from './atoms/DownloadRow';
 
 import { useConfigContext } from './context/ConfigContext';
@@ -256,6 +258,74 @@ const RightPane = styled.div<{ $fullWidth?: boolean }>`
 `;
 
 /**
+ * The centre column: the Outputs/Build switch above the active view.
+ */
+const CenterColumn = styled.div`
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+`;
+
+const CenterContent = styled.div`
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+`;
+
+const ViewSwitchBar = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid ${theme.colors.border};
+  flex-shrink: 0;
+
+  @media (max-width: 639px) {
+    display: none;
+  }
+`;
+
+const ViewSwitchGroup = styled.div`
+  display: inline-flex;
+  border: 1px solid ${theme.colors.border};
+  border-radius: 6px;
+  overflow: hidden;
+`;
+
+const ViewSwitchButton = styled.button<{ $active: boolean }>`
+  background: ${(props) =>
+    props.$active ? theme.colors.accentDarker : 'transparent'};
+  color: ${theme.colors.white};
+  border: none;
+  padding: 0.3rem 0.9rem;
+  font-family: ${theme.fonts.body};
+  font-size: ${theme.fontSizes.bodySmall};
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  .material-symbols-outlined {
+    font-size: ${theme.fontSizes.iconMedium};
+  }
+
+  &:hover {
+    background: ${(props) =>
+      props.$active ? theme.colors.accentDarker : theme.colors.buttonHover};
+  }
+
+  &:focus-visible {
+    outline: 2px solid ${theme.colors.white};
+    outline-offset: -2px;
+  }
+`;
+
+type CenterView = 'outputs' | 'build';
+
+/**
  * A container for nested right pane content.
  */
 const NestedRightPane = styled.div`
@@ -302,6 +372,15 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
   });
 
   const [showShareDialog, setShowShareDialog] = useState(false);
+
+  // The Build view opens directly when the welcome page's "Build visually"
+  // card navigates here.
+  const location = useLocation();
+  const [centerView, setCenterView] = useState<CenterView>(() =>
+    (location.state as { view?: string } | null)?.view === 'build'
+      ? 'build'
+      : 'outputs'
+  );
 
   /**
    * Wrapper function to set preview and hide downloads panel.
@@ -595,12 +674,34 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
               Config
             </OutlineIconButton>
             <OutlineIconButton
-              className={!configContext.showConfig ? 'active' : ''}
-              onClick={() => configContext.setShowConfig(false)}
+              className={
+                !configContext.showConfig && centerView === 'outputs'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() => {
+                setCenterView('outputs');
+                configContext.setShowConfig(false);
+              }}
               aria-label="Show outputs panel"
               data-testid="mobile-outputs-button"
             >
               Outputs
+            </OutlineIconButton>
+            <OutlineIconButton
+              className={
+                !configContext.showConfig && centerView === 'build'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() => {
+                setCenterView('build');
+                configContext.setShowConfig(false);
+              }}
+              aria-label="Show build panel"
+              data-testid="mobile-build-button"
+            >
+              Build
             </OutlineIconButton>
             <Spacer />
             {configContext.showConfig && (
@@ -635,7 +736,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                 </OutlineIconButton>
               </>
             )}
-            {!configContext.showConfig && (
+            {!configContext.showConfig && centerView === 'outputs' && (
               <>
                 <SubHeaderResponsiveIconButton
                   onClick={handleDownloadArchive}
@@ -720,42 +821,82 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                 </ResizablePanel>
               )}
               <RightPane $fullWidth={!configContext.showConfig}>
-                {configContext.showDownloads ? (
-                  <>
-                    <NestedRightPane>
-                      <StyledFilePreview
-                        data-testid={`${preview.key}-file-preview`}
-                        previewExtension={preview.extension}
-                        previewKey={`${preview.key}-${configContext.resultsVersion}`}
-                        previewContent={preview.content}
-                      />
-                    </NestedRightPane>
-                    <ResizablePanel
-                      initialWidth={getInitialRightWidth()}
-                      minWidth={105}
-                      maxWidth="30%"
-                      side="right"
-                      data-testid="downloads-panel"
-                    >
-                      <ScrollablePanelContainer>
-                        <Downloads
-                          setPreview={handleSetPreview}
-                          previewKey={preview.key}
-                          data-testid="downloads-container"
+                <CenterColumn>
+                  <ViewSwitchBar>
+                    <ViewSwitchGroup role="group" aria-label="Centre view">
+                      <ViewSwitchButton
+                        type="button"
+                        $active={centerView === 'outputs'}
+                        aria-pressed={centerView === 'outputs'}
+                        onClick={() => setCenterView('outputs')}
+                        data-testid="view-outputs-button"
+                      >
+                        <span
+                          className="material-symbols-outlined"
+                          aria-hidden="true"
+                        >
+                          preview
+                        </span>
+                        Outputs
+                      </ViewSwitchButton>
+                      <ViewSwitchButton
+                        type="button"
+                        $active={centerView === 'build'}
+                        aria-pressed={centerView === 'build'}
+                        onClick={() => setCenterView('build')}
+                        data-testid="view-build-button"
+                      >
+                        <span
+                          className="material-symbols-outlined"
+                          aria-hidden="true"
+                        >
+                          design_services
+                        </span>
+                        Build
+                      </ViewSwitchButton>
+                    </ViewSwitchGroup>
+                  </ViewSwitchBar>
+                  <CenterContent>
+                    {centerView === 'build' ? (
+                      <Builder />
+                    ) : configContext.showDownloads ? (
+                      <>
+                        <NestedRightPane>
+                          <StyledFilePreview
+                            data-testid={`${preview.key}-file-preview`}
+                            previewExtension={preview.extension}
+                            previewKey={`${preview.key}-${configContext.resultsVersion}`}
+                            previewContent={preview.content}
+                          />
+                        </NestedRightPane>
+                        <ResizablePanel
+                          initialWidth={getInitialRightWidth()}
+                          minWidth={105}
+                          maxWidth="30%"
+                          side="right"
+                          data-testid="downloads-panel"
+                        >
+                          <ScrollablePanelContainer>
+                            <Downloads
+                              setPreview={handleSetPreview}
+                              previewKey={preview.key}
+                              data-testid="downloads-container"
+                            />
+                          </ScrollablePanelContainer>
+                        </ResizablePanel>
+                      </>
+                    ) : (
+                      <NestedRightPane>
+                        <StyledFilePreview
+                          data-testid={`${preview.key}-file-preview`}
+                          previewExtension={preview.extension}
+                          previewKey={`${preview.key}-${configContext.resultsVersion}`}
+                          previewContent={preview.content}
                         />
-                      </ScrollablePanelContainer>
-                    </ResizablePanel>
-                  </>
-                ) : (
-                  <NestedRightPane>
-                    <StyledFilePreview
-                      data-testid={`${preview.key}-file-preview`}
-                      previewExtension={preview.extension}
-                      previewKey={`${preview.key}-${configContext.resultsVersion}`}
-                      previewContent={preview.content}
-                    />
-                  </NestedRightPane>
-                )}
+                      </NestedRightPane>
+                    )}
+                  </CenterContent>
+                </CenterColumn>
               </RightPane>
             </>
           ) : (

@@ -428,6 +428,37 @@ Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
   blur flushes it. Download and generate actions read the current buffer through
   `getRealtimeConfigInput()` rather than the debounced state.
 
+## Build view
+
+The Build view (`src/organisms/Builder.tsx`) has no layout model of its own: the
+YAML in `ConfigContext` is the only source of truth.
+
+- **Layout**: `src/utils/builder/pointsPreview.ts` runs Ergogen's own modules up
+  to the points stage (interpretation, the four preprocessing passes, units,
+  points), so positions match a full generation (`builderEngine.test.ts` checks
+  this). Skipped keys are found by a second points pass without `skip` flags;
+  the real layout is unaffected. It runs in `points.worker.ts`, a separate quiet
+  worker, through `previewClient.ts`, where the latest request wins. Outlines,
+  cases and PCBs are not computed, which keeps a preview to milliseconds.
+- **Edits**: `src/utils/builder/yamlPatch.ts` splices new text into the source
+  ranges that the `yaml` package reports, following dotted and nested keys.
+  After each splice it reloads the text with js-yaml and Ergogen's `unnest` and
+  requires exactly the intended change; otherwise, and for aliases, merge keys,
+  `$extends`, `$params`, `$args` and `$skip`, it refuses with a reason.
+  `layoutModel.ts` maps scopes to the five levels Ergogen merges per key and
+  reports where a value comes from; `structureOps.ts` builds column, row, zone,
+  thumb cluster and mirror edits.
+- **Commit and history**: `src/hooks/useBuilderDocument.ts` commits through
+  `updateRealtimeConfigInput` and `setConfigInput`, like the editor, so shared
+  configurations fork and saving works as usual. A drag only previews until the
+  pointer is released, then commits once. Undo and redo are in memory, reset
+  when another configuration opens, and are cleared when the text no longer
+  matches the builder's last edit.
+- **Handles** map pointer movement to one value and never draw geometry
+  themselves. The zone move handle is only offered for an anchor with a plain
+  numeric `shift` and no reference, rotation or zone or board rotation, where
+  the shift is in board coordinates.
+
 ## Loading and injections
 
 - **Providers** register in `src/utils/gitProvider.ts`. GitHub handles

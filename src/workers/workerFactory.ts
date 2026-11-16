@@ -39,3 +39,21 @@ export const createJscadWorker = (): Worker | null => {
     return null;
   }
 };
+
+/**
+ * Factory function for the Build view's points-only preview worker.
+ */
+export const createPointsWorker = (): Worker | null => {
+  if (typeof window === 'undefined' || !('Worker' in window)) {
+    return null;
+  }
+
+  try {
+    return new Worker(new URL('./points.worker.ts', import.meta.url), {
+      type: 'module',
+    });
+  } catch (e) {
+    console.error('Failed to create points worker:', e);
+    return null;
+  }
+};

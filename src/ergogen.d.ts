@@ -7,3 +7,6 @@ declare module 'ergogen/src/point';
 declare module 'ergogen/src/prepare';
 declare module 'ergogen/src/anchor';
 declare module 'ergogen/src/filter';
+declare module 'ergogen/src/io';
+declare module 'ergogen/src/units';
+declare module 'ergogen/src/points';
