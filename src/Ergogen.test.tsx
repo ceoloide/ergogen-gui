@@ -373,8 +373,9 @@ describe('Ergogen centre view switch', () => {
     // Act
     fireEvent.click(outputs);
 
-    // Assert
-    expect(screen.queryByTestId('mock-builder')).not.toBeInTheDocument();
+    // Assert: the builder is hidden but kept, with its history
+    expect(screen.getByTestId('mock-builder')).not.toBeVisible();
+    expect(screen.getByTestId('mock-downloads')).toBeInTheDocument();
   });
 
   it('opens the Build view from the mobile sub-header', () => {

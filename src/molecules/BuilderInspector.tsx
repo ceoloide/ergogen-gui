@@ -434,8 +434,11 @@ const BuilderInspector = ({
             );
           }}
         />
-        Skip{' '}
-        {scope === 'key' ? 'this key' : `keys in this ${describeScope(scope)}`}
+        {scope === 'key'
+          ? 'Skip this key'
+          : scope === 'all'
+            ? 'Skip all keys'
+            : `Skip keys in this ${scope}`}
         {selected.skipped ? ' (this key is skipped)' : ''}
       </CheckboxLabel>
     );

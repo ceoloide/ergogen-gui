@@ -268,6 +268,12 @@ const CenterColumn = styled.div`
   flex-direction: column;
 `;
 
+const BuildSlot = styled.div`
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+`;
+
 const CenterContent = styled.div`
   position: relative;
   flex: 1;
@@ -381,6 +387,10 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
       ? 'build'
       : 'outputs'
   );
+  const [builderOpened, setBuilderOpened] = useState(centerView === 'build');
+  useEffect(() => {
+    if (centerView === 'build') setBuilderOpened(true);
+  }, [centerView]);
 
   /**
    * Wrapper function to set preview and hide downloads panel.
@@ -857,9 +867,19 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                     </ViewSwitchGroup>
                   </ViewSwitchBar>
                   <CenterContent>
-                    {centerView === 'build' ? (
-                      <Builder />
-                    ) : configContext.showDownloads ? (
+                    {builderOpened && (
+                      // Stays mounted once opened, so switching to Outputs
+                      // and back keeps the selection and undo history.
+                      <BuildSlot
+                        style={{
+                          display: centerView === 'build' ? 'flex' : 'none',
+                        }}
+                      >
+                        <Builder />
+                      </BuildSlot>
+                    )}
+                    {centerView ===
+                    'build' ? null : configContext.showDownloads ? (
                       <>
                         <NestedRightPane>
                           <StyledFilePreview

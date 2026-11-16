@@ -81,6 +81,33 @@ test.describe('Build view', () => {
       .toMatch(/middle:\n {10}key:\n {12}stagger: -\d+(\.5)?\n/);
     expect(await savedConfig(page)).toContain('# hand-written note');
 
+    // Act: Escape cancels a drag; the layout returns and nothing is written
+    const committed = await savedConfig(page);
+    const settled = await keyBox(page, 'matrix_middle_home');
+    const again = await handle.boundingBox();
+    if (!again) throw new Error('No stagger handle');
+    await page.mouse.move(
+      again.x + again.width / 2,
+      again.y + again.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      again.x + again.width / 2,
+      again.y + again.height / 2 - 40,
+      { steps: 8 }
+    );
+    await expect
+      .poll(async () => (await keyBox(page, 'matrix_middle_home')).y)
+      .toBeLessThan(settled.y - 10);
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+
+    // Assert
+    await expect
+      .poll(async () => (await keyBox(page, 'matrix_middle_home')).y)
+      .toBeCloseTo(settled.y, 0);
+    expect(await savedConfig(page)).toBe(committed);
+
     // Act: an expression through the form, at row scope
     await page.getByRole('radio', { name: 'Row' }).check();
     await expect(page.getByLabel('Padding (mm, row)')).toBeVisible();

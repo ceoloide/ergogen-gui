@@ -118,7 +118,11 @@ export const useBuilderDocument = (active: boolean): BuilderDocument => {
     (operations: PatchOperation[], label: string) => {
       const before = currentText();
       const result = applyPatch(before, operations);
-      if (!result.ok) return result.reason;
+      // A refused edit also ends any drag preview it would have committed.
+      if (!result.ok) {
+        setDraft(null);
+        return result.reason;
+      }
       if (result.text === before) {
         setDraft(null);
         return null;
