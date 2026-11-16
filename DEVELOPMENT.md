@@ -76,8 +76,8 @@ report and traces/screenshots of failures (no retries). A failed test also gets 
 `readiness` attachment (`e2e/utils/readiness.ts`): how busy the machine's CPUs were
 during the test, how many generation requests the Ergogen worker received and
 finished, and the app's worker milestones. A request still running at near 100%
-CPU points to a starved machine; a finished generation without the expected
-outputs points to the app. The console prints its first 300 characters, the HTML
+CPU fits a starved machine but does not prove it; a finished generation without
+the expected outputs points to the app, even at 100% CPU. The console prints its first 300 characters, the HTML
 report all of it. `E2E_SCREENSHOTS=1` also
 saves a full-page screenshot at each test step in `e2e/screenshots/`; it is off
 by default because these check nothing and took 13% of traced test time under
@@ -126,12 +126,14 @@ missing file below the base returns `index.html` with HTTP 200.
 
 Waits for generated outputs start once `page.goto` resolves, before the
 workers have started, so they also cover CPU-bound worker start-up. One A. dux
-page uses 7 to 8 s of CPU in browser threads. Its STL rows appeared 2.2 s into
+page used about 8 s of CPU in browser threads on a quiet machine, and 10 to 11 s
+with other CPU-bound processes running (single samples). Its STL rows appeared 2.2 s into
 the STL test's 10 s wait on an otherwise quiet 4-core machine, and 5.8 to 7.1 s
 into it with four other CPU-bound processes running: the Ergogen and JSCAD
 workers were busy 2.3 to 2.8 times longer for 1.1 to 1.25 times their CPU time.
-Two parallel tests and other load can therefore exceed these waits without any
-change in the app; the `readiness` attachment shows which case a failure is.
+Two parallel tests and other load may therefore exceed these waits without any
+change in the app; the `readiness` attachment helps tell such a failure from an
+app fault, as a diagnostic rather than proof of the cause.
 
 Other test suites worth knowing: `tests/workflow-security.test.ts` checks
 workflow policy; `tests/release-publication.test.ts` runs the deploy workflow's
