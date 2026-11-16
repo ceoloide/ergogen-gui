@@ -1,5 +1,22 @@
 # Changelog
 
+## Briefs 56 Keyboard Example
+
+November 15, 2026
+
+The built-in examples now include **Briefs 56**, a unibody layout based on the
+Dygma Sonsei reference drawing. Choose it under **Miscellaneous** to start with
+56 keys with 19.05 mm along-column pitch for Choc v2 / MX and traced thumb
+positions.
+
+**What changed:**
+
+- **Key layout**: Six columns of four keys and four thumb keys per side.
+- **Outlines**: Separate outer body and central shape, plus a combined preview.
+- **Editable geometry**: Changing `pitch` rescales the entire layout and
+  outlines. The independent `cap` size draws the visible keys; it is not a
+  physical keycap clearance specification.
+
 ## Steadier Previews After Opening a Configuration
 
 November 15, 2026

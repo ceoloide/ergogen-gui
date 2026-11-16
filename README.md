@@ -23,6 +23,15 @@ was created by [@MvEerd](https://github.com/MvEerd) and is maintained by
 Use `infused-kim/diode` for the bundled infused-kim diode footprint. Replace the
 historical typo `infused-kimo/isde` in existing configurations; it is not supported.
 
+**Briefs 56**, under **Miscellaneous**, is a 56-key unibody example traced from
+the Dygma Sonsei layout. It uses 19.05 mm along-column pitch for Choc v2 / MX,
+with traced stagger and thumb positions, and includes key, outer body, central
+shape and combined preview outlines. The body is approximately 297 × 139 mm
+(the drawing is labelled 299 × 140 mm). The 16 mm key shapes represent visible
+caps, not clearance envelopes: full-size 18 mm caps overlap near the thumbs.
+Changing `pitch` rescales the layout and outlines; `cap` changes only the drawn
+key size. These outlines are a design starting point, not fabrication files.
+
 ## Privacy and network use
 
 Configurations stay in browser storage unless you share or export them. The app
