@@ -19,6 +19,7 @@ import {
   isAlias,
   isMap,
   isScalar,
+  isSeq,
   isCollection,
   Pair,
   YAMLMap,
@@ -440,6 +441,74 @@ const fillEmptyPair = (
   );
 };
 
+/**
+ * The lines of `value`, a non-empty list of scalars, written as the block
+ * list `node` is: one `- item` per line at the indentation of its first
+ * item. Null when `node` is not such a list, so the value is written in flow
+ * style instead.
+ */
+const blockListItems = (
+  text: string,
+  node: YamlNode,
+  value: PatchValue
+): string[] | null => {
+  if (!isSeq(node) || node.flow || !Array.isArray(value) || !value.length) {
+    return null;
+  }
+  if (value.some((item) => item !== null && typeof item === 'object')) {
+    return null;
+  }
+  const first = node.items[0] as YamlNode | undefined;
+  if (!first?.range) return null;
+  const start = lineStart(text, first.range[0]);
+  const lead = text.slice(start, first.range[0]);
+  const match = /^( *)- +$/.exec(lead);
+  if (!match) return null;
+  return value.map((item) => `${match[1]}- ${formatFlow(item)}`);
+};
+
+/**
+ * Writes a non-empty list of scalars in block style under `key: []` (as a
+ * block list that lost its last item is written), so the list keeps its
+ * shape when it fills up again. Null when the pair is not laid out that way.
+ */
+const refillEmptyList = (
+  text: string,
+  pair: Pair,
+  value: PatchValue
+): string | null => {
+  const valueNode = pair.value as YamlNode | null;
+  const keyNode = pair.key as YamlNode;
+  if (
+    !isSeq(valueNode) ||
+    !valueNode.flow ||
+    valueNode.items.length ||
+    !valueNode.range ||
+    !Array.isArray(value) ||
+    !value.length ||
+    value.some((item) => item !== null && typeof item === 'object')
+  ) {
+    return null;
+  }
+  const keyStart = keyNode.range![0];
+  const start = lineStart(text, keyStart);
+  if (text.slice(start, keyStart).trim() !== '') return null;
+  const [from, to] = valueNode.range;
+  const lineEnd = text.indexOf('\n', from);
+  const rest = text.slice(to, lineEnd === -1 ? text.length : lineEnd);
+  if (
+    rest.trim() !== '' ||
+    text.slice(keyNode.range![1], from).trim() !== ':'
+  ) {
+    return null;
+  }
+  const eol = detectEol(text);
+  const indent = ' '.repeat(keyStart - start) + detectIndentUnit(text);
+  const lines = value.map((item) => `${indent}- ${formatFlow(item)}`);
+  const colon = text.indexOf(':', keyNode.range![1]);
+  return text.slice(0, colon + 1) + eol + lines.join(eol) + text.slice(to);
+};
+
 /** Replaces the value of an existing `key: value` pair. */
 const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
   const valueNode = pair.value as YamlNode | null;
@@ -465,12 +534,25 @@ const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
   if (!valueNode?.range) {
     return refuse('Unexpected value layout.');
   }
+  const refilled = refillEmptyList(text, pair, value);
+  if (refilled !== null) return refilled;
   const [from, to] = valueNode.range;
   if (isCollection(valueNode) && !valueNode.flow) {
     // A block list or map: replace everything after the colon.
     const colon = text.indexOf(':', keyNode.range![1]);
     const end = pairEnd(text, pair);
     const newline = text.slice(from, end).endsWith('\n') ? detectEol(text) : '';
+    const items = blockListItems(text, valueNode, value);
+    if (items) {
+      const eol = detectEol(text);
+      return (
+        text.slice(0, colon + 1) +
+        eol +
+        items.join(eol) +
+        newline +
+        text.slice(end)
+      );
+    }
     return (
       text.slice(0, colon + 1) + ' ' + replacement + newline + text.slice(end)
     );

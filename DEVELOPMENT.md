@@ -455,14 +455,19 @@ YAML in `ConfigContext` is the only source of truth.
   `layoutModel.ts` maps scopes to the five levels Ergogen merges per key and
   reports where a value comes from; `structureOps.ts` builds column, row, zone,
   thumb cluster and mirror edits, refusing removals of keys that an anchor or
-  the mirror names.
+  the mirror names. `builderHull.ts` finds the hull a `meta.builder.hull`
+  marker hands to the builder (`starterConfig.ts` sets one) and returns the
+  patch that makes its `points` list every unskipped key of a layout.
+  `yamlPatch.ts` keeps such a list in block style, also when it refills
+  `points: []`.
 - **Commit and history**: `src/hooks/useBuilderDocument.ts` commits through
   `updateRealtimeConfigInput` and `setConfigInput`, like the editor, so shared
   configurations fork and saving works as usual. An edit is only made on the
   text the layout shows (or the builder's own last commit), never on text typed
   since. Inspector edits go through `editChecked`, which commits only after the
   engine lays the result out and neither the text nor the open configuration
-  has changed meanwhile (a configuration counter catches a switch to one with
+  has changed meanwhile, adding the managed hull sync to the same commit and
+  undo step (a configuration counter catches a switch to one with
   the same text, or away and back). A drag only previews until the pointer is
   released, then commits once; a cancelled pointer cancels it. Opening another configuration (including leaving a
   shared preview without forking it) clears the layout, selection, messages and

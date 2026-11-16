@@ -24,6 +24,9 @@ written straight into your YAML, keeping your comments and formatting.
   from.
 - **Structure**: Add or remove columns, rows and zones, add a thumb cluster and
   mirror the board, with undo and redo.
+- **Board outline**: The **Build Visually** starter draws keycaps and a board
+  hull around every key; the hull follows the keys you add, remove, skip or
+  mirror.
 
 ## Symmetric Hull Outlines
 

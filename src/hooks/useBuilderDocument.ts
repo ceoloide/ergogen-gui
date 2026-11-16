@@ -13,6 +13,7 @@ import {
 } from '../utils/builder/previewClient';
 import type { Layout } from '../utils/builder/pointsPreview';
 import { applyPatch, PatchOperation } from '../utils/builder/yamlPatch';
+import { syncManagedHull } from '../utils/builder/builderHull';
 
 export type BuilderStatus = 'loading' | 'updating' | 'ready' | 'error';
 
@@ -248,13 +249,19 @@ export const useBuilderDocument = (active: boolean): BuilderDocument => {
           changed: false,
         };
       }
-      record({ before, after: result.text, label });
+      // A board hull the builder owns follows the keys the edit added,
+      // removed, skipped or mirrored. Outlines do not move keys, so the
+      // checked layout still describes the synced text.
+      let after = result.text;
+      const synced = applyPatch(after, syncManagedHull(after, checked.layout));
+      if (synced.ok) after = synced.text;
+      record({ before, after, label });
       setNotice(null);
       setDraft(null);
-      commit(result.text);
+      commit(after);
       // The check already laid the new text out.
-      shownTextRef.current = result.text;
-      accept(checked);
+      shownTextRef.current = after;
+      accept({ ...checked, text: after });
       return { reason: null, changed: true };
     },
     [accept, commit, currentText, isBaseline, record]

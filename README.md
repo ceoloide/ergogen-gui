@@ -37,7 +37,9 @@ fabrication.
 ## Build view
 
 Switch the centre pane from **Outputs** to **Build** (on a phone, use the **Build**
-button), or pick **Build Visually** on the welcome page to start from a 5×3 grid.
+button), or pick **Build Visually** on the welcome page to start from a 5×3 grid
+with 18 mm keycap outlines (`keys`), a board hull around every key (`board`) and
+both stacked in `preview`.
 The canvas shows every key at the position, rotation and size Ergogen computes;
 mirrored keys are dashed and select the key they mirror, skipped keys are faint
 outlines. Drag the background to pan, scroll or use the buttons to zoom.
@@ -58,6 +60,12 @@ outlines. Drag the background to pan, scroll or use the buttons to zoom.
   the mirror refers to is refused with the name of that reference.
 - **Undo and redo** (also Ctrl+Z and Ctrl+Shift+Z) cover builder edits in the
   current configuration.
+- **Board hull**: Ergogen's `hull` only takes a list of key names, so the starter
+  hands its list to the builder with `meta.builder.hull: board.hull`. After each
+  inspector or structure edit, the builder rewrites `outlines.board.hull.points`
+  to name every key, mirrored keys included and skipped keys left out. Remove
+  that marker to edit the list yourself; configurations without it are never
+  changed.
 
 Every edit changes only the affected part of the YAML, so comments, formatting and
 dotted keys elsewhere stay as written. Edits through YAML anchors, merge keys,

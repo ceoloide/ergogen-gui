@@ -188,6 +188,10 @@ describe('Builder', () => {
     expect(currentText()).toContain(
       '          stagger: 3\n        col1:\n        index:'
     );
+    // The starter's board hull takes in the new keys.
+    expect(currentText()).toContain(
+      '        - matrix_middle_top\n        - matrix_col1_bottom\n'
+    );
 
     // Act
     await user.click(screen.getByRole('button', { name: 'Delete column' }));
@@ -471,6 +475,7 @@ describe('Builder', () => {
     const box = screen.getByLabelText(/Skip all keys/);
     expect(box).toBeChecked();
     expect(box).toBeEnabled();
+    expect(currentText()).toContain('      points: []\n');
 
     // Act
     await user.click(box);
@@ -479,6 +484,8 @@ describe('Builder', () => {
     await waitFor(() =>
       expect(screen.getByTestId('builder-status')).toHaveTextContent('15 keys')
     );
+    const outlines = (text: string) => text.slice(text.indexOf('outlines:'));
+    expect(outlines(currentText())).toBe(outlines(commented));
   });
 
   describe('skip inheritance', () => {
@@ -566,9 +573,11 @@ describe('Builder', () => {
       // Act
       await user.click(box);
 
-      // Assert
+      // Assert: the starter's board hull leaves out the skipped key
       await keyCount(14);
-      expect(currentText()).toBe(withKeySkip(commented));
+      expect(currentText()).toBe(
+        withKeySkip(commented).replace('        - matrix_ring_top\n', '')
+      );
     });
   });
 });

@@ -167,6 +167,8 @@ test.describe('Build view', () => {
       '    thumb:\n      anchor:\n        ref: matrix_inner_bottom'
     );
     expect(saved).toContain('  mirror:\n    ref:');
+    // The starter's board hull names every key, the mirrored half included.
+    expect(saved).toContain('        - mirror_thumb_far_cluster\n');
     await shoot('structure');
 
     // Act: a mirrored key selects its source
@@ -182,6 +184,37 @@ test.describe('Build view', () => {
     // Assert: the regular outputs follow the YAML
     await page.getByRole('button', { name: 'Outputs' }).click();
     await expect(page.getByTestId('demo.svg-file-preview')).toBeVisible();
+
+    // Act: preview the board with its keycaps
+    await page.getByTestId('downloads-container-preview-dxf-preview').click();
+
+    // Assert: the board hull and the keycap preview render and download
+    const preview = page.getByTestId('outlines.preview.svg-file-preview');
+    await expect(preview).toBeVisible({ timeout: 20_000 });
+    // Outputs regenerate after a pause, so wait for the mirrored board: the
+    // starter half is about 110 mm wide, both halves well over 200 mm.
+    const image = preview.getByRole('img', {
+      name: 'Ergogen SVG Output preview',
+    });
+    const drawnWidth = async () => {
+      const source = decodeURIComponent(
+        (await image.getAttribute('src')) ?? ''
+      );
+      return Number(/viewBox="[^"]*?\S+ \S+ (\S+) /.exec(source)?.[1] ?? 0);
+    };
+    await expect.poll(drawnWidth, { timeout: 20_000 }).toBeGreaterThan(200);
+    await shoot('board-preview');
+    for (const name of ['board', 'preview']) {
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        page.getByLabel(`Download ${name}.dxf`).click(),
+      ]);
+      expect(download.suggestedFilename()).toBe(`${name}.dxf`);
+    }
+    await page.getByTestId('downloads-container-board-dxf-preview').click();
+    await expect(
+      page.getByTestId('outlines.board.svg-file-preview')
+    ).toBeVisible();
   });
 
   test('keeps the last layout and pauses edits while the YAML is invalid', async ({

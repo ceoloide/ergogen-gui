@@ -243,6 +243,65 @@ points.zones.matrix.rows.bottom:
     );
   });
 
+  it('keeps a block list of names in block style when replacing it', () => {
+    // Arrange
+    const text = `outlines:
+  board:
+    hull:
+      points:
+        - a
+        - b # gone with its item
+      expand: 3
+# next section
+pcbs: {}
+`;
+
+    // Act
+    const longer = expectText(
+      applyPatch(text, [
+        {
+          type: 'set',
+          path: ['outlines', 'board', 'hull', 'points'],
+          value: ['a', 'b', 'mirror_a'],
+        },
+      ])
+    );
+    const empty = expectText(
+      applyPatch(text, [
+        {
+          type: 'set',
+          path: ['outlines', 'board', 'hull', 'points'],
+          value: [],
+        },
+      ])
+    );
+
+    // Assert
+    expect(longer).toBe(`outlines:
+  board:
+    hull:
+      points:
+        - a
+        - b
+        - mirror_a
+      expand: 3
+# next section
+pcbs: {}
+`);
+    expect(empty).toContain('      points: []\n      expand: 3\n');
+    expect(
+      expectText(
+        applyPatch(empty, [
+          {
+            type: 'set',
+            path: ['outlines', 'board', 'hull', 'points'],
+            value: ['a'],
+          },
+        ])
+      )
+    ).toContain('      points:\n        - a\n      expand: 3\n');
+  });
+
   it('removes a key with its comment and keeps its siblings', () => {
     // Act
     const text = expectText(
