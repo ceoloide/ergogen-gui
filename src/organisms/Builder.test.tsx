@@ -22,6 +22,15 @@ type HarnessContext = {
 let context: HarnessContext | null = null;
 let setTextFromOutside: ((value: string) => void) | null = null;
 let switchConfig: ((id: string, value: string) => void) | null = null;
+/** While true, the points worker holds its answers until they are released. */
+let holdWorker = false;
+let heldAnswers: Array<() => void> = [];
+const releaseWorker = () => {
+  holdWorker = false;
+  const answers = heldAnswers;
+  heldAnswers = [];
+  answers.forEach((answer) => answer());
+};
 
 vi.mock('../context/ConfigContext', () => ({
   useConfigContext: () => context,
@@ -37,7 +46,7 @@ vi.mock('../workers/workerFactory', () => ({
       onerror: null,
       terminate: () => {},
       postMessage: ({ id, text }: { id: number; text: string }) => {
-        setTimeout(() => {
+        const answer = () => {
           let data;
           try {
             data = { id, type: 'success', layout: computeLayout(text) };
@@ -45,7 +54,9 @@ vi.mock('../workers/workerFactory', () => ({
             data = { id, type: 'error', error: (error as Error).message };
           }
           worker.onmessage?.({ data } as MessageEvent);
-        }, 0);
+        };
+        if (holdWorker) heldAnswers.push(answer);
+        else setTimeout(answer, 0);
       },
     };
     return worker;
@@ -90,6 +101,11 @@ const renderBuilder = async (initial = commented) => {
 };
 
 describe('Builder', () => {
+  afterEach(() => {
+    holdWorker = false;
+    heldAnswers = [];
+  });
+
   it('draws the engine layout and selects the first key', async () => {
     // Act
     await renderBuilder();
@@ -291,6 +307,38 @@ describe('Builder', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
   });
 
+  it.each([
+    ['opened', ['config-2']],
+    ['opened and left again', ['config-2', 'config-1']],
+  ])(
+    'refuses a checked edit when another config with the same YAML is %s meanwhile',
+    async (_, switches) => {
+      // Arrange: the engine holds its answer to the check of the edit
+      const user = userEvent.setup();
+      await renderBuilder();
+      await user.click(
+        screen.getByRole('button', { name: 'matrix_ring_home' })
+      );
+      const field = screen.getByLabelText('Stagger (mm, column)');
+      await user.clear(field);
+      holdWorker = true;
+      await user.type(field, '9{Enter}');
+
+      // Act: switch configurations, all with the same text, then answer
+      for (const id of switches) {
+        act(() => switchConfig?.(id, commented));
+      }
+      await act(async () => releaseWorker());
+
+      // Assert: nothing was written and no history was recorded
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /another configuration was opened/
+      );
+      expect(currentText()).toBe(commented);
+      expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    }
+  );
+
   it('reports an empty configuration instead of waiting forever', async () => {
     // Arrange
     await renderBuilder();
@@ -327,6 +375,24 @@ describe('Builder', () => {
     expect(currentText()).toBe(commented);
   });
 
+  it('shows the written value after an input that reads the same', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    const decimal = commented.replace('stagger: 6\n', 'stagger: 6.0\n');
+    await renderBuilder(decimal);
+    await user.click(screen.getByRole('button', { name: 'matrix_ring_home' }));
+    const field = screen.getByLabelText('Stagger (mm, column)');
+    expect(field).toHaveValue('6');
+
+    // Act
+    await user.clear(field);
+    await user.type(field, '6.0{Enter}');
+
+    // Assert
+    await waitFor(() => expect(currentText()).toBe(commented));
+    await waitFor(() => expect(field).toHaveValue('6'));
+  });
+
   it('moves the column with its handle whatever scope is chosen', async () => {
     // Arrange
     const user = userEvent.setup();
@@ -350,6 +416,23 @@ describe('Builder', () => {
     expect(
       screen.getByRole('button', { name: /^Move zone matrix, shift 0, 0 mm/ })
     ).toBeInTheDocument();
+  });
+
+  it('steps a handle from a value beyond its usual range', async () => {
+    // Arrange
+    const far = commented.replace('stagger: 6\n', 'stagger: 300\n');
+    await renderBuilder(far);
+    fireEvent.click(screen.getByRole('button', { name: 'matrix_ring_top' }));
+    const handle = await screen.findByRole('slider', {
+      name: 'Column ring stagger',
+    });
+
+    // Act
+    fireEvent.keyDown(handle, { key: 'ArrowDown' });
+
+    // Assert
+    expect(handle).toHaveAttribute('aria-valuemax', '300');
+    expect(currentText()).toBe(far.replace('stagger: 300', 'stagger: 299.5'));
   });
 
   it('does not let a handle replace an expression', async () => {
@@ -396,5 +479,96 @@ describe('Builder', () => {
     await waitFor(() =>
       expect(screen.getByTestId('builder-status')).toHaveTextContent('15 keys')
     );
+  });
+
+  describe('skip inheritance', () => {
+    const zoneSkip = '      key:\n        skip: true\n      columns:\n';
+    const columnSkip =
+      '        ring: # reach column\n          key:\n            stagger: 6\n            skip: true\n';
+    const keySkip =
+      '          rows:\n            top:\n              skip: true\n';
+    const withColumnSkip = (text: string) =>
+      text.replace(
+        '        ring: # reach column\n          key:\n            stagger: 6\n',
+        columnSkip
+      );
+    const withKeySkip = (text: string) =>
+      text.replace(
+        '            stagger: 6\n',
+        `            stagger: 6\n${keySkip}`
+      );
+    const withKeySkipAfterColumnSkip = (text: string) =>
+      text.replace(columnSkip, `${columnSkip}${keySkip}`);
+
+    const renderAt = async (initial: string, keyName: string) => {
+      const user = userEvent.setup();
+      render(<Harness initial={initial} />);
+      await user.click(
+        await screen.findByRole('button', {
+          name: new RegExp(`^${keyName}(, skipped)?$`),
+        })
+      );
+      await user.click(screen.getByRole('radio', { name: 'Column' }));
+      return user;
+    };
+
+    const keyCount = (count: number) =>
+      waitFor(() =>
+        expect(screen.getByTestId('builder-status')).toHaveTextContent(
+          `${count} keys`
+        )
+      );
+
+    it('does not show a column as skipped when only one of its keys is', async () => {
+      // Arrange and act
+      await renderAt(withKeySkip(commented), 'matrix_ring_top');
+
+      // Assert
+      const box = screen.getByLabelText(/Skip keys in this column/);
+      expect(box).not.toBeChecked();
+      expect(box).toHaveAccessibleDescription(
+        'A narrower key value skips the selected key anyway.'
+      );
+    });
+
+    it('turns a column skip off against a broader skip and keeps narrower ones', async () => {
+      // Arrange
+      const text = withKeySkipAfterColumnSkip(
+        withColumnSkip(commented.replace('      columns:\n', zoneSkip))
+      );
+      const user = await renderAt(text, 'matrix_ring_home');
+      await keyCount(0);
+      const box = screen.getByLabelText(/Skip keys in this column/);
+      expect(box).toBeChecked();
+
+      // Act
+      await user.click(box);
+
+      // Assert: the ring column is back, except its own skipped top key
+      await keyCount(2);
+      expect(currentText()).toContain(
+        '            stagger: 6\n            skip: false\n'
+      );
+      expect(currentText()).toContain(keySkip);
+      expect(
+        screen.getByLabelText(/Skip keys in this column/)
+      ).not.toBeChecked();
+    });
+
+    it('removes a column skip that nothing broader sets', async () => {
+      // Arrange
+      const text = withKeySkipAfterColumnSkip(withColumnSkip(commented));
+      const user = await renderAt(text, 'matrix_ring_top');
+      await keyCount(12);
+      const box = screen.getByLabelText(/Skip keys in this column/);
+      expect(box).toBeChecked();
+
+      // Act
+      await user.click(box);
+
+      // Assert
+      await keyCount(14);
+      expect(currentText()).toBe(withKeySkip(commented));
+    });
   });
 });

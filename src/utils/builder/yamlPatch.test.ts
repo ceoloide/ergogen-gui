@@ -600,6 +600,66 @@ describe('applyPatch near trailing comments', () => {
     expect(after).toBe(expected);
   });
 
+  it('inserts after a sibling that is written as dotted keys', () => {
+    // Arrange
+    const text = `points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+        ring.key.stagger: 6 # dotted column
+        middle:
+      rows:
+        bottom:
+        top.padding: 18
+`;
+
+    // Act
+    const column = expectText(
+      applyPatch(text, [
+        {
+          type: 'set',
+          path: ['points', 'zones', 'matrix', 'columns', 'col1'],
+          value: null,
+          after: 'ring',
+        },
+      ])
+    );
+    const row = expectText(
+      applyPatch(text, [
+        {
+          type: 'set',
+          path: ['points', 'zones', 'matrix', 'rows', 'row1'],
+          value: null,
+          after: 'top',
+        },
+      ])
+    );
+
+    // Assert
+    expect(column).toBe(
+      text.replace('# dotted column\n', '# dotted column\n        col1:\n')
+    );
+    expect(row).toBe(`${text}        row1:\n`);
+  });
+
+  it('refuses to insert after a sibling whose dotted keys are apart', () => {
+    // Arrange: inserting after the last fragment would land after "middle"
+    const text = `columns:
+  ring.key.stagger: 6
+  middle:
+  ring.key.spread: 20
+`;
+
+    // Act
+    const result = applyPatch(text, [
+      { type: 'set', path: ['columns', 'col1'], value: null, after: 'ring' },
+    ]);
+
+    // Assert
+    expect(result.ok).toBe(false);
+  });
+
   it('replaces a block value without taking the next section comment', () => {
     // Arrange
     const text = 'a:\n  b:\n    c: # note\n# Section\nd: 1\n';

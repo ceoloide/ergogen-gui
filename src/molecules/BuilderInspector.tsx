@@ -8,6 +8,7 @@ import {
   COLUMN_PROPERTIES,
   columnKeys,
   formatNumber,
+  inheritedValue,
   isOverridden,
   KEY_PROPERTIES,
   NumericProperty,
@@ -275,20 +276,21 @@ const ValueField = ({
   resetLabel,
 }: FieldProps) => {
   const [text, setText] = useState(value);
-  const valueRef = useRef(value);
-  valueRef.current = value;
+  // Bumped after each apply, so the field shows the written value again even
+  // when it reads the same as before (`6.0` written as `6`).
+  const [applied, setApplied] = useState(0);
   // The input being applied, so that Enter followed by blur applies it once.
   const applying = useRef<string | null>(null);
-  useEffect(() => setText(value), [value]);
+  useEffect(() => setText(value), [value, applied]);
   const hintId = `${id}-hint`;
   const apply = async () => {
     if (text.trim() === value.trim() || applying.current === text) return;
     applying.current = text;
     try {
-      const changed = await onApply(text);
-      if (!changed) setText(valueRef.current);
+      await onApply(text);
     } finally {
       applying.current = null;
+      setApplied((count) => count + 1);
     }
   };
   return (
@@ -464,34 +466,50 @@ const BuilderInspector = ({
     const { scope: skipScope } = writableScope('skip', selected);
     const skipPath = scopePath(skipScope, selected, 'skip');
     const written = valueAtScope(layout, selected, 'skip', skipScope);
+    // What this scope says: its own value, or else what broader scopes give
+    // it. Narrower values (a row or this key) override it and are kept.
+    const inherited = inheritedValue(layout, selected, 'skip', skipScope);
     const checked =
-      written === true || (written === undefined && selected.skipped);
+      written !== undefined ? written === true : inherited === true;
+    const origin = provenance(layout, selected, 'skip');
+    // Only a narrower value can make this key differ from what the box says.
+    const overridden = checked !== selected.skipped;
+    const overrideId = `${baseId}-skip-override`;
     return (
-      <CheckboxLabel>
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          onChange={(event) => {
-            const operations: PatchOperation[] = event.target.checked
-              ? [{ type: 'set', path: skipPath, value: true }]
-              : written === undefined ||
-                  isOverridden(layout, selected, 'skip', skipScope)
-                ? [{ type: 'set', path: skipPath, value: false }]
-                : [{ type: 'delete', path: skipPath }];
-            void run(
-              operations,
-              event.target.checked ? 'skip keys' : 'restore keys'
-            );
-          }}
-        />
-        {skipScope === 'key'
-          ? 'Skip this key'
-          : skipScope === 'all'
-            ? 'Skip all keys'
-            : `Skip keys in this ${skipScope}`}
-        {selected.skipped ? ' (this key is skipped)' : ''}
-      </CheckboxLabel>
+      <>
+        <CheckboxLabel>
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={disabled}
+            aria-describedby={overridden ? overrideId : undefined}
+            onChange={(event) => {
+              const operations: PatchOperation[] = event.target.checked
+                ? [{ type: 'set', path: skipPath, value: true }]
+                : inherited === true
+                  ? [{ type: 'set', path: skipPath, value: false }]
+                  : [{ type: 'delete', path: skipPath }];
+              void run(
+                operations,
+                event.target.checked ? 'skip keys' : 'restore keys'
+              );
+            }}
+          />
+          {skipScope === 'key'
+            ? 'Skip this key'
+            : skipScope === 'all'
+              ? 'Skip all keys'
+              : `Skip keys in this ${skipScope}`}
+          {selected.skipped ? ' (this key is skipped)' : ''}
+        </CheckboxLabel>
+        {overridden && (
+          <Hint id={overrideId}>
+            {`A narrower ${origin.scope === 'key' ? 'key' : origin.scope} value ${
+              selected.skipped ? 'skips' : 'keeps'
+            } the selected key anyway.`}
+          </Hint>
+        )}
+      </>
     );
   };
 

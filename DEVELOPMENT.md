@@ -461,9 +461,10 @@ YAML in `ConfigContext` is the only source of truth.
   configurations fork and saving works as usual. An edit is only made on the
   text the layout shows (or the builder's own last commit), never on text typed
   since. Inspector edits go through `editChecked`, which commits only after the
-  engine lays the result out and the text has not changed meanwhile. A drag
-  only previews until the pointer is released, then commits once; a cancelled
-  pointer cancels it. Opening another configuration (including leaving a
+  engine lays the result out and neither the text nor the open configuration
+  has changed meanwhile (a configuration counter catches a switch to one with
+  the same text, or away and back). A drag only previews until the pointer is
+  released, then commits once; a cancelled pointer cancels it. Opening another configuration (including leaving a
   shared preview without forking it) clears the layout, selection, messages and
   history. Undo and redo are in memory and are cleared when the text no longer
   matches the builder's last edit. While the view is hidden, no layouts are
@@ -471,7 +472,8 @@ YAML in `ConfigContext` is the only source of truth.
 - **Editor sync**: `ConfigEditor` remembers the text it last saved. Any other
   new `configInput` is a change from outside: it cancels the editor's pending
   save and is applied as one minimal, undoable edit, even while the editor has
-  focus, so a builder edit and typing never overwrite each other.
+  focus, so a builder edit and typing never overwrite each other. The change
+  events that edit fires are not saved back.
 - **Handles** map pointer movement to one value and never draw geometry
   themselves. Column handles always write the column's own value; their axes
   and splay pivot come from `columnFrame` in `layoutModel.ts`, which follows

@@ -332,9 +332,7 @@ export const mirrorState = (layout: Layout): MirrorState => {
     object &&
     typeof object.ref === 'string' &&
     ['number', 'string', 'undefined'].includes(typeof object.distance) &&
-    Object.keys(object).every((key) =>
-      ['ref', 'distance', 'shift'].includes(key)
-    )
+    Object.keys(object).every((key) => ['ref', 'distance'].includes(key))
   ) {
     return {
       kind: 'reference',

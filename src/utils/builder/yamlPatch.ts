@@ -370,7 +370,13 @@ const insertIntoMap = (
   const floor = lineStart(text, firstKey.range[0]);
   let position = contentEnd(text, valueEnd, floor, indent.length);
   if (after !== undefined) {
-    const sibling = map.items.find((pair) => keyText(pair) === after);
+    // The sibling may be spelled in dotted fragments (`ring.key.stagger: 6`);
+    // insert after the last one. If other keys sit between its fragments,
+    // the semantic check refuses the edit, as the order would differ.
+    const sibling = [...map.items].reverse().find((pair) => {
+      const name = keyText(pair) as string;
+      return name === after || name.startsWith(`${after}.`);
+    });
     if (!sibling) return refuse(`Cannot find "${after}" to insert after.`);
     position = pairEnd(text, sibling);
   }

@@ -153,6 +153,26 @@ export const valueAtScope = (
   return value === null ? undefined : value;
 };
 
+/**
+ * The value `key` would get from the levels broader (of lower priority) than
+ * `scope`, that is, what removing the value at `scope` would fall back to,
+ * ignoring narrower levels.
+ */
+export const inheritedValue = (
+  layout: Layout,
+  key: KeyAddress,
+  property: Property,
+  scope: Scope
+): unknown => {
+  const values = levelValues(layout, key, property);
+  for (const level of ['key', 'row', 'column', 'zone', 'all'] as Scope[]) {
+    if (PRIORITY[level] >= PRIORITY[scope]) continue;
+    const value = values[level];
+    if (value !== undefined && value !== null) return value;
+  }
+  return undefined;
+};
+
 /** True when a higher-priority level hides a value written at `scope`. */
 export const isOverridden = (
   layout: Layout,

@@ -379,7 +379,7 @@ describe('zone anchors and mirrors the builder cannot edit', () => {
     expect(reason).toMatch(/YAML/);
   });
 
-  it('treats zone mirrors and structured mirror references as custom', () => {
+  it('treats zone mirrors, shifted and structured mirror references as custom', () => {
     // Arrange
     const zoneMirror = computeLayout(`points:
   zones:
@@ -397,9 +397,17 @@ describe('zone anchors and mirrors the builder cannot edit', () => {
     distance: 20
 `);
 
+    const shifted = computeLayout(
+      BUILDER_STARTER_CONFIG.replace(
+        'outlines:',
+        '  mirror:\n    ref: matrix_inner_top\n    distance: 20\n    shift: [0, 5]\noutlines:'
+      )
+    );
+
     // Act and assert
     expect(mirrorState(zoneMirror).kind).toBe('custom');
     expect(mirrorState(aggregate).kind).toBe('custom');
+    expect(mirrorState(shifted).kind).toBe('custom');
   });
 });
 
@@ -445,6 +453,38 @@ describe('structure edits', () => {
       'row1',
     ]);
     expect(removed).toBe(BUILDER_STARTER_CONFIG);
+  });
+
+  it('adds a column and a row after siblings written as dotted keys', () => {
+    // Arrange: dotted siblings, as in several bundled examples
+    const dotted = BUILDER_STARTER_CONFIG.replace(
+      '        ring:\n          key:\n            stagger: 6\n',
+      '        ring.key.stagger: 6\n'
+    ).replace('        top:\n', '        top.padding: 18\n');
+    const dottedLayout = computeLayout(dotted);
+
+    // Act
+    const withColumn = applyEdit(
+      dotted,
+      addColumn(dottedLayout, 'matrix', 'ring')
+    );
+    const withRow = applyEdit(dotted, addRow(dottedLayout, 'matrix'));
+
+    // Assert: the engine sees them right after their siblings
+    expect(computeLayout(withColumn).zones[0].columns).toEqual([
+      'pinky',
+      'ring',
+      'col1',
+      'middle',
+      'index',
+      'inner',
+    ]);
+    expect(computeLayout(withRow).zones[0].rows).toEqual([
+      'bottom',
+      'home',
+      'top',
+      'row1',
+    ]);
   });
 
   it('adds a thumb cluster anchored to the last column and a free zone', () => {

@@ -115,6 +115,9 @@ const ConfigEditor = ({
   // comes back as that text, it is the echo of typing here; any other value
   // was written elsewhere (the Build view, undo there, loading a file).
   const savedByEditorRef = useRef<string | null>(null);
+  // True while the editor shows a change from outside, whose change events
+  // must not save that text back as if it had been typed here.
+  const syncingRef = useRef(false);
 
   // Create a debounced setConfigInput to avoid updating context on every keystroke
   const debouncedSetConfigInput = useRef(
@@ -147,7 +150,12 @@ const ConfigEditor = ({
     // the editor has focus.
     debouncedSetConfigInput.cancel();
     savedByEditorRef.current = null;
-    replaceChangedText(editor, configInput);
+    syncingRef.current = true;
+    try {
+      replaceChangedText(editor, configInput);
+    } finally {
+      syncingRef.current = false;
+    }
   }, [configInput, debouncedSetConfigInput]);
 
   /**
@@ -161,6 +169,9 @@ const ConfigEditor = ({
 
       // Sync the realtime value ref immediately (without triggering re-renders)
       updateRealtimeConfigInput(textInput);
+
+      // Showing a change from outside: the context already holds it.
+      if (syncingRef.current) return;
 
       // Debounce the state/localStorage update
       debouncedSetConfigInput(textInput);

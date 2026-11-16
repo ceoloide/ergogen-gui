@@ -1,7 +1,6 @@
 import { KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
-import { useConfigContext } from '../context/ConfigContext';
 import { useBuilderDocument } from '../hooks/useBuilderDocument';
 import BuilderCanvas, { CanvasHandle } from '../molecules/BuilderCanvas';
 import BuilderInspector from '../molecules/BuilderInspector';
@@ -100,7 +99,6 @@ type BuilderProps = {
  * All edits patch the YAML in place.
  */
 const Builder = ({ active = true }: BuilderProps) => {
-  const context = useConfigContext();
   const document = useBuilderDocument(active);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>('column');
@@ -201,9 +199,10 @@ const Builder = ({ active = true }: BuilderProps) => {
             handles={handles}
             onSelect={(key) => setSelectedName(sourceKey(layout, key).name)}
             onRefuse={setMessage}
-            // Refit for another configuration and after structure edits,
-            // which can add keys outside the current view.
-            fitToken={`${context?.activeConfigId ?? 'preview'}:${layout.keys.length}`}
+            // Refit when the builder starts over on another configuration
+            // (but not when a shared one is forked) and after structure
+            // edits, which can add keys outside the current view.
+            fitToken={`${document.generation}:${layout.keys.length}`}
           />
         ) : (
           <Empty>
@@ -302,12 +301,15 @@ const columnHandles = (
   ): CanvasHandle => {
     const path = scopePath('column', first, property);
     const unit = property === 'splay' ? '°' : ' mm';
+    const value = first.params[property];
+    // A value written beyond the usual range widens it, so the slider keeps
+    // it and arrow keys step from it instead of jumping to the bound.
     const [min, max] = HANDLE_RANGE[property];
     return {
       ...base,
-      value: first.params[property],
-      min,
-      max,
+      value,
+      min: Math.min(min, value),
+      max: Math.max(max, value),
       step: property === 'splay' ? 1 : 0.5,
       valueText: `${formatNumber(first.params[property])}${unit}`,
       disabledReason: refusal(property),

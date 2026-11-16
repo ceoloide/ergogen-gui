@@ -45,7 +45,9 @@ outlines. Drag the background to pan, scroll or use the buttons to zoom.
 - **Edit a key, row, column, zone or all keys**: choose the scope, then type a
   number or an Ergogen expression such as `u/4` for stagger, spread, splay,
   padding, width, height or rotate, or skip keys. Each field shows the value
-  Ergogen uses and which level sets it.
+  Ergogen uses and which level sets it. The skip box shows what the chosen
+  scope sets or inherits; a narrower row or key value that overrides it is noted
+  and kept.
 - **Drag handles** change the selected column's own stagger, spread and splay
   (whatever scope is chosen) and, when the zone's anchor is a plain numeric
   shift, move the zone. Values snap to 0.5 mm and 1°; Escape cancels a drag.

@@ -91,6 +91,13 @@ export const useBuilderDocument = (active: boolean): BuilderDocument => {
   shownTextRef.current = shownText;
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  // Counts configuration switches as soon as a render sees them, so an edit
+  // checked across a switch is refused even when both configurations have
+  // the same text, or the user has switched away and back.
+  const epochRef = useRef({ identity, epoch: 0 });
+  if (epochRef.current.identity !== identity) {
+    epochRef.current = { identity, epoch: epochRef.current.epoch + 1 };
+  }
 
   const accept = useCallback((result: PreviewResult) => {
     setLatest(result);
@@ -206,6 +213,7 @@ export const useBuilderDocument = (active: boolean): BuilderDocument => {
       operations: PatchOperation[],
       label: string
     ): Promise<CheckedEditResult> => {
+      const epoch = epochRef.current.epoch;
       const before = currentText();
       if (!isBaseline(before)) {
         return { reason: STALE_LAYOUT_REASON, changed: false };
@@ -221,6 +229,12 @@ export const useBuilderDocument = (active: boolean): BuilderDocument => {
         };
       }
       const checked = await client.check(result.text);
+      if (epochRef.current.epoch !== epoch) {
+        return {
+          reason: `The ${label} was not applied, because another configuration was opened while it was being checked.`,
+          changed: false,
+        };
+      }
       if (checked.error !== undefined) {
         return {
           reason: `The ${label} was not applied, because Ergogen could not lay out the result: ${checked.error}`,
