@@ -28,8 +28,9 @@ Dygma Sonsei. It uses Ergogen's default `u` (19 mm) spread and padding for
 Choc v2 / MX, column stagger and a relative thumb fan. The outer two thumbs
 align with the matrix; the inner pair approximates the reference's custom
 keycaps. Separate key, body, central shape and combined preview outlines are
-included. The body is approximately 296 × 139 mm. The drawn caps (`u - 3`)
-are visual guides; check physical keycap clearance before fabrication.
+included. The body is approximately 296 × 139 mm. The key outlines use
+18 mm caps with 1.5 mm corner radii; check physical keycap clearance before
+fabrication.
 
 ## Privacy and network use
 

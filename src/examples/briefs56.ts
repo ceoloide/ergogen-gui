@@ -4,23 +4,15 @@ import { ConfigExample } from './index';
 const Briefs56: ConfigExample = {
   label: 'Briefs 56',
   author: 'ceoloide',
-  value: `meta:
+  value: `# Inspired by the Dygma Sonsei
+meta:
   name: Briefs 56
   author: ceoloide
   engine: 4.3.0
   version: 1.0.0
-# Inspired by the Dygma Sonsei: 6 x 4 + 4 keys per half.
-# Ergogen defaults to u (19 mm) for both spread and padding; U is 19.05 mm.
-# The matrix and outer two thumbs use that default spacing for Choc v2 / MX.
-# The inner thumb pair approximates the drawing's custom keycaps.
-# cap is a visual guide, not a physical keycap clearance specification.
-# The body and center are illustrative outlines, not a manufactured case/PCB.
 units:
-  cap: u - 3
+  keycap: 18
 points:
-  key:
-    width: cap
-    height: cap
   mirror: 0
   zones:
     matrix:
@@ -52,13 +44,13 @@ points:
         middle:
         inner:
           key:
-            spread: 1.1u
-            stagger: -0.2u
+            spread: 1.15u
+            stagger: -0.19u
             splay: -19
         tip:
           key:
             spread: 1.1u
-            stagger: -0.1u
+            stagger: -0.115u
             splay: -12
       rows:
         thumb:
@@ -66,27 +58,27 @@ outlines:
   keys:
     - what: rectangle
       where: true
-      size: cap
-      corner: 1
+      size: keycap
+      corner: 1.5
   body:
     - what: polygon
       points:
         - shift: [-7.8u, 0]
         - shift: [15.6u, 0]
         - shift: [0, -5u]
-        - shift: [-5.4u, -1.2u]
-        - shift: [-1.45u, -1.1u]
-        - shift: [-1.9u, 0]
-        - shift: [-1.45u, 1.1u]
-        - shift: [-5.4u, 1.2u]
+        - shift: [-5.35u, -1.1u]
+        - shift: [-1.55u, -1.2u]
+        - shift: [-1.8u, 0]
+        - shift: [-1.55u, 1.2u]
+        - shift: [-5.35u, 1.1u]
       fillet: 5
   center:
     - what: polygon
       points:
-        - shift: [-0.5u, -1.4u]
+        - shift: [-0.5u, -1.3u]
         - shift: [0.5u, -0.1u]
         - shift: [0.5u, 0.1u]
-        - shift: [0.85u, -3.7u]
+        - shift: [0.85u, -4u]
         - shift: [-1.35u, -1.15u]
         - shift: [-1.35u, 1.15u]
       fillet: 2
