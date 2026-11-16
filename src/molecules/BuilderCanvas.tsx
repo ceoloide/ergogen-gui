@@ -25,12 +25,26 @@ export type CanvasHandle = {
   y: number;
   step: number;
   valueText: string;
+  /** Why this handle cannot be used; it is drawn dimmed and explains this. */
+  disabledReason?: string;
   onPreview: (value: number | [number, number]) => void;
   onCommit: (value: number | [number, number]) => void;
   onCancel: () => void;
 } & (
-  | { kind: 'linear'; axis: [number, number]; value: number }
-  | { kind: 'angle'; pivot: [number, number]; value: number }
+  | {
+      kind: 'linear';
+      axis: [number, number];
+      value: number;
+      min: number;
+      max: number;
+    }
+  | {
+      kind: 'angle';
+      pivot: [number, number];
+      value: number;
+      min: number;
+      max: number;
+    }
   | { kind: 'move'; value: [number, number] }
 );
 
@@ -42,6 +56,8 @@ type Props = {
   inScope: Set<string>;
   handles: CanvasHandle[];
   onSelect: (key: LayoutKey) => void;
+  /** Shows why a disabled handle cannot be used. */
+  onRefuse: (reason: string) => void;
   /** Changing this value fits the view to the layout again. */
   fitToken: string;
 };
@@ -163,6 +179,7 @@ const BuilderCanvas = ({
   inScope,
   handles,
   onSelect,
+  onRefuse,
   fitToken,
 }: Props) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -226,6 +243,10 @@ const BuilderCanvas = ({
   const startDrag = (handle: CanvasHandle) => (event: ReactPointerEvent) => {
     event.stopPropagation();
     if (event.button !== 0) return;
+    if (handle.disabledReason) {
+      onRefuse(handle.disabledReason);
+      return;
+    }
     const start = toEngine(event.clientX, event.clientY);
     if (!start) return;
     (event.currentTarget as Element).setPointerCapture?.(event.pointerId);
@@ -284,6 +305,12 @@ const BuilderCanvas = ({
     drag.handle.onCancel();
     return true;
   }, []);
+
+  /** The browser took the pointer away (a scroll gesture, for example). */
+  const abortPointer = (event: ReactPointerEvent) => {
+    if (dragRef.current?.pointerId === event.pointerId) cancelDrag();
+    if (panRef.current?.pointerId === event.pointerId) panRef.current = null;
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -348,6 +375,10 @@ const BuilderCanvas = ({
       const move = direction[event.key];
       if (!move) return;
       event.preventDefault();
+      if (handle.disabledReason) {
+        onRefuse(handle.disabledReason);
+        return;
+      }
       if (handle.kind === 'move') {
         handle.onCommit([
           roundTo(handle.value[0] + move[0] * handle.step),
@@ -355,7 +386,8 @@ const BuilderCanvas = ({
         ]);
       } else {
         const sign = move[0] + move[1];
-        handle.onCommit(roundTo(handle.value + sign * handle.step));
+        const next = roundTo(handle.value + sign * handle.step);
+        handle.onCommit(Math.min(Math.max(next, handle.min), handle.max));
       }
     };
 
@@ -381,7 +413,7 @@ const BuilderCanvas = ({
         onPointerDown={startPan}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerCancel={abortPointer}
         aria-label="Keyboard layout canvas"
         data-testid="builder-canvas"
       >
@@ -472,18 +504,34 @@ const BuilderCanvas = ({
           <HandleGroup
             key={handle.id}
             transform={`translate(${handle.x} ${-handle.y})`}
-            role="slider"
+            // A two-axis move has no single value for a slider, so it is a
+            // button whose name carries the value; arrow keys move it.
+            {...(handle.kind === 'move'
+              ? {
+                  role: 'button',
+                  'aria-label': `${handle.label}, ${handle.valueText}`,
+                }
+              : {
+                  role: 'slider',
+                  'aria-label': handle.label,
+                  'aria-valuetext': handle.valueText,
+                  'aria-valuenow': handle.value,
+                  'aria-valuemin': handle.min,
+                  'aria-valuemax': handle.max,
+                })}
             tabIndex={0}
-            aria-label={handle.label}
-            aria-valuetext={handle.valueText}
-            aria-valuenow={
-              typeof handle.value === 'number' ? handle.value : undefined
-            }
+            aria-disabled={handle.disabledReason ? true : undefined}
+            aria-description={handle.disabledReason}
+            opacity={handle.disabledReason ? 0.45 : 1}
             data-handle={handle.id}
             onPointerDown={startDrag(handle)}
             onKeyDown={handleHandleKeyDown(handle)}
           >
-            <title>{`${handle.label}: ${handle.valueText}`}</title>
+            <title>
+              {`${handle.label}: ${handle.valueText}${
+                handle.disabledReason ? `. ${handle.disabledReason}` : ''
+              }`}
+            </title>
             <circle
               r={Math.max(2.6, 9 * strokeScale)}
               fill={theme.colors.builderHandle}
@@ -509,17 +557,23 @@ const BuilderCanvas = ({
           onClick={() => zoom(1 / 1.25)}
           aria-label="Zoom in"
         >
-          <span className="material-symbols-outlined">add</span>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            add
+          </span>
         </ToolButton>
         <ToolButton
           type="button"
           onClick={() => zoom(1.25)}
           aria-label="Zoom out"
         >
-          <span className="material-symbols-outlined">remove</span>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            remove
+          </span>
         </ToolButton>
         <ToolButton type="button" onClick={fit} aria-label="Fit layout to view">
-          <span className="material-symbols-outlined">fit_screen</span>
+          <span className="material-symbols-outlined" aria-hidden="true">
+            fit_screen
+          </span>
         </ToolButton>
       </Toolbar>
     </CanvasWrapper>

@@ -46,20 +46,25 @@ outlines. Drag the background to pan, scroll or use the buttons to zoom.
   number or an Ergogen expression such as `u/4` for stagger, spread, splay,
   padding, width, height or rotate, or skip keys. Each field shows the value
   Ergogen uses and which level sets it.
-- **Drag handles** change the selected column's stagger, spread and splay and,
-  when the zone's anchor is a plain numeric shift, move the zone. Values snap to
-  0.5 mm and 1°; Escape cancels a drag. Focused handles also move with the
-  arrow keys.
+- **Drag handles** change the selected column's own stagger, spread and splay
+  (whatever scope is chosen) and, when the zone's anchor is a plain numeric
+  shift, move the zone. Values snap to 0.5 mm and 1°; Escape cancels a drag.
+  Focused handles also move with the arrow keys. A handle is dimmed, and
+  explains why, when the column's value is an expression or a row sets it.
 - **Structure**: add or delete columns, rows and zones, add a thumb cluster,
-  rotate the board and turn mirroring on or off.
+  rotate the board and turn mirroring on or off. Deleting keys that an anchor or
+  the mirror refers to is refused with the name of that reference.
 - **Undo and redo** (also Ctrl+Z and Ctrl+Shift+Z) cover builder edits in the
   current configuration.
 
 Every edit changes only the affected part of the YAML, so comments, formatting and
 dotted keys elsewhere stay as written. Edits through YAML anchors, merge keys,
 `$extends` or `$params`, or that would also change other values, are refused with
-a reason; make those in the editor. While the YAML is invalid, the last valid
-layout stays visible and editing is paused.
+a reason; make those in the editor. Typed values and structure edits are laid
+out by Ergogen before they are written, so a mistyped expression is explained
+instead of written. While the YAML is invalid, or while the layout catches up
+with text typed in the editor, the last valid layout stays visible and editing
+is paused.
 
 ## Privacy and network use
 

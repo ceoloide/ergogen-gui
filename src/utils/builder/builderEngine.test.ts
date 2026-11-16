@@ -7,11 +7,14 @@ import { computeLayout, Layout, LayoutKey } from './pointsPreview';
 import { applyPatch, PatchOperation } from './yamlPatch';
 import { BUILDER_STARTER_CONFIG } from './starterConfig';
 import {
+  columnFrame,
+  columnKeys,
   isOverridden,
   keysInScope,
   provenance,
   scopeAvailability,
   scopePath,
+  zoneAnchor,
 } from './layoutModel';
 import {
   addColumn,
@@ -103,6 +106,44 @@ describe('computeLayout', () => {
     expect(hint.y).toBeCloseTo(key(layout, 'matrix_inner_home').y + 19, 6);
   });
 
+  it('keeps every key when all of them are skipped, in engine order', () => {
+    // Arrange
+    const allSkipped = patch(BUILDER_STARTER_CONFIG, [
+      { type: 'set', path: ['points', 'key', 'skip'], value: true },
+    ]);
+    const bottomSkipped = patch(BUILDER_STARTER_CONFIG, [
+      {
+        type: 'set',
+        path: ['points', 'zones', 'matrix', 'rows', 'bottom', 'skip'],
+        value: true,
+      },
+    ]);
+
+    // Act
+    const all = computeLayout(allSkipped);
+    const bottom = computeLayout(bottomSkipped);
+
+    // Assert
+    expect(all.keys).toHaveLength(15);
+    expect(all.keys.every((k) => k.skipped)).toBe(true);
+    expect(all.zones[0].columns).toHaveLength(5);
+    expect(
+      columnKeys(bottom, 'matrix', 'ring').map((k) => [k.row, k.skipped])
+    ).toEqual([
+      ['bottom', true],
+      ['home', false],
+      ['top', false],
+    ]);
+    expect(bottom.keys.map((k) => k.name)).toEqual(
+      computeLayout(BUILDER_STARTER_CONFIG).keys.map((k) => k.name)
+    );
+  });
+
+  it('reports an empty configuration clearly', () => {
+    expect(() => computeLayout('')).toThrow('The configuration is empty.');
+    expect(() => computeLayout('  \n')).toThrow('The configuration is empty.');
+  });
+
   it('throws the engine error for an invalid configuration', () => {
     expect(() =>
       computeLayout(
@@ -179,6 +220,186 @@ describe('parameter edits', () => {
     expect(availability.key).toMatch(/first key/);
     expect(scopeAvailability(layout, ringHome, 'width').row).toBeNull();
     expect(rowKeys.size).toBe(5);
+  });
+});
+
+describe('column handle geometry', () => {
+  const displacement = (
+    before: Layout,
+    after: Layout,
+    name: string
+  ): [number, number] => [
+    key(after, name).x - key(before, name).x,
+    key(after, name).y - key(before, name).y,
+  ];
+
+  const direction = (angle: number, [x, y]: [number, number]) => {
+    const radians = (angle * Math.PI) / 180;
+    return [
+      x * Math.cos(radians) - y * Math.sin(radians),
+      x * Math.sin(radians) + y * Math.cos(radians),
+    ];
+  };
+
+  it('moves a splayed column along the axis the engine uses', () => {
+    // Arrange: its own splay does not turn the column's stagger
+    const text = (stagger: number) => `points:
+  zones:
+    solo:
+      columns:
+        only:
+          key:
+            splay: 90
+            stagger: ${stagger}
+            rotate: 15
+      rows:
+        bottom:
+        top:
+`;
+    const before = computeLayout(text(0));
+
+    // Act
+    const after = computeLayout(text(10));
+    const frame = columnFrame(before, 'solo', 'only');
+
+    // Assert
+    if (!frame.ok) throw new Error(frame.reason);
+    const [dx, dy] = displacement(before, after, 'solo_only_bottom');
+    const [ax, ay] = direction(frame.axisAngle, [0, 10]);
+    expect(dx).toBeCloseTo(ax, 6);
+    expect(dy).toBeCloseTo(ay, 6);
+    expect(dx).toBeCloseTo(0, 6);
+    expect(dy).toBeCloseTo(10, 6);
+  });
+
+  it('uses earlier splays for spread and pivots splay at the engine origin', () => {
+    // Arrange
+    const text = (spread: number, splay: number) => `points:
+  zones:
+    matrix:
+      anchor:
+        rotate: 10
+      columns:
+        a:
+          key:
+            splay: 20
+        b:
+          key:
+            spread: ${spread}
+            splay: ${splay}
+            origin: [-9.5, -9.5]
+            rotate: 5
+`;
+    const before = computeLayout(text(19, 0));
+
+    // Act
+    const spread = computeLayout(text(29, 0));
+    const splayed = computeLayout(text(19, 30));
+    const frame = columnFrame(before, 'matrix', 'b');
+
+    // Assert
+    if (!frame.ok) throw new Error(frame.reason);
+    expect(frame.axisAngle).toBeCloseTo(30, 6);
+    const [dx, dy] = displacement(before, spread, 'matrix_b');
+    const [ax, ay] = direction(frame.axisAngle, [10, 0]);
+    expect(dx).toBeCloseTo(ax, 6);
+    expect(dy).toBeCloseTo(ay, 6);
+    const [px, py] = frame.pivot;
+    const from = key(before, 'matrix_b');
+    const to = key(splayed, 'matrix_b');
+    expect(Math.hypot(to.x - px, to.y - py)).toBeCloseTo(
+      Math.hypot(from.x - px, from.y - py),
+      6
+    );
+    const turned =
+      Math.atan2(to.y - py, to.x - px) - Math.atan2(from.y - py, from.x - px);
+    expect((turned * 180) / Math.PI).toBeCloseTo(30, 6);
+  });
+
+  it('refuses to drag a column whose first key has an adjust', () => {
+    // Arrange
+    const layout = computeLayout(`points:
+  zones:
+    matrix:
+      columns:
+        a:
+          key:
+            adjust:
+              shift: [1, 2]
+`);
+
+    // Act
+    const frame = columnFrame(layout, 'matrix', 'a');
+
+    // Assert
+    expect(frame.ok).toBe(false);
+  });
+});
+
+describe('scope availability with column-local rows', () => {
+  it('only offers the row scope when the row is zone-wide', () => {
+    // Arrange: no zone rows, but one column defines its own
+    const layout = computeLayout(`points:
+  zones:
+    matrix:
+      columns:
+        a:
+        b:
+          rows:
+            extra:
+`);
+    const plain = key(layout, 'matrix_a');
+
+    // Act
+    const availability = scopeAvailability(layout, plain, 'width');
+
+    // Assert
+    expect(availability.row).toMatch(/column/);
+    expect(availability.key).toBeNull();
+  });
+});
+
+describe('zone anchors and mirrors the builder cannot edit', () => {
+  it('explains structured anchors instead of showing them as text', () => {
+    // Arrange
+    const layout = computeLayout(`points:
+  zones:
+    matrix:
+    other:
+      anchor:
+        ref: matrix
+        rotate:
+          ref: matrix
+`);
+
+    // Act
+    const { reason } = zoneAnchor(layout, 'other');
+
+    // Assert
+    expect(reason).toMatch(/YAML/);
+  });
+
+  it('treats zone mirrors and structured mirror references as custom', () => {
+    // Arrange
+    const zoneMirror = computeLayout(`points:
+  zones:
+    matrix:
+      mirror:
+        ref: matrix
+        distance: 20
+`);
+    const aggregate = computeLayout(`points:
+  zones:
+    matrix:
+  mirror:
+    ref:
+      - matrix
+    distance: 20
+`);
+
+    // Act and assert
+    expect(mirrorState(zoneMirror).kind).toBe('custom');
+    expect(mirrorState(aggregate).kind).toBe('custom');
   });
 });
 
@@ -261,7 +482,7 @@ describe('structure edits', () => {
     // Act
     const mirrored = applyEdit(BUILDER_STARTER_CONFIG, enableMirror(layout));
     const mirroredLayout = computeLayout(mirrored);
-    const restored = applyEdit(mirrored, disableMirror());
+    const restored = applyEdit(mirrored, disableMirror(mirroredLayout));
 
     // Assert
     const inner = key(mirroredLayout, 'matrix_inner_bottom');
@@ -275,6 +496,67 @@ describe('structure edits', () => {
       distance: 40,
     });
     expect(restored).toBe(BUILDER_STARTER_CONFIG);
+  });
+
+  it('removes a row from every column that overrides it', () => {
+    // Arrange
+    const text = patch(BUILDER_STARTER_CONFIG, [
+      {
+        type: 'set',
+        path: [
+          'points',
+          'zones',
+          'matrix',
+          'columns',
+          'ring',
+          'rows',
+          'top',
+          'width',
+        ],
+        value: 20,
+      },
+    ]);
+    const before = computeLayout(text);
+
+    // Act
+    const removed = computeLayout(
+      applyEdit(text, deleteRow(before, 'matrix', 'top'))
+    );
+
+    // Assert
+    expect(removed.keys.filter((k) => k.row === 'top')).toHaveLength(0);
+    expect(removed.keys).toHaveLength(10);
+  });
+
+  it('refuses to remove keys that other parts of the layout refer to', () => {
+    // Arrange
+    const withThumb = applyEdit(
+      BUILDER_STARTER_CONFIG,
+      addThumbCluster(layout, 'matrix')
+    );
+    const thumbLayout = computeLayout(withThumb);
+    const mirrored = applyEdit(withThumb, enableMirror(thumbLayout));
+    const mirroredLayout = computeLayout(mirrored);
+
+    // Act
+    const column = deleteColumn(thumbLayout, 'matrix', 'inner');
+    const row = deleteRow(thumbLayout, 'matrix', 'bottom');
+    const zone = deleteZone(thumbLayout, 'matrix');
+    const mirrorColumn = deleteColumn(mirroredLayout, 'thumb', 'far');
+
+    // Assert
+    for (const edit of [column, row, zone]) {
+      expect(edit.ok).toBe(false);
+      if (!edit.ok) {
+        expect(edit.reason).toContain('matrix_inner_bottom');
+        expect(edit.reason).toContain('points.zones.thumb.anchor.ref');
+      }
+    }
+    expect(mirrorColumn.ok).toBe(false);
+    if (!mirrorColumn.ok) {
+      expect(mirrorColumn.reason).toContain('points.mirror.ref');
+    }
+    expect(deleteColumn(thumbLayout, 'matrix', 'pinky').ok).toBe(true);
   });
 
   it('refuses structure edits that the config cannot express safely', () => {

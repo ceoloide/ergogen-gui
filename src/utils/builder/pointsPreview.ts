@@ -41,6 +41,8 @@ export type LayoutKey = {
   source?: string;
   /** True for keys that `skip: true` removes from the real output. */
   skipped: boolean;
+  /** True when an `adjust` moves the key away from its column's anchor. */
+  adjusted: boolean;
   params: KeyParameters;
 };
 
@@ -125,6 +127,13 @@ const toKey = (point: EnginePoint, skipped: boolean): LayoutKey => {
     mirrored,
     source: mirrored ? meta.name.replace(/^mirror_/, '') : undefined,
     skipped,
+    adjusted:
+      meta.adjust !== undefined &&
+      meta.adjust !== null &&
+      !(
+        typeof meta.adjust === 'object' &&
+        Object.keys(meta.adjust as object).length === 0
+      ),
     params: {
       stagger: Number(meta.stagger),
       spread: Number(meta.spread),
@@ -145,6 +154,7 @@ const toKey = (point: EnginePoint, skipped: boolean): LayoutKey => {
  * error when the configuration is invalid.
  */
 export const computeLayout = (raw: string): Layout => {
+  if (raw.trim() === '') throw new Error('The configuration is empty.');
   const [interpreted, format] = io.interpret(raw, () => {});
   let config = prepare.unnest(interpreted);
   config = prepare.inherit(config);
@@ -159,14 +169,11 @@ export const computeLayout = (raw: string): Layout => {
     string,
     EnginePoint
   >;
-  if (!Object.keys(points).length) {
-    throw new Error('Input does not contain any points!');
-  }
-
-  const keys = Object.values(points).map((point) => toKey(point, false));
 
   // Skipped keys are laid out like any other and only dropped at the end, so
-  // the same engine pass without their `skip` flags shows where they sit.
+  // the same engine pass without their `skip` flags shows where they sit, in
+  // the engine's own order (a column's first key may be a skipped one).
+  let keys = Object.values(points).map((point) => toKey(point, false));
   const revealConfig = deepcopy(config.points) as Record<string, unknown>;
   const holders = SKIP_LEVELS(revealConfig).filter(
     (holder) => 'skip' in holder
@@ -178,12 +185,18 @@ export const computeLayout = (raw: string): Layout => {
         string,
         EnginePoint
       >;
-      for (const [name, point] of Object.entries(revealed)) {
-        if (!(name in points)) keys.push(toKey(point, true));
+      keys = Object.entries(revealed).map(([name, point]) =>
+        name in points ? toKey(points[name], false) : toKey(point, true)
+      );
+      for (const [name, point] of Object.entries(points)) {
+        if (!(name in revealed)) keys.push(toKey(point, false));
       }
     } catch {
       // The real layout above is still correct; only the hints are missing.
     }
+  }
+  if (!keys.length) {
+    throw new Error('Input does not contain any points!');
   }
 
   return {

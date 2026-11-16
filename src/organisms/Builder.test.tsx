@@ -21,6 +21,7 @@ type HarnessContext = {
 
 let context: HarnessContext | null = null;
 let setTextFromOutside: ((value: string) => void) | null = null;
+let switchConfig: ((id: string, value: string) => void) | null = null;
 
 vi.mock('../context/ConfigContext', () => ({
   useConfigContext: () => context,
@@ -53,14 +54,20 @@ vi.mock('../workers/workerFactory', () => ({
 
 const Harness = ({ initial }: { initial: string }) => {
   const [text, setText] = useState(initial);
+  const [activeConfigId, setActiveConfigId] = useState('config-1');
   const realtime = useRef(initial);
   setTextFromOutside = (value) => {
     realtime.current = value;
     setText(value);
   };
+  switchConfig = (id, value) => {
+    realtime.current = value;
+    setActiveConfigId(id);
+    setText(value);
+  };
   context = {
     configInput: text,
-    activeConfigId: 'config-1',
+    activeConfigId,
     getRealtimeConfigInput: () => realtime.current,
     updateRealtimeConfigInput: (value) => {
       realtime.current = value;
@@ -234,5 +241,157 @@ describe('Builder', () => {
     // Assert
     expect(await screen.findByRole('alert')).toHaveTextContent(/\$extends/);
     expect(currentText()).toBe(extended);
+  });
+
+  it('refuses an edit while the YAML has changed since the layout', async () => {
+    // Arrange: typing in the editor updates the realtime text first
+    const user = userEvent.setup();
+    await renderBuilder();
+    await user.click(screen.getByRole('button', { name: 'matrix_ring_home' }));
+    const typed = `${commented}# typing\n`;
+    context?.updateRealtimeConfigInput(typed);
+
+    // Act
+    const field = screen.getByLabelText('Stagger (mm, column)');
+    await user.clear(field);
+    await user.type(field, '9{Enter}');
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /catching up with the YAML/
+    );
+    expect(currentText()).toBe(typed);
+    expect(field).toHaveValue('6');
+  });
+
+  it('starts over with a fresh layout and selection for another config', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    await renderBuilder();
+    await user.click(screen.getByRole('button', { name: 'matrix_ring_home' }));
+    await user.click(screen.getByRole('button', { name: 'Add column' }));
+    await screen.findByRole('heading', { name: 'matrix_col1_bottom' });
+
+    // Act: the other config has keys with the same names
+    act(() => switchConfig?.('config-2', BUILDER_STARTER_CONFIG));
+
+    // Assert: the old layout is gone at once, then the new one is shown
+    expect(
+      screen.queryByRole('button', { name: /^matrix_/ })
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'matrix_pinky_bottom' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'matrix_col1_bottom' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  });
+
+  it('reports an empty configuration instead of waiting forever', async () => {
+    // Arrange
+    await renderBuilder();
+
+    // Act
+    act(() => setTextFromOutside?.(''));
+
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByTestId('builder-status')).toHaveTextContent(
+        'The configuration is empty.'
+      )
+    );
+  });
+
+  it('explains a mistyped expression, keeps the YAML and resets the field', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    await renderBuilder();
+    await user.click(screen.getByRole('button', { name: 'matrix_ring_home' }));
+    const field = screen.getByLabelText('Stagger (mm, column)');
+
+    // Act
+    await user.clear(field);
+    await user.type(field, 'cy/{Enter}');
+
+    // Assert
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /Ergogen could not lay out the result/
+    );
+    expect(currentText()).toBe(commented);
+    await waitFor(() => expect(field).toHaveValue('6'));
+    await user.click(screen.getByTestId('builder-status'));
+    expect(currentText()).toBe(commented);
+  });
+
+  it('moves the column with its handle whatever scope is chosen', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    await renderBuilder();
+    await user.click(screen.getByRole('button', { name: 'matrix_ring_top' }));
+    await user.click(screen.getByRole('radio', { name: 'Zone' }));
+    const handle = await screen.findByRole('slider', {
+      name: 'Column ring stagger',
+    });
+
+    // Act
+    fireEvent.keyDown(handle, { key: 'ArrowUp' });
+
+    // Assert
+    expect(currentText()).toContain(
+      '        ring: # reach column\n          key:\n            stagger: 6.5\n'
+    );
+    expect(currentText()).not.toMatch(/matrix:\n {6}key:/);
+    expect(handle).toHaveAttribute('aria-valuemin', '-200');
+    expect(handle).toHaveAttribute('aria-valuemax', '200');
+    expect(
+      screen.getByRole('button', { name: /^Move zone matrix, shift 0, 0 mm/ })
+    ).toBeInTheDocument();
+  });
+
+  it('does not let a handle replace an expression', async () => {
+    // Arrange
+    const expression = commented.replace('stagger: 6', 'stagger: cy/4');
+    await renderBuilder(expression);
+    fireEvent.click(screen.getByRole('button', { name: 'matrix_ring_top' }));
+    const handle = await screen.findByRole('slider', {
+      name: 'Column ring stagger',
+    });
+
+    // Act
+    fireEvent.keyDown(handle, { key: 'ArrowUp' });
+
+    // Assert
+    expect(handle).toHaveAttribute('aria-disabled', 'true');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /expression "cy\/4"/
+    );
+    expect(currentText()).toBe(expression);
+  });
+
+  it('skips every key and restores them from a skipped key', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    await renderBuilder();
+    await user.click(screen.getByRole('radio', { name: 'All keys' }));
+
+    // Act
+    await user.click(screen.getByLabelText(/Skip all keys/));
+
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByTestId('builder-status')).toHaveTextContent('0 keys')
+    );
+    const box = screen.getByLabelText(/Skip all keys/);
+    expect(box).toBeChecked();
+    expect(box).toBeEnabled();
+
+    // Act
+    await user.click(box);
+
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByTestId('builder-status')).toHaveTextContent('15 keys')
+    );
   });
 });

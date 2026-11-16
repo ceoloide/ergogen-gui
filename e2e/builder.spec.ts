@@ -213,14 +213,17 @@ test.describe('Build view', () => {
   test('works on a phone-sized screen', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/new');
+
+    // Act: the welcome card opens the Build view, not the editor
     await page.getByRole('button', { name: 'Start a visual build' }).click();
 
-    // Act
-    await page.getByTestId('mobile-build-button').click();
-
     // Assert
-    await expect(page.getByTestId('builder-canvas')).toBeVisible();
+    await expect(page.getByTestId('builder-canvas')).toBeVisible({
+      // The first layout waits for the worker bundle on a cold start.
+      timeout: 30_000,
+    });
     await expect(page.getByTestId('config-editor')).toBeHidden();
+    await expect(page.getByTestId('mobile-build-button')).toHaveClass(/active/);
     await page.getByRole('button', { name: 'matrix_ring_home' }).click();
     await expect(
       page.getByRole('heading', { name: 'matrix_ring_home' })
@@ -229,5 +232,118 @@ test.describe('Build view', () => {
     // Act: back to outputs
     await page.getByTestId('mobile-outputs-button').click();
     await expect(page.getByTestId('builder-canvas')).toBeHidden();
+  });
+
+  test('keeps both edits when the editor gets focus from an inspector field', async ({
+    page,
+  }) => {
+    await page.goto('/new');
+    await page.getByRole('button', { name: 'Start a visual build' }).click();
+    await expect(page.getByTestId('builder-status')).toContainText('15 keys', {
+      // The first layout waits for the worker bundle on a cold start.
+      timeout: 30_000,
+    });
+    await page.getByRole('button', { name: 'matrix_ring_home' }).click();
+
+    // Act: leaving the field for the editor commits it while the editor
+    // already has focus, then typing continues in the editor
+    const field = page.getByLabel('Stagger (mm, column)');
+    await field.fill('9');
+    await page.locator('.monaco-editor .view-lines').click();
+    await expect.poll(() => savedConfig(page)).toContain('stagger: 9\n');
+    await page.keyboard.press('Control+End');
+    await page.keyboard.insertText('\n# typed after the field');
+
+    // Assert: the editor picked up the field's change and kept the typing
+    await expect
+      .poll(() => savedConfig(page))
+      .toContain('# typed after the field');
+    expect(await savedConfig(page)).toContain('stagger: 9\n');
+    await expect(field).toHaveValue('9');
+  });
+
+  test('applies a builder edit to a focused editor and cancels its pending save', async ({
+    page,
+  }) => {
+    await page.goto('/new');
+    await page.getByRole('button', { name: 'Start a visual build' }).click();
+    await expect(page.getByTestId('builder-status')).toContainText('15 keys', {
+      // The first layout waits for the worker bundle on a cold start.
+      timeout: 30_000,
+    });
+    await page.getByRole('button', { name: 'matrix_index_top' }).click();
+    const addColumn = page.getByRole('button', { name: 'Add column' });
+
+    // Act: type, then click a builder button without taking focus from the
+    // editor (as WebKit does) before the typing is saved
+    await page.locator('.monaco-editor .view-lines').click();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.insertText('\n# first');
+    await addColumn.evaluate((button: HTMLElement) => button.click());
+
+    // Assert: the builder waits for the layout of the typed text
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'catching up with the YAML' })
+    ).toBeVisible();
+    await expect.poll(() => savedConfig(page)).toContain('# first');
+    await expect(page.getByTestId('builder-status')).toContainText('15 keys');
+
+    // Act: now the edit applies while the editor keeps focus
+    await page.keyboard.insertText('\n# second');
+    await expect.poll(() => savedConfig(page)).toContain('# second');
+    await expect(page.getByTestId('builder-status')).toContainText('15 keys');
+    await addColumn.evaluate((button: HTMLElement) => button.click());
+    await expect(page.getByTestId('builder-status')).toContainText('18 keys');
+    await page.keyboard.insertText('\n# third');
+
+    // Assert: nothing typed and nothing built was lost
+    await expect.poll(() => savedConfig(page)).toContain('# third');
+    await page.waitForTimeout(800);
+    const saved = await savedConfig(page);
+    expect(saved).toContain('        col1:\n');
+    expect(saved).toContain('# first\n# second');
+    expect(saved).toContain('# third');
+    await expect(page.getByTestId('builder-status')).toContainText('18 keys');
+  });
+
+  test('cancels a drag when the browser cancels the pointer', async ({
+    page,
+  }) => {
+    await page.goto('/new');
+    await page.getByRole('button', { name: 'Start a visual build' }).click();
+    await expect(page.getByTestId('builder-status')).toContainText('15 keys', {
+      // The first layout waits for the worker bundle on a cold start.
+      timeout: 30_000,
+    });
+    await page.getByRole('button', { name: 'matrix_middle_home' }).click();
+    const committed = await savedConfig(page);
+    const settled = await keyBox(page, 'matrix_middle_home');
+    const start = await page.locator('[data-handle="stagger"]').boundingBox();
+    if (!start) throw new Error('No stagger handle');
+
+    // Act
+    await page.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      start.x + start.width / 2,
+      start.y + start.height / 2 + 40,
+      { steps: 8 }
+    );
+    await expect
+      .poll(async () => (await keyBox(page, 'matrix_middle_home')).y)
+      .toBeGreaterThan(settled.y + 10);
+    await page
+      .getByTestId('builder-canvas')
+      .dispatchEvent('pointercancel', { pointerId: 1, isPrimary: true });
+    await page.mouse.up();
+
+    // Assert
+    await expect
+      .poll(async () => (await keyBox(page, 'matrix_middle_home')).y)
+      .toBeCloseTo(settled.y, 0);
+    expect(await savedConfig(page)).toBe(committed);
   });
 });

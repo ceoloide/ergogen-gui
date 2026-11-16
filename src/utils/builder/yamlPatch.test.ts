@@ -357,3 +357,212 @@ points:
     expect(result.ok).toBe(false);
   });
 });
+
+describe('applyPatch removals that empty a mapping', () => {
+  const starter = `points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+        ring:
+          key:
+            stagger: 6 # reach
+        inner:
+          key:
+            stagger: -2
+      rows:
+        bottom:
+        top:
+`;
+  const ringStagger = [
+    'points',
+    'zones',
+    'matrix',
+    'columns',
+    'ring',
+    'key',
+    'stagger',
+  ];
+
+  it('leaves an empty map when the only entry of a block map is removed', () => {
+    // Act
+    const text = expectText(
+      applyPatch(starter, [{ type: 'delete', path: ringStagger }])
+    );
+
+    // Assert
+    expect(text).toBe(
+      starter.replace(
+        '        ring:\n          key:\n            stagger: 6 # reach\n',
+        '        ring:\n          key: {}\n'
+      )
+    );
+  });
+
+  it('shortens a dotted key instead of removing its parents', () => {
+    // Arrange
+    const dotted = `points.zones.matrix.columns.pinky.key.stagger: 2 # dotted
+points.zones.matrix.rows.bottom:
+`;
+
+    // Act
+    const text = expectText(
+      applyPatch(dotted, [
+        {
+          type: 'delete',
+          path: [
+            'points',
+            'zones',
+            'matrix',
+            'columns',
+            'pinky',
+            'key',
+            'stagger',
+          ],
+        },
+      ])
+    );
+
+    // Assert
+    expect(text).toBe(
+      dotted.replace(
+        'points.zones.matrix.columns.pinky.key.stagger: 2',
+        'points.zones.matrix.columns.pinky.key: {}'
+      )
+    );
+  });
+
+  it('turns skip on and off again at key scope', () => {
+    // Arrange
+    const skip = [
+      'points',
+      'zones',
+      'matrix',
+      'columns',
+      'inner',
+      'rows',
+      'top',
+      'skip',
+    ];
+
+    // Act
+    const skipped = expectText(
+      applyPatch(starter, [{ type: 'set', path: skip, value: true }])
+    );
+    const restored = expectText(
+      applyPatch(skipped, [{ type: 'delete', path: skip }])
+    );
+
+    // Assert
+    expect(skipped).toContain(
+      '        inner:\n          key:\n            stagger: -2\n          rows:\n            top:\n              skip: true\n'
+    );
+    expect(restored).toContain(
+      '          rows:\n            top: {}\n      rows:\n'
+    );
+  });
+
+  it('removes a mirror written as dotted keys', () => {
+    // Arrange
+    const mirrored = `points:
+  zones:
+    matrix:
+  mirror.ref: matrix_default_default # axis
+  mirror.distance: 40
+outlines: {}
+`;
+
+    // Act
+    const text = expectText(
+      applyPatch(mirrored, [{ type: 'delete', path: ['points', 'mirror'] }])
+    );
+
+    // Assert
+    expect(text).toBe('points:\n  zones:\n    matrix:\noutlines: {}\n');
+  });
+});
+
+describe('applyPatch near trailing comments', () => {
+  it('keeps a section comment that follows a removed block', () => {
+    // Arrange
+    const text =
+      'pinky:\n  rows:\n    bottom: # note\n# Section comment\nring:\n';
+
+    // Act
+    const result = expectText(
+      applyPatch(text, [{ type: 'delete', path: ['pinky'] }])
+    );
+
+    // Assert
+    expect(result).toBe('# Section comment\nring:\n');
+  });
+
+  it('keeps a section comment with CRLF line endings', () => {
+    // Arrange
+    const text =
+      'pinky:\r\n  rows:\r\n    bottom: # note\r\n# Section comment\r\nring:\r\n';
+
+    // Act
+    const result = expectText(
+      applyPatch(text, [{ type: 'delete', path: ['pinky'] }])
+    );
+
+    // Assert
+    expect(result).toBe('# Section comment\r\nring:\r\n');
+  });
+
+  it('inserts into a map whose last value is empty with a comment', () => {
+    // Arrange
+    const text = `points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+        ring: # last col
+      rows:
+        bottom:
+`;
+
+    // Act
+    const atEnd = expectText(
+      applyPatch(text, [
+        {
+          type: 'set',
+          path: ['points', 'zones', 'matrix', 'columns', 'middle'],
+          value: null,
+        },
+      ])
+    );
+    const after = expectText(
+      applyPatch(text, [
+        {
+          type: 'set',
+          path: ['points', 'zones', 'matrix', 'columns', 'middle'],
+          value: null,
+          after: 'ring',
+        },
+      ])
+    );
+
+    // Assert
+    const expected = text.replace(
+      '        ring: # last col\n',
+      '        ring: # last col\n        middle:\n'
+    );
+    expect(atEnd).toBe(expected);
+    expect(after).toBe(expected);
+  });
+
+  it('replaces a block value without taking the next section comment', () => {
+    // Arrange
+    const text = 'a:\n  b:\n    c: # note\n# Section\nd: 1\n';
+
+    // Act
+    const result = expectText(
+      applyPatch(text, [{ type: 'set', path: ['a', 'b'], value: 5 }])
+    );
+
+    // Assert
+    expect(result).toBe('a:\n  b: 5\n# Section\nd: 1\n');
+  });
+});

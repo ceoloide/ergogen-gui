@@ -30,6 +30,53 @@ const uniqueName = (prefix: string, taken: string[]) => {
 const keyName = (zone: string, column: string, row: string) =>
   [zone, column, row].filter((part) => part !== 'default').join('_');
 
+/**
+ * The first place in `points`, outside the parts an edit removes, that names
+ * one of the keys it removes (as an anchor or mirror `ref`, for example), so
+ * the edit can be refused before the engine fails on the missing key.
+ */
+const findReference = (
+  layout: Layout,
+  removedKeys: (key: Layout['keys'][number]) => boolean,
+  removedPaths: string[][]
+): { path: string; name: string } | null => {
+  const names = new Set(layout.keys.filter(removedKeys).map((key) => key.name));
+  if (!names.size) return null;
+  const isRemoved = (path: string[]) =>
+    removedPaths.some(
+      (removed) =>
+        removed.length <= path.length &&
+        removed.every(
+          (segment, index) => segment === '*' || segment === path[index]
+        )
+    );
+  const visit = (
+    value: unknown,
+    path: string[]
+  ): { path: string; name: string } | null => {
+    if (isRemoved(path)) return null;
+    if (typeof value === 'string') {
+      return names.has(value) ? { path: path.join('.'), name: value } : null;
+    }
+    if (value && typeof value === 'object') {
+      for (const [key, item] of Object.entries(value)) {
+        const found = visit(item, [...path, key]);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return visit(layout.canonicalPoints, ['points']);
+};
+
+const referenceRefusal = (
+  reference: { path: string; name: string },
+  action: string
+): StructureEdit => ({
+  ok: false,
+  reason: `${reference.path} refers to ${reference.name}, which ${action} would remove. Change that reference first.`,
+});
+
 export const addColumn = (
   layout: Layout,
   zone: string,
@@ -72,6 +119,14 @@ export const deleteColumn = (
   }
   if (Object.keys(columns).length < 2) {
     return { ok: false, reason: 'A zone needs at least one column.' };
+  }
+  const reference = findReference(
+    layout,
+    (key) => key.zone === zone && key.column === column,
+    [['points', 'zones', zone, 'columns', column]]
+  );
+  if (reference) {
+    return referenceRefusal(reference, `deleting column ${column}`);
   }
   return {
     ok: true,
@@ -126,9 +181,33 @@ export const deleteRow = (
   if (Object.keys(rows).length < 2) {
     return { ok: false, reason: 'A zone needs at least one row.' };
   }
+  const reference = findReference(
+    layout,
+    (key) => key.zone === zone && key.row === row,
+    [
+      ['points', 'zones', zone, 'rows', row],
+      ['points', 'zones', zone, 'columns', '*', 'rows', row],
+    ]
+  );
+  if (reference) return referenceRefusal(reference, `deleting row ${row}`);
+  // Columns can override the row for their own key; those entries go too,
+  // or they would keep the row alive in that column.
+  const columns = asObject(zoneConfig(layout, zone)?.columns) ?? {};
+  const local = Object.entries(columns)
+    .filter(([, column]) => {
+      const columnRows = asObject(asObject(column)?.rows);
+      return columnRows !== undefined && row in columnRows;
+    })
+    .map(
+      ([column]): PatchOperation => ({
+        type: 'delete',
+        path: ['points', 'zones', zone, 'columns', column, 'rows', row],
+      })
+    );
   return {
     ok: true,
     operations: [
+      ...local,
       { type: 'delete', path: ['points', 'zones', zone, 'rows', row] },
     ],
   };
@@ -224,6 +303,10 @@ export const deleteZone = (layout: Layout, zone: string): StructureEdit => {
   if (layout.zones.length < 2) {
     return { ok: false, reason: 'The layout needs at least one zone.' };
   }
+  const reference = findReference(layout, (key) => key.zone === zone, [
+    ['points', 'zones', zone],
+  ]);
+  if (reference) return referenceRefusal(reference, `deleting zone ${zone}`);
   return {
     ok: true,
     operations: [{ type: 'delete', path: ['points', 'zones', zone] }],
@@ -236,11 +319,19 @@ type MirrorState =
   | { kind: 'custom' };
 
 export const mirrorState = (layout: Layout): MirrorState => {
+  const zones = asObject(layout.canonicalPoints.zones) ?? {};
+  const zoneMirror = Object.values(zones).some((zone) => {
+    const mirror = asObject(zone)?.mirror;
+    return mirror !== undefined && mirror !== null;
+  });
+  if (zoneMirror) return { kind: 'custom' };
   const mirror = layout.canonicalPoints.mirror;
   if (mirror === undefined || mirror === null) return { kind: 'off' };
   const object = asObject(mirror);
   if (
     object &&
+    typeof object.ref === 'string' &&
+    ['number', 'string', 'undefined'].includes(typeof object.distance) &&
     Object.keys(object).every((key) =>
       ['ref', 'distance', 'shift'].includes(key)
     )
@@ -272,7 +363,13 @@ export const enableMirror = (layout: Layout): StructureEdit => {
   };
 };
 
-export const disableMirror = (): StructureEdit => ({
-  ok: true,
-  operations: [{ type: 'delete', path: ['points', 'mirror'] }],
-});
+export const disableMirror = (layout: Layout): StructureEdit => {
+  const reference = findReference(layout, (key) => key.mirrored, [
+    ['points', 'mirror'],
+  ]);
+  if (reference) return referenceRefusal(reference, 'turning mirroring off');
+  return {
+    ok: true,
+    operations: [{ type: 'delete', path: ['points', 'mirror'] }],
+  };
+};

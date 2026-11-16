@@ -104,4 +104,36 @@ describe('PointsPreviewClient', () => {
     expect(results).toEqual([]);
     expect(workers[0].terminated).toBe(true);
   });
+
+  it('checks a text without dropping it or disturbing the preview', async () => {
+    // Arrange
+    const { client, workers, results } = setup();
+    client.request('a');
+
+    // Act
+    const checked = client.check('b');
+    client.request('c');
+    workers[0].answer(0);
+    workers[0].answer(1, { format: 'YAML' });
+    workers[0].answer(2);
+
+    // Assert
+    await expect(checked).resolves.toEqual({
+      text: 'b',
+      layout: { format: 'YAML' },
+    });
+    expect(results.map((result) => result.text)).toEqual(['c']);
+  });
+
+  it('answers pending checks with an error when the worker fails', async () => {
+    // Arrange
+    const { client, workers } = setup();
+    const checked = client.check('b');
+
+    // Act
+    workers[0].onerror?.({ message: 'boom' } as ErrorEvent);
+
+    // Assert
+    await expect(checked).resolves.toEqual({ text: 'b', error: 'boom' });
+  });
 });

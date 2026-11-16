@@ -164,6 +164,40 @@ const afterLine = (text: string, offset: number) => {
   return newline === -1 ? text.length : newline + 1;
 };
 
+const isTrivialLine = (line: string) => {
+  const trimmed = line.trim();
+  return trimmed === '' || trimmed.startsWith('#');
+};
+
+/**
+ * Where the content of a node that ends at `offset` really ends: the start of
+ * the line after its last content line. The `yaml` package lets a node's
+ * range run on over the indentation of the next key and over blank and
+ * comment lines that come before the next, less indented key; those belong
+ * to what follows, so they are left out. Comment lines indented deeper than
+ * `column` stay with the node.
+ */
+const contentEnd = (
+  text: string,
+  offset: number,
+  floor: number,
+  column: number
+) => {
+  const start = lineStart(text, offset);
+  let end =
+    text.slice(start, offset).trim() === '' ? start : afterLine(text, offset);
+  while (end > floor) {
+    const previous = lineStart(text, end - 1);
+    if (previous <= floor) break;
+    const line = text.slice(previous, end).replace(/\r?\n$/, '');
+    if (!isTrivialLine(line)) break;
+    const indent = line.length - line.trimStart().length;
+    if (line.trim() !== '' && indent > column) break;
+    end = previous;
+  }
+  return end;
+};
+
 const detectEol = (text: string) => (text.includes('\r\n') ? '\r\n' : '\n');
 
 /** Indentation step used by the document's block mappings (default two). */
@@ -210,12 +244,15 @@ type Location =
   | {
       kind: 'value';
       map: YAMLMap;
+      /** The pair whose value is `map`, absent for the document. */
+      parent?: Pair;
       pair: Pair;
     }
   | {
       kind: 'missing';
       /** The deepest existing map, or the pair whose empty value must become one. */
       map?: YAMLMap;
+      parent?: Pair;
       emptyPair?: Pair;
       remaining: string[];
       siblingPrefix: boolean;
@@ -228,6 +265,7 @@ type Location =
  */
 const locate = (root: YAMLMap, path: string[]): Location => {
   let map = root;
+  let parent: Pair | undefined;
   let index = 0;
   for (;;) {
     const at = formatPath(path.slice(0, index)) || 'the document';
@@ -249,13 +287,13 @@ const locate = (root: YAMLMap, path: string[]): Location => {
       const siblingPrefix = map.items.some(
         (pair) => (keyText(pair) as string).split('.')[0] === remaining[0]
       );
-      return { kind: 'missing', map, remaining, siblingPrefix };
+      return { kind: 'missing', map, parent, remaining, siblingPrefix };
     }
     const pair = candidates[0];
     const consumed = (keyText(pair) as string).split('.').length;
     index += consumed;
     if (index === path.length) {
-      return { kind: 'value', map, pair };
+      return { kind: 'value', map, parent, pair };
     }
     const value = pair.value as YamlNode | null;
     if (isAlias(value)) {
@@ -282,6 +320,7 @@ const locate = (root: YAMLMap, path: string[]): Location => {
       );
     }
     map = value;
+    parent = pair;
   }
 };
 
@@ -328,15 +367,12 @@ const insertIntoMap = (
   ) {
     return refuse('A mapping that starts mid-line cannot be extended safely.');
   }
-  let position = afterLine(text, valueEnd);
+  const floor = lineStart(text, firstKey.range[0]);
+  let position = contentEnd(text, valueEnd, floor, indent.length);
   if (after !== undefined) {
     const sibling = map.items.find((pair) => keyText(pair) === after);
     if (!sibling) return refuse(`Cannot find "${after}" to insert after.`);
-    const siblingValue = sibling.value as YamlNode | null;
-    const siblingEnd = siblingValue?.range
-      ? siblingValue.range[1]
-      : (sibling.key as YamlNode).range![1];
-    position = afterLine(text, siblingEnd);
+    position = pairEnd(text, sibling);
   }
   const unit = detectIndentUnit(text);
   const lines = formatBlockEntry(key, entryValue, indent, unit);
@@ -425,9 +461,10 @@ const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
   if (isCollection(valueNode) && !valueNode.flow) {
     // A block list or map: replace everything after the colon.
     const colon = text.indexOf(':', keyNode.range![1]);
-    const newline = text.slice(from, to).endsWith('\n') ? detectEol(text) : '';
+    const end = pairEnd(text, pair);
+    const newline = text.slice(from, end).endsWith('\n') ? detectEol(text) : '';
     return (
-      text.slice(0, colon + 1) + ' ' + replacement + newline + text.slice(to)
+      text.slice(0, colon + 1) + ' ' + replacement + newline + text.slice(end)
     );
   }
   if (from === to) {
@@ -442,20 +479,112 @@ const replaceValue = (text: string, pair: Pair, value: PatchValue): string => {
   return text.slice(0, from) + replacement + text.slice(to);
 };
 
-/** Removes a `key: value` pair, including its trailing comment line. */
-const deletePair = (text: string, map: YAMLMap, pair: Pair): string => {
-  if (map.flow) return refuse('Cannot remove entries from a flow mapping.');
+/**
+ * The offset just after the last line of a pair (its key line and value
+ * lines, with the comment at the end of those lines).
+ */
+const pairEnd = (text: string, pair: Pair) => {
   const keyNode = pair.key as YamlNode;
-  const start = lineStart(text, keyNode.range![0]);
-  if (text.slice(start, keyNode.range![0]).trim() !== '') {
-    return refuse('A key that starts mid-line cannot be removed safely.');
-  }
   const valueNode = pair.value as YamlNode | null;
-  const end = afterLine(
+  const start = lineStart(text, keyNode.range![0]);
+  return contentEnd(
     text,
-    valueNode?.range ? valueNode.range[1] : keyNode.range![1]
+    valueNode?.range ? valueNode.range[1] : keyNode.range![1],
+    start,
+    columnOf(text, keyNode.range![0])
   );
-  return text.slice(0, start) + text.slice(end);
+};
+
+/** Removes `key: value` pairs of a block map, with their trailing comments. */
+const deletePairs = (text: string, map: YAMLMap, pairs: Pair[]): string => {
+  if (map.flow) return refuse('Cannot remove entries from a flow mapping.');
+  const ranges = pairs.map((pair) => {
+    const keyNode = pair.key as YamlNode;
+    const start = lineStart(text, keyNode.range![0]);
+    if (text.slice(start, keyNode.range![0]).trim() !== '') {
+      return refuse('A key that starts mid-line cannot be removed safely.');
+    }
+    return [start, pairEnd(text, pair)] as const;
+  });
+  let result = text;
+  for (const [start, end] of ranges.sort((a, b) => b[0] - a[0])) {
+    result = result.slice(0, start) + result.slice(end);
+  }
+  return result;
+};
+
+/**
+ * Writes `{}` as the value of `parent`, whose block map has just lost its
+ * last entry, so the now empty map does not turn into a null.
+ */
+const emptyBlockValue = (text: string, parent: Pair): string => {
+  const keyNode = parent.key as YamlNode;
+  const colon = text.indexOf(':', keyNode.range![1]);
+  const lineEnd = text.indexOf('\n', colon);
+  const rest = text.slice(colon + 1, lineEnd === -1 ? text.length : lineEnd);
+  if (colon === -1 || !isTrivialLine(rest)) {
+    return refuse('Unexpected mapping layout.');
+  }
+  return text.slice(0, colon + 1) + ' {}' + text.slice(colon + 1);
+};
+
+/**
+ * Replaces a dotted `a.b.c: value` with `a.b: {}`, which removes `c` and
+ * keeps the parents the dotted key also defined.
+ */
+const shortenDottedKey = (text: string, pair: Pair): string => {
+  const keyNode = pair.key as YamlNode;
+  const valueNode = pair.value as YamlNode | null;
+  const segments = (keyText(pair) as string).split('.');
+  const colon = text.indexOf(':', keyNode.range![1]);
+  if (valueNode && isCollection(valueNode) && !valueNode.flow) {
+    return refuse('Unexpected dotted key layout.');
+  }
+  const end = Math.max(colon + 1, valueNode?.range ? valueNode.range[1] : 0);
+  return (
+    text.slice(0, keyNode.range![0]) +
+    `${formatKey(segments.slice(0, -1).join('.'))}: {}` +
+    text.slice(end)
+  );
+};
+
+/**
+ * Ways to remove `path`, tried in order until one changes exactly that
+ * value: removing its lines, then keeping the parents it would take along
+ * as empty maps (a block map that loses its only entry, or the parents a
+ * dotted key also spells).
+ */
+const deleteCandidates = (
+  text: string,
+  location: Location
+): Array<() => string> => {
+  if (location.kind === 'value') {
+    const { map, pair, parent } = location;
+    const plain = () => deletePairs(text, map, [pair]);
+    if ((keyText(pair) as string).includes('.')) {
+      return [plain, () => shortenDottedKey(text, pair)];
+    }
+    if (map.items.length === 1 && parent) {
+      return [plain, () => emptyBlockValue(plain(), parent)];
+    }
+    return [plain];
+  }
+  const { map, parent, remaining } = location;
+  if (!map || location.emptyPair) return [() => text];
+  // `path` may only exist through longer dotted keys (`mirror.ref: …`).
+  const spelled = map.items.filter((pair) => {
+    const segments = (keyText(pair) as string).split('.');
+    return (
+      segments.length > remaining.length &&
+      remaining.every((segment, i) => segments[i] === segment)
+    );
+  });
+  if (!spelled.length) return [() => text];
+  const plain = () => deletePairs(text, map, spelled);
+  if (spelled.length === map.items.length && parent) {
+    return [plain, () => emptyBlockValue(plain(), parent)];
+  }
+  return [plain];
 };
 
 const parseRoot = (text: string): YAMLMap => {
@@ -469,13 +598,21 @@ const parseRoot = (text: string): YAMLMap => {
   return doc.contents;
 };
 
-const applyOne = (text: string, operation: PatchOperation): string => {
+const candidatesFor = (
+  text: string,
+  operation: PatchOperation
+): Array<() => string> => {
   const root = parseRoot(text);
   const location = locate(root, operation.path);
-  if (operation.type === 'delete') {
-    if (location.kind !== 'value') return text;
-    return deletePair(text, location.map, location.pair);
-  }
+  if (operation.type === 'delete') return deleteCandidates(text, location);
+  return [() => applySet(text, location, operation)];
+};
+
+const applySet = (
+  text: string,
+  location: Location,
+  operation: Extract<PatchOperation, { type: 'set' }>
+): string => {
   if (location.kind === 'value') {
     return replaceValue(text, location.pair, operation.value);
   }
@@ -566,24 +703,35 @@ export const applyPatch = (
   try {
     for (const operation of operations) {
       if (!operation.path.length) return { ok: false, reason: 'Empty path.' };
-      const before = loadExpanded(current);
-      const next = applyOne(current, operation);
-      let after: Plain;
-      try {
-        after = loadExpanded(next);
-      } catch (error) {
-        return {
-          ok: false,
-          reason: `The edit would break the YAML (${(error as Error).message.split('\n')[0]}), so it was not applied.`,
-        };
+      const expected = expectMutation(loadExpanded(current), operation);
+      let accepted: string | null = null;
+      let reason: string | null = null;
+      for (const candidate of candidatesFor(current, operation)) {
+        let next: string;
+        try {
+          next = candidate();
+        } catch (error) {
+          if (!(error instanceof PatchRefusal)) throw error;
+          reason ??= error.message;
+          continue;
+        }
+        let after: Plain;
+        try {
+          after = loadExpanded(next);
+        } catch (error) {
+          reason ??= `The edit would break the YAML (${(error as Error).message.split('\n')[0]}), so it was not applied.`;
+          continue;
+        }
+        if (sameValue(after, expected)) {
+          accepted = next;
+          break;
+        }
+        reason ??= `Changing "${formatPath(operation.path)}" here would also change other values, so it was not applied; edit it in YAML.`;
       }
-      if (!sameValue(after, expectMutation(before, operation))) {
-        return {
-          ok: false,
-          reason: `Changing "${formatPath(operation.path)}" here would also change other values, so it was not applied; edit it in YAML.`,
-        };
+      if (accepted === null) {
+        return { ok: false, reason: reason ?? 'The edit was not applied.' };
       }
-      current = next;
+      current = accepted;
     }
   } catch (error) {
     if (error instanceof PatchRefusal) {

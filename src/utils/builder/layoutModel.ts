@@ -177,19 +177,38 @@ export const scopeAvailability = (
     typeof zoneRows === 'object' &&
     Object.keys(zoneRows as Plain).length > 0;
   // Writing a zone-wide row that only one column defines would add that row
-  // to every column of the zone.
-  const rowIsZoneWide = hasZoneRows
-    ? Object.prototype.hasOwnProperty.call(zoneRows, key.row)
-    : key.row === 'default';
+  // to every column of the zone. Without zone-wide rows, a key's row is the
+  // implicit "default" one, and writing it would also add a "default" key to
+  // the columns that list their own rows.
+  const columns = child(zoneConfig(layout, key.zone), 'columns');
+  const someColumnHasRows = Object.values(
+    columns && typeof columns === 'object' ? (columns as Plain) : {}
+  ).some((column) => {
+    const rows = child(column, 'rows');
+    return (
+      rows !== null &&
+      typeof rows === 'object' &&
+      Object.keys(rows as Plain).length > 0
+    );
+  });
+  let rowReason: string | null = null;
+  if (hasZoneRows) {
+    if (!Object.prototype.hasOwnProperty.call(zoneRows, key.row)) {
+      rowReason = 'This row is defined inside one column only.';
+    }
+  } else if (key.row !== 'default') {
+    rowReason = 'This row is defined inside one column only.';
+  } else if (someColumnHasRows) {
+    rowReason =
+      'Other columns of this zone list their own rows, so a zone-wide row would add keys to them.';
+  }
   return {
     all: null,
     zone: null,
     column: null,
     row: columnOnly
       ? 'Ergogen reads this from the first key of each column.'
-      : rowIsZoneWide
-        ? null
-        : 'This row is defined inside one column only.',
+      : rowReason,
     key: columnOnly
       ? 'Ergogen reads this from the first key of each column.'
       : null,
@@ -255,7 +274,14 @@ export const columnKeys = (layout: Layout, zone: string, column: string) =>
     (key) => !key.mirrored && key.zone === zone && key.column === column
   );
 
-/** The `points.zones.<zone>.anchor` written in the config, if it is a map. */
+const isScalar = (value: unknown) =>
+  typeof value === 'number' || typeof value === 'string';
+
+/**
+ * The `points.zones.<zone>.anchor` written in the config, when the builder
+ * can show and edit it: a map of a point name `ref`, a `shift` and a
+ * `rotate` written as numbers or expressions.
+ */
 export const zoneAnchor = (
   layout: Layout,
   zone: string
@@ -264,13 +290,37 @@ export const zoneAnchor = (
   if (anchor === undefined || anchor === null) {
     return { anchor: null, reason: null };
   }
-  if (typeof anchor !== 'object' || Array.isArray(anchor)) {
+  if (Array.isArray(anchor)) {
     return {
       anchor: null,
       reason: 'This zone uses a list of anchors; edit it in YAML.',
     };
   }
-  return { anchor: anchor as Plain, reason: null };
+  if (typeof anchor !== 'object') {
+    return {
+      anchor: null,
+      reason: `This zone is anchored to ${String(anchor)}; edit the anchor in YAML.`,
+    };
+  }
+  const fields = anchor as Plain;
+  const shift = fields.shift;
+  const editable =
+    Object.keys(fields).every((field) =>
+      ['ref', 'shift', 'rotate'].includes(field)
+    ) &&
+    (fields.ref === undefined || typeof fields.ref === 'string') &&
+    (fields.rotate === undefined || isScalar(fields.rotate)) &&
+    (shift === undefined ||
+      isScalar(shift) ||
+      (Array.isArray(shift) && shift.length <= 2 && shift.every(isScalar)));
+  if (!editable) {
+    return {
+      anchor: null,
+      reason:
+        'This zone anchor uses fields the builder cannot show (such as aggregate, orient or a structured reference); edit it in YAML.',
+    };
+  }
+  return { anchor: fields, reason: null };
 };
 
 /** The raw `[x, y]` of an anchor shift, defaulting to zeros. */
@@ -281,4 +331,63 @@ export const anchorShift = (anchor: Plain | null): [unknown, unknown] => {
     return [shift, shift];
   }
   return [0, 0];
+};
+
+/** Rotates `[x, y]` by `degrees` counterclockwise (Ergogen's y points up). */
+export const rotateVector = (
+  degrees: number,
+  [x, y]: [number, number]
+): [number, number] => {
+  const radians = (degrees * Math.PI) / 180;
+  return [
+    x * Math.cos(radians) - y * Math.sin(radians),
+    x * Math.sin(radians) + y * Math.cos(radians),
+  ];
+};
+
+type ColumnFrame =
+  | {
+      ok: true;
+      /** The column's first key, whose values the engine uses. */
+      first: LayoutKey;
+      /**
+       * The direction stagger (y) and spread (x) move this column in: the
+       * zone anchor's rotation and the splay of earlier columns, but not the
+       * column's own splay or its first key's orient and rotate.
+       */
+      axisAngle: number;
+      /** The point the column's own splay turns it around. */
+      pivot: [number, number];
+    }
+  | { ok: false; reason: string };
+
+/**
+ * How Ergogen places a column, recovered from its first key: the engine
+ * moves the column anchor by stagger and spread before it applies any
+ * rotation, adds the column's splay around `origin`, then orients, shifts and
+ * rotates the first key.
+ */
+export const columnFrame = (
+  layout: Layout,
+  zone: string,
+  column: string
+): ColumnFrame => {
+  const first = columnKeys(layout, zone, column)[0];
+  if (!first) return { ok: false, reason: 'This column has no keys.' };
+  if (first.adjusted) {
+    return {
+      ok: false,
+      reason: `The first key of column ${column} uses adjust, so a handle could not follow it; use the fields instead.`,
+    };
+  }
+  const { splay, orient, rotate, shift, origin } = first.params;
+  const columnAngle = first.r - orient - rotate;
+  const [shiftX, shiftY] = rotateVector(first.r - rotate, shift);
+  const [originX, originY] = rotateVector(columnAngle, origin);
+  return {
+    ok: true,
+    first,
+    axisAngle: columnAngle - splay,
+    pivot: [first.x - shiftX + originX, first.y - shiftY + originY],
+  };
 };

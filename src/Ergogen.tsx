@@ -430,6 +430,18 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
   // switch would only suggest collection that cannot happen.
   const hasAnalyticsTagId = Boolean(import.meta.env.VITE_GTAG_ID);
 
+  // On a phone the editor and the centre view take turns, so opening
+  // straight into the Build view hides the editor.
+  const openedInBuildRef = useRef(centerView === 'build');
+  useEffect(() => {
+    if (openedInBuildRef.current && window.innerWidth <= 639) {
+      configContext?.setShowConfig(false);
+    }
+    openedInBuildRef.current = false;
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Track screen size changes
   useEffect(() => {
     const handleResize = () => {
@@ -875,7 +887,12 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                           display: centerView === 'build' ? 'flex' : 'none',
                         }}
                       >
-                        <Builder />
+                        <Builder
+                          active={
+                            centerView === 'build' &&
+                            !(isMobile && configContext.showConfig)
+                          }
+                        />
                       </BuildSlot>
                     )}
                     {centerView ===

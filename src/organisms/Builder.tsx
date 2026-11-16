@@ -8,12 +8,15 @@ import BuilderInspector from '../molecules/BuilderInspector';
 import type { Layout, LayoutKey } from '../utils/builder/pointsPreview';
 import {
   anchorShift,
-  columnKeys,
+  columnFrame,
   formatNumber,
   keysInScope,
+  provenance,
+  rotateVector,
   Scope,
   scopePath,
   sourceKey,
+  valueAtScope,
   zoneAnchor,
 } from '../utils/builder/layoutModel';
 
@@ -80,14 +83,6 @@ const Empty = styled.div`
 
 const HANDLE_GAP = 6;
 
-const rotateVector = (degrees: number, [x, y]: [number, number]) => {
-  const radians = (degrees * Math.PI) / 180;
-  return [
-    x * Math.cos(radians) - y * Math.sin(radians),
-    x * Math.sin(radians) + y * Math.cos(radians),
-  ] as [number, number];
-};
-
 const offset = (key: LayoutKey, local: [number, number]) => {
   const [dx, dy] = rotateVector(key.r, local);
   return [key.x + dx, key.y + dy] as [number, number];
@@ -95,17 +90,28 @@ const offset = (key: LayoutKey, local: [number, number]) => {
 
 const isNumber = (value: unknown) => typeof value === 'number';
 
+type BuilderProps = {
+  /** False while the view is hidden: layouts are not requested. */
+  active?: boolean;
+};
+
 /**
  * The Build view: the engine's key layout on a canvas next to an inspector.
  * All edits patch the YAML in place.
  */
-const Builder = () => {
+const Builder = ({ active = true }: BuilderProps) => {
   const context = useConfigContext();
-  const document = useBuilderDocument(true);
+  const document = useBuilderDocument(active);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [scope, setScope] = useState<Scope>('column');
   const [message, setMessage] = useState<string | null>(null);
   const layout = document.layout;
+
+  // Another configuration starts with a fresh selection and no message.
+  useEffect(() => {
+    setSelectedName(null);
+    setMessage(null);
+  }, [document.generation]);
 
   const selected = useMemo(
     () =>
@@ -118,9 +124,13 @@ const Builder = () => {
   // Wait for an up-to-date layout, so a key that an edit just added and
   // selected is not replaced before it appears.
   const layoutIsCurrent = document.status === 'ready';
+  // When every key is skipped, a skipped key is selected, so that skipping
+  // can be turned off again.
   useEffect(() => {
     if (!layout || selected || (selectedName && !layoutIsCurrent)) return;
-    const fallback = layout.keys.find((key) => !key.mirrored && !key.skipped);
+    const fallback =
+      layout.keys.find((key) => !key.mirrored && !key.skipped) ??
+      layout.keys.find((key) => !key.mirrored);
     if (fallback) setSelectedName(fallback.name);
   }, [layout, selected, selectedName, layoutIsCurrent]);
 
@@ -135,9 +145,9 @@ const Builder = () => {
   const handles = useMemo(
     () =>
       layout && selected && document.canEdit
-        ? buildHandles(layout, selected, scope, document, setMessage)
+        ? buildHandles(layout, selected, document, setMessage)
         : [],
-    [layout, selected, scope, document]
+    [layout, selected, document]
   );
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -190,6 +200,7 @@ const Builder = () => {
             inScope={inScope}
             handles={handles}
             onSelect={(key) => setSelectedName(sourceKey(layout, key).name)}
+            onRefuse={setMessage}
             // Refit for another configuration and after structure edits,
             // which can add keys outside the current view.
             fitToken={`${context?.activeConfigId ?? 'preview'}:${layout.keys.length}`}
@@ -220,41 +231,86 @@ const Builder = () => {
   );
 };
 
+const HANDLE_RANGE: Record<'stagger' | 'spread' | 'splay', [number, number]> = {
+  stagger: [-200, 200],
+  spread: [-200, 200],
+  splay: [-180, 180],
+};
+
 /**
  * Drag handles for the selected key's column and zone. Each one maps the
  * pointer to a single configuration value; the engine then lays the keys out
- * again, so what the canvas shows is always Ergogen's own result.
+ * again, so what the canvas shows is always Ergogen's own result. Column
+ * handles always write the column's own value, which the engine reads from
+ * the column's first key.
  */
 const buildHandles = (
   layout: Layout,
   selected: LayoutKey,
-  scope: Scope,
+  document: ReturnType<typeof useBuilderDocument>,
+  setMessage: (message: string | null) => void
+): CanvasHandle[] => [
+  ...columnHandles(layout, selected, document, setMessage),
+  ...zoneHandles(layout, selected, document, setMessage),
+];
+
+/** Stagger, spread and splay handles of the selected key's column. */
+const columnHandles = (
+  layout: Layout,
+  selected: LayoutKey,
   document: ReturnType<typeof useBuilderDocument>,
   setMessage: (message: string | null) => void
 ): CanvasHandle[] => {
-  const keys = columnKeys(layout, selected.zone, selected.column);
-  if (!keys.length) return [];
-  const first = keys[0];
+  const frame = columnFrame(layout, selected.zone, selected.column);
+  if (!frame.ok) return [];
+  const { first, axisAngle, pivot } = frame;
+  const keys = layout.keys.filter(
+    (key) =>
+      !key.mirrored &&
+      key.zone === selected.zone &&
+      key.column === selected.column
+  );
   const top = keys[keys.length - 1];
-  const columnScope: Scope = ['all', 'zone', 'column'].includes(scope)
-    ? scope
-    : 'column';
   const handles: CanvasHandle[] = [];
+
+  /** Why dragging would not change `property` as shown, if it would not. */
+  const refusal = (property: 'stagger' | 'spread' | 'splay') => {
+    const origin = provenance(layout, first, property);
+    if (origin.scope === 'row' || origin.scope === 'key') {
+      return `The ${first.row} row sets the ${property} of column ${selected.column}, so a column value would have no effect; change it in YAML.`;
+    }
+    const written = valueAtScope(layout, first, property, 'column');
+    if (written !== undefined && typeof written !== 'number') {
+      return `The ${property} of column ${selected.column} is the expression "${String(written)}"; edit it in the field so it is not replaced by a number.`;
+    }
+    return undefined;
+  };
 
   const valueHandle = (
     property: 'stagger' | 'spread' | 'splay',
     base: Omit<
       CanvasHandle,
-      'onPreview' | 'onCommit' | 'onCancel' | 'valueText' | 'step' | 'value'
+      | 'onPreview'
+      | 'onCommit'
+      | 'onCancel'
+      | 'valueText'
+      | 'step'
+      | 'value'
+      | 'min'
+      | 'max'
     >
   ): CanvasHandle => {
-    const path = scopePath(columnScope, first, property);
+    const path = scopePath('column', first, property);
     const unit = property === 'splay' ? '°' : ' mm';
+    const [min, max] = HANDLE_RANGE[property];
     return {
       ...base,
       value: first.params[property],
+      min,
+      max,
       step: property === 'splay' ? 1 : 0.5,
       valueText: `${formatNumber(first.params[property])}${unit}`,
+      disabledReason: refusal(property),
       onPreview: (value) => {
         const reason = document.preview([{ type: 'set', path, value }]);
         if (reason) setMessage(reason);
@@ -277,7 +333,7 @@ const buildHandles = (
       glyph: '↕',
       x: staggerX,
       y: staggerY,
-      axis: rotateVector(first.r, [0, 1]),
+      axis: rotateVector(axisAngle, [0, 1]),
     } as CanvasHandle)
   );
 
@@ -297,7 +353,7 @@ const buildHandles = (
         glyph: '↔',
         x: spreadX,
         y: spreadY,
-        axis: rotateVector(first.r, [1, 0]),
+        axis: rotateVector(axisAngle, [1, 0]),
       } as CanvasHandle)
     );
   }
@@ -306,7 +362,6 @@ const buildHandles = (
     top.width / 2 + HANDLE_GAP,
     top.height / 2 + HANDLE_GAP,
   ]);
-  const pivot = offset(first, first.params.origin);
   handles.push(
     valueHandle('splay', {
       id: 'splay',
@@ -318,7 +373,19 @@ const buildHandles = (
       pivot,
     } as CanvasHandle)
   );
+  return handles;
+};
 
+/** The handle that moves the selected key's zone. */
+const zoneHandles = (
+  layout: Layout,
+  selected: LayoutKey,
+  document: ReturnType<typeof useBuilderDocument>,
+  setMessage: (message: string | null) => void
+): CanvasHandle[] => {
+  const zone = layout.zones.find(
+    (candidate) => candidate.name === selected.zone
+  );
   // Moving a zone by its anchor shift is only offered where the shift is in
   // board coordinates: a plain, numeric shift with no reference, rotation or
   // zone or board rotation that would turn it.
@@ -341,14 +408,15 @@ const buildHandles = (
       key.column === zone?.columns[0] &&
       key.row === zone?.rows[0]
   );
-  if (plainAnchor && zoneFirst) {
-    const [moveX, moveY] = offset(zoneFirst, [
-      -(zoneFirst.width / 2 + HANDLE_GAP),
-      -(zoneFirst.height / 2 + HANDLE_GAP),
-    ]);
-    const path = ['points', 'zones', selected.zone, 'anchor', 'shift'];
-    const value: [number, number] = [shiftX as number, shiftY as number];
-    handles.push({
+  if (!plainAnchor || !zoneFirst) return [];
+  const [moveX, moveY] = offset(zoneFirst, [
+    -(zoneFirst.width / 2 + HANDLE_GAP),
+    -(zoneFirst.height / 2 + HANDLE_GAP),
+  ]);
+  const path = ['points', 'zones', selected.zone, 'anchor', 'shift'];
+  const value: [number, number] = [shiftX as number, shiftY as number];
+  return [
+    {
       id: 'zone-move',
       kind: 'move',
       label: `Move zone ${selected.zone}`,
@@ -372,9 +440,8 @@ const buildHandles = (
           )
         ),
       onCancel: document.cancelPreview,
-    });
-  }
-  return handles;
+    },
+  ];
 };
 
 export default Builder;

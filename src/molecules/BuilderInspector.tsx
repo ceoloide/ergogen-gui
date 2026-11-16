@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, ReactNode } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import type { Layout, LayoutKey } from '../utils/builder/pointsPreview';
@@ -6,6 +6,7 @@ import type { PatchOperation } from '../utils/builder/yamlPatch';
 import {
   anchorShift,
   COLUMN_PROPERTIES,
+  columnKeys,
   formatNumber,
   isOverridden,
   KEY_PROPERTIES,
@@ -250,14 +251,17 @@ type FieldProps = {
   placeholder?: string;
   disabled?: boolean;
   hint?: ReactNode;
-  onApply: (input: string) => void;
+  /** Resolves to true when the YAML changed. */
+  onApply: (input: string) => Promise<boolean> | boolean;
   onReset?: () => void;
   resetLabel?: string;
 };
 
 /**
  * A text field that takes a number or an Ergogen math expression and applies
- * it on Enter or when it loses focus. Escape restores the written value.
+ * it on Enter or when it loses focus. Escape restores the written value, and
+ * so does an input that was refused or changed nothing, so the field always
+ * ends up showing what the YAML says.
  */
 const ValueField = ({
   id,
@@ -271,10 +275,21 @@ const ValueField = ({
   resetLabel,
 }: FieldProps) => {
   const [text, setText] = useState(value);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  // The input being applied, so that Enter followed by blur applies it once.
+  const applying = useRef<string | null>(null);
   useEffect(() => setText(value), [value]);
   const hintId = `${id}-hint`;
-  const apply = () => {
-    if (text.trim() !== value.trim()) onApply(text);
+  const apply = async () => {
+    if (text.trim() === value.trim() || applying.current === text) return;
+    applying.current = text;
+    try {
+      const changed = await onApply(text);
+      if (!changed) setText(valueRef.current);
+    } finally {
+      applying.current = null;
+    }
   };
   return (
     <FieldWrapper>
@@ -287,11 +302,11 @@ const ValueField = ({
           disabled={disabled}
           aria-describedby={hint ? hintId : undefined}
           onChange={(event) => setText(event.target.value)}
-          onBlur={apply}
+          onBlur={() => void apply()}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault();
-              apply();
+              void apply();
             } else if (event.key === 'Escape') {
               setText(value);
             }
@@ -335,29 +350,61 @@ const BuilderInspector = ({
   const baseId = useId();
   const disabled = !document.canEdit;
 
-  const run = (operations: PatchOperation[], label: string) => {
-    const reason = document.edit(operations, label);
+  /**
+   * Writes an edit once the engine has laid out the result, so a mistyped
+   * expression or a broken structure is explained instead of written.
+   * Resolves to true when the YAML changed.
+   */
+  const run = async (operations: PatchOperation[], label: string) => {
+    const { reason, changed } = await document.editChecked(operations, label);
     setMessage(reason);
-    return reason === null;
+    return changed;
   };
 
-  const runStructure = (edit: StructureEdit, label: string) => {
+  const runStructure = async (edit: StructureEdit, label: string) => {
     if (!edit.ok) {
       setMessage(edit.reason);
       return;
     }
-    if (run(edit.operations, label) && edit.select) onSelectName(edit.select);
+    if ((await run(edit.operations, label)) && edit.select) {
+      onSelectName(edit.select);
+    }
+  };
+
+  /**
+   * The scope a field writes: the chosen one, or the nearest one where the
+   * property means something (the column for column values, this key for
+   * per-key values in a row that is not zone-wide).
+   */
+  const writableScope = (
+    property: NumericProperty | 'skip',
+    key: LayoutKey
+  ): { scope: Scope; reason: string | null } => {
+    const reason = scopeAvailability(layout, key, property)[scope];
+    if (!reason) return { scope, reason: null };
+    return {
+      scope: (COLUMN_PROPERTIES as string[]).includes(property)
+        ? 'column'
+        : 'key',
+      reason,
+    };
   };
 
   const propertyField = (property: NumericProperty) => {
     if (!selected) return null;
-    const availability = scopeAvailability(layout, selected, property)[scope];
-    const fieldScope: Scope = availability ? 'column' : scope;
-    const written = valueAtScope(layout, selected, property, fieldScope);
-    const origin = provenance(layout, selected, property);
-    const effective = selected.params[property];
+    // The engine reads column values from the column's first key.
+    const subject = (COLUMN_PROPERTIES as string[]).includes(property)
+      ? (columnKeys(layout, selected.zone, selected.column)[0] ?? selected)
+      : selected;
+    const { scope: fieldScope, reason: availability } = writableScope(
+      property,
+      subject
+    );
+    const written = valueAtScope(layout, subject, property, fieldScope);
+    const origin = provenance(layout, subject, property);
+    const effective = subject.params[property];
     const unit = PROPERTY_UNITS[property];
-    const path = scopePath(fieldScope, selected, property);
+    const path = scopePath(fieldScope, subject, property);
     const scopeName = describeScope(fieldScope);
     const isFirstColumn =
       layout.zones.find((zone) => zone.name === selected.zone)?.columns[0] ===
@@ -367,8 +414,12 @@ const BuilderInspector = ({
         origin.raw !== undefined ? ` (${rawText(origin.raw)})` : ''
       }.`,
     ];
-    if (availability) notes.push(`Edits the column: ${availability}`);
-    if (isOverridden(layout, selected, property, fieldScope)) {
+    if (availability) {
+      notes.push(
+        `Edits ${fieldScope === 'column' ? 'the column' : 'this key'}: ${availability}`
+      );
+    }
+    if (isOverridden(layout, subject, property, fieldScope)) {
       notes.push(
         `A ${describeScope(origin.scope)} value overrides this ${scopeName} value.`
       );
@@ -387,7 +438,7 @@ const BuilderInspector = ({
         hint={notes.join(' ')}
         onApply={(input) => {
           const value = parseFieldValue(input);
-          run(
+          return run(
             value === null
               ? [{ type: 'delete', path }]
               : [{ type: 'set', path, value }],
@@ -397,7 +448,7 @@ const BuilderInspector = ({
         onReset={
           written !== undefined
             ? () =>
-                run(
+                void run(
                   [{ type: 'delete', path }],
                   `reset ${PROPERTY_LABELS[property].toLowerCase()}`
                 )
@@ -410,9 +461,9 @@ const BuilderInspector = ({
 
   const skipControl = () => {
     if (!selected) return null;
-    const skipPath = scopePath(scope, selected, 'skip');
-    const written = valueAtScope(layout, selected, 'skip', scope);
-    const unavailable = scopeAvailability(layout, selected, 'skip')[scope];
+    const { scope: skipScope } = writableScope('skip', selected);
+    const skipPath = scopePath(skipScope, selected, 'skip');
+    const written = valueAtScope(layout, selected, 'skip', skipScope);
     const checked =
       written === true || (written === undefined && selected.skipped);
     return (
@@ -420,25 +471,25 @@ const BuilderInspector = ({
         <input
           type="checkbox"
           checked={checked}
-          disabled={disabled || Boolean(unavailable)}
+          disabled={disabled}
           onChange={(event) => {
             const operations: PatchOperation[] = event.target.checked
               ? [{ type: 'set', path: skipPath, value: true }]
               : written === undefined ||
-                  isOverridden(layout, selected, 'skip', scope)
+                  isOverridden(layout, selected, 'skip', skipScope)
                 ? [{ type: 'set', path: skipPath, value: false }]
                 : [{ type: 'delete', path: skipPath }];
-            run(
+            void run(
               operations,
               event.target.checked ? 'skip keys' : 'restore keys'
             );
           }}
         />
-        {scope === 'key'
+        {skipScope === 'key'
           ? 'Skip this key'
-          : scope === 'all'
+          : skipScope === 'all'
             ? 'Skip all keys'
-            : `Skip keys in this ${scope}`}
+            : `Skip keys in this ${skipScope}`}
         {selected.skipped ? ' (this key is skipped)' : ''}
       </CheckboxLabel>
     );
@@ -457,7 +508,7 @@ const BuilderInspector = ({
       const value = parseFieldValue(input) ?? 0;
       const next = [shiftX, shiftY] as Array<unknown>;
       next[index] = value;
-      run(
+      return run(
         [
           {
             type: 'set',
@@ -501,7 +552,7 @@ const BuilderInspector = ({
               onApply={(input) => {
                 const value = parseFieldValue(input);
                 const path = [...zonePath, 'anchor', 'rotate'];
-                run(
+                return run(
                   value === null
                     ? [{ type: 'delete', path }]
                     : [{ type: 'set', path, value }],
@@ -520,7 +571,7 @@ const BuilderInspector = ({
           onApply={(input) => {
             const value = parseFieldValue(input);
             const path = [...zonePath, 'rotate'];
-            run(
+            return run(
               value === null
                 ? [{ type: 'delete', path }]
                 : [{ type: 'set', path, value }],
@@ -630,7 +681,7 @@ const BuilderInspector = ({
             disabled={disabled || !selected}
             onClick={() =>
               selected &&
-              runStructure(
+              void runStructure(
                 addColumn(layout, selected.zone, selected.column),
                 'add column'
               )
@@ -643,7 +694,7 @@ const BuilderInspector = ({
             disabled={disabled || !selected}
             onClick={() =>
               selected &&
-              runStructure(
+              void runStructure(
                 deleteColumn(layout, selected.zone, selected.column),
                 `delete column ${selected.column}`
               )
@@ -655,7 +706,8 @@ const BuilderInspector = ({
             type="button"
             disabled={disabled || !selected}
             onClick={() =>
-              selected && runStructure(addRow(layout, selected.zone), 'add row')
+              selected &&
+              void runStructure(addRow(layout, selected.zone), 'add row')
             }
           >
             Add row
@@ -665,7 +717,7 @@ const BuilderInspector = ({
             disabled={disabled || !selected}
             onClick={() =>
               selected &&
-              runStructure(
+              void runStructure(
                 deleteRow(layout, selected.zone, selected.row),
                 `delete row ${selected.row}`
               )
@@ -680,7 +732,7 @@ const BuilderInspector = ({
             disabled={disabled || !selected}
             onClick={() =>
               selected &&
-              runStructure(
+              void runStructure(
                 addThumbCluster(layout, selected.zone),
                 'add thumb cluster'
               )
@@ -691,7 +743,7 @@ const BuilderInspector = ({
           <SmallButton
             type="button"
             disabled={disabled}
-            onClick={() => runStructure(addZone(layout), 'add zone')}
+            onClick={() => void runStructure(addZone(layout), 'add zone')}
           >
             Add zone
           </SmallButton>
@@ -700,7 +752,7 @@ const BuilderInspector = ({
             disabled={disabled || !selected}
             onClick={() =>
               selected &&
-              runStructure(
+              void runStructure(
                 deleteZone(layout, selected.zone),
                 `delete zone ${selected.zone}`
               )
@@ -726,7 +778,7 @@ const BuilderInspector = ({
           onApply={(input) => {
             const value = parseFieldValue(input);
             const path = ['points', 'rotate'];
-            run(
+            return run(
               value === null
                 ? [{ type: 'delete', path }]
                 : [{ type: 'set', path, value }],
@@ -735,7 +787,10 @@ const BuilderInspector = ({
           }}
         />
         {mirror.kind === 'custom' ? (
-          <Muted>This board uses a custom mirror axis; edit it in YAML.</Muted>
+          <Muted>
+            This board mirrors with a custom axis or per zone; edit mirroring in
+            YAML.
+          </Muted>
         ) : (
           <>
             <CheckboxLabel>
@@ -744,10 +799,10 @@ const BuilderInspector = ({
                 checked={mirror.kind === 'reference'}
                 disabled={disabled}
                 onChange={(event) =>
-                  runStructure(
+                  void runStructure(
                     event.target.checked
                       ? enableMirror(layout)
-                      : disableMirror(),
+                      : disableMirror(layout),
                     event.target.checked ? 'mirror board' : 'remove mirror'
                   )
                 }
@@ -767,7 +822,7 @@ const BuilderInspector = ({
                 }
                 onApply={(input) => {
                   const value = parseFieldValue(input) ?? 0;
-                  run(
+                  return run(
                     [
                       {
                         type: 'set',
