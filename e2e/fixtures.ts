@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 import { isHostName, resolveNoHostName } from './utils/hostNames';
+import { ReadinessLog } from './utils/readiness';
 
 // App assets and workers must come from this run's production server. Provider
 // tests register narrower page routes with deterministic fixtures before goto.
@@ -21,6 +22,19 @@ export const test = base.extend({
       return route.abort('blockedbyclient');
     });
     await use(context);
+  },
+  // A failed test gets a "readiness" attachment: the app's worker milestones
+  // and how busy the machine was (see DEVELOPMENT.md, Browser tests).
+  page: async ({ page }, use, testInfo) => {
+    const readiness = new ReadinessLog();
+    page.on('console', (message) => readiness.record(message.text()));
+    await use(page);
+    if (testInfo.status !== testInfo.expectedStatus) {
+      await testInfo.attach('readiness', {
+        body: readiness.summary(),
+        contentType: 'text/plain',
+      });
+    }
   },
 });
 export { expect };

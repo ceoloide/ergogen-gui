@@ -11,6 +11,13 @@ test.describe('Ergogen Configuration Processing', () => {
     return crypto.createHash('sha256').update(buffer).digest('hex');
   };
 
+  // A binary STL is an 80-byte header, a triangle count and 50 bytes per
+  // triangle; `stored` is how many whole triangles the file holds.
+  const binaryStlTriangles = (stl: Buffer) => ({
+    declared: stl.length >= 84 ? stl.readUInt32LE(80) : -1,
+    stored: (stl.length - 84) / 50,
+  });
+
   test('loads A. dux configuration from local storage and displays outputs', async ({
     page,
   }) => {
@@ -38,10 +45,22 @@ test.describe('Ergogen Configuration Processing', () => {
     });
     await shoot('after-config-editor-visible');
 
-    // Wait for the downloads section to be visible
+    // The section shows "No outputs" until the first results arrive, so check
+    // the outputs themselves (default settings: STL instead of JSCAD).
     const downloadsSection = page.getByTestId('downloads-container');
     await shoot('before-downloads-section-visible');
-    await expect(downloadsSection).toBeVisible({ timeout: 20000 });
+    await expect(
+      downloadsSection.getByTestId(/^downloads-container-.+-preview$/)
+    ).toHaveText(
+      [
+        'demo.dxf',
+        'bottom.dxf',
+        'prototype.stl',
+        'mounting_plate.stl',
+        'architeuthis_dux.kicad_pcb',
+      ],
+      { timeout: 20000 }
+    );
     await shoot('after-downloads-section-visible');
   });
   test('loads A. dux demo.dxf preview', async ({ page }) => {
@@ -170,12 +189,16 @@ test.describe('Ergogen Configuration Processing', () => {
     // Navigate to the main page
     await page.goto('/');
 
-    // The JSCAD download should NOT be visible
+    // Once the case is listed (as STL), its JSCAD download should NOT be.
+    // Before any results the JSCAD row is missing anyway.
+    await expect(
+      page.getByTestId('downloads-container-prototype-stl')
+    ).toBeVisible({ timeout: 20000 });
     const demoJscadRow = page.getByTestId(
       'downloads-container-prototype-jscad'
     );
     await shoot('before-jscad-row-hidden');
-    await expect(demoJscadRow).not.toBeVisible();
+    await expect(demoJscadRow).toHaveCount(0);
     await shoot('after-jscad-row-hidden');
   });
 
@@ -310,11 +333,14 @@ test.describe('Ergogen Configuration Processing', () => {
     const protoPath = test.info().outputPath('prototype.stl');
     await downloadProto.saveAs(protoPath);
 
-    // Basic sanity: files exist and non-empty
-    const plateStat = await fs.promises.stat(platePath);
-    const protoStat = await fs.promises.stat(protoPath);
-    expect(plateStat.size).toBeGreaterThan(0);
-    expect(protoStat.size).toBeGreaterThan(0);
+    // Both are complete binary STL files with triangles
+    for (const stlPath of [platePath, protoPath]) {
+      const { declared, stored } = binaryStlTriangles(
+        await fs.promises.readFile(stlPath)
+      );
+      expect(declared).toBeGreaterThan(0);
+      expect(stored).toBe(declared);
+    }
 
     // Hash and compare to verify they are different
     const [plateHash, protoHash] = await Promise.all([

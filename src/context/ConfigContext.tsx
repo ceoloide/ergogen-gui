@@ -1647,6 +1647,10 @@ const ConfigContextProvider = ({
     setError,
   });
 
+  // The configuration the load-time generation below is for. Its results set
+  // that configuration's preview, so the background preview pass skips it.
+  const loadGenerationConfigIdRef = useRef<string | null>(null);
+
   /**
    * Effect to process the input configuration on the initial load.
    */
@@ -1663,6 +1667,7 @@ const ConfigContextProvider = ({
     const githubUrl = queryParameters.get('github');
 
     if (!githubUrl && configInputState) {
+      loadGenerationConfigIdRef.current = activeConfigIdRef.current;
       generateNow(configInputState, injectionInput, { pointsonly: false });
     }
     // eslint-disable-next-line
@@ -1754,7 +1759,7 @@ const ConfigContextProvider = ({
 
       // Loop through all configurations that don't have a previewSvg and generate them
       configsRef.current.forEach((cfg) => {
-        if (!cfg.previewSvg) {
+        if (!cfg.previewSvg && cfg.id !== loadGenerationConfigIdRef.current) {
           console.log(
             `Triggering background preview generation for: ${cfg.name}`
           );

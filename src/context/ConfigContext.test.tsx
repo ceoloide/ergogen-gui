@@ -871,13 +871,55 @@ describe('ConfigContextProvider', () => {
       expect(backupAfterPruningData2.configs[99].name).toBe('Config 104');
     });
 
+    // Ergogen worker requests posted so far, in order.
+    const ergogenRequests = () =>
+      mockErgogenWorker.postMessage.mock.calls
+        .map(([message]) => message)
+        .filter((message) => message?.type === 'generate');
+
+    // The load-time generation already makes the active configuration's
+    // preview; a background request for it ran the same generation again,
+    // alongside the STL conversion of the first (#222).
+    it('generates a migrated legacy configuration once on load', () => {
+      // Arrange: a configuration saved before multiple configurations existed
+      localStorage.setItem(
+        'ergogen:config',
+        JSON.stringify('points: {legacy: {}}')
+      );
+      const TestComponent = () => {
+        useConfigContext();
+        return null;
+      };
+
+      // Act
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Assert
+      expect(ergogenRequests()).toHaveLength(1);
+      expect(ergogenRequests()[0].requestId).toMatch(/^ergogen-generate-/);
+      expect(ergogenRequests()[0].inputConfig).toEqual({
+        points: { legacy: {} },
+      });
+    });
+
     it('should upgrade version 1 to version 2 on load and trigger background generation for configurations missing preview SVG', async () => {
-      // Setup version 1 container in localStorage with a configuration that lacks previewSvg
+      // Setup version 1 container in localStorage with configurations that lack previewSvg
       const initialConfigs = [
         {
           id: 'cfg-v1-1',
           name: 'V1 Config',
           config: 'points: {A: {}}',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          id: 'cfg-v1-2',
+          name: 'Other V1 Config',
+          config: 'points: {B: {}}',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -908,14 +950,43 @@ describe('ConfigContextProvider', () => {
       const parsed = JSON.parse(storedRaw!);
       expect(parsed.version).toBe(2);
 
-      // Verify that background-preview generation was triggered
-      expect(mockErgogenWorker.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'generate',
-          inputConfig: 'points: {A: {}}',
-          requestId: 'background-preview-cfg-v1-1',
-        })
+      // The active configuration is generated once, in the foreground; the
+      // other one gets a background preview.
+      expect(ergogenRequests().map((message) => message.requestId)).toEqual([
+        expect.stringMatching(/^ergogen-generate-/),
+        'background-preview-cfg-v1-2',
+      ]);
+      expect(ergogenRequests()[0].inputConfig).toEqual({ points: { A: {} } });
+      expect(ergogenRequests()[1]).toEqual(
+        expect.objectContaining({ inputConfig: 'points: {B: {}}' })
       );
+    });
+
+    it('keeps the background preview of the active configuration when nothing generates it on load', () => {
+      // Arrange: a share link that failed to load skips the load-time generation
+      localStorage.setItem(
+        'ergogen:config',
+        JSON.stringify('points: {legacy: {}}')
+      );
+      const TestComponent = () => {
+        useConfigContext();
+        return null;
+      };
+
+      // Act
+      render(
+        <ConfigContextProvider hashError="Invalid share link">
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Assert
+      expect(ergogenRequests()).toEqual([
+        expect.objectContaining({
+          inputConfig: 'points: {legacy: {}}',
+          requestId: expect.stringMatching(/^background-preview-/),
+        }),
+      ]);
     });
 
     it('should process background generation worker success message and update previewSvg in local storage without triggering STL conversion', () => {
