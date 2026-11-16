@@ -1,5 +1,25 @@
 # Changelog
 
+## Symmetric Hull Outlines
+
+November 15, 2026
+
+A `hull` outline around a mirrored keyboard came out lopsided. One half got
+notches and corners the other did not, even though the keys were an exact mirror
+image.
+
+The engine now builds `hull` outlines in a way that does not depend on the order
+of the points, so a mirrored board gets a mirrored outline. Boards that already
+use `hull` are redrawn the next time they are generated.
+
+**What changed:**
+
+- **Mirrored boards**: A `hull` outline is now the same on both halves.
+- **Single-sided boards**: The outline can change slightly, because the new
+  method chooses different notches.
+- **Opting out**: Add `symmetric: false` to a `hull` to get the previous outline
+  back exactly.
+
 ## Steadier Previews After Opening a Configuration
 
 November 15, 2026
