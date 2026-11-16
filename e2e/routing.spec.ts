@@ -44,10 +44,20 @@ test.describe('Routing and Welcome Page', () => {
   }) => {
     const shoot = makeShooter(page, test.info());
     await page.goto('/');
-    // With no config, the "New Design" button should not be visible on the main page
-    const btn = page.getByTestId('new-config-button');
+    // Without a configuration the app settles on the welcome page at /new.
+    // Wait for it and the header first: the button is also absent from a page
+    // that has not rendered yet, or failed to render.
+    await expect(page).toHaveURL(/\/new$/);
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Ergogen Web UI' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('banner').getByRole('link', { name: 'Go to home page' })
+    ).toBeVisible();
     await shoot('before-new-config-btn-not-visible');
-    await expect(btn).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Start new configuration' })
+    ).not.toBeVisible();
     await shoot('after-new-config-btn-not-visible');
   });
 
