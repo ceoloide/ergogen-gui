@@ -98,10 +98,13 @@ describe('Builder', () => {
     expect(screen.getAllByRole('button', { name: /^matrix_/ })).toHaveLength(
       15
     );
+    // The first key is selected once the layout is shown.
     expect(
-      screen.getByRole('heading', { name: 'matrix_pinky_bottom' })
+      await screen.findByRole('heading', { name: 'matrix_pinky_bottom' })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('builder-status')).toHaveTextContent('15 keys');
+    await waitFor(() =>
+      expect(screen.getByTestId('builder-status')).toHaveTextContent('15 keys')
+    );
   });
 
   it('edits a column stagger through the form, keeps comments and undoes', async () => {

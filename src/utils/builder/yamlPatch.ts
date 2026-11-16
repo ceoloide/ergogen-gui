@@ -387,8 +387,8 @@ const insertIntoMap = (
 };
 
 /**
- * Writes `entries` as block children under `key:` whose value is empty or an
- * explicit null (`null` or `~`, which is removed first).
+ * Writes `entries` as block children under `key:` whose value is empty, an
+ * explicit null (`null` or `~`) or an empty `{}`, which is removed first.
  */
 const fillEmptyPair = (
   text: string,
@@ -404,7 +404,9 @@ const fillEmptyPair = (
   }
   let source = text;
   const valueNode = pair.value as YamlNode | null;
-  if (valueNode && isScalar(valueNode) && valueNode.range) {
+  const emptyFlowMap =
+    isMap(valueNode) && valueNode.flow && !valueNode.items.length;
+  if (valueNode && (isScalar(valueNode) || emptyFlowMap) && valueNode.range) {
     const [from, to] = valueNode.range;
     if (to > from) {
       const lineEnd = text.indexOf('\n', to);
@@ -623,7 +625,18 @@ const applySet = (
   }
   const map = location.map as YAMLMap;
   if (!map.items.length) {
-    return refuse('Cannot add to an empty mapping; edit it in YAML.');
+    // An empty `{}` under a key, such as one a removal left, becomes a block.
+    if (map.flow && location.parent) {
+      return fillEmptyPair(text, location.parent, {
+        [location.remaining[0]]: nestedValue(
+          location.remaining,
+          operation.value
+        ),
+      });
+    }
+    if (!map.flow) {
+      return refuse('Cannot add to an empty mapping; edit it in YAML.');
+    }
   }
   return insertIntoMap(
     text,

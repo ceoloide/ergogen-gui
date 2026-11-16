@@ -350,7 +350,20 @@ points:
         ],
         value: 9,
       },
-      { type: 'set', path: ['outlines', 'x', 'y'], value: 1 },
+      {
+        type: 'set',
+        path: [
+          'points',
+          'zones',
+          'matrix',
+          'columns',
+          'ring',
+          'key',
+          'stagger',
+          'x',
+        ],
+        value: 1,
+      },
     ]);
 
     // Assert
@@ -397,6 +410,40 @@ describe('applyPatch removals that empty a mapping', () => {
         '        ring:\n          key: {}\n'
       )
     );
+  });
+
+  it('writes into the empty map a removal left behind', () => {
+    // Arrange
+    const plain = starter.replace(' # reach', '');
+    const emptied = expectText(
+      applyPatch(plain, [{ type: 'delete', path: ringStagger }])
+    );
+
+    // Act
+    const restored = expectText(
+      applyPatch(emptied, [{ type: 'set', path: ringStagger, value: 6 }])
+    );
+    const nested = expectText(
+      applyPatch(emptied, [
+        {
+          type: 'set',
+          path: [
+            'points',
+            'zones',
+            'matrix',
+            'columns',
+            'ring',
+            'key',
+            'origin',
+          ],
+          value: [1, 2],
+        },
+      ])
+    );
+
+    // Assert
+    expect(restored).toBe(plain);
+    expect(nested).toContain('          key:\n            origin: [1, 2]\n');
   });
 
   it('shortens a dotted key instead of removing its parents', () => {
