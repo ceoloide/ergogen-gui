@@ -5,6 +5,7 @@ import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
 import { exampleOptions, ConfigOption } from '../examples';
 import EmptyYAML from '../examples/empty_yaml';
+import { BUILDER_STARTER_CONFIG } from '../utils/builder/starterConfig';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
 import { loadLocalFile } from '../utils/localFiles';
@@ -407,6 +408,8 @@ const Welcome = () => {
   const [isRepoLoading, setIsRepoLoading] = useState(false);
   const isLoading = isLocalLoading || isRepoLoading;
   const [shouldNavigate, setShouldNavigate] = useState(false);
+  // Set by "Build visually" so the editor opens in the Build view.
+  const openBuildViewRef = useRef(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -476,7 +479,11 @@ const Welcome = () => {
       queryParameters.has('gitea');
 
     if ((shouldNavigate || hasRemoteUrlParam) && configContext?.configInput) {
-      navigate('/');
+      navigate(
+        '/',
+        openBuildViewRef.current ? { state: { view: 'build' } } : undefined
+      );
+      openBuildViewRef.current = false;
       setShouldNavigate(false);
     }
   }, [shouldNavigate, configContext?.configInput, navigate]);
@@ -514,6 +521,18 @@ const Welcome = () => {
       );
       setShouldNavigate(true);
     }
+  };
+
+  const handleBuildVisually = async () => {
+    if (!configContext) return;
+    openBuildViewRef.current = true;
+    configContext.createNewConfig(BUILDER_STARTER_CONFIG);
+    await configContext.generateNow(
+      BUILDER_STARTER_CONFIG,
+      configContext.injectionInput,
+      { pointsonly: false }
+    );
+    setShouldNavigate(true);
   };
 
   const handleSelectSavedConfig = async (id: string) => {
@@ -835,6 +854,20 @@ const Welcome = () => {
               data-testid="empty-config-button"
             >
               Empty Configuration
+            </Button>
+          </OptionBox>
+          <OptionBox>
+            <h2>Build Visually</h2>
+            <p>
+              Start from a 5×3 key grid and shape it on a canvas. Every change
+              is written to the YAML.
+            </p>
+            <Button
+              onClick={handleBuildVisually}
+              aria-label="Start a visual build"
+              data-testid="build-visually-button"
+            >
+              Build Visually
             </Button>
           </OptionBox>
           <OptionBox>

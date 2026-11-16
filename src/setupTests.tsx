@@ -41,4 +41,5 @@ vi.mock('react-router-dom', () => ({
 vi.mock('./workers/workerFactory', () => ({
   createErgogenWorker: () => null,
   createJscadWorker: () => null,
+  createPointsWorker: () => null,
 }));

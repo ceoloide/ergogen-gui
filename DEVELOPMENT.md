@@ -428,6 +428,66 @@ Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
   blur flushes it. Download and generate actions read the current buffer through
   `getRealtimeConfigInput()` rather than the debounced state.
 
+## Build view
+
+The Build view (`src/organisms/Builder.tsx`) has no layout model of its own: the
+YAML in `ConfigContext` is the only source of truth.
+
+- **Layout**: `src/utils/builder/pointsPreview.ts` runs Ergogen's own modules up
+  to the points stage (interpretation, the four preprocessing passes, units,
+  points), so positions match a full generation (`builderEngine.test.ts` checks
+  this). Skipped keys are found by a second points pass without `skip` flags,
+  whose key order is kept (so a column's first key may be a skipped one, and
+  a layout where every key is skipped still shows them); the real layout is
+  unaffected. It runs in `points.worker.ts`, a separate quiet worker, through
+  `previewClient.ts`, where the latest request wins; `check` lays out one
+  candidate text and is never dropped. Outlines, cases and PCBs are not
+  computed, which keeps a preview to milliseconds.
+- **Edits**: `src/utils/builder/yamlPatch.ts` splices new text into the source
+  ranges that the `yaml` package reports, following dotted and nested keys.
+  After each splice it reloads the text with js-yaml and Ergogen's `unnest` and
+  requires exactly the intended change; otherwise, and for aliases, merge keys,
+  `$extends`, `$params`, `$args` and `$skip`, it refuses with a reason. A
+  removal tries plain deletion first, then keeps the parents it would take
+  along (`key: {}` for a block map that loses its last entry, `a.b: {}` for a
+  dotted `a.b.c`). Node ranges are clamped to their last content line, so
+  comments that introduce the next section stay in place.
+  `layoutModel.ts` maps scopes to the five levels Ergogen merges per key and
+  reports where a value comes from; `structureOps.ts` builds column, row, zone,
+  thumb cluster and mirror edits, refusing removals of keys that an anchor or
+  the mirror names. `builderHull.ts` finds the hull a `meta.builder.hull`
+  marker hands to the builder (`starterConfig.ts` sets one) and returns the
+  patch that makes its `points` list every unskipped key of a layout.
+  `yamlPatch.ts` keeps such a list in block style, also when it refills
+  `points: []`.
+- **Commit and history**: `src/hooks/useBuilderDocument.ts` commits through
+  `updateRealtimeConfigInput` and `setConfigInput`, like the editor, so shared
+  configurations fork and saving works as usual. An edit is only made on the
+  text the layout shows (or the builder's own last commit), never on text typed
+  since. Inspector edits go through `editChecked`, which commits only after the
+  engine lays the result out and neither the text nor the open configuration
+  has changed meanwhile, adding the managed hull sync to the same commit and
+  undo step (a configuration counter catches a switch to one with
+  the same text, or away and back). A drag only previews until the pointer is
+  released, then commits once; a cancelled pointer cancels it. Opening another configuration (including leaving a
+  shared preview without forking it) clears the layout, selection, messages and
+  history. Undo and redo are in memory and are cleared when the text no longer
+  matches the builder's last edit. While the view is hidden, no layouts are
+  requested.
+- **Editor sync**: `ConfigEditor` remembers the text it last saved. Any other
+  new `configInput` is a change from outside: it cancels the editor's pending
+  save and is applied as one minimal, undoable edit, even while the editor has
+  focus, so a builder edit and typing never overwrite each other. The change
+  events that edit fires are not saved back.
+- **Handles** map pointer movement to one value and never draw geometry
+  themselves. Column handles always write the column's own value; their axes
+  and splay pivot come from `columnFrame` in `layoutModel.ts`, which follows
+  the engine: stagger and spread move the column before any rotation, so they
+  turn with the zone anchor and earlier splays but not the column's own splay
+  or its first key's orient and rotate. The zone move handle is only offered for an anchor with a plain
+  numeric `shift` and no reference, rotation or zone or board rotation, where
+  the shift is in board coordinates.
+
 ## Loading and injections
 
 - **Providers** register in `src/utils/gitProvider.ts`. GitHub handles

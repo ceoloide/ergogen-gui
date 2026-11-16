@@ -26,6 +26,47 @@ type Props = {
   'aria-label'?: string;
 };
 
+type EditorInstance = Parameters<OnMount>[0];
+
+/**
+ * Replaces only the part of the editor's text that differs from `next`, as
+ * one undoable edit, so the cursor and the scroll position follow the text
+ * around them instead of jumping.
+ */
+const replaceChangedText = (editor: EditorInstance, next: string) => {
+  const model = editor.getModel();
+  if (!model) return;
+  const current = model.getValue();
+  let start = 0;
+  const limit = Math.min(current.length, next.length);
+  while (start < limit && current[start] === next[start]) start++;
+  let end = 0;
+  while (
+    end < limit - start &&
+    current[current.length - 1 - end] === next[next.length - 1 - end]
+  ) {
+    end++;
+  }
+  const from = model.getPositionAt(start);
+  const to = model.getPositionAt(current.length - end);
+  model.pushEditOperations(
+    editor.getSelections() ?? [],
+    [
+      {
+        range: {
+          startLineNumber: from.lineNumber,
+          startColumn: from.column,
+          endLineNumber: to.lineNumber,
+          endColumn: to.column,
+        },
+        text: next.slice(start, next.length - end),
+      },
+    ],
+    () => null
+  );
+  if (model.getValue() !== next) model.setValue(next);
+};
+
 /**
  * A component that provides a YAML editor for configuring Ergogen settings.
  * It uses the Monaco Editor for a rich editing experience and integrates with the ConfigContext
@@ -41,7 +82,7 @@ const ConfigEditor = ({
   'aria-label': ariaLabel,
 }: Props) => {
   const configContext = useConfigContext();
-  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const editorRef = useRef<EditorInstance | null>(null);
 
   // Provide safe defaults when context is null to avoid conditional hooks
   const defaults = {
@@ -70,9 +111,18 @@ const ConfigEditor = ({
     activeConfigId,
   } = configContext ?? defaults;
 
+  // The last text this editor saved to the context. When `configInput`
+  // comes back as that text, it is the echo of typing here; any other value
+  // was written elsewhere (the Build view, undo there, loading a file).
+  const savedByEditorRef = useRef<string | null>(null);
+  // True while the editor shows a change from outside, whose change events
+  // must not save that text back as if it had been typed here.
+  const syncingRef = useRef(false);
+
   // Create a debounced setConfigInput to avoid updating context on every keystroke
   const debouncedSetConfigInput = useRef(
     debounce((val: string) => {
+      savedByEditorRef.current = val;
       setConfigInput(val);
     }, 500)
   ).current;
@@ -86,18 +136,27 @@ const ConfigEditor = ({
 
   // Sync editor value with context configInput (only when changed from outside)
   useEffect(() => {
-    if (editorRef.current) {
-      // If the editor currently has focus, the changes came from user typing.
-      // Do not overwrite the editor as that resets the cursor position.
-      if (editorRef.current.hasTextFocus()) {
-        return;
-      }
-      const currentVal = editorRef.current.getValue();
-      if (configInput !== undefined && configInput !== currentVal) {
-        editorRef.current.setValue(configInput);
-      }
+    const editor = editorRef.current;
+    if (!editor || configInput === undefined) return;
+    if (configInput === savedByEditorRef.current) {
+      // The echo of typing here, which may already be behind the editor.
+      savedByEditorRef.current = null;
+      return;
     }
-  }, [configInput]);
+    if (configInput === editor.getValue()) return;
+    // A change from outside wins over typing that has not been saved yet:
+    // whoever wrote it started from the latest text (the realtime value), and
+    // the pending save would otherwise overwrite it. It also applies while
+    // the editor has focus.
+    debouncedSetConfigInput.cancel();
+    savedByEditorRef.current = null;
+    syncingRef.current = true;
+    try {
+      replaceChangedText(editor, configInput);
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [configInput, debouncedSetConfigInput]);
 
   /**
    * Handles changes in the editor's content.
@@ -110,6 +169,9 @@ const ConfigEditor = ({
 
       // Sync the realtime value ref immediately (without triggering re-renders)
       updateRealtimeConfigInput(textInput);
+
+      // Showing a change from outside: the context already holds it.
+      if (syncingRef.current) return;
 
       // Debounce the state/localStorage update
       debouncedSetConfigInput(textInput);
@@ -134,6 +196,7 @@ const ConfigEditor = ({
         // Cancel pending debounces and apply immediately
         debouncedSetConfigInput.cancel();
         updateRealtimeConfigInput(currentConfig);
+        savedByEditorRef.current = currentConfig;
         setConfigInput(currentConfig);
         generateNow(currentConfig, injectionInput, {
           pointsonly: false,

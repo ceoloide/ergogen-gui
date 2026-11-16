@@ -1,5 +1,33 @@
 # Changelog
 
+## Build Keyboards Visually
+
+November 16, 2026
+
+![Build view with a mirrored keyboard, thumb cluster and scoped inspector.](./public/images/changelog/2026-11-16-build-view.png)
+
+Shaping a layout meant editing numbers in YAML and regenerating to see the
+result, and it was easy to lose track of which level of the config a value came
+from.
+
+The new **Build** view sits next to the editor and draws the keys exactly as
+Ergogen lays them out. Select a key, choose whether a change applies to the key,
+row, column, zone or all keys, and edit values or drag handles; every change is
+written straight into your YAML, keeping your comments and formatting.
+
+**What changed:**
+
+- **Build view**: Switch the centre pane between **Outputs** and **Build**, or
+  start from the **Build Visually** card on the welcome page.
+- **Direct editing**: Drag column stagger, spread and splay or move a zone,
+  type numbers or expressions such as `u/4`, and see where each value comes
+  from.
+- **Structure**: Add or remove columns, rows and zones, add a thumb cluster and
+  mirror the board, with undo and redo.
+- **Board outline**: The **Build Visually** starter draws keycaps and a board
+  hull around every key; the hull follows the keys you add, remove, skip or
+  mirror.
+
 ## Symmetric Hull Outlines
 
 November 15, 2026

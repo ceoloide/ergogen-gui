@@ -44,6 +44,11 @@ vi.mock('./molecules/FilePreview', () => {
   MockFilePreview.displayName = 'MockFilePreview';
   return { default: MockFilePreview };
 });
+vi.mock('./organisms/Builder', () => {
+  const MockBuilder = () => <div data-testid="mock-builder" />;
+  MockBuilder.displayName = 'MockBuilder';
+  return { default: MockBuilder };
+});
 vi.mock('./molecules/ResizablePanel', () => {
   const MockResizablePanel = ({ children }: any) => <div>{children}</div>;
   MockResizablePanel.displayName = 'MockResizablePanel';
@@ -314,5 +319,74 @@ describe('Ergogen Privacy settings', () => {
     expect(
       screen.queryByText(/built without an analytics tag ID/)
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('Ergogen centre view switch', () => {
+  const context = {
+    configs: [],
+    activeConfigId: '1',
+    activeConfigName: 'Board',
+    isPreview: false,
+    results: null,
+    configInput: 'points: {}',
+    injectionInput: [],
+    debug: false,
+    stlPreview: false,
+    isGenerating: false,
+    isJscadConverting: false,
+    showSettings: false,
+    showSideNav: false,
+    showConfig: true,
+    showDownloads: true,
+    setShowSettings: vi.fn(),
+    setShowSideNav: vi.fn(),
+    setShowConfig: vi.fn(),
+    setShowDownloads: vi.fn(),
+    generateNow: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (useConfigContext as Mock).mockReturnValue(context);
+  });
+
+  it('switches between Outputs and Build and keeps the editor', () => {
+    // Arrange
+    render(<Ergogen />);
+    const outputs = screen.getByRole('button', { name: 'Outputs' });
+    const build = screen.getByRole('button', { name: 'Build' });
+
+    // Assert: outputs first
+    expect(outputs).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('mock-downloads')).toBeInTheDocument();
+
+    // Act
+    fireEvent.click(build);
+
+    // Assert
+    expect(build).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('mock-builder')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-downloads')).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-config-editor')).toBeInTheDocument();
+
+    // Act
+    fireEvent.click(outputs);
+
+    // Assert: the builder is hidden but kept, with its history
+    expect(screen.getByTestId('mock-builder')).not.toBeVisible();
+    expect(screen.getByTestId('mock-downloads')).toBeInTheDocument();
+  });
+
+  it('opens the Build view from the mobile sub-header', () => {
+    // Arrange
+    render(<Ergogen />);
+
+    // Act
+    fireEvent.click(screen.getByTestId('mobile-build-button'));
+
+    // Assert
+    expect(context.setShowConfig).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId('mock-builder')).toBeInTheDocument();
   });
 });
