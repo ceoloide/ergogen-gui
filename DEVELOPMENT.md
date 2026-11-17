@@ -396,9 +396,11 @@ a saturated machine (see the last item).**
 Components follow atomic design: `src/atoms`, `src/molecules`, `src/organisms`,
 `src/pages`. Global state is `src/context/ConfigContext.tsx`; pure logic is in
 `src/utils`; workers are in `src/workers`; theme tokens are in
-`src/theme/theme.ts`. `index.html` loads the classic-script helpers in
-`public/dependencies` (maker.js, KLE parser, KiCanvas and others) before
-`src/index.tsx`.
+`src/theme/theme.ts`. `public/dependencies` contains KiCanvas, loaded by
+`index.html` for PCB previews, and OpenJSCAD, imported by `jscad.worker.ts`
+for case previews and STL conversion. Ergogen's dependencies (including
+Maker.js, Bezier, hull and the KLE parser) are bundled into its worker from
+the installed packages; they need no separate browser-global scripts.
 
 ## Generation
 
