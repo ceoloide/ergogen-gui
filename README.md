@@ -32,6 +32,14 @@ included. The body is approximately 296 × 139 mm. The key outlines use
 18 mm caps with 1.5 mm corner radii; check physical keycap clearance before
 fabrication.
 
+**Willy 50**, also under **Miscellaneous**, is inspired by the Keychron Orca
+Echo. It models only the pictured half: 25 keyboard keys and a scroll-wheel
+point beside the angled thumb, with default `u` spacing and column stagger.
+The wheel point, `wheel_scroll_key`, inherits the thumb's rotation and has
+width `0.75u` and height `u` (14.25 × 19 mm). Its dimensions approximate the
+pictured wheel and can be adjusted for the chosen component. Use that named
+point to place a scroll-wheel footprint; no hardware footprint is bundled.
+
 ## Privacy and network use
 
 Configurations stay in browser storage unless you share or export them. The app
