@@ -1,16 +1,15 @@
 /**
  * Ergogen GUI Service Worker
  *
- * This file is compiled by CRA's Workbox InjectManifest plugin (because it
- * exists at `src/service-worker.ts`). The plugin injects the precache manifest
- * into `self.__WB_MANIFEST` at build time.
+ * This file is compiled by vite-plugin-pwa in injectManifest mode. The plugin
+ * injects the precache manifest into `self.__WB_MANIFEST` at build time.
  *
  * Caching strategy overview:
- * - **Precache** (install-time): All webpack-bundled JS/CSS/HTML assets are
+ * - **Precache** (install-time): All built JS/CSS/HTML assets are
  *   precached automatically via `self.__WB_MANIFEST`. These include the app
  *   shell, chunks, and the entry HTML.
- * - **Runtime – public dependencies**: Large third-party JS bundles loaded via
- *   `<script>` tags in index.html (`dependencies/*.js`, `kicanvas.js`, etc.)
+ * - **Runtime – public dependencies**: Vendored JS under `dependencies/`,
+ *   including KiCanvas loaded via a `<script>` tag in index.html,
  *   are cached on first use with a CacheFirst strategy so they load instantly
  *   on subsequent visits, even offline.
  * - **Runtime – Google Fonts**: Cached with StaleWhileRevalidate (CSS) and
@@ -86,8 +85,7 @@ registerRoute(
 // --------------------------------------------------------------------------
 // Runtime – Public dependencies
 //
-// The large third-party bundles loaded via <script> tags (maker.js, bezier.js,
-// hull.js, kle.js, kicanvas.js) live under dependencies/. The precache above
+// Vendored KiCanvas and OpenJSCAD scripts live under dependencies/. The precache above
 // already serves the files present at build time; this route caches any
 // other file there on first access so it also loads offline.
 // --------------------------------------------------------------------------

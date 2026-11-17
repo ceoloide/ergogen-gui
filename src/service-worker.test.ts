@@ -243,11 +243,11 @@ describe.each([
 
   it('caches script dependencies of this app', () => {
     // Act / Assert
-    expect(matches('public-dependencies-v1', 'dependencies/maker.js')).toBe(
+    expect(matches('public-dependencies-v1', 'dependencies/kicanvas.js')).toBe(
       true
     );
     expect(
-      matches('public-dependencies-v1', '/other-app/dependencies/maker.js')
+      matches('public-dependencies-v1', '/other-app/dependencies/kicanvas.js')
     ).toBe(false);
   });
 
