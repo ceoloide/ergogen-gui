@@ -1,6 +1,6 @@
 import { ConfigExample } from './index';
 
-/** A split 50-key layout with a scroll wheel on the pictured left half. */
+/** The pictured Willy 50 half, including a point for its thumb scroll wheel. */
 const Willy50: ConfigExample = {
   label: 'Willy 50',
   author: 'ceoloide',
@@ -12,10 +12,9 @@ meta:
   version: 1.0.0
 units:
   keycap: 18
+  wheel_width: 0.75u
+  wheel_height: u
 points:
-  mirror:
-    ref: matrix_inner_home
-    distance: 5u
   zones:
     matrix:
       columns:
@@ -52,54 +51,63 @@ points:
         inner:
       rows:
         key:
+    wheel:
+      anchor:
+        ref: thumb_inner_key
+        shift: [0.95u, 0]
+      key:
+        width: wheel_width
+        height: wheel_height
+      columns:
+        scroll:
+      rows:
+        key:
 outlines:
   keys:
     - what: rectangle
-      where: true
+      where: -wheel_scroll_key
       size: keycap
       corner: 1.5
-  # The wheel is an outline, not a 51st switch. Only the shown half has one.
+  # Use wheel_scroll_key as the anchor for a future scroll-wheel footprint.
   wheel:
     - what: rectangle
-      where:
-        ref: thumb_inner_key
-        shift: [0.95u, 0]
-      size: [0.75u, u]
+      where: wheel_scroll_key
+      size: [wheel_width, wheel_height]
       corner: 1
     # Grip ribs distinguish the scroll wheel from a keycap.
     - what: rectangle
       operation: stack
       where:
-        ref: thumb_inner_key
-        shift: [0.65u, 0]
+        ref: wheel_scroll_key
+        shift: [-0.3u, 0]
       size: [0.025u, 0.85u]
     - what: rectangle
       operation: stack
       where:
-        ref: thumb_inner_key
-        shift: [0.8u, 0]
+        ref: wheel_scroll_key
+        shift: [-0.15u, 0]
       size: [0.025u, 0.85u]
     - what: rectangle
       operation: stack
       where:
-        ref: thumb_inner_key
-        shift: [0.95u, 0]
+        ref: wheel_scroll_key
+        shift: [0u, 0]
       size: [0.025u, 0.85u]
     - what: rectangle
       operation: stack
       where:
-        ref: thumb_inner_key
-        shift: [1.1u, 0]
+        ref: wheel_scroll_key
+        shift: [0.15u, 0]
       size: [0.025u, 0.85u]
     - what: rectangle
       operation: stack
       where:
-        ref: thumb_inner_key
-        shift: [1.25u, 0]
+        ref: wheel_scroll_key
+        shift: [0.3u, 0]
       size: [0.025u, 0.85u]
   body:
     - what: polygon
-      where: /^(mirror_)?matrix_outer_mod$/
+      where: matrix_outer_mod
       points:
         - shift: [-0.75u, -0.75u]
         - shift: [2.4u, 0]
