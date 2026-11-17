@@ -11,6 +11,7 @@ import Alpha from './alpha';
 import Plank from './plank';
 import Curly45 from './curly45';
 import Briefs56 from './briefs56';
+import Willy50 from './willy50';
 
 /**
  * Represents a group of configuration options for the react-select component.
@@ -52,7 +53,7 @@ const simpleExamples = [Absolem, Atreus];
 
 const completeExamples = [Adux, CorneyIsland, Sweeplike, Reviung41, Tiny20];
 
-const miscExamples = [Wubbo, Alpha, Plank, Curly45, Briefs56];
+const miscExamples = [Wubbo, Alpha, Plank, Curly45, Briefs56, Willy50];
 
 /**
  * An array of grouped example configurations to be displayed in the select dropdown.
