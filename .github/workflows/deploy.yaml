@@ -61,8 +61,29 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      - name: Install locked dependencies
-        run: PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
+      # The ERGOGEN_VERSION repository variable selects this deployment's
+      # engine; unset keeps the canonical frozen install. A branch or tag is
+      # resolved to a commit here, and install, check and build all use that
+      # one pinned specifier (see DEVELOPMENT.md, "Deployment engine").
+      - name: Resolve engine
+        id: engine
+        run: node scripts/ci/deploy-engine.mts resolve
+        env:
+          CONFIGURED_ERGOGEN_VERSION: ${{ vars.ERGOGEN_VERSION }}
+      - name: Install dependencies
+        run: |
+          if [ -z "$ERGOGEN_VERSION" ]; then
+            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
+          else
+            node scripts/preinstall.js
+            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
+          fi
+        env:
+          ERGOGEN_VERSION: ${{ steps.engine.outputs.specifier }}
+      - name: Verify installed engine
+        run: node scripts/ci/deploy-engine.mts verify
+        env:
+          ERGOGEN_VERSION: ${{ steps.engine.outputs.specifier }}
       - name: Install validation tools
         run: |
           pnpm tools:install
@@ -70,6 +91,7 @@ jobs:
       - name: Validate production build
         run: pnpm validate
         env:
+          ERGOGEN_VERSION: ${{ steps.engine.outputs.specifier }}
           VITE_GTAG_ID: ${{ vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           VITE_BUILD_ID: ${{ github.sha }}.${{ github.run_id }}.${{ github.run_attempt }}

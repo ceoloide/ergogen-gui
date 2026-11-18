@@ -513,9 +513,10 @@ network.
 
 ### Engine experiments
 
-Canonical installs, CI and deployment use the `package.json` specifier and the
-frozen lockfile. To change the production engine, update both in a reviewed PR.
-To try another engine, use a separate checkout:
+Canonical installs and CI use the `package.json` specifier and the frozen
+lockfile, and so does deployment unless a repository selects another engine (see
+[Deployment engine](#deployment-engine)). To change the canonical engine, update
+both in a reviewed PR. To try another engine, use a separate checkout:
 
 ```shell
 export ERGOGEN_VERSION=github:ceoloide/ergogen#develop   # or ergogen@<version>
@@ -531,6 +532,43 @@ specifier, and Vite also uses it as the displayed engine identity. Never commit
 the experiment's `package.json`, `pnpm-lock.yaml` or preview SVGs. Restore
 canonical inputs and reinstall with `--frozen-lockfile` before reporting
 canonical results.
+
+### Deployment engine
+
+The `ERGOGEN_VERSION` repository variable (**Settings > Secrets and variables >
+Actions > Variables**) selects the engine that `deploy.yaml` builds for that
+repository only, so a staging fork and production can differ without a code
+change. Pull request CI ignores it and always validates the canonical engine.
+
+| Value                                      | Engine deployed                                             |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| unset or empty                             | Canonical: `package.json` specifier and frozen lockfile.    |
+| `github:<owner>/<repo>#<branch>`           | The branch's commit when the build starts.                  |
+| `github:<owner>/<repo>#<tag>`              | The tag's commit (annotated tags are peeled).               |
+| `github:<owner>/<repo>#<40-character SHA>` | That commit. Use it when the name is both a branch and tag. |
+
+The override accepts GitHub repositories only. Use a Git branch or tag name,
+or a full SHA (uppercase hex is normalized to lowercase). Surrounding
+whitespace is ignored.
+
+In the build job, `node scripts/ci/deploy-engine.mts resolve` reads the variable
+through `env` and turns a branch or tag into `github:<owner>/<repo>#<commit>`
+with `git ls-remote`. Resolving every run matters: if the value equals the
+manifest specifier (`github:ceoloide/ergogen#v4.3.0`), pnpm would otherwise keep
+the commit the lockfile recorded rather than the branch's current one. The
+install step then runs the [engine experiment](#engine-experiments) steps with
+that pinned specifier (`--no-frozen-lockfile`); `deploy-engine.mts verify` fails
+unless pnpm installed that specifier from that exact commit; and
+`pnpm validate` uses the same commit for engine preparation and for the UI and
+share links. The step summary records the installed version and the commit
+when available, including for canonical builds.
+
+The rewritten lockfile stays in the runner and is never committed. Engine
+preparation keys its cache on the installed package path, which names the
+commit, so a different commit always rebuilds the engine. The deploy workflow
+runs `pnpm validate` like CI but not the browser tests or `pnpm test:reports`,
+so validate a non-canonical engine in a separate checkout before selecting it.
+A repository selected through the override must be public.
 
 Example preview SVGs in `public/images/previews` are tracked. Regenerate them only
 with `pnpm generate-previews` and review the diff; builds never rewrite them.
@@ -552,8 +590,9 @@ with `pnpm generate-previews` and review the diff; builds never rewrite them.
   one (not FIFO). Manual runs on other branches build in their own group and
   never publish.
 - Build variables come from repository variables; see the README configuration
-  section. The analytics tag ID comes only from `VITE_GTAG_ID`, in both
-  workflows and `vite.config.mts`.
+  section. `ERGOGEN_VERSION` selects the deployed engine; see
+  [Deployment engine](#deployment-engine). The analytics tag ID comes only from
+  `VITE_GTAG_ID`, in both workflows and `vite.config.mts`.
 - Actions are pinned by commit and updated by Dependabot with a seven-day
   cooldown. `tests/workflow-security.test.ts` asserts permissions, triggers,
   credentials, the artifact handoff, the shared validation step, what the
