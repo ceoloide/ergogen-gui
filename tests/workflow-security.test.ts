@@ -1,5 +1,14 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import yaml from 'js-yaml';
@@ -371,6 +380,110 @@ describe('HC-013a deployment policy', () => {
         "${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}",
       'cancel-in-progress': false,
     });
+  });
+});
+
+describe('deployment engine selection', () => {
+  const step = (name: string) => build.steps.find((s) => s.name === name);
+  const resolved = '${{ steps.engine.outputs.specifier }}';
+  const frozenInstall =
+    'PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile';
+
+  /** Runs the install step's script with stub pnpm and node commands. */
+  const runInstall = (ergogenVersion: string) => {
+    const bin = mkdtempSync(join(tmpdir(), 'deploy-install-'));
+    const calls = join(bin, 'calls');
+    for (const command of ['pnpm', 'node']) {
+      writeFileSync(
+        join(bin, command),
+        `#!/bin/sh\necho "${command} $* blocked=$PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS" >> "${calls}"\n`,
+        { mode: 0o755 }
+      );
+    }
+    const result = spawnSync(
+      'bash',
+      ['-e', '-c', step('Install dependencies')!.run!],
+      {
+        env: {
+          PATH: `${bin}:${process.env.PATH}`,
+          ERGOGEN_VERSION: ergogenVersion,
+        },
+        encoding: 'utf8',
+      }
+    );
+    const log = existsSync(calls) ? readFileSync(calls, 'utf8') : '';
+    rmSync(bin, { recursive: true, force: true });
+    expect(result.status, result.stderr).toBe(0);
+    return log.trim().split('\n');
+  };
+
+  it('keeps pull request CI on the canonical frozen install', () => {
+    // Assert
+    const text = readFileSync(
+      resolve(projectRoot, '.github/workflows/ci.yaml'),
+      'utf8'
+    );
+    expect(text).not.toContain('ERGOGEN_VERSION');
+    expect(
+      ci.jobs['lint-and-test'].steps.find(
+        (s) => s.name === 'Install locked dependencies'
+      )?.run
+    ).toBe(frozenInstall);
+  });
+
+  it('reads the repository variable only in the resolve step, through env', () => {
+    // Arrange
+    const steps = build.steps.filter((s) =>
+      JSON.stringify(s).includes('vars.ERGOGEN_VERSION')
+    );
+
+    // Assert
+    expect(steps).toEqual([step('Resolve engine')]);
+    expect(steps[0]?.env?.CONFIGURED_ERGOGEN_VERSION).toBe(
+      '${{ vars.ERGOGEN_VERSION }}'
+    );
+    expect(steps[0]?.run).not.toContain('${{');
+  });
+
+  it('installs, verifies and builds with the one resolved specifier', () => {
+    // Arrange
+    const names = build.steps.map((s) => s.name);
+    const validate = build.steps.find((s) => s.run === 'pnpm validate');
+
+    // Assert
+    expect(step('Install dependencies')?.env?.ERGOGEN_VERSION).toBe(resolved);
+    expect(step('Verify installed engine')?.env?.ERGOGEN_VERSION).toBe(
+      resolved
+    );
+    expect(validate?.env?.ERGOGEN_VERSION).toBe(resolved);
+    expect(names.indexOf('Resolve engine')).toBeLessThan(
+      names.indexOf('Install dependencies')
+    );
+    expect(names.indexOf('Install dependencies')).toBeLessThan(
+      names.indexOf('Verify installed engine')
+    );
+    expect(names.indexOf('Verify installed engine')).toBeLessThan(
+      build.steps.indexOf(validate!)
+    );
+  });
+
+  it('installs from the frozen lockfile when no engine is configured', () => {
+    // Act
+    const calls = runInstall('');
+
+    // Assert
+    expect(calls).toEqual(['pnpm install --frozen-lockfile blocked=false']);
+  });
+
+  it('patches the manifest and re-resolves when an engine is configured', () => {
+    // Act
+    const calls = runInstall(`github:ceoloide/ergogen#${'a'.repeat(40)}`);
+
+    // Assert
+    expect(calls).toEqual([
+      'node scripts/preinstall.js blocked=',
+      'pnpm install --no-frozen-lockfile blocked=false',
+    ]);
   });
 });
 

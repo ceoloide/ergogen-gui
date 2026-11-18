@@ -143,7 +143,11 @@ installed specifier, so it can break a canonical frozen install. Use
 | `VITE_ERGOGEN_VERSION`, `ERGOGEN_VERSION`, `REACT_APP_ERGOGEN_VERSION` | The `package.json` specifier if it names a repository: `github:ceoloide/ergogen#v4.3.0` | Engine identity shown in the UI and written to share links. It does not install an engine. For a non-semver ref, feature checks use the installed package version. |
 
 GitHub Actions passes repository variables `PUBLIC_URL` as `VITE_PUBLIC_URL` and
-`VITE_GTAG_ID` unchanged. `CNAME_DOMAIN` writes `dist/CNAME` on `main`.
+`VITE_GTAG_ID` unchanged. `CNAME_DOMAIN` writes `dist/CNAME` on `main`. The
+repository variable `ERGOGEN_VERSION`, such as `github:ceoloide/ergogen#v4.3.0`,
+makes the deploy workflow install, build and show that engine, pinned to the
+branch or tag's current commit; leave it unset for the canonical engine. See
+[Deployment engine](DEVELOPMENT.md#deployment-engine) for the accepted values.
 
 URL parameters change a running page: `?ff_templates=true|false` and
 `?ff_outlines=true|false` override the feature settings above;
