@@ -82,7 +82,7 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
     }
 
     const isHash = branch.length === 40 && /^[0-9a-fA-F]{40}$/.test(branch);
-    const displayText = isHash ? branch.substring(0, 7) : branch;
+    const displayText = isHash ? defaultVersionLabel : branch;
     const url = isHash
       ? `${baseUrl}/commit/${branch}`
       : `${baseUrl}/tree/${branch}`;
@@ -110,7 +110,7 @@ export const getErgogenVersionInfo = (version?: string): VersionInfo => {
   }
 
   const isHash = branch.length === 40 && /^[0-9a-fA-F]{40}$/.test(branch);
-  const displayText = isHash ? branch.substring(0, 7) : branch;
+  const displayText = isHash ? defaultVersionLabel : branch;
   const url = isHash
     ? `${baseUrl}/commit/${branch}`
     : `${baseUrl}/tree/${branch}`;
