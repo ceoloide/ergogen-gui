@@ -90,19 +90,23 @@ describe('getErgogenVersionInfo', () => {
     });
   });
 
-  it('handles 40-character commit hashes correctly', () => {
-    const fullHash = 'fb2509f8e404b9015c7e3ebbd6931754020a2e0a';
-    expect(
-      getErgogenVersionInfo(`github:ceoloide/ergogen#${fullHash}`)
-    ).toEqual({
-      label: `ceoloide/ergogen#${fullHash}`,
-      url: `https://github.com/ceoloide/ergogen/commit/${fullHash}`,
-      displayText: 'fb2509f',
-      isCustom: true,
-      isHash: true,
-      isTag: false,
-    });
-  });
+  it.each(['ceoloide/ergogen', 'ergogen/ergogen'])(
+    'shows the installed version for a pinned commit of %s',
+    (repo) => {
+      const fullHash = 'c7fc3021b699ea424bc4f0799b1abfc9462b8d08';
+
+      const info = getErgogenVersionInfo(`github:${repo}#${fullHash}`);
+
+      expect(info).toEqual({
+        label: repo === 'ergogen/ergogen' ? fullHash : `${repo}#${fullHash}`,
+        url: `https://github.com/${repo}/commit/${fullHash}`,
+        displayText: defaultVersionLabel,
+        isCustom: true,
+        isHash: true,
+        isTag: false,
+      });
+    }
+  );
 });
 
 describe('getFullErgogenVersion', () => {

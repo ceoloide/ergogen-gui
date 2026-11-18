@@ -559,9 +559,10 @@ the commit the lockfile recorded rather than the branch's current one. The
 install step then runs the [engine experiment](#engine-experiments) steps with
 that pinned specifier (`--no-frozen-lockfile`); `deploy-engine.mts verify` fails
 unless pnpm installed that specifier from that exact commit; and
-`pnpm validate` uses the same commit for engine preparation and for the UI and
-share links. The step summary records the installed version and the commit
-when available, including for canonical builds.
+`pnpm validate` uses the same commit for engine preparation, the UI's GitHub
+link and share links. The version chip shows the installed package version.
+The step summary records the installed version and the commit when available,
+including for canonical builds.
 
 The rewritten lockfile stays in the runner and is never committed. Engine
 preparation keys its cache on the installed package path, which names the
