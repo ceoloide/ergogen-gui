@@ -172,7 +172,10 @@ Every other test runs with every engine:
   `installedEngineVersion` (in `src/utils/engineRequirements.ts`) to the
   version in the `package.json` engine specifier (also inside a `^` or `~`
   range); when the specifier names no version, such as a branch or a commit,
-  they use the installed version. A test of behavior on another
+  they use the installed version. Keep a version in the specifier (a tag such as
+  `#v4.4.0`, or a range) while any deployment selects an older engine: with a
+  branch or commit there, that deployment's GUI tests see its older engine and
+  the ones that expect the canonical engine fail. A test of behavior on another
   engine sets the version it needs with
   `vi.mocked(installedEngineVersion).mockReturnValue(...)`.
 - **`tests/engine-smoke.test.ts`** sees the real installed version. It checks
