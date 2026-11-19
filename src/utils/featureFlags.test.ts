@@ -1,15 +1,10 @@
-const mockState = vi.hoisted(() => ({ version: '4.2.1' }));
-vi.mock('ergogen/package.json', () => ({
-  get version() {
-    return mockState.version;
-  },
-  get default() {
-    return mockState;
-  },
-}));
-
 import { isFeatureEnabled } from './featureFlags';
+import { installedEngineVersion } from './engineRequirements';
 import { parseVersion, compareVersions } from './version';
+
+// src/setupTests.tsx makes installedEngineVersion a mock that returns the
+// canonical version; these tests set the version they need.
+const engineVersion = vi.mocked(installedEngineVersion);
 
 describe('featureFlags utilities', () => {
   describe('parseVersion', () => {
@@ -43,8 +38,7 @@ describe('featureFlags utilities', () => {
     beforeEach(() => {
       vi.stubEnv('VITE_FEATURE_TEMPLATES', '');
       vi.stubEnv('VITE_FEATURE_OUTLINES', '');
-      vi.stubEnv('VITE_ERGOGEN_VERSION', '');
-      mockState.version = '4.2.1';
+      engineVersion.mockReturnValue('4.2.1');
 
       // Mock window location search
       delete (window as any).location;
@@ -55,18 +49,19 @@ describe('featureFlags utilities', () => {
 
     afterEach(() => {
       vi.unstubAllEnvs();
+      engineVersion.mockRestore();
     });
 
     it('should prioritize URL query overrides if present', () => {
       window.location.search = '?ff_templates=true';
       vi.stubEnv('VITE_FEATURE_TEMPLATES', 'false');
-      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.2.1'); // would normally disable it
+      engineVersion.mockReturnValue('4.2.1'); // would normally disable it
 
       expect(isFeatureEnabled('templates')).toBe(true);
 
       window.location.search = '?ff_templates=false';
       vi.stubEnv('VITE_FEATURE_TEMPLATES', 'true');
-      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.3.0'); // would normally enable it
+      engineVersion.mockReturnValue('4.3.0'); // would normally enable it
 
       expect(isFeatureEnabled('templates')).toBe(false);
     });
@@ -74,61 +69,52 @@ describe('featureFlags utilities', () => {
     it('should fall back to environment variable if no query override', () => {
       window.location.search = '';
       vi.stubEnv('VITE_FEATURE_TEMPLATES', 'true');
-      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.2.1'); // would normally disable it
+      engineVersion.mockReturnValue('4.2.1'); // would normally disable it
 
       expect(isFeatureEnabled('templates')).toBe(true);
 
       vi.stubEnv('VITE_FEATURE_TEMPLATES', 'false');
-      vi.stubEnv('VITE_ERGOGEN_VERSION', '4.3.0'); // would normally enable it
+      engineVersion.mockReturnValue('4.3.0'); // would normally enable it
 
       expect(isFeatureEnabled('templates')).toBe(false);
     });
 
-    it('should check Ergogen version if no overrides exist', () => {
+    it('should check the engine version if no overrides exist', () => {
       window.location.search = '';
 
       // Under minimum version (4.2.1 < 4.3.0)
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'ergogen@4.2.1');
+      engineVersion.mockReturnValue('4.2.1');
       expect(isFeatureEnabled('templates')).toBe(false);
       expect(isFeatureEnabled('outlines')).toBe(false);
 
       // At minimum version
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'ergogen@4.3.0');
+      engineVersion.mockReturnValue('4.3.0');
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);
 
       // Higher version
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'ergogen@4.4.0');
+      engineVersion.mockReturnValue('4.4.0');
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);
     });
 
-    it('should defer to package.json version for custom developer branches (non-semver)', () => {
+    it('should keep features on a later major version', () => {
       window.location.search = '';
 
-      // Defer to package version when version in package.json is < 4.3.0
-      mockState.version = '4.2.1';
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#develop');
-      expect(isFeatureEnabled('templates')).toBe(false);
-      expect(isFeatureEnabled('outlines')).toBe(false);
-
-      // Defer to package version when version in package.json is >= 4.3.0
-      mockState.version = '4.3.0';
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#develop');
+      // A feature needs at least its version, whatever the major version.
+      engineVersion.mockReturnValue('5.0.0');
       expect(isFeatureEnabled('templates')).toBe(true);
       expect(isFeatureEnabled('outlines')).toBe(true);
     });
 
-    it('should check tag version for custom repo releases', () => {
+    it('should enable features on the canonical engine by default', () => {
+      // Arrange: the version setupTests fixes for GUI tests.
+      engineVersion.mockRestore();
       window.location.search = '';
 
-      // Custom release with tag < 4.3.0
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.2.1');
-      expect(isFeatureEnabled('templates')).toBe(false);
-
-      // Custom release with tag >= 4.3.0
-      vi.stubEnv('VITE_ERGOGEN_VERSION', 'github:ceoloide/ergogen#v4.3.0');
+      // Act / Assert
       expect(isFeatureEnabled('templates')).toBe(true);
+      expect(isFeatureEnabled('outlines')).toBe(true);
     });
   });
 });

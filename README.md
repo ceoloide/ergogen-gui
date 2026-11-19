@@ -17,7 +17,8 @@ was created by [@MvEerd](https://github.com/MvEerd) and is maintained by
   and [infused-kim/kb_ergogen_fp](https://github.com/infused-kim/kb_ergogen_fp). Custom
   footprints, templates and outlines can be added in settings or loaded with a config.
 - **Loading**: built-in examples; local YAML, JSON, KLE JSON, ZIP or `.ekb` files;
-  public GitHub, Codeberg, Forgejo and Gitea repositories; and share links.
+  public GitHub, Codeberg, Forgejo and Gitea repositories; and share links. A site
+  built with an older Ergogen hides the examples that need a newer one.
 - **Several configurations** saved in browser storage, and an installable PWA.
 
 Use `infused-kim/diode` for the bundled infused-kim diode footprint. Replace the
@@ -133,20 +134,22 @@ read by `scripts/preinstall.js` and engine preparation (`postinstall`, `predev`,
 installed specifier, so it can break a canonical frozen install. Use
 `VITE_ERGOGEN_VERSION` to change only the displayed identity.
 
-| Variable (first non-empty wins)                                        | Default                                                                                 | Effect                                                                                                                                                             |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `VITE_PUBLIC_URL`, `PUBLIC_URL`                                        | `/`                                                                                     | Base path, with a leading and trailing slash, such as `/ergogen-gui/` (see [Self-hosting](#self-hosting)).                                                         |
-| `VITE_GTAG_ID`                                                         | empty                                                                                   | GA4 tag ID. Empty disables analytics entirely and greys out **Send Usage Metrics**.                                                                                |
-| `VITE_FORCE_ANALYTICS`                                                 | unset                                                                                   | Literal `true` lifts the development/localhost block for diagnostics. It does not supply an ID or bypass consent.                                                  |
-| `VITE_FEATURE_TEMPLATES`, `REACT_APP_FEATURE_TEMPLATES`                | unset                                                                                   | Literal `true`/`false` forces custom templates on or off. Unset: on when the engine version is 4.3.0 or later.                                                     |
-| `VITE_FEATURE_OUTLINES`, `REACT_APP_FEATURE_OUTLINES`                  | unset                                                                                   | Same, for custom outlines.                                                                                                                                         |
-| `VITE_ERGOGEN_VERSION`, `ERGOGEN_VERSION`, `REACT_APP_ERGOGEN_VERSION` | The `package.json` specifier if it names a repository: `github:ceoloide/ergogen#v4.3.0` | Engine identity shown in the UI and written to share links. It does not install an engine. For a non-semver ref, feature checks use the installed package version. |
+| Variable (first non-empty wins)                                        | Default                                                                                 | Effect                                                                                                                                                       |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VITE_PUBLIC_URL`, `PUBLIC_URL`                                        | `/`                                                                                     | Base path, with a leading and trailing slash, such as `/ergogen-gui/` (see [Self-hosting](#self-hosting)).                                                   |
+| `VITE_GTAG_ID`                                                         | empty                                                                                   | GA4 tag ID. Empty disables analytics entirely and greys out **Send Usage Metrics**.                                                                          |
+| `VITE_FORCE_ANALYTICS`                                                 | unset                                                                                   | Literal `true` lifts the development/localhost block for diagnostics. It does not supply an ID or bypass consent.                                            |
+| `VITE_FEATURE_TEMPLATES`, `REACT_APP_FEATURE_TEMPLATES`                | unset                                                                                   | Literal `true`/`false` forces custom templates on or off. Unset: on when the engine version is 4.3.0 or later.                                               |
+| `VITE_FEATURE_OUTLINES`, `REACT_APP_FEATURE_OUTLINES`                  | unset                                                                                   | Same, for custom outlines.                                                                                                                                   |
+| `VITE_ERGOGEN_VERSION`, `ERGOGEN_VERSION`, `REACT_APP_ERGOGEN_VERSION` | The `package.json` specifier if it names a repository: `github:ceoloide/ergogen#v4.3.0` | Engine identity shown in the UI and written to share links. It does not install an engine or change feature checks, which use the installed package version. |
 
 GitHub Actions passes repository variables `PUBLIC_URL` as `VITE_PUBLIC_URL` and
 `VITE_GTAG_ID` unchanged. `CNAME_DOMAIN` writes `dist/CNAME` on `main`. The
 repository variable `ERGOGEN_VERSION`, such as `github:ceoloide/ergogen#v4.3.0`,
 makes the deploy workflow install, build and show that engine, pinned to the
-branch or tag's current commit; leave it unset for the canonical engine. See
+branch or tag's current commit; leave it unset for the canonical engine. With
+another engine, deployment validation skips the tests of canonical engine output
+and runs the GUI and engine smoke tests. See
 [Deployment engine](DEVELOPMENT.md#deployment-engine) for the accepted values.
 
 URL parameters change a running page: `?ff_templates=true|false` and

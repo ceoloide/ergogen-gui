@@ -19,7 +19,7 @@ import BulkDownloadDialog from './molecules/BulkDownloadDialog';
 import { trackEvent } from './utils/analytics';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import guiPkg from '../package.json';
-import ergogenPkg from 'ergogen/package.json';
+import { installedEngineVersion } from './utils/engineRequirements';
 import {
   parseVersion,
   compareVersions,
@@ -427,7 +427,7 @@ const AppContent = ({
 
       // Check if current is older
       const currentSemver =
-        getSemverFromErgogenVersion(currentErgogen) || ergogenPkg.version;
+        getSemverFromErgogenVersion(currentErgogen) || installedEngineVersion();
       const sharedSemver = getSemverFromErgogenVersion(sharedErgogen);
       if (currentSemver && sharedSemver) {
         const parsedCurrent = parseVersion(currentSemver);

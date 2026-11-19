@@ -50,7 +50,7 @@ export default tseslint.config(
   },
   {
     // Ergogen injections: the app's evaluator supplies `module` and `require`.
-    files: ['tests/corpus/footprints/**/*.js'],
+    files: ['tests/engine-contract/corpus/footprints/**/*.js'],
     languageOptions: { sourceType: 'commonjs', globals: globals.commonjs },
   },
   {

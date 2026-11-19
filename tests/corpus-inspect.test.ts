@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { svgOutlineGeometry } from './corpus/inspect';
+import { svgOutlineGeometry } from './engine-contract/corpus/inspect';
 
 // The corpus trusts svgOutlineGeometry to reject an SVG whose viewport does
 // not frame its paths and to count only closed outlines as regions. These

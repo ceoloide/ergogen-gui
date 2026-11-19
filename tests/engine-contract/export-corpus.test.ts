@@ -1,7 +1,7 @@
 import { saveAs } from 'file-saver';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parseZipArchive } from '../src/utils/ergogenBundleLoader';
-import { createZip, exportConfigsProgressively } from '../src/utils/zip';
+import { parseZipArchive } from '../../src/utils/ergogenBundleLoader';
+import { createZip, exportConfigsProgressively } from '../../src/utils/zip';
 import {
   bulkProbePadInjection,
   bulkStaggeredThumbsConfig,
@@ -13,7 +13,7 @@ import {
   unknownOutlineConfig,
 } from './corpus/corpus';
 import { generate } from './corpus/inProcessWorker';
-import type { WorkerResponse } from '../src/workers/ergogen.worker.types';
+import type { WorkerResponse } from '../../src/workers/ergogen.worker.types';
 import {
   type ArchiveContents,
   dxfLineSegments,
@@ -29,7 +29,7 @@ import {
 // the browser download and the Worker transport are replaced. Bulk export
 // compiles through the app's real worker handler (see inProcessWorker.ts).
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
-vi.mock('../src/workers/workerFactory', async () => {
+vi.mock('../../src/workers/workerFactory', async () => {
   const { InProcessErgogenWorker } = await import('./corpus/inProcessWorker');
   return {
     createErgogenWorker: () => new InProcessErgogenWorker(),
