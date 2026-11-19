@@ -24,7 +24,7 @@ const request: WorkerRequest = {
   options: { debug: false },
 };
 
-const loadAdapter = () => import('./corpus/inProcessWorker');
+const loadAdapter = () => import('./engine-contract/corpus/inProcessWorker');
 
 /** Posts one request and settles with whichever callback fires first. */
 const postAndWait = async (): Promise<ErrorEvent> => {

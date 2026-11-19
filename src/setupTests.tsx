@@ -3,7 +3,7 @@
  */
 
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import { expect, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type { LinkProps } from 'react-router-dom';
 
@@ -36,6 +36,34 @@ vi.mock('react-router-dom', () => ({
   Routes: ({ children }: ComponentProps<'div'>) => children,
   Route: () => null,
 }));
+
+// GUI tests see the canonical engine version (the one package.json pins),
+// whichever engine is installed, so a deployment that builds with another
+// engine runs them unchanged. A test that needs another version sets it with
+// vi.mocked(installedEngineVersion).mockReturnValue(...). Tests that run the
+// real engine (tests/engine-contract/ and tests/engine-smoke.test.ts) see the
+// real installed version.
+const testPath = expect.getState().testPath ?? '';
+const runsRealEngine =
+  /[\\/]tests[\\/]engine-contract[\\/]/.test(testPath) ||
+  /[\\/]tests[\\/]engine-smoke\.test\.ts$/.test(testPath);
+if (!runsRealEngine) {
+  vi.doMock('./utils/engineRequirements', async (importOriginal) => {
+    const actual =
+      await importOriginal<typeof import('./utils/engineRequirements')>();
+    const { default: packageJson } = await import('../package.json');
+    const { getSemverFromErgogenVersion } = await import('./utils/version');
+    const canonical = getSemverFromErgogenVersion(
+      packageJson.dependencies.ergogen
+    );
+    if (!canonical) {
+      throw new Error(
+        `package.json pins no engine version: ${packageJson.dependencies.ergogen}`
+      );
+    }
+    return { ...actual, installedEngineVersion: vi.fn(() => canonical) };
+  });
+}
 
 // Global mock for workers to avoid import.meta syntax issues in Jest
 vi.mock('./workers/workerFactory', () => ({

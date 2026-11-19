@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
-import { exampleOptions, ConfigOption } from '../examples';
+import { ConfigOption } from '../examples';
+import { supportedExampleOptions } from '../examples/supported';
 import EmptyYAML from '../examples/empty_yaml';
 import { fetchConfigFromUrl, GitInjection } from '../utils/github';
 import { ConflictResolutionStrategy } from '../utils/injections';
@@ -391,8 +392,9 @@ const FallbackIconContainer = styled.div`
   }
 `;
 
-// Flatten examples into a single list, excluding the "Empty" one which has a dedicated button
-const allExamples: ConfigOption[] = exampleOptions
+// Flatten the examples this build's engine can generate into a single list,
+// excluding the "Empty" one which has a dedicated button
+const allExamples: ConfigOption[] = supportedExampleOptions()
   .flatMap((group) => group.options)
   .filter((ex) => ex.label !== 'Empty YAML configuration');
 

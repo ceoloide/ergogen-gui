@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as ergogen from 'ergogen';
 import { describe, expect, it } from 'vitest';
-import { exampleOptions } from '../src/examples';
+import { exampleOptions } from '../../src/examples';
 import { segmentDifferences, svgOutlineGeometry } from './corpus/inspect';
 
 /**
@@ -16,7 +16,11 @@ import { segmentDifferences, svgOutlineGeometry } from './corpus/inspect';
  * be traversed differently by different makerjs runs.
  */
 
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const projectRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..'
+);
 const previewsDirectory = join(projectRoot, 'public', 'images', 'previews');
 
 // The same file name rule as scripts/generate-previews.js and the Welcome page.

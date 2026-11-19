@@ -20,8 +20,12 @@ uses the same installer and commands.
 | `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                                               |
 | `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                                          |
 | `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                                                    |
+| `pnpm test:contract`                             | Only the [engine contract tests](#engine-contract-tests), with any installed engine. Writes `reports/contract.xml`.                                        |
 | `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                                                  |
 | `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                                                      |
+
+With the `ERGOGEN_VERSION` environment variable set, the Vitest run leaves out
+the [engine contract tests](#engine-contract-tests).
 
 A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
 does. Husky/lint-staged run quick fixes on staged files; GitHub enforces
@@ -68,8 +72,8 @@ uses the declarations is type-checked by `tsc` as usual.
 
 Not checked, on purpose: the vendored scripts in `public/dependencies/` and other
 files in `public/`, `pnpm-lock.yaml` (written by pnpm), the byte-exact fixtures
-`tests/ci/reports/*.xml` and `tests/corpus/*.yaml`, and Git-ignored output such as
-`dist*`, `reports/` and `.tools/`.
+`tests/ci/reports/*.xml` and `tests/engine-contract/corpus/*.yaml`, and
+Git-ignored output such as `dist*`, `reports/` and `.tools/`.
 
 Vitest writes `reports/unit.xml`. Playwright writes `reports/browser.xml`, an HTML
 report and traces/screenshots of failures (no retries). A failed test also gets a
@@ -142,26 +146,61 @@ result on a loopback server (see [Releases and rollback](#releases-and-rollback)
 `tests/build-version.test.ts` checks build-time engine identity;
 `tests/analytics-tag-id.test.ts` checks the build-time analytics tag ID.
 
+### Engine contract tests
+
+Test files that run the real engine and assert what it generates live in
+`tests/engine-contract/`, with their fixtures: the
+[semantic regression corpus](#semantic-regression-corpus) and the preview
+check. They state the contract of the canonical engine,
+the one `package.json` pins. Put a new test of engine output there, not in
+`src/` or elsewhere in `tests/`.
+
+`vitest.config.mts` leaves the folder out of `pnpm test:unit` (and so
+`pnpm validate`) when the `ERGOGEN_VERSION` environment variable is not empty,
+as in a deployment that selects another engine (see
+[Deployment engine](#deployment-engine)), and prints a `[vitest] ...
+excluding tests/engine-contract/**` line when it does. `pnpm test:contract`
+runs the folder with whatever engine is installed, for engine development; on
+an older engine it fails exactly where that engine lacks the canonical
+behavior.
+
+Every other test runs with every engine:
+
+- **GUI tests** see the canonical engine version: `src/setupTests.tsx` fixes
+  `installedEngineVersion` (in `src/utils/engineRequirements.ts`) to the
+  version in the `package.json` engine specifier. A test of behavior on another
+  engine sets the version it needs with
+  `vi.mocked(installedEngineVersion).mockReturnValue(...)`.
+- **`tests/engine-smoke.test.ts`** sees the real installed version. It checks
+  that the prepared engine loads and generates every example the site offers
+  with it (`src/examples/supported.ts`), so new examples need no change there.
+- **`src/examples/supported.test.ts`** fails if an example needs a newer engine
+  than the canonical one, so the canonical site hides nothing; the preview check
+  generates every example on the canonical engine.
+
 ### Semantic regression corpus
 
 These Vitest suites catch wrong generated output, not only crashes, by checking
 geometry and structure instead of byte snapshots. They run the prepared engine
 offline and only read their fixtures.
 
-- **Inputs** in `tests/corpus/`: `staggered-thumbs.yaml` (column stagger, a
-  rotated and splayed thumb cluster, a private `_plate` outline, a vendor and a
-  custom footprint), the custom footprint `footprints/corpus/probe_pad.js`, and
-  two invalid configs (YAML syntax, missing outline). Expected values are worked
-  out by hand in `tests/corpus/corpus.ts`, never copied from output.
-- **`tests/engine-corpus.test.ts`** starts with four quick checks that call
-  `ergogen.process` directly on a two-key config. Its corpus cases generate
-  through the app's own worker handler and injection evaluator
-  (`tests/corpus/inProcessWorker.ts` replaces only the `Worker` transport).
+- **Inputs** in `tests/engine-contract/corpus/`: `staggered-thumbs.yaml`
+  (column stagger, a rotated and splayed thumb cluster, a private `_plate`
+  outline, a vendor and a custom footprint), the custom footprint
+  `footprints/corpus/probe_pad.js`, and two invalid configs (YAML syntax,
+  missing outline). Expected values are worked
+  out by hand in `tests/engine-contract/corpus/corpus.ts`, never copied from
+  output.
+- **`tests/engine-contract/engine-corpus.test.ts`** starts with four quick
+  checks that call `ergogen.process` directly on a two-key config. Its corpus
+  cases generate through the app's own worker handler and injection evaluator
+  (`tests/engine-contract/corpus/inProcessWorker.ts` replaces only the `Worker`
+  transport).
   They check key positions and rotations, outline sizes and region counts, that
   DXF and SVG hold the same segments, footprint placement and nets, Edge.Cuts
   against the board outline, error replies for invalid input, and that a second
   run gives identical output.
-- **`tests/export-corpus.test.ts`** runs `createZip` and
+- **`tests/engine-contract/export-corpus.test.ts`** runs `createZip` and
   `exportConfigsProgressively` with real JSZip (only the download and the
   worker transport are replaced). It checks archive names, the exact file list,
   file contents and geometry, that a single-config archive reloads as just its
@@ -171,26 +210,27 @@ offline and only read their fixtures.
 - **Shared engine:** all requests in one test file share one engine, so a
   footprint injected once stays registered, unlike browser bulk export, which
   starts a fresh worker per config. Bulk export therefore uses the probe pad
-  under its own name (`bulkProbePadInjection` in `tests/corpus/corpus.ts`), so
-  it fails if it does not pass its injections to the worker.
-  `tests/corpus-in-process-worker.test.ts` checks the adapter itself: a handler
-  that throws or does not reply reaches `onerror` at once, and a failed import
-  restores the globals it replaced.
-- **`tests/preview-consistency.test.ts`** regenerates the geometry of every
-  tracked preview in `public/images/previews` and compares it with the file,
-  ignoring path direction and start point, and requires one preview per
-  example. It covers these previews only, not other generated files.
-- **`tests/corpus-inspect.test.ts`** checks the SVG reader the suites share: the
-  viewBox must be four finite numbers that frame the paths exactly, and only
-  closed chains count as regions.
+  under its own name (`bulkProbePadInjection` in
+  `tests/engine-contract/corpus/corpus.ts`), so it fails if it does not pass its
+  injections to the worker.
+  `tests/corpus-in-process-worker.test.ts` checks the adapter
+  itself: a handler that throws or does not reply reaches `onerror` at once, and
+  a failed import restores the globals it replaced.
+- **`tests/engine-contract/preview-consistency.test.ts`** regenerates the
+  geometry of every tracked preview in `public/images/previews` and compares it
+  with the file, ignoring path direction and start point, and requires one
+  preview per example. It covers these previews only, not other generated files.
+- **`tests/corpus-inspect.test.ts`** checks the SVG reader the
+  suites share: the viewBox must be four finite numbers that frame the paths
+  exactly, and only closed chains count as regions.
 
 Only documented volatile data is ignored: the KiCad 8 title-block date (see
 `withoutPcbGenerationDate`) and the date in archive names, matched by pattern.
 
 When a change is meant to alter output, such as an engine or footprint pin
 update, first check the new output yourself (open it in the app or KiCad). Then
-update the hand-worked values in `tests/corpus/corpus.ts` or the affected
-assertion, and explain the change in the pull request. For a stale preview, run
+update the hand-worked values in `tests/engine-contract/corpus/corpus.ts` or the
+affected assertion, and explain the change in the pull request. For a stale preview, run
 `pnpm generate-previews` and review the SVG diff.
 
 ### Acceptance record (HC-001 to HC-004)
@@ -471,9 +511,19 @@ later). The first match wins:
 1. URL `?ff_templates=` / `?ff_outlines=` set to literal `true` or `false`.
 2. Build variables `VITE_FEATURE_*` (else `REACT_APP_FEATURE_*`), literal `true` or
    `false`.
-3. The engine version from `VITE_ERGOGEN_VERSION`. If that is not semver (a branch
-   or commit), the installed package version is used instead, so features turn on
-   only if that installed version is 4.3.0 or later (unless a rule above wins).
+3. Whether the engine this build uses has the feature, by the engine's own rule
+   for `meta.engine` (same major version, minor and patch at least as high).
+
+The engine version and each feature's minimum version come from one registry,
+`src/utils/engineRequirements.ts`. `installedEngineVersion` returns the installed
+package version; `VITE_ERGOGEN_VERSION` only changes the displayed identity. The Welcome page uses the same
+registry to offer only the examples whose `meta.engine` the engine meets
+(`src/examples/supported.ts`).
+
+To add UI for a feature of a newer engine, add one line with its minimum version
+to `ENGINE_FEATURES` and gate the UI with `isFeatureEnabled`. A deployment on an
+older engine then hides it; GUI tests see the canonical engine (see
+[Engine contract tests](#engine-contract-tests)).
 
 Gates apply in the injections panel, local and repository loaders, and on the main
 thread before generation, so stale stored injections cannot reach an engine that
@@ -570,6 +620,21 @@ commit, so a different commit always rebuilds the engine. The deploy workflow
 runs `pnpm validate` like CI but not the browser tests or `pnpm test:reports`,
 so validate a non-canonical engine in a separate checkout before selecting it.
 A repository selected through the override must be public.
+
+The override may select an engine older than the canonical one. The site then
+hides what that engine cannot do: examples whose `meta.engine` it does not meet
+(their tracked preview SVGs are still deployed but not shown) and features
+recorded in the registry (see [Feature flags](#feature-flags)). Because
+`ERGOGEN_VERSION` is set, `pnpm validate` runs the GUI tests and
+`tests/engine-smoke.test.ts` but not the
+[engine contract tests](#engine-contract-tests), which describe the canonical
+engine. A repository that deploys the canonical engine should leave the
+variable unset, so its deployment runs the contract tests too.
+
+Version checks read the engine's `package.json` version, which a branch does
+not change by itself. After each engine release, bump the fork's `develop` to
+the next version (for example `4.4.0-develop` after `4.3.0`), so a deployment
+of that branch is never mistaken for the release before it.
 
 Example preview SVGs in `public/images/previews` are tracked. Regenerate them only
 with `pnpm generate-previews` and review the diff; builds never rewrite them.

@@ -124,9 +124,14 @@ describe('lsRemote and resolveEngine against a real repository', () => {
   let repository: string;
   const env = { ...process.env };
   const git = (...args: string[]) => {
+    // A Git hook exports the index of the repository being committed, which
+    // would otherwise replace the fixture repository's own index.
+    const fixtureEnv = { ...process.env };
+    delete fixtureEnv.GIT_INDEX_FILE;
     const result = spawnSync('git', args, {
       cwd: repository,
       encoding: 'utf8',
+      env: fixtureEnv,
     });
     if (result.status !== 0) throw new Error(result.stderr);
     return result.stdout.trim();

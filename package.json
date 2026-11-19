@@ -49,6 +49,7 @@
     "build": "vite build",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "test:contract": "vitest run --mode contract tests/engine-contract",
     "test:e2e": "playwright test",
     "test:reports": "node scripts/ci/check-reports.mts",
     "assess:pr": "node scripts/ci/assess-pr.mts",
@@ -72,7 +73,8 @@
     "typecheck": "tsc --project tsconfig.json && pnpm typecheck:tooling && pnpm typecheck:declarations",
     "validate:extended": "pnpm validate:fast && pnpm test:e2e && pnpm test:reports",
     "predev": "pnpm run build-ergogen",
-    "pretest:unit": "pnpm build-ergogen"
+    "pretest:unit": "pnpm build-ergogen",
+    "pretest:contract": "pnpm build-ergogen"
   },
   "browserslist": {
     "production": [

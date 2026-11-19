@@ -1,6 +1,6 @@
 import * as ergogen from 'ergogen';
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { WorkerResponse } from '../src/workers/ergogen.worker.types';
+import type { WorkerResponse } from '../../src/workers/ergogen.worker.types';
 import {
   expectedKeys,
   expectedRectangleUnionSize,

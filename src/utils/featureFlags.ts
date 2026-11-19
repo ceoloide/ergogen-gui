@@ -1,26 +1,18 @@
 import {
-  getErgogenVersionInfo,
-  parseVersion,
-  compareVersions,
-} from './version';
-import ergogenPkg from 'ergogen/package.json';
-
-type FeatureName = 'templates' | 'outlines';
-
-// Minimum Ergogen version required for each feature
-const FEATURE_VERSION_REQUIREMENTS: Record<FeatureName, string> = {
-  templates: '4.3.0',
-  outlines: '4.3.0',
-};
+  engineHasFeature,
+  installedEngineVersion,
+  type EngineFeature,
+} from './engineRequirements';
 
 /**
  * Checks if a specific feature is enabled in the current environment.
  * Evaluates in order:
  * 1. URL Query overrides (e.g. ?ff_templates=true)
  * 2. Environment variable overrides (e.g. REACT_APP_FEATURE_TEMPLATES=true)
- * 3. Runtime capability detection based on active Ergogen version
+ * 3. Whether the engine this build uses has the feature, as recorded in
+ *    src/utils/engineRequirements.ts
  */
-export const isFeatureEnabled = (feature: FeatureName): boolean => {
+export const isFeatureEnabled = (feature: EngineFeature): boolean => {
   // --- Step 1: URL Query Overrides (for testing/development) ---
   if (typeof window !== 'undefined' && window.location) {
     try {
@@ -43,26 +35,6 @@ export const isFeatureEnabled = (feature: FeatureName): boolean => {
   if (envVal === 'true') return true;
   if (envVal === 'false') return false;
 
-  // --- Step 3: Runtime Capability Check ---
-  const versionInfo = getErgogenVersionInfo(
-    import.meta.env.VITE_ERGOGEN_VERSION
-  );
-  let currentVersion = versionInfo.displayText;
-
-  // Defer to the package version carried in the package.json if the versionInfo.displayText
-  // is a custom reference that doesn't resolve to a standard semver string (e.g. branch name or commit hash).
-  if (!parseVersion(currentVersion)) {
-    currentVersion = ergogenPkg.version;
-  }
-
-  const requiredVersion = FEATURE_VERSION_REQUIREMENTS[feature];
-
-  const parsedCurrent = parseVersion(currentVersion);
-  const parsedRequired = parseVersion(requiredVersion);
-
-  if (parsedCurrent && parsedRequired) {
-    return compareVersions(parsedCurrent, parsedRequired);
-  }
-
-  return false;
+  // --- Step 3: Engine Requirement Check ---
+  return engineHasFeature(feature, installedEngineVersion());
 };

@@ -2,7 +2,7 @@ import yaml from 'js-yaml';
 import type {
   WorkerRequest,
   WorkerResponse,
-} from '../../src/workers/ergogen.worker.types';
+} from '../../../src/workers/ergogen.worker.types';
 
 /**
  * Runs the app's real Ergogen worker module (src/workers/ergogen.worker.ts) in
@@ -32,7 +32,7 @@ const loadWorkerHandler = (): Promise<WorkerHandler> => {
     const originalLog = console.log;
     console.log = () => undefined;
     try {
-      await import('../../src/workers/ergogen.worker');
+      await import('../../../src/workers/ergogen.worker');
       return self.onmessage as unknown as WorkerHandler;
     } finally {
       console.log = originalLog;
