@@ -1,11 +1,14 @@
 import ergogenPkg from 'ergogen/package.json';
+import { compareVersions, parseVersion } from './version';
 
 /**
  * The one place that records which Ergogen engine version the GUI needs for
  * each engine feature it offers. A deployment may build with an older engine
  * than the canonical one (see DEVELOPMENT.md, "Deployment engine"); the GUI
- * then hides what that engine cannot do. To add a feature, add one line here
- * and gate its UI with `isFeatureEnabled` (src/utils/featureFlags.ts).
+ * then hides what that engine cannot do. To add a feature, add its line here
+ * and its build-variable override to `featureEnvOverrides` in
+ * src/utils/featureFlags.ts (TypeScript rejects a feature without one), and
+ * gate its UI with `isFeatureEnabled`.
  */
 export const ENGINE_FEATURES = {
   templates: '4.3.0',
@@ -15,9 +18,11 @@ export const ENGINE_FEATURES = {
 export type EngineFeature = keyof typeof ENGINE_FEATURES;
 
 /**
- * The version of the engine this build uses, for requirement checks: the
- * version of the installed package. `VITE_ERGOGEN_VERSION` only names the
- * engine in the UI and share links, so it is not consulted here.
+ * The version of the engine this build uses, for requirement checks (features,
+ * examples and share-link compatibility): the version of the installed
+ * package. `VITE_ERGOGEN_VERSION` only names the engine in the UI and share
+ * links, so it is not consulted here. src/utils/version.ts reads the package
+ * version too, for the displayed identity.
  *
  * GUI tests replace this function with the canonical version (see
  * src/setupTests.tsx), so they behave the same whichever engine is installed.
@@ -56,8 +61,17 @@ export const meetsEngineRequirement = (
   );
 };
 
-/** Whether the engine version `engineVersion` has an engine feature. */
+/**
+ * Whether the engine version `engineVersion` has an engine feature: it is at
+ * least the feature's minimum version, whatever the major version.
+ */
 export const engineHasFeature = (
   feature: EngineFeature,
   engineVersion: string
-): boolean => meetsEngineRequirement(engineVersion, ENGINE_FEATURES[feature]);
+): boolean => {
+  const current = parseVersion(engineVersion);
+  const required = parseVersion(ENGINE_FEATURES[feature]);
+  return current !== null && required !== null
+    ? compareVersions(current, required)
+    : false;
+};

@@ -98,13 +98,13 @@ describe('featureFlags utilities', () => {
       expect(isFeatureEnabled('outlines')).toBe(true);
     });
 
-    it('should follow the engine rule and refuse another major version', () => {
+    it('should keep features on a later major version', () => {
       window.location.search = '';
 
-      // The engine itself refuses a 4.x requirement on 5.0.0.
+      // A feature needs at least its version, whatever the major version.
       engineVersion.mockReturnValue('5.0.0');
-      expect(isFeatureEnabled('templates')).toBe(false);
-      expect(isFeatureEnabled('outlines')).toBe(false);
+      expect(isFeatureEnabled('templates')).toBe(true);
+      expect(isFeatureEnabled('outlines')).toBe(true);
     });
 
     it('should enable features on the canonical engine by default', () => {

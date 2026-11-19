@@ -41,6 +41,12 @@ describe('engineHasFeature', () => {
     expect(engineHasFeature('templates', '4.2.1')).toBe(false);
     expect(engineHasFeature('outlines', '4.4.0')).toBe(true);
   });
+
+  it('needs only at least the feature version, whatever the major version', () => {
+    // Act / Assert
+    expect(engineHasFeature('templates', '5.0.0')).toBe(true);
+    expect(engineHasFeature('templates', 'latest')).toBe(false);
+  });
 });
 
 describe('installedEngineVersion', () => {

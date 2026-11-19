@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import packageJson from '../../package.json';
 import { installedEngineVersion } from '../utils/engineRequirements';
-import { getSemverFromErgogenVersion } from '../utils/version';
 import { exampleOptions } from './index';
 import {
   isExampleSupported,
@@ -18,7 +16,8 @@ describe('example engine requirements', () => {
   it('reads the requirement an example declares in meta.engine', () => {
     // Act / Assert
     expect(requiredEngine(example('meta:\n  engine: 4.3.0\n'))).toBe('4.3.0');
-    expect(requiredEngine(example('meta:\n  engine: 4.3\n'))).toBe('4.3');
+    expect(requiredEngine(example('meta:\n  engine: "4.3"\n'))).toBe('4.3');
+    expect(requiredEngine(example('meta.engine: 4.4.0\n'))).toBe('4.4.0');
     expect(requiredEngine(example('points: {}\n'))).toBeUndefined();
     expect(requiredEngine(example(''))).toBeUndefined();
   });
@@ -32,6 +31,23 @@ describe('example engine requirements', () => {
     expect(isExampleSupported(needsNewer, '4.2.1')).toBe(false);
     expect(isExampleSupported(needsNewer, '5.0.0')).toBe(false);
     expect(isExampleSupported(example('points: {}\n'), '4.2.1')).toBe(true);
+  });
+
+  it('reads the dotted top-level meta.engine key like the engine', () => {
+    // Arrange
+    const dotted = example('meta.engine: 4.4.0\n');
+    // Act / Assert
+    expect(isExampleSupported(dotted, '4.4.0')).toBe(true);
+    expect(isExampleSupported(dotted, '4.3.0')).toBe(false);
+  });
+
+  it('supports an example whose requirement is not a string on no engine', () => {
+    // Arrange: an unquoted 4.3 is a number, which makes the engine throw.
+    const unquoted = example('meta:\n  engine: 4.3\n');
+    // Act / Assert
+    expect(requiredEngine(unquoted)).toBe(4.3);
+    expect(isExampleSupported(unquoted, '4.3.0')).toBe(false);
+    expect(isExampleSupported(unquoted, '9.9.9')).toBe(false);
   });
 
   it('offers an older engine only the examples it can generate', () => {
@@ -54,13 +70,10 @@ describe('example engine requirements', () => {
   });
 
   it('offers every example on the canonical engine', () => {
-    // Arrange: the engine that package.json pins, whatever is installed now.
-    const canonical = getSemverFromErgogenVersion(
-      packageJson.dependencies.ergogen
-    );
-    expect(canonical).not.toBeNull();
+    // Arrange: setupTests fixes the version to the canonical engine.
+    const canonical = installedEngineVersion();
     // Act / Assert
-    expect(labels(supportedExampleOptions(canonical as string))).toEqual(
+    expect(labels(supportedExampleOptions(canonical))).toEqual(
       labels(exampleOptions)
     );
   });

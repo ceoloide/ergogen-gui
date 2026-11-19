@@ -37,9 +37,10 @@ vi.mock('react-router-dom', () => ({
   Route: () => null,
 }));
 
-// GUI tests see the canonical engine version (the one package.json pins),
-// whichever engine is installed, so a deployment that builds with another
-// engine runs them unchanged. A test that needs another version sets it with
+// GUI tests see the canonical engine version (the one package.json pins,
+// also inside a ^ or ~ range), whichever engine is installed, so a deployment
+// that builds with another engine runs them unchanged. When the pin names no
+// version (a branch or a commit), they see the installed version. A test that needs another version sets it with
 // vi.mocked(installedEngineVersion).mockReturnValue(...). Tests that run the
 // real engine (tests/engine-contract/ and tests/engine-smoke.test.ts) see the
 // real installed version.
@@ -53,14 +54,10 @@ if (!runsRealEngine) {
       await importOriginal<typeof import('./utils/engineRequirements')>();
     const { default: packageJson } = await import('../package.json');
     const { getSemverFromErgogenVersion } = await import('./utils/version');
-    const canonical = getSemverFromErgogenVersion(
-      packageJson.dependencies.ergogen
-    );
-    if (!canonical) {
-      throw new Error(
-        `package.json pins no engine version: ${packageJson.dependencies.ergogen}`
-      );
-    }
+    const canonical =
+      getSemverFromErgogenVersion(
+        packageJson.dependencies.ergogen.replace(/^[\^~]/, '')
+      ) ?? actual.installedEngineVersion();
     return { ...actual, installedEngineVersion: vi.fn(() => canonical) };
   });
 }

@@ -5,6 +5,16 @@ import {
 } from './engineRequirements';
 
 /**
+ * The build-variable override of each feature, read when called. The type
+ * lists every feature in src/utils/engineRequirements.ts, so a new feature does
+ * not compile until it has a line here (and its variable in vite.config.mts).
+ */
+const featureEnvOverrides = (): Record<EngineFeature, string | undefined> => ({
+  templates: import.meta.env.VITE_FEATURE_TEMPLATES,
+  outlines: import.meta.env.VITE_FEATURE_OUTLINES,
+});
+
+/**
  * Checks if a specific feature is enabled in the current environment.
  * Evaluates in order:
  * 1. URL Query overrides (e.g. ?ff_templates=true)
@@ -26,12 +36,7 @@ export const isFeatureEnabled = (feature: EngineFeature): boolean => {
   }
 
   // --- Step 2: Build-Time Environment Variable Check ---
-  let envVal: string | undefined;
-  if (feature === 'templates') {
-    envVal = import.meta.env.VITE_FEATURE_TEMPLATES;
-  } else if (feature === 'outlines') {
-    envVal = import.meta.env.VITE_FEATURE_OUTLINES;
-  }
+  const envVal = featureEnvOverrides()[feature];
   if (envVal === 'true') return true;
   if (envVal === 'false') return false;
 

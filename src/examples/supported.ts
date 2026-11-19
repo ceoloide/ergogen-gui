@@ -6,17 +6,20 @@ import {
 import { exampleOptions, type ConfigOption } from './index';
 
 /**
- * The engine version an example asks for in `meta.engine`, or undefined when
+ * The engine version an example asks for in `meta.engine` (or the dotted
+ * top-level key `meta.engine`, which the engine also reads), or undefined when
  * it asks for none. The engine refuses a configuration whose requirement it
- * does not meet, so this is the one place an example states what it needs.
+ * does not meet, so this is the one place an example states what it needs. A
+ * value that is not a string, such as an unquoted `4.3`, is returned as is:
+ * the engine fails on it, so no engine supports the example.
  */
-export const requiredEngine = (example: ConfigOption): string | undefined => {
+export const requiredEngine = (example: ConfigOption): unknown => {
   const config = yaml.load(example.value) as
-    | { meta?: { engine?: unknown } }
+    | { meta?: { engine?: unknown }; 'meta.engine'?: unknown }
     | null
     | undefined;
-  const engine = config?.meta?.engine;
-  return engine === undefined || engine === null ? undefined : String(engine);
+  const engine = config?.meta?.engine ?? config?.['meta.engine'];
+  return engine === null ? undefined : engine;
 };
 
 /**
@@ -29,8 +32,10 @@ export const isExampleSupported = (
   engineVersion: string = installedEngineVersion()
 ): boolean => {
   const required = requiredEngine(example);
+  if (required === undefined) return true;
   return (
-    required === undefined || meetsEngineRequirement(engineVersion, required)
+    typeof required === 'string' &&
+    meetsEngineRequirement(engineVersion, required)
   );
 };
 

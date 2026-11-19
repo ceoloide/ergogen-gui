@@ -25,7 +25,9 @@ uses the same installer and commands.
 | `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                                                      |
 
 With the `ERGOGEN_VERSION` environment variable set, the Vitest run leaves out
-the [engine contract tests](#engine-contract-tests).
+the [engine contract tests](#engine-contract-tests), even a file named on the
+command line: run one with `pnpm exec vitest run --mode contract
+tests/engine-contract/<file>`, or all of them with `pnpm test:contract`.
 
 A Vite build does not type-check; only `pnpm typecheck` (part of `validate:fast`)
 does. Husky/lint-staged run quick fixes on staged files; GitHub enforces
@@ -168,12 +170,14 @@ Every other test runs with every engine:
 
 - **GUI tests** see the canonical engine version: `src/setupTests.tsx` fixes
   `installedEngineVersion` (in `src/utils/engineRequirements.ts`) to the
-  version in the `package.json` engine specifier. A test of behavior on another
+  version in the `package.json` engine specifier (also inside a `^` or `~`
+  range); when the specifier names no version, such as a branch or a commit,
+  they use the installed version. A test of behavior on another
   engine sets the version it needs with
   `vi.mocked(installedEngineVersion).mockReturnValue(...)`.
 - **`tests/engine-smoke.test.ts`** sees the real installed version. It checks
-  that the prepared engine loads and generates every example the site offers
-  with it (`src/examples/supported.ts`), so new examples need no change there.
+  that the app's worker handler, with the prepared engine, generates every
+  example the site offers with it (`src/examples/supported.ts`), so new examples need no change there.
 - **`src/examples/supported.test.ts`** fails if an example needs a newer engine
   than the canonical one, so the canonical site hides nothing; the preview check
   generates every example on the canonical engine.
@@ -511,17 +515,25 @@ later). The first match wins:
 1. URL `?ff_templates=` / `?ff_outlines=` set to literal `true` or `false`.
 2. Build variables `VITE_FEATURE_*` (else `REACT_APP_FEATURE_*`), literal `true` or
    `false`.
-3. Whether the engine this build uses has the feature, by the engine's own rule
-   for `meta.engine` (same major version, minor and patch at least as high).
+3. Whether the engine this build uses has the feature: its version is at least
+   the feature's minimum version.
 
 The engine version and each feature's minimum version come from one registry,
 `src/utils/engineRequirements.ts`. `installedEngineVersion` returns the installed
-package version; `VITE_ERGOGEN_VERSION` only changes the displayed identity. The Welcome page uses the same
-registry to offer only the examples whose `meta.engine` the engine meets
-(`src/examples/supported.ts`).
+package version, which feature and example checks use; `VITE_ERGOGEN_VERSION`
+only changes the displayed identity. Share-link compatibility compares with the
+version in that identity when it names one, and otherwise with the installed
+version. The Welcome page uses the same
+registry to offer only the examples whose `meta.engine` the engine meets, by the
+engine's own rule (same major version, minor and patch at least as high;
+`src/examples/supported.ts`).
 
-To add UI for a feature of a newer engine, add one line with its minimum version
-to `ENGINE_FEATURES` and gate the UI with `isFeatureEnabled`. A deployment on an
+To add UI for a feature of a newer engine, add its line with its minimum version
+to `ENGINE_FEATURES` in `src/utils/engineRequirements.ts`, add its build-variable
+override to `featureEnvOverrides` in `src/utils/featureFlags.ts`, with its
+variable in `vite.config.mts` (TypeScript rejects a feature without its override
+line), and
+gate the UI with `isFeatureEnabled`. A deployment on an
 older engine then hides it; GUI tests see the canonical engine (see
 [Engine contract tests](#engine-contract-tests)).
 
@@ -579,7 +591,9 @@ pnpm 11 reads the manifest before the root `preinstall` hook, so the script must
 run first. It backs up `package.json`; `postinstall` restores it. Keep
 `ERGOGEN_VERSION` set: preparation fails if it differs from the installed
 specifier, and Vite also uses it as the displayed engine identity. Never commit
-the experiment's `package.json`, `pnpm-lock.yaml` or preview SVGs. Restore
+the experiment's `package.json`, `pnpm-lock.yaml` or preview SVGs. With
+`ERGOGEN_VERSION` set, Vitest leaves out the engine contract tests; see
+[Validation](#validation) to run them. Restore
 canonical inputs and reinstall with `--frozen-lockfile` before reporting
 canonical results.
 
@@ -631,10 +645,11 @@ recorded in the registry (see [Feature flags](#feature-flags)). Because
 engine. A repository that deploys the canonical engine should leave the
 variable unset, so its deployment runs the contract tests too.
 
-Version checks read the engine's `package.json` version, which a branch does
-not change by itself. After each engine release, bump the fork's `develop` to
-the next version (for example `4.4.0-develop` after `4.3.0`), so a deployment
-of that branch is never mistaken for the release before it.
+Version checks read the engine's `package.json` version: a branch reports that
+version whatever has landed on it. Bump an engine development branch to the
+next version (for example `4.4.0-develop`) in the same change that lands the
+first feature the GUI gates on that version; from then on the GUI treats that
+branch as having every feature registered for that version.
 
 Example preview SVGs in `public/images/previews` are tracked. Regenerate them only
 with `pnpm generate-previews` and review the diff; builds never rewrite them.
