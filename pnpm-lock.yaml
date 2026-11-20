@@ -25,7 +25,7 @@ importers:
         version: 8.18.0(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.180.0)
       ergogen:
         specifier: github:ceoloide/ergogen#v4.3.0
-        version: https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07
+        version: https://codeload.github.com/ceoloide/ergogen/tar.gz/ecbb2a8d0d4c5c9b3b89d811108e837b746648ec
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -2537,9 +2537,10 @@ packages:
     resolution: {integrity: sha512-xUtoPkMggbz0MPyPiIWr1Kp4aeWJjDZ6SMvURhimjdZgsRuDplF5/s9hcgGhyXMhs+6vpnuoiZ2kFiu3FMnS8Q==}
     engines: {node: '>=18'}
 
-  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07:
-    resolution: {gitHosted: true, integrity: sha512-BYtQarWpdMaMj0RGxDQfoz2dOtm6F3ewO7Wwmzlq76vqRQM7iW3CjVUPGDAXAV9rifVIYD8Ve9qw7920f5EkeA==, tarball: https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07}
+  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/ecbb2a8d0d4c5c9b3b89d811108e837b746648ec:
+    resolution: {gitHosted: true, integrity: sha512-++TKY+J/nhMb4faQ0Zjca58caLls42o3hIVViA1A0HhLaIMJmaY2bW5rVGiu1XON19pljCvJ1qD3l0ynFZYf0g==, tarball: https://codeload.github.com/ceoloide/ergogen/tar.gz/ecbb2a8d0d4c5c9b3b89d811108e837b746648ec}
     version: 4.3.0
+    engines: {node: ^20.19.0 || ^22.12.0 || >=23}
     hasBin: true
 
   error-ex@1.3.4:
@@ -3469,6 +3470,10 @@ packages:
 
   js-yaml@4.1.1:
     resolution: {integrity: sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==}
+    hasBin: true
+
+  js-yaml@4.3.2:
+    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
   jsdom@16.7.0:
@@ -7839,11 +7844,11 @@ snapshots:
 
   environment@1.1.0: {}
 
-  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/86e6dea703f4a07a38d65c58afdc79131a5cae07:
+  ergogen@https://codeload.github.com/ceoloide/ergogen/tar.gz/ecbb2a8d0d4c5c9b3b89d811108e837b746648ec:
     dependencies:
       fs-extra: 11.3.6
       hull: hull.js@https://codeload.github.com/ceoloide/hull/tar.gz/4a8a9147f9f4fcbaf0c8a91a4e8f1b6092b2ca18
-      js-yaml: 4.1.1
+      js-yaml: 4.3.2
       jszip: 3.10.1
       kle-serial: '@ijprest/kle-serial@https://codeload.github.com/ergogen/kle-serial/tar.gz/61f29f317d87bbfed0b0b7e646e1b91d4384ac02'
       makerjs: 0.19.2
@@ -9198,6 +9203,10 @@ snapshots:
     optional: true
 
   js-yaml@4.1.1:
+    dependencies:
+      argparse: 2.0.1
+
+  js-yaml@4.3.2:
     dependencies:
       argparse: 2.0.1
 
