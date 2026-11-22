@@ -100,3 +100,17 @@ export const preparePreviewConfig = (
   }
   return parsedConfig;
 };
+
+/**
+ * Return the most up-to-date YAML input, preferring the live editor ref over
+ * debounced context state when available.
+ */
+export const getLatestConfigInput = (
+  context:
+    | {
+        getRealtimeConfigInput?: () => string | undefined;
+        configInput?: string;
+      }
+    | null
+    | undefined
+): string => context?.getRealtimeConfigInput?.() ?? context?.configInput ?? '';

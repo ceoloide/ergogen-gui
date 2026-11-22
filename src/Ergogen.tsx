@@ -7,7 +7,6 @@ import {
   Dispatch,
 } from 'react';
 import styled from 'styled-components';
-import yaml from 'js-yaml';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import ConfigEditor from './molecules/ConfigEditor';
@@ -19,7 +18,8 @@ import ResizablePanel from './molecules/ResizablePanel';
 import { Preview } from './atoms/DownloadRow';
 
 import { useConfigContext } from './context/ConfigContext';
-import { findResult } from './utils/object';
+import { getLatestConfigInput } from './utils/generationHelpers';
+import { resolvePreview } from './utils/preview';
 import { isMacOS } from './utils/platform';
 import Input from './atoms/Input';
 import { Injection } from './atoms/InjectionRow';
@@ -352,11 +352,14 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
 
   useHotkeys(
     isMacOS() ? 'meta+enter' : 'ctrl+enter',
-    () => {
+    (event) => {
+      if ((event?.target as Element | null)?.closest?.('.monaco-editor')) {
+        return;
+      }
       if (configContext) {
         trackEvent('shortcut_used', { action: 'generate' });
         configContext.generateNow(
-          configContext.configInput,
+          getLatestConfigInput(configContext),
           configContext.injectionInput,
           { pointsonly: false, isManual: true }
         );
@@ -365,6 +368,8 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
     {
       enableOnFormTags: true,
       preventDefault: true,
+      ignoreEventWhen: (event) =>
+        Boolean((event.target as Element | null)?.closest?.('.monaco-editor')),
     }
   );
 
@@ -418,6 +423,14 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
   // Results are cleared (set to null) when a config is selected, created,
   // duplicated or loaded from a shared link, so we reset the memory then to
   // track the first preview of the newly loaded config.
+  const latestConfigInput = getLatestConfigInput(configContext);
+  const resolvedPreview = resolvePreview(
+    configContext?.results,
+    preview.key,
+    preview.extension,
+    latestConfigInput
+  );
+
   const lastTrackedPreviewRef = useRef<string | null>(null);
   const hasResults = Boolean(configContext?.results);
   useEffect(() => {
@@ -425,57 +438,17 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
       lastTrackedPreviewRef.current = null;
       return;
     }
-    if (!preview.key || !preview.extension) return;
-    const previewId = `${preview.key}|${preview.extension}`;
+    if (!resolvedPreview.key || !resolvedPreview.extension) return;
+    const previewId = `${resolvedPreview.key}|${resolvedPreview.extension}`;
     if (lastTrackedPreviewRef.current === previewId) return;
     lastTrackedPreviewRef.current = previewId;
     trackEvent('preview_loaded', {
-      preview_type: preview.extension,
-      preview_key: preview.key,
+      preview_type: resolvedPreview.extension,
+      preview_key: resolvedPreview.key,
     });
-  }, [preview.key, preview.extension, hasResults]);
+  }, [resolvedPreview.key, resolvedPreview.extension, hasResults]);
 
   if (!configContext) return null;
-  let result = null;
-  if (configContext.results) {
-    result = findResult(preview.key, configContext.results);
-    // Fallback to the default demo SVG if the current preview key is not found.
-    if (result === undefined && preview.key !== 'demo.svg') {
-      preview.key = 'demo.svg';
-      preview.extension = 'svg';
-      result = findResult(preview.key, configContext.results);
-    }
-  }
-
-  // Process the result based on the file extension to format it for the preview component.
-  switch (preview.extension) {
-    case 'svg':
-    case 'kicad_pcb':
-      preview.content = typeof result === 'string' ? result : '';
-      break;
-    case 'stl':
-      preview.content =
-        typeof result === 'string' ||
-        result instanceof ArrayBuffer ||
-        ArrayBuffer.isView(result)
-          ? (result as string | ArrayBuffer | Uint8Array)
-          : '';
-      break;
-    case 'jscad':
-      preview.content =
-        typeof (result as Record<string, unknown>)?.jscad === 'string'
-          ? ((result as Record<string, unknown>).jscad as string)
-          : '';
-      break;
-    case 'yaml':
-      preview.content = yaml.dump(result);
-      break;
-    case 'txt':
-      preview.content = configContext.configInput || '';
-      break;
-    default:
-      preview.content = '';
-  }
 
   /**
    * Handles changes to the name input field for the injection being edited.
@@ -537,7 +510,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
   };
 
   const handleShare = () => {
-    if (!configContext.configInput) {
+    if (!latestConfigInput) {
       return;
     }
 
@@ -553,7 +526,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
   const handleDownloadArchive = () => {
     if (
       !configContext.results ||
-      !configContext.configInput ||
+      !latestConfigInput ||
       configContext.isGenerating ||
       configContext.isJscadConverting
     ) {
@@ -567,7 +540,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
     });
     createZip(
       configContext.results,
-      configContext.configInput,
+      latestConfigInput,
       configContext.injectionInput,
       configContext.debug,
       configContext.stlPreview
@@ -578,7 +551,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
     <>
       {showShareDialog && (
         <ShareDialog
-          config={configContext.configInput || ''}
+          config={latestConfigInput}
           injections={configContext.injectionInput || []}
           onClose={() => setShowShareDialog(false)}
         />
@@ -608,7 +581,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                 <GenerateIconButton
                   onClick={() =>
                     configContext.generateNow(
-                      configContext.configInput,
+                      latestConfigInput,
                       configContext.injectionInput,
                       { pointsonly: false, isManual: true }
                     )
@@ -620,7 +593,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                 </GenerateIconButton>
                 <SubHeaderResponsiveIconButton
                   onClick={handleShare}
-                  disabled={!configContext.configInput}
+                  disabled={!latestConfigInput}
                   aria-label="Share configuration"
                   data-testid="mobile-share-button"
                 >
@@ -686,7 +659,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                       <GrowButton
                         onClick={() =>
                           configContext.generateNow(
-                            configContext.configInput,
+                            latestConfigInput,
                             configContext.injectionInput,
                             { pointsonly: false, isManual: true }
                           )
@@ -724,10 +697,10 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                   <>
                     <NestedRightPane>
                       <StyledFilePreview
-                        data-testid={`${preview.key}-file-preview`}
-                        previewExtension={preview.extension}
-                        previewKey={`${preview.key}-${configContext.resultsVersion}`}
-                        previewContent={preview.content}
+                        data-testid={`${resolvedPreview.key}-file-preview`}
+                        previewExtension={resolvedPreview.extension}
+                        previewKey={`${resolvedPreview.key}-${configContext.resultsVersion}`}
+                        previewContent={resolvedPreview.content}
                       />
                     </NestedRightPane>
                     <ResizablePanel
@@ -740,7 +713,7 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                       <ScrollablePanelContainer>
                         <Downloads
                           setPreview={handleSetPreview}
-                          previewKey={preview.key}
+                          previewKey={resolvedPreview.key}
                           data-testid="downloads-container"
                         />
                       </ScrollablePanelContainer>
@@ -749,10 +722,10 @@ const Ergogen = ({ pwaState }: ErgogenProps) => {
                 ) : (
                   <NestedRightPane>
                     <StyledFilePreview
-                      data-testid={`${preview.key}-file-preview`}
-                      previewExtension={preview.extension}
-                      previewKey={`${preview.key}-${configContext.resultsVersion}`}
-                      previewContent={preview.content}
+                      data-testid={`${resolvedPreview.key}-file-preview`}
+                      previewExtension={resolvedPreview.extension}
+                      previewKey={`${resolvedPreview.key}-${configContext.resultsVersion}`}
+                      previewContent={resolvedPreview.content}
                     />
                   </NestedRightPane>
                 )}
