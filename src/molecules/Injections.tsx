@@ -3,7 +3,7 @@ import { Injection } from '../atoms/InjectionRow';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import { useConfigContext } from '../context/ConfigContext';
-import { Dispatch, SetStateAction, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useRef, useState } from 'react';
 import GrowButton from '../atoms/GrowButton';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import ConflictResolutionDialog from './ConflictResolutionDialog';
@@ -103,7 +103,14 @@ const Injections = ({
   const outlines: InjectionArr = [];
   const templates: InjectionArr = [];
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const attachFolderInput = useCallback((node: HTMLInputElement | null) => {
+    folderInputRef.current = node;
+    if (node) {
+      node.setAttribute('webkitdirectory', '');
+      node.setAttribute('directory', '');
+    }
+  }, []);
   const configContext = useConfigContext();
   const [activeUploadType, setActiveUploadType] = useState<
     'footprint' | 'outline' | 'template'
@@ -533,12 +540,10 @@ const Injections = ({
       />
       <input
         type="file"
-        ref={folderInputRef}
+        ref={attachFolderInput}
         onChange={handleLoadFolder}
         accept={activeUploadType === 'outline' ? '.js,.svg' : '.js'}
         style={{ display: 'none' }}
-        /* eslint-disable-next-line */
-        {...({ webkitdirectory: '', directory: '' } as any)}
       />
     </InjectionsContainer>
   );

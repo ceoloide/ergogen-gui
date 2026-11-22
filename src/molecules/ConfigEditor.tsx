@@ -2,6 +2,7 @@ import { Editor, OnMount } from '@monaco-editor/react';
 import React, { useCallback, useEffect, useRef } from 'react';
 import debounce from 'lodash.debounce';
 import { useConfigContext } from '../context/ConfigContext';
+import { trackEvent } from '../utils/analytics';
 
 /**
  * Defines the options for the Monaco Editor instance.
@@ -56,7 +57,7 @@ const ConfigEditor = ({
     generateNow: (async () => {}) as (
       textInput: string | undefined,
       injectionInput: string[][] | undefined,
-      options?: { pointsonly: boolean }
+      options?: { pointsonly?: boolean; isManual?: boolean }
     ) => Promise<void>,
     activeConfigId: null as string | null,
   };
@@ -69,6 +70,19 @@ const ConfigEditor = ({
     generateNow,
     activeConfigId,
   } = configContext ?? defaults;
+
+  const latestPropsRef = useRef({
+    updateRealtimeConfigInput,
+    setConfigInput,
+    injectionInput,
+    generateNow,
+  });
+  latestPropsRef.current = {
+    updateRealtimeConfigInput,
+    setConfigInput,
+    injectionInput,
+    generateNow,
+  };
 
   // Create a debounced setConfigInput to avoid updating context on every keystroke
   const debouncedSetConfigInput = useRef(
@@ -130,12 +144,19 @@ const ConfigEditor = ({
       label: 'Generate',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => {
+        const {
+          updateRealtimeConfigInput: updateRealtime,
+          setConfigInput: applyConfigInput,
+          injectionInput: latestInjections,
+          generateNow: runGenerateNow,
+        } = latestPropsRef.current;
         const currentConfig = editor.getValue();
         // Cancel pending debounces and apply immediately
         debouncedSetConfigInput.cancel();
-        updateRealtimeConfigInput(currentConfig);
-        setConfigInput(currentConfig);
-        generateNow(currentConfig, injectionInput, {
+        updateRealtime(currentConfig);
+        applyConfigInput(currentConfig);
+        trackEvent('shortcut_used', { action: 'generate' });
+        runGenerateNow(currentConfig, latestInjections, {
           pointsonly: false,
           isManual: true,
         });

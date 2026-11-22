@@ -32,6 +32,16 @@ import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import { useConfigLoader } from '../hooks/useConfigLoader';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
+import {
+  beginGeneration,
+  buildRequestKey,
+  classifyErgogenResponse,
+  createGenerationSession,
+  failActiveGeneration,
+  invalidateSession,
+  isActiveJscadVersion,
+  shouldSkipRequest,
+} from '../utils/generationSession';
 import type {
   JscadWorkerRequest,
   JscadWorkerResponse,
@@ -607,12 +617,12 @@ const ConfigContextProvider = ({
   const [info, setInfo] = useState<string | null>(null);
   const [results, setResults] = useState<Results | null>(null);
   const [resultsVersion, setResultsVersion] = useState<number>(0);
-  // The worker request behind the current or pending results, or null once
-  // they are cleared.
-  const currentRequestRef = useRef<string | null>(null);
+  const generationSessionRef = useRef(createGenerationSession());
   const clearResults = useCallback(() => {
-    currentRequestRef.current = null;
+    invalidateSession(generationSessionRef.current);
     setResults(null);
+    setIsGenerating(false);
+    setIsJscadConverting(false);
   }, []);
   const [settings, setSettings] = useLocalStorage<AppSettings>(
     'ergogen:settings',
@@ -624,6 +634,8 @@ const ConfigContextProvider = ({
   const autoGen3D = settings?.autoGen3D ?? true;
   const kicanvasPreview = settings?.kicanvasPreview ?? true;
   const stlPreview = settings?.stlPreview ?? true;
+  const stlPreviewRef = useRef<boolean>(stlPreview);
+  stlPreviewRef.current = stlPreview;
 
   // Consent is resolved by the analytics module (explicit toggle, older
   // opt-outs, then the web/PWA default). Analytics itself is bootstrapped in
@@ -771,8 +783,6 @@ const ConfigContextProvider = ({
   const ergogenWorkerRef = useRef<Worker | null>(null);
   const jscadWorkerRef = useRef<Worker | null>(null);
 
-  // Config version tracking
-  const currentConfigVersion = useRef<number>(0);
   const [isJscadConverting, setIsJscadConverting] = useState<boolean>(false);
   const isInitialMountRef = useRef<boolean>(true);
   const generationStartTimeRef = useRef<number | null>(null);
@@ -804,15 +814,13 @@ const ConfigContextProvider = ({
   const handleErgogenWorkerMessage = useCallback(
     (event: MessageEvent<ErgogenWorkerResponse>) => {
       const response = event.data;
+      const classification = classifyErgogenResponse(
+        generationSessionRef.current,
+        response
+      );
 
-      // Handle background preview generation requests
-      if (
-        response.requestId &&
-        response.requestId.startsWith('background-preview-')
-      ) {
-        const configId = response.requestId.substring(
-          'background-preview-'.length
-        );
+      if (classification.kind === 'background-preview') {
+        const configId = classification.configId;
         if (response.type === 'success' && response.results) {
           const resultsObj = response.results as Results;
           const svgContent =
@@ -836,37 +844,43 @@ const ConfigContextProvider = ({
         return;
       }
 
-      const isManualRequest = Boolean(
-        response.requestId && response.requestId.startsWith('ergogen-manual-')
-      );
+      if (classification.kind === 'stale') {
+        return;
+      }
 
-      if (response.type === 'error') {
-        console.error('--- Ergogen worker error:', response.error);
-        setError(response.error);
+      if (classification.kind === 'active-error') {
+        const errorMsg =
+          response.type === 'error'
+            ? response.error || 'Unknown worker error'
+            : 'Unknown worker error';
+        console.error('--- Ergogen worker error:', errorMsg);
+        setError(errorMsg);
         setIsGenerating(false);
         setIsJscadConverting(false);
         queueGenerationEvent(
           'generation_failed',
           {
-            error_message: response.error || 'Unknown worker error',
+            error_message: errorMsg,
             stored_configs_count: configsRef.current.length,
-            trigger: isManualRequest ? 'manual' : 'auto',
+            trigger: classification.isManual ? 'manual' : 'auto',
           },
-          isManualRequest
+          classification.isManual
         );
         return;
       }
 
-      if (response.type === 'success') {
-        // Handle warnings
-        if (response.warnings && response.warnings.length > 0) {
+      if (classification.kind === 'active-success') {
+        if (
+          response.type === 'success' &&
+          response.warnings &&
+          response.warnings.length > 0
+        ) {
           setDeprecationWarning(
             (prev) => (prev ? prev + '\n' : '') + response.warnings.join('\n')
           );
         }
 
-        // Set results and trigger STL conversion if needed
-        if (response.results) {
+        if (response.type === 'success' && response.results) {
           const newResults = response.results as Results;
 
           const duration = generationStartTimeRef.current
@@ -887,12 +901,11 @@ const ConfigContextProvider = ({
                 : 0,
               has_outlines: !!newResults.outlines,
               stored_configs_count: configsRef.current.length,
-              trigger: isManualRequest ? 'manual' : 'auto',
+              trigger: classification.isManual ? 'manual' : 'auto',
             },
-            isManualRequest
+            classification.isManual
           );
 
-          // Perform configuration analysis and track GA4 event (debounced)
           try {
             const canonicalText = yaml.dump(newResults.canonical || {});
             const pointsText = yaml.dump(newResults.points || {});
@@ -903,9 +916,7 @@ const ConfigContextProvider = ({
               lastTrackedConfigIdRef.current
             );
 
-            // Avoid sending redundant tracking events when the config hasn't changed geometrically
             if (payload.config_id !== lastTrackedConfigIdRef.current) {
-              // Clear any existing pending tracking timer
               if (pendingAnalyticsRef.current) {
                 clearTimeout(pendingAnalyticsRef.current.timeoutId);
               }
@@ -929,19 +940,16 @@ const ConfigContextProvider = ({
             );
           }
 
-          // Store preview or demo SVG in the active configuration
           const svgContent =
             newResults.outlines?.preview?.svg || newResults.demo?.svg;
           const formattedSvg = formatPreviewSvg(svgContent);
-          const currentActiveId = activeConfigIdRef.current;
-          if (formattedSvg && currentActiveId) {
+          const targetConfigId = classification.targetConfigId;
+          if (formattedSvg && targetConfigId) {
             setConfigs((prevConfigs) => {
               const updated = prevConfigs.map((c) =>
-                c.id === currentActiveId
-                  ? { ...c, previewSvg: formattedSvg }
-                  : c
+                c.id === targetConfigId ? { ...c, previewSvg: formattedSvg } : c
               );
-              saveMultiConfigToStorage(updated, currentActiveId, 2);
+              saveMultiConfigToStorage(updated, activeConfigIdRef.current, 2);
               return updated;
             });
           }
@@ -949,11 +957,10 @@ const ConfigContextProvider = ({
           let willConvertStl = false;
 
           if (
-            stlPreview &&
+            stlPreviewRef.current &&
             newResults.cases &&
             Object.keys(newResults.cases).length > 0
           ) {
-            // Mark STL as pending for all cases that have JSCAD
             for (const name of Object.keys(newResults.cases)) {
               const caseObj = newResults.cases[name];
               if (caseObj?.jscad) {
@@ -967,7 +974,7 @@ const ConfigContextProvider = ({
               const request: JscadWorkerRequest = {
                 type: 'batch_jscad_to_stl',
                 results: newResults,
-                configVersion: currentConfigVersion.current,
+                configVersion: classification.version,
               };
               jscadWorkerRef.current.postMessage(request);
             }
@@ -976,7 +983,6 @@ const ConfigContextProvider = ({
           setResults(newResults);
           setResultsVersion((v) => v + 1);
 
-          // Only clear isGenerating if we're not waiting for STL conversion
           if (!willConvertStl) {
             setIsGenerating(false);
           }
@@ -985,10 +991,14 @@ const ConfigContextProvider = ({
         }
       } else {
         setIsGenerating(false);
+        setIsJscadConverting(false);
       }
     },
-    [stlPreview, queueGenerationEvent]
+    [queueGenerationEvent]
   );
+
+  const handleErgogenWorkerMessageRef = useRef(handleErgogenWorkerMessage);
+  handleErgogenWorkerMessageRef.current = handleErgogenWorkerMessage;
 
   /**
    * Handler for messages received from the JSCAD worker.
@@ -997,7 +1007,12 @@ const ConfigContextProvider = ({
     (event: MessageEvent<JscadWorkerResponse>) => {
       const response = event.data;
 
-      if (response.configVersion !== currentConfigVersion.current) {
+      if (
+        !isActiveJscadVersion(
+          generationSessionRef.current,
+          response.configVersion
+        )
+      ) {
         return;
       }
 
@@ -1015,32 +1030,58 @@ const ConfigContextProvider = ({
     []
   );
 
+  const handleJscadWorkerMessageRef = useRef(handleJscadWorkerMessage);
+  handleJscadWorkerMessageRef.current = handleJscadWorkerMessage;
+
+  const startErgogenWorker = useCallback(() => {
+    if (ergogenWorkerRef.current) {
+      ergogenWorkerRef.current.terminate();
+      ergogenWorkerRef.current = null;
+      setWorkerReady(false);
+    }
+
+    const worker = createErgogenWorker();
+    if (worker) {
+      worker.onmessage = (event) =>
+        handleErgogenWorkerMessageRef.current(event);
+      worker.onerror = (e) => {
+        console.error('Ergogen worker error:', e);
+        const errorMessage = e.message || 'Ergogen worker error';
+        failActiveGeneration(generationSessionRef.current);
+        setError(errorMessage);
+        setIsGenerating(false);
+        setIsJscadConverting(false);
+        trackError(e.message || 'Worker crash', false, 'ergogen_worker');
+      };
+      ergogenWorkerRef.current = worker;
+      setWorkerReady(true);
+    } else {
+      setWorkerReady(false);
+      console.warn('Failed to initialize Ergogen worker.');
+    }
+    return worker;
+  }, []);
+
   /**
    * Effect to initialize and terminate workers.
    */
   useEffect(() => {
     if (!ergogenWorkerRef.current) {
-      ergogenWorkerRef.current = createErgogenWorker();
-      if (ergogenWorkerRef.current) {
-        ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
-        ergogenWorkerRef.current.onerror = (e) => {
-          console.error('Ergogen worker error:', e);
-          trackError(e.message || 'Worker crash', false, 'ergogen_worker');
-        };
-        setWorkerReady(true);
-      } else {
-        console.warn('Failed to initialize Ergogen worker.');
-      }
+      startErgogenWorker();
     }
 
     if (!jscadWorkerRef.current) {
-      jscadWorkerRef.current = createJscadWorker();
-      if (jscadWorkerRef.current) {
-        jscadWorkerRef.current.onmessage = handleJscadWorkerMessage;
-        jscadWorkerRef.current.onerror = (e) => {
+      const jscadWorker = createJscadWorker();
+      if (jscadWorker) {
+        jscadWorker.onmessage = (event) =>
+          handleJscadWorkerMessageRef.current(event);
+        jscadWorker.onerror = (e) => {
           console.error('JSCAD worker error:', e);
+          setIsJscadConverting(false);
+          setIsGenerating(false);
           trackError(e.message || 'Worker crash', false, 'jscad_worker');
         };
+        jscadWorkerRef.current = jscadWorker;
       } else {
         console.warn('Failed to initialize JSCAD worker.');
       }
@@ -1057,7 +1098,7 @@ const ConfigContextProvider = ({
         jscadWorkerRef.current = null;
       }
     };
-  }, [handleErgogenWorkerMessage, handleJscadWorkerMessage]);
+  }, [startErgogenWorker]);
 
   // Flush pending analytics on unmount and visibility change to hidden
   useEffect(() => {
@@ -1179,20 +1220,21 @@ const ConfigContextProvider = ({
         return;
       }
       const inputInjection = filterInjectionsByFeatureFlags(injectionInput);
-      // Everything the worker output depends on. Auto-generation skips a
-      // request that repeats the current one: on load and when the settings
-      // panel closes, an immediate generation has already made it, and
-      // repeating it would replace finished STL files with pending ones.
-      const request = JSON.stringify([
+      const requestKey = buildRequestKey(
         targetInput,
         inputInjection,
-        options.pointsonly,
-        debug,
-      ]);
-      if (options.skipIfCurrent && request === currentRequestRef.current) {
+        Boolean(options.pointsonly),
+        debug
+      );
+      if (
+        shouldSkipRequest(
+          generationSessionRef.current,
+          requestKey,
+          options.skipIfCurrent
+        )
+      ) {
         return;
       }
-      currentRequestRef.current = request;
       const [, parsedConfig] = parseConfig(targetInput);
 
       setError(null);
@@ -1200,7 +1242,6 @@ const ConfigContextProvider = ({
       setSkippedWarning(null);
       setIsGenerating(true);
       generationStartTimeRef.current = performance.now();
-      currentConfigVersion.current += 1;
 
       const warning = checkForDeprecationWarnings(parsedConfig);
       if (warning) {
@@ -1215,27 +1256,35 @@ const ConfigContextProvider = ({
       const inputConfig =
         preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
-      const requestPrefix = options.isManual
-        ? 'ergogen-manual'
-        : 'ergogen-generate';
-
       try {
-        if (ergogenWorkerRef.current) {
-          ergogenWorkerRef.current.postMessage({
-            type: 'generate',
-            inputConfig,
-            injectionInput: inputInjection,
-            requestId: `${requestPrefix}-${currentConfigVersion.current}-${Date.now()}`,
-            options: {
-              debug: debug,
-              svg: true,
-            },
-          });
-        } else {
+        if (!ergogenWorkerRef.current) {
           console.error('Worker not available for processing request.');
+          failActiveGeneration(generationSessionRef.current);
+          setIsGenerating(false);
+          setIsJscadConverting(false);
+          setError('Worker not available for processing request.');
+          return;
         }
+
+        const active = beginGeneration(generationSessionRef.current, {
+          requestKey,
+          targetConfigId: activeConfigIdRef.current,
+          isManual: Boolean(options.isManual),
+        });
+        ergogenWorkerRef.current.postMessage({
+          type: 'generate',
+          inputConfig,
+          injectionInput: inputInjection,
+          requestId: active.requestId,
+          options: {
+            debug: debug,
+            svg: true,
+          },
+        });
       } catch (e: unknown) {
+        failActiveGeneration(generationSessionRef.current);
         setIsGenerating(false);
+        setIsJscadConverting(false);
         const errMsg = typeof e === 'string' ? e : String(e);
         setError(errMsg);
         queueGenerationEvent(
@@ -1528,7 +1577,7 @@ const ConfigContextProvider = ({
       configsRef.current = remainingConfigs;
 
       const isDeletingActive = currentActiveId === id;
-      const isLastConfig = configsRef.current.length <= 1;
+      const isLastConfig = remainingConfigs.length === 0;
 
       if (isLastConfig || isDeletingActive) {
         clearResults();
@@ -1654,7 +1703,7 @@ const ConfigContextProvider = ({
       loadGenerationConfigIdRef.current = activeConfigIdRef.current;
       generateNow(configInputState, injectionInput, { pointsonly: false });
     }
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfigLoading]);
 
   // Track previous showSettings value
@@ -1665,30 +1714,10 @@ const ConfigContextProvider = ({
    */
   useEffect(() => {
     if (prevShowSettingsRef.current && !showSettings) {
-      console.log(
-        'Settings panel closed. Restarting Ergogen worker to clear stale custom libraries...'
-      );
-
-      if (ergogenWorkerRef.current) {
-        ergogenWorkerRef.current.terminate();
-        ergogenWorkerRef.current = null;
-        setWorkerReady(false);
-        console.log('Ergogen worker terminated.');
-      }
-
-      console.log('Initializing fresh Ergogen worker...');
-      ergogenWorkerRef.current = createErgogenWorker();
-      if (ergogenWorkerRef.current) {
-        ergogenWorkerRef.current.onmessage = handleErgogenWorkerMessage;
-        ergogenWorkerRef.current.onerror = (e) => {
-          console.error('Ergogen worker error:', e);
-          trackError(e.message || 'Worker crash', false, 'ergogen_worker');
-        };
-        setWorkerReady(true);
-        console.log('Ergogen worker initialized.');
-      } else {
-        console.warn('Failed to initialize Ergogen worker.');
-      }
+      invalidateSession(generationSessionRef.current);
+      setIsGenerating(false);
+      setIsJscadConverting(false);
+      startErgogenWorker();
 
       if (configInputState) {
         generateNow(configInputState, injectionInput, {
@@ -1703,7 +1732,7 @@ const ConfigContextProvider = ({
     injectionInput,
     autoGen3D,
     generateNow,
-    handleErgogenWorkerMessage,
+    startErgogenWorker,
   ]);
 
   /**
