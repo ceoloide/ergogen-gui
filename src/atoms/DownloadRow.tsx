@@ -167,10 +167,16 @@ const DownloadRow = ({
     });
     const element = document.createElement('a');
     const file = new Blob([content as BlobPart], { type: 'octet/stream' });
-    element.href = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
+    element.href = url;
     element.download = `${fileName}.${extension}`;
     document.body.appendChild(element);
-    element.click();
+    try {
+      element.click();
+    } finally {
+      document.body.removeChild(element);
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handlePreview = () => {

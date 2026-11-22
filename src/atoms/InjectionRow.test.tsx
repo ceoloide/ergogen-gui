@@ -113,4 +113,79 @@ describe('InjectionRow', () => {
       'blob:http://localhost/mock-url'
     );
   });
+
+  it('reuses the Blob URL across unrelated re-renders and revokes old URLs on content change and unmount', () => {
+    const createObjectURL = vi
+      .fn()
+      .mockReturnValueOnce('blob:http://localhost/url-1')
+      .mockReturnValueOnce('blob:http://localhost/url-2');
+    const revokeObjectURL = vi.fn();
+    const prevCreate = global.URL.createObjectURL;
+    const prevRevoke = global.URL.revokeObjectURL;
+    global.URL.createObjectURL = createObjectURL;
+    global.URL.revokeObjectURL = revokeObjectURL;
+
+    try {
+      const baseInjection = {
+        key: 0,
+        type: 'footprint',
+        name: 'test-injection',
+        content: 'content-v1',
+      };
+      const { rerender, unmount } = render(
+        <InjectionRow
+          injection={baseInjection}
+          setInjectionToEdit={vi.fn()}
+          deleteInjection={vi.fn()}
+          previewKey=""
+          data-testid="injection-row"
+        />
+      );
+
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('injection-row-download')).toHaveAttribute(
+        'href',
+        'blob:http://localhost/url-1'
+      );
+
+      // Unrelated prop change should not allocate another Blob URL
+      rerender(
+        <InjectionRow
+          injection={baseInjection}
+          setInjectionToEdit={vi.fn()}
+          deleteInjection={vi.fn()}
+          previewKey="test-injection"
+          data-testid="injection-row"
+        />
+      );
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+      // Content change revokes old URL and creates a new one
+      rerender(
+        <InjectionRow
+          injection={{ ...baseInjection, content: 'content-v2' }}
+          setInjectionToEdit={vi.fn()}
+          deleteInjection={vi.fn()}
+          previewKey="test-injection"
+          data-testid="injection-row"
+        />
+      );
+      expect(revokeObjectURL).toHaveBeenCalledWith(
+        'blob:http://localhost/url-1'
+      );
+      expect(screen.getByTestId('injection-row-download')).toHaveAttribute(
+        'href',
+        'blob:http://localhost/url-2'
+      );
+
+      // Unmount revokes the active URL
+      unmount();
+      expect(revokeObjectURL).toHaveBeenCalledWith(
+        'blob:http://localhost/url-2'
+      );
+    } finally {
+      global.URL.createObjectURL = prevCreate;
+      global.URL.revokeObjectURL = prevRevoke;
+    }
+  });
 });
