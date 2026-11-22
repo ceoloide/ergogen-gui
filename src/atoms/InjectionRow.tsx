@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import styled, { css } from 'styled-components';
 import { theme } from '../theme/theme';
 
@@ -121,6 +122,18 @@ const InjectionRow = ({
   previewKey,
   'data-testid': dataTestId,
 }: Props): JSX.Element => {
+  const [downloadUrl, setDownloadUrl] = useState<string>('');
+
+  useEffect(() => {
+    const url = window.URL.createObjectURL(
+      new Blob([injection.content], { type: 'octet/stream' })
+    );
+    setDownloadUrl(url);
+    return () => {
+      window.URL.revokeObjectURL(url);
+    };
+  }, [injection.content]);
+
   return (
     <Row data-testid={dataTestId}>
       <InjectionName
@@ -157,9 +170,7 @@ const InjectionRow = ({
           target={'_blank'}
           rel={'noopener noreferrer'}
           download={`${injection.name.split('/').reverse()[0]}.js`}
-          href={window.URL.createObjectURL(
-            new Blob([injection.content], { type: 'octet/stream' })
-          )}
+          href={downloadUrl || undefined}
           aria-label={`download injection ${injection.name}`}
           data-testid={dataTestId && `${dataTestId}-download`}
         >
