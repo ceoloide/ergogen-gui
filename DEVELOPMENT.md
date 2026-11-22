@@ -66,7 +66,7 @@ This is a bounded rule, not a complete record of which errors our files cause:
 an error that our declaration causes but that TypeScript reports on another
 symbol, with no related information pointing to us, is still treated as a
 dependency error and filtered out. Checking every declaration file takes most of
-`pnpm typecheck`'s runtime. Our files are the `*.d.ts`,
+the command's time, about 26 seconds locally. Our files are the `*.d.ts`,
 `*.d.mts` and `*.d.cts` files Git lists, tracked or untracked, outside
 `node_modules`; one that belongs to neither project fails the check. Code that
 uses the declarations is type-checked by `tsc` as usual.
