@@ -3,14 +3,20 @@ import { createServer, type Server } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { reachNoHostName } from './e2e/utils/hostNames';
 
+const isRootOnly = process.env.PLAYWRIGHT_ROOT_ONLY === '1' && !process.env.CI;
+
 // Reserve distinct available loopback ports. strictPort makes a subsequent
 // collision fail explicitly; Playwright must never silently reuse a different
 // checkout. All sockets stay open until every port is chosen so none repeats.
-const portVariables = [
-  'PLAYWRIGHT_TEST_PORT',
-  'PLAYWRIGHT_SUBPATH_PORT',
-  'PLAYWRIGHT_UPDATE_PORT',
-].filter((name) => !process.env[name]);
+const portVariables = (
+  isRootOnly
+    ? ['PLAYWRIGHT_TEST_PORT']
+    : [
+        'PLAYWRIGHT_TEST_PORT',
+        'PLAYWRIGHT_SUBPATH_PORT',
+        'PLAYWRIGHT_UPDATE_PORT',
+      ]
+).filter((name) => !process.env[name]);
 const listen = () =>
   new Promise<Server>((resolve, reject) => {
     const server = createServer();
@@ -43,17 +49,87 @@ const urlOf = (variable: string, path: string) =>
 const buildId = identity('PLAYWRIGHT_BUILD_ID');
 const baseURL = urlOf('PLAYWRIGHT_TEST_PORT', '');
 
+const preview = (outDir: string, variable: string) =>
+  `pnpm exec vite preview --outDir ${outDir} --host 127.0.0.1 --port ${process.env[variable]} --strictPort`;
+
+const rootProject = {
+  name: 'chromium',
+  testIgnore: '**/service-worker-update.spec.ts',
+  metadata: { buildId, baseURL },
+  use: { ...devices['Desktop Chrome'], baseURL },
+};
+
+const rootServer = {
+  env: { VITE_BUILD_ID: buildId, VITE_PUBLIC_URL: '', PUBLIC_URL: '' },
+  command: `pnpm build && ${preview('dist', 'PLAYWRIGHT_TEST_PORT')}`,
+  url: `${baseURL}/build-id.txt`,
+  reuseExistingServer: false,
+  timeout: 180 * 1000,
+};
+
 // A build below a subpath, as on a GitHub project page, and the next build of
 // the same base for the update drill. The drill gets its own server and copy
 // of the build, because it deploys the next build over the files it serves.
-const subpath = '/ergogen-gui/';
-const subpathEnv = { VITE_PUBLIC_URL: subpath, PUBLIC_URL: '' };
-const subpathBuildId = identity('PLAYWRIGHT_SUBPATH_BUILD_ID');
-const nextBuildId = identity('PLAYWRIGHT_SUBPATH_NEXT_BUILD_ID');
-const subpathURL = urlOf('PLAYWRIGHT_SUBPATH_PORT', subpath);
-const updateURL = urlOf('PLAYWRIGHT_UPDATE_PORT', subpath);
-const preview = (outDir: string, variable: string) =>
-  `pnpm exec vite preview --outDir ${outDir} --host 127.0.0.1 --port ${process.env[variable]} --strictPort`;
+const subpathProjectsAndServers = () => {
+  const subpath = '/ergogen-gui/';
+  const subpathEnv = { VITE_PUBLIC_URL: subpath, PUBLIC_URL: '' };
+  const subpathBuildId = identity('PLAYWRIGHT_SUBPATH_BUILD_ID');
+  const nextBuildId = identity('PLAYWRIGHT_SUBPATH_NEXT_BUILD_ID');
+  const subpathURL = urlOf('PLAYWRIGHT_SUBPATH_PORT', subpath);
+  const updateURL = urlOf('PLAYWRIGHT_UPDATE_PORT', subpath);
+
+  return {
+    projects: [
+      {
+        name: 'chromium-subpath',
+        testMatch: ['**/base-path.spec.ts', '**/service-worker.spec.ts'],
+        metadata: { buildId: subpathBuildId, baseURL: subpathURL },
+        use: { ...devices['Desktop Chrome'], baseURL: subpathURL },
+      },
+      {
+        name: 'chromium-subpath-update',
+        testMatch: '**/service-worker-update.spec.ts',
+        metadata: {
+          buildId: subpathBuildId,
+          baseURL: updateURL,
+          nextBuildId,
+          nextBuildDir: 'dist-subpath-next',
+          servedDir: 'dist-subpath-served',
+        },
+        // Its worker's requests to other hosts fail here, not in the fixture
+        // (see e2e/fixtures.ts).
+        use: {
+          ...devices['Desktop Chrome'],
+          baseURL: updateURL,
+          launchOptions: { args: reachNoHostName },
+        },
+      },
+    ],
+    webServer: [
+      {
+        env: { ...subpathEnv, VITE_BUILD_ID: subpathBuildId },
+        command:
+          `pnpm exec vite build --outDir dist-subpath` +
+          ` && VITE_BUILD_ID=${nextBuildId} pnpm exec vite build --outDir dist-subpath-next` +
+          ` && ${preview('dist-subpath', 'PLAYWRIGHT_SUBPATH_PORT')}`,
+        url: `${subpathURL}build-id.txt`,
+        reuseExistingServer: false,
+        timeout: 240 * 1000,
+      },
+      {
+        env: subpathEnv,
+        command:
+          'rm -rf dist-subpath-served && cp -R dist-subpath dist-subpath-served' +
+          ` && ${preview('dist-subpath-served', 'PLAYWRIGHT_UPDATE_PORT')}`,
+        url: `${updateURL}build-id.txt`,
+        reuseExistingServer: false,
+        timeout: 60 * 1000,
+      },
+    ],
+  };
+};
+
+const extra = isRootOnly ? null : subpathProjectsAndServers();
 
 export default defineConfig({
   testDir: './e2e',
@@ -72,65 +148,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    {
-      name: 'chromium',
-      testIgnore: '**/service-worker-update.spec.ts',
-      metadata: { buildId, baseURL },
-      use: { ...devices['Desktop Chrome'], baseURL },
-    },
-    {
-      name: 'chromium-subpath',
-      testMatch: ['**/base-path.spec.ts', '**/service-worker.spec.ts'],
-      metadata: { buildId: subpathBuildId, baseURL: subpathURL },
-      use: { ...devices['Desktop Chrome'], baseURL: subpathURL },
-    },
-    {
-      name: 'chromium-subpath-update',
-      testMatch: '**/service-worker-update.spec.ts',
-      metadata: {
-        buildId: subpathBuildId,
-        baseURL: updateURL,
-        nextBuildId,
-        nextBuildDir: 'dist-subpath-next',
-        servedDir: 'dist-subpath-served',
-      },
-      // Its worker's requests to other hosts fail here, not in the fixture
-      // (see e2e/fixtures.ts).
-      use: {
-        ...devices['Desktop Chrome'],
-        baseURL: updateURL,
-        launchOptions: { args: reachNoHostName },
-      },
-    },
-  ],
+  projects: extra ? [rootProject, ...extra.projects] : [rootProject],
   // Playwright starts these in order: the root build also prepares the engine.
-  webServer: [
-    {
-      env: { VITE_BUILD_ID: buildId, VITE_PUBLIC_URL: '', PUBLIC_URL: '' },
-      command: `pnpm build && ${preview('dist', 'PLAYWRIGHT_TEST_PORT')}`,
-      url: `${baseURL}/build-id.txt`,
-      reuseExistingServer: false,
-      timeout: 180 * 1000,
-    },
-    {
-      env: { ...subpathEnv, VITE_BUILD_ID: subpathBuildId },
-      command:
-        `pnpm exec vite build --outDir dist-subpath` +
-        ` && VITE_BUILD_ID=${nextBuildId} pnpm exec vite build --outDir dist-subpath-next` +
-        ` && ${preview('dist-subpath', 'PLAYWRIGHT_SUBPATH_PORT')}`,
-      url: `${subpathURL}build-id.txt`,
-      reuseExistingServer: false,
-      timeout: 240 * 1000,
-    },
-    {
-      env: subpathEnv,
-      command:
-        'rm -rf dist-subpath-served && cp -R dist-subpath dist-subpath-served' +
-        ` && ${preview('dist-subpath-served', 'PLAYWRIGHT_UPDATE_PORT')}`,
-      url: `${updateURL}build-id.txt`,
-      reuseExistingServer: false,
-      timeout: 60 * 1000,
-    },
-  ],
+  webServer: extra ? [rootServer, ...extra.webServer] : [rootServer],
 });
