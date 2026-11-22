@@ -10,13 +10,22 @@ const mockErgogenWorker = {
   postMessage: vi.fn(),
   terminate: vi.fn(),
   onmessage: (_e: any) => {},
+  onerror: (_e: any) => {},
 };
 
 const mockJscadWorker = {
   postMessage: vi.fn(),
   terminate: vi.fn(),
   onmessage: (_e: any) => {},
+  onerror: (_e: any) => {},
 };
+
+const mockCreateErgogenWorker = vi.fn(
+  () => mockErgogenWorker as unknown as Worker | null
+);
+const mockCreateJscadWorker = vi.fn(
+  () => mockJscadWorker as unknown as Worker | null
+);
 
 import { isFeatureEnabled } from '../utils/featureFlags';
 
@@ -25,8 +34,8 @@ vi.mock('../utils/featureFlags', () => ({
 }));
 
 vi.mock('../workers/workerFactory', () => ({
-  createErgogenWorker: () => mockErgogenWorker,
-  createJscadWorker: () => mockJscadWorker,
+  createErgogenWorker: () => mockCreateErgogenWorker(),
+  createJscadWorker: () => mockCreateJscadWorker(),
 }));
 
 import {
@@ -36,6 +45,7 @@ import {
 } from '../utils/analytics';
 vi.mock('../utils/analytics', () => ({
   trackEvent: vi.fn(),
+  trackError: vi.fn(),
   initAnalytics: vi.fn(),
   setSendUsageMetricsEnabled: vi.fn(),
   getSendUsageMetricsEnabled: () => true,
@@ -103,12 +113,34 @@ const mockInitialConfig = (config: string) => {
   );
 };
 
+const getLatestErgogenRequestId = (): string => {
+  const foregroundCalls = mockErgogenWorker.postMessage.mock.calls.filter(
+    (call) =>
+      call[0]?.type === 'generate' &&
+      typeof call[0]?.requestId === 'string' &&
+      !call[0].requestId.startsWith('background-preview-')
+  );
+  const latest = foregroundCalls.at(-1)?.[0];
+  if (!latest?.requestId) {
+    throw new Error('Expected a foreground Ergogen worker request');
+  }
+  return latest.requestId;
+};
+
 describe('ConfigContextProvider', () => {
   beforeEach(() => {
     // Clear the URL for each test
     window.history.replaceState({}, 'Test page', '/');
     mockErgogenWorker.postMessage.mockClear();
+    mockErgogenWorker.terminate.mockClear();
     mockJscadWorker.postMessage.mockClear();
+    mockJscadWorker.terminate.mockClear();
+    mockCreateErgogenWorker
+      .mockReset()
+      .mockReturnValue(mockErgogenWorker as unknown as Worker);
+    mockCreateJscadWorker
+      .mockReset()
+      .mockReturnValue(mockJscadWorker as unknown as Worker);
     (isFeatureEnabled as Mock).mockReturnValue(true);
     localStorage.clear();
   });
@@ -286,7 +318,11 @@ describe('ConfigContextProvider', () => {
 
       act(() => {
         mockErgogenWorker.onmessage({
-          data: { type: 'success', results: ergogenResults },
+          data: {
+            type: 'success',
+            requestId: getLatestErgogenRequestId(),
+            results: ergogenResults,
+          },
         } as MessageEvent);
       });
 
@@ -375,7 +411,11 @@ describe('ConfigContextProvider', () => {
 
       act(() => {
         mockErgogenWorker.onmessage({
-          data: { type: 'success', results: ergogenResults1 },
+          data: {
+            type: 'success',
+            requestId: getLatestErgogenRequestId(),
+            results: ergogenResults1,
+          },
         } as MessageEvent);
       });
 
@@ -402,7 +442,11 @@ describe('ConfigContextProvider', () => {
 
       act(() => {
         mockErgogenWorker.onmessage({
-          data: { type: 'success', results: ergogenResults2 },
+          data: {
+            type: 'success',
+            requestId: getLatestErgogenRequestId(),
+            results: ergogenResults2,
+          },
         } as MessageEvent);
       });
 
@@ -1081,7 +1125,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
-            requestId: 'ergogen-generate-12345',
+            requestId: getLatestErgogenRequestId(),
             results: {
               demo: {
                 svg: '<svg><path stroke="#000" /></svg>',
@@ -1328,8 +1372,9 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should debounce tracking by 5 seconds and only send the latest event', async () => {
+      let capturedContext: any = null;
       const TestComponent = () => {
-        useConfigContext();
+        capturedContext = useConfigContext();
         return null;
       };
 
@@ -1344,6 +1389,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1360,11 +1406,16 @@ describe('ConfigContextProvider', () => {
       });
       expect(getKeyboardGeneratedCalls().length).toBe(0);
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { p2: {} }', undefined);
+      });
+
       // Trigger second success response before debounce expires (different coordinates, config_id B)
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1400,8 +1451,9 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should correctly chain lineages across multiple distinct generations', async () => {
+      let capturedContext: any = null;
       const TestComponent = () => {
-        useConfigContext();
+        capturedContext = useConfigContext();
         return null;
       };
 
@@ -1416,6 +1468,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1435,11 +1488,16 @@ describe('ConfigContextProvider', () => {
       const firstConfigId = firstPayload.config_id;
       expect(firstPayload.previous_config_id).toBeUndefined();
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { p2: {} }', undefined);
+      });
+
       // 2. Second compile (config B)
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1460,8 +1518,9 @@ describe('ConfigContextProvider', () => {
     });
 
     it('should ignore duplicate compilation results with identical layout geometries', async () => {
+      let capturedContext: any = null;
       const TestComponent = () => {
-        useConfigContext();
+        capturedContext = useConfigContext();
         return null;
       };
 
@@ -1476,6 +1535,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1492,11 +1552,16 @@ describe('ConfigContextProvider', () => {
       });
       expect(getKeyboardGeneratedCalls().length).toBe(1);
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { p2: {} }', undefined);
+      });
+
       // 2. Second compile with identical values
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1532,6 +1597,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1552,11 +1618,16 @@ describe('ConfigContextProvider', () => {
         capturedContext.selectConfig(null);
       });
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { corne: {} }', undefined);
+      });
+
       // 2. Second compile (different coordinates, should have previous_config_id = undefined)
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Corne', author: 'foobar' } },
               points: {
@@ -1587,6 +1658,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: {
               canonical: { meta: { name: 'Sweep', author: 'david' } },
               points: {
@@ -1761,10 +1833,15 @@ describe('ConfigContextProvider', () => {
       vi.useRealTimers();
     });
 
-    it('should debounce generation_completed by 5 seconds during auto-generation', () => {
+    it('should debounce generation_completed by 5 seconds during auto-generation', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
       render(
         <ConfigContextProvider>
-          <div />
+          <TestComponent />
         </ConfigContextProvider>
       );
 
@@ -1773,6 +1850,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: { points: { p1: { x: 0, y: 0 } } },
           },
         } as MessageEvent);
@@ -1787,11 +1865,16 @@ describe('ConfigContextProvider', () => {
       );
       expect(completedCalls.length).toBe(0);
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { p2: {} }', undefined);
+      });
+
       // Another completion before debounce finishes
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: { points: { p1: { x: 10, y: 10 } } },
           },
         } as MessageEvent);
@@ -1815,10 +1898,15 @@ describe('ConfigContextProvider', () => {
       expect(completedCalls.length).toBe(1);
     });
 
-    it('should debounce generation_failed by 5 seconds during auto-generation', () => {
+    it('should debounce generation_failed by 5 seconds during auto-generation', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
       render(
         <ConfigContextProvider>
-          <div />
+          <TestComponent />
         </ConfigContextProvider>
       );
 
@@ -1827,6 +1915,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'error',
+            requestId: getLatestErgogenRequestId(),
             error: 'SyntaxError at line 1',
           },
         } as MessageEvent);
@@ -1840,11 +1929,16 @@ describe('ConfigContextProvider', () => {
       );
       expect(failedCalls.length).toBe(0);
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { p2: {} }', undefined);
+      });
+
       // Second error
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'error',
+            requestId: getLatestErgogenRequestId(),
             error: 'SyntaxError at line 2',
           },
         } as MessageEvent);
@@ -1881,6 +1975,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: { points: { p1: { x: 0, y: 0 } } },
           },
         } as MessageEvent);
@@ -1904,10 +1999,15 @@ describe('ConfigContextProvider', () => {
       expect(countCompleted()).toBe(1);
     });
 
-    it('should cancel pending generation_failed when generation succeeds', () => {
+    it('should cancel pending generation_failed when generation succeeds', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
       render(
         <ConfigContextProvider>
-          <div />
+          <TestComponent />
         </ConfigContextProvider>
       );
 
@@ -1916,6 +2016,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'error',
+            requestId: getLatestErgogenRequestId(),
             error: 'Incomplete YAML while typing',
           },
         } as MessageEvent);
@@ -1925,11 +2026,16 @@ describe('ConfigContextProvider', () => {
         vi.advanceTimersByTime(2000);
       });
 
+      await act(async () => {
+        await capturedContext.generateNow('points: { fixed: {} }', undefined);
+      });
+
       // User fixes error and generation succeeds
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: { points: { p1: { x: 0, y: 0 } } },
           },
         } as MessageEvent);
@@ -1966,6 +2072,7 @@ describe('ConfigContextProvider', () => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: { points: { p1: { x: 0, y: 0 } } },
           },
         } as MessageEvent);
@@ -1978,7 +2085,7 @@ describe('ConfigContextProvider', () => {
       expect(completedCalls.length).toBe(1);
     });
 
-    it('should honor mid-session autoGen toggles immediately without stale closures', () => {
+    it('should honor mid-session autoGen toggles immediately without stale closures', async () => {
       // Arrange: start with autoGen = false
       localStorage.setItem(
         'ergogen:settings',
@@ -2001,16 +2108,20 @@ describe('ConfigContextProvider', () => {
       act(() => {
         capturedContext.setAutoGen(true);
       });
-      act(() => {
-        for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 3; i++) {
+        await act(async () => {
+          await capturedContext.generateNow(`points: { i${i}: {} }`, undefined);
+        });
+        act(() => {
           mockErgogenWorker.onmessage({
             data: {
               type: 'success',
+              requestId: getLatestErgogenRequestId(),
               results: { points: { p1: { x: i, y: i } } },
             },
           } as MessageEvent);
-        }
-      });
+        });
+      }
 
       // Assert 1: 0 emitted before 5s debounce expires, then 1 after timer fires
       let completedCalls = (trackEvent as Mock).mock.calls.filter(
@@ -2031,10 +2142,14 @@ describe('ConfigContextProvider', () => {
       act(() => {
         capturedContext.setAutoGen(false);
       });
+      await act(async () => {
+        await capturedContext.generateNow('points: { final: {} }', undefined);
+      });
       act(() => {
         mockErgogenWorker.onmessage({
           data: {
             type: 'success',
+            requestId: getLatestErgogenRequestId(),
             results: { points: { p1: { x: 99, y: 99 } } },
           },
         } as MessageEvent);
@@ -2155,6 +2270,312 @@ pcbs:
       });
 
       expect(capturedContext.deprecationWarning).toBeNull();
+    });
+  });
+
+  describe('Generation session correlation, worker lifecycle, and deleteConfig', () => {
+    it('ignores stale Ergogen success and error responses after a newer request starts', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      mockInitialConfig('points: { initial: {} }');
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      await act(async () => {
+        await capturedContext.generateNow('points: { req1: {} }', undefined);
+      });
+      const req1Id = getLatestErgogenRequestId();
+
+      await act(async () => {
+        await capturedContext.generateNow('points: { req2: {} }', undefined);
+      });
+      const req2Id = getLatestErgogenRequestId();
+      expect(req1Id).not.toBe(req2Id);
+
+      // Stale error for request 1 must not clear isGenerating or surface error
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'error',
+            requestId: req1Id,
+            error: 'Stale syntax error',
+          },
+        } as MessageEvent);
+      });
+      expect(capturedContext.error).toBeNull();
+      expect(capturedContext.isGenerating).toBe(true);
+
+      // Stale success for request 1 must not overwrite results or clear isGenerating
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: req1Id,
+            results: { points: { stale: { x: 1, y: 1 } } },
+          },
+        } as MessageEvent);
+      });
+      expect(capturedContext.results).toBeNull();
+      expect(capturedContext.isGenerating).toBe(true);
+
+      // Fresh success for request 2 applies cleanly
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: req2Id,
+            results: { points: { fresh: { x: 2, y: 2 } } },
+          },
+        } as MessageEvent);
+      });
+      expect(capturedContext.results).toEqual({
+        points: { fresh: { x: 2, y: 2 } },
+      });
+      expect(capturedContext.isGenerating).toBe(false);
+    });
+
+    it('discards late worker results after switching configs and does not overwrite the new config previewSvg', async () => {
+      const now = new Date().toISOString();
+      localStorage.setItem(
+        'ergogen:multi-config',
+        JSON.stringify({
+          version: 2,
+          activeConfigId: 'cfg-1',
+          configs: [
+            {
+              id: 'cfg-1',
+              name: 'Board One',
+              config: 'points: { one: {} }',
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: 'cfg-2',
+              name: 'Board Two',
+              config: 'points: { two: {} }',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        })
+      );
+
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      await act(async () => {
+        await capturedContext.generateNow('points: { one: {} }', undefined);
+      });
+      const cfg1RequestId = getLatestErgogenRequestId();
+
+      // Switch to cfg-2 before cfg-1 completes
+      act(() => {
+        capturedContext.selectConfig('cfg-2');
+      });
+
+      // Late reply from cfg-1 arrives
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: cfg1RequestId,
+            results: {
+              points: { fromOne: { x: 5, y: 5 } },
+              demo: { svg: '<svg><path stroke="#000" /></svg>' },
+            },
+          },
+        } as MessageEvent);
+      });
+
+      expect(capturedContext.activeConfigId).toBe('cfg-2');
+      expect(capturedContext.results).toBeNull();
+      const stored = JSON.parse(localStorage.getItem('ergogen:multi-config')!);
+      const storedCfg2 = stored.configs.find((c: any) => c.id === 'cfg-2');
+      expect(storedCfg2.previewSvg).toBeUndefined();
+    });
+
+    it('does not terminate or recreate workers when toggling stlPreview', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      mockInitialConfig('points: {}');
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      mockErgogenWorker.terminate.mockClear();
+      mockJscadWorker.terminate.mockClear();
+
+      act(() => {
+        capturedContext.setStlPreview(false);
+      });
+      act(() => {
+        capturedContext.setStlPreview(true);
+      });
+
+      expect(mockErgogenWorker.terminate).not.toHaveBeenCalled();
+      expect(mockJscadWorker.terminate).not.toHaveBeenCalled();
+
+      // Toggling stlPreview back to true still routes cases to JSCAD worker via ref
+      await act(async () => {
+        await capturedContext.generateNow('cases: {}', undefined);
+      });
+      mockJscadWorker.postMessage.mockClear();
+
+      act(() => {
+        mockErgogenWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: getLatestErgogenRequestId(),
+            results: { cases: { left: { jscad: 'code' } } },
+          },
+        } as MessageEvent);
+      });
+
+      expect(mockJscadWorker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'batch_jscad_to_stl' })
+      );
+    });
+
+    it('recovers from worker crash (onerror) and missing worker without leaving isGenerating stuck', async () => {
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      mockInitialConfig('points: { p1: {} }');
+      const { unmount } = render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      await act(async () => {
+        await capturedContext.generateNow('points: { crash: {} }', undefined);
+      });
+      expect(capturedContext.isGenerating).toBe(true);
+
+      act(() => {
+        mockErgogenWorker.onerror(
+          new ErrorEvent('error', { message: 'Worker crashed' })
+        );
+      });
+
+      expect(capturedContext.isGenerating).toBe(false);
+      expect(capturedContext.isJscadConverting).toBe(false);
+      expect(capturedContext.error).toContain('Worker crashed');
+
+      // Same config can be retried after a worker crash even with skipIfCurrent
+      mockErgogenWorker.postMessage.mockClear();
+      await act(async () => {
+        await capturedContext.generateNow('points: { crash: {} }', undefined, {
+          skipIfCurrent: true,
+        });
+      });
+      expect(mockErgogenWorker.postMessage).toHaveBeenCalled();
+
+      unmount();
+
+      // Missing worker on mount surfaces error and never leaves isGenerating stuck
+      mockCreateErgogenWorker.mockReturnValue(null);
+      localStorage.clear();
+      mockInitialConfig('points: { missing: {} }');
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      await act(async () => {
+        await capturedContext.generateNow('points: { missing: {} }', undefined);
+      });
+      expect(capturedContext.isGenerating).toBe(false);
+      expect(capturedContext.error).toMatch(/worker/i);
+    });
+
+    it('preserves remaining active config when deleting an inactive config and only clears when deleting the last config', () => {
+      const now = new Date().toISOString();
+      localStorage.setItem(
+        'ergogen:multi-config',
+        JSON.stringify({
+          version: 2,
+          activeConfigId: 'cfg-1',
+          configs: [
+            {
+              id: 'cfg-1',
+              name: 'Active Board',
+              config: 'points: { one: {} }',
+              createdAt: now,
+              updatedAt: now,
+            },
+            {
+              id: 'cfg-2',
+              name: 'Inactive Board',
+              config: 'points: { two: {} }',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        })
+      );
+
+      let capturedContext: any = null;
+      const TestComponent = () => {
+        capturedContext = useConfigContext();
+        return null;
+      };
+
+      render(
+        <ConfigContextProvider>
+          <TestComponent />
+        </ConfigContextProvider>
+      );
+
+      // Delete the inactive config while 2 configs exist -> active config must stay intact
+      act(() => {
+        capturedContext.deleteConfig('cfg-2');
+      });
+
+      expect(capturedContext.configs.map((c: any) => c.id)).toEqual(['cfg-1']);
+      expect(capturedContext.activeConfigId).toBe('cfg-1');
+      expect(capturedContext.configInput).toBe('points: { one: {} }');
+
+      const storedAfterFirst = JSON.parse(
+        localStorage.getItem('ergogen:multi-config')!
+      );
+      expect(storedAfterFirst.activeConfigId).toBe('cfg-1');
+
+      // Delete the last remaining config -> clears active state
+      act(() => {
+        capturedContext.deleteConfig('cfg-1');
+      });
+
+      expect(capturedContext.configs).toEqual([]);
+      expect(capturedContext.activeConfigId).toBeNull();
+      expect(capturedContext.configInput).toBe('');
+      expect(capturedContext.results).toBeNull();
     });
   });
 });
