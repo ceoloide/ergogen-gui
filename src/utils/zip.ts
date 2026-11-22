@@ -2,6 +2,8 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import yaml from 'js-yaml';
 import { Results } from '../types/results';
+import { filterInjectionsByFeatureFlags } from './generationHelpers';
+import { WorkerRequest } from '../workers/ergogen.worker.types';
 import {
   createErgogenWorker,
   createJscadWorker,
@@ -12,16 +14,35 @@ const WORKER_TIMEOUT_MS = 30000;
 const sanitizeName = (name: string): string =>
   name.replace(/[/\\?%*:|"<>]/g, '_') || 'Untitled';
 
-const parseConfigForWorker = (config: string): unknown => {
+const getUniqueName = (usedNames: Set<string>, rawName: string): string => {
+  const baseName = sanitizeName(rawName);
+  let finalName = baseName;
+  let counter = 1;
+  while (usedNames.has(finalName)) {
+    finalName = `${baseName}_${counter}`;
+    counter++;
+  }
+  usedNames.add(finalName);
+  return finalName;
+};
+
+const parseConfigForWorker = (config: string): string | object => {
   try {
-    return JSON.parse(config);
+    const parsed = JSON.parse(config);
+    if (parsed && typeof parsed === 'object') {
+      return parsed as object;
+    }
   } catch {
     try {
-      return yaml.load(config);
+      const parsed = yaml.load(config);
+      if (parsed && typeof parsed === 'object') {
+        return parsed as object;
+      }
     } catch {
       return config;
     }
   }
+  return config;
 };
 
 const writeInjections = (parentFolder: JSZip, injections: string[][]) => {
@@ -153,6 +174,7 @@ const generateAndSaveZip = async (zip: JSZip, filenamePrefix: string) => {
 const compileConfigAbortable = (
   config: string,
   injections: string[][] | undefined,
+  debug: boolean,
   activeWorkers: Set<Worker>,
   isAborted: () => boolean
 ): Promise<Results> => {
@@ -195,12 +217,16 @@ const compileConfigAbortable = (
       reject(error);
     };
 
-    worker.postMessage({
+    const request: WorkerRequest = {
       type: 'generate',
       inputConfig: parseConfigForWorker(config),
       injectionInput: injections,
       requestId: `export-compile-${Date.now()}`,
-    });
+      options: {
+        debug,
+      },
+    };
+    worker.postMessage(request);
   });
 };
 
@@ -289,7 +315,7 @@ export const exportConfigsProgressively = async (
   configs: { name: string; config: string }[],
   injections: string[][] | undefined,
   debug: boolean,
-  _stlPreview: boolean,
+  stlPreview: boolean,
   onlyConfigs: boolean,
   onProgress: (current: number, total: number, name: string) => void,
   isAborted: () => boolean
@@ -303,14 +329,7 @@ export const exportConfigsProgressively = async (
       const configRecord = configs[i];
       onProgress(i, configs.length, configRecord.name);
 
-      const baseName = sanitizeName(configRecord.name);
-      let finalName = baseName;
-      let counter = 1;
-      while (usedNames.has(finalName)) {
-        finalName = `${baseName}_${counter}`;
-        counter++;
-      }
-      usedNames.add(finalName);
+      const finalName = getUniqueName(usedNames, configRecord.name);
       zip.file(`${finalName}.yaml`, configRecord.config);
     }
 
@@ -326,6 +345,12 @@ export const exportConfigsProgressively = async (
     return { succeededCount: configs.length, failedCount: 0 };
   }
 
+  const filteredInjections = filterInjectionsByFeatureFlags(injections);
+  const tasks = configs.map((configRecord) => ({
+    configRecord,
+    folderName: getUniqueName(usedNames, configRecord.name),
+  }));
+
   const activeWorkers = new Set<Worker>();
   const activeConfigs = new Set<string>();
   let completedCount = 0;
@@ -333,7 +358,10 @@ export const exportConfigsProgressively = async (
   let failedCount = 0;
   const concurrencyLimit = Math.min(4, navigator.hardwareConcurrency || 2);
 
-  const processTask = async (configRecord: (typeof configs)[0]) => {
+  const processTask = async ({
+    configRecord,
+    folderName,
+  }: (typeof tasks)[number]) => {
     if (isAborted()) return;
     activeConfigs.add(configRecord.name);
     onProgress(
@@ -342,7 +370,6 @@ export const exportConfigsProgressively = async (
       Array.from(activeConfigs).join(', ')
     );
 
-    const folderName = sanitizeName(configRecord.name);
     const configFolder = zip.folder(folderName);
     if (!configFolder) {
       activeConfigs.delete(configRecord.name);
@@ -358,12 +385,17 @@ export const exportConfigsProgressively = async (
     try {
       const results = await compileConfigAbortable(
         configRecord.config,
-        injections,
+        filteredInjections,
+        debug,
         activeWorkers,
         isAborted
       );
       let finalResults = results;
-      if (results.cases && Object.keys(results.cases).length > 0) {
+      if (
+        stlPreview &&
+        results.cases &&
+        Object.keys(results.cases).length > 0
+      ) {
         finalResults = await compileJscadToStlAbortable(
           results,
           activeWorkers,
@@ -382,7 +414,7 @@ export const exportConfigsProgressively = async (
           configRecord.config,
           finalResults,
           debug,
-          true
+          stlPreview
         );
       }
 
@@ -410,13 +442,13 @@ export const exportConfigsProgressively = async (
   };
 
   try {
-    const queue = [...configs];
+    const queue = [...tasks];
     const promises: Promise<void>[] = [];
 
     const next = async (): Promise<void> => {
       if (isAborted() || queue.length === 0) return;
-      const configRecord = queue.shift()!;
-      await processTask(configRecord);
+      const task = queue.shift()!;
+      await processTask(task);
       await next();
     };
 

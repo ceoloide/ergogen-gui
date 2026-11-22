@@ -8,9 +8,16 @@ vi.mock('jszip', () => ({
 vi.mock('file-saver', () => ({
   saveAs: vi.fn(),
 }));
+const mockCreateErgogenWorker = vi.fn<() => Worker | null>(() => null);
+const mockCreateJscadWorker = vi.fn<() => Worker | null>(() => null);
 vi.mock('../workers/workerFactory', () => ({
-  createErgogenWorker: () => null,
-  createJscadWorker: () => null,
+  createErgogenWorker: () => mockCreateErgogenWorker(),
+  createJscadWorker: () => mockCreateJscadWorker(),
+}));
+
+const mockIsFeatureEnabled = vi.fn<(feature: string) => boolean>(() => true);
+vi.mock('./featureFlags', () => ({
+  isFeatureEnabled: (feature: string) => mockIsFeatureEnabled(feature),
 }));
 
 // Mock Blob since it might not be available in the test environment as expected
@@ -292,6 +299,9 @@ describe('exportConfigsProgressively', () => {
         .mockResolvedValue(new Blob(['mock progressive zip'])),
     };
     (JSZip as unknown as Mock).mockImplementation(() => mockZip);
+    mockCreateErgogenWorker.mockReset().mockReturnValue(null);
+    mockCreateJscadWorker.mockReset().mockReturnValue(null);
+    mockIsFeatureEnabled.mockReset().mockReturnValue(true);
   });
 
   it('returns failedCount when full-compilation configs fail and write error.txt', async () => {
@@ -368,6 +378,198 @@ describe('exportConfigsProgressively', () => {
     expect(saveAs).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringMatching(/^ergogen-config-all-\d{4}-\d{2}-\d{2}\.zip$/)
+    );
+  });
+
+  it('respects stlPreview=false and stlPreview=true in full compilation mode', async () => {
+    const ergogenRequests: any[] = [];
+    const jscadRequests: any[] = [];
+
+    mockCreateErgogenWorker.mockImplementation(() => {
+      const worker: any = {
+        onmessage: null,
+        onerror: null,
+        terminate: vi.fn(),
+        postMessage: vi.fn((req: any) => {
+          ergogenRequests.push(req);
+          queueMicrotask(() => {
+            worker.onmessage?.({
+              data: {
+                type: 'success',
+                requestId: req.requestId,
+                results: { cases: { left: { jscad: 'jscad-code' } } },
+                warnings: [],
+              },
+            });
+          });
+        }),
+      };
+      return worker;
+    });
+
+    mockCreateJscadWorker.mockImplementation(() => {
+      const worker: any = {
+        onmessage: null,
+        onerror: null,
+        terminate: vi.fn(),
+        postMessage: vi.fn((req: any) => {
+          jscadRequests.push(req);
+          queueMicrotask(() => {
+            worker.onmessage?.({
+              data: {
+                type: 'success',
+                results: {
+                  cases: { left: { jscad: 'jscad-code', stl: 'stl-data' } },
+                },
+                configVersion: req.configVersion,
+              },
+            });
+          });
+        }),
+      };
+      return worker;
+    });
+
+    const configs = [{ name: 'BoardA', config: 'points: {}' }];
+
+    await exportConfigsProgressively(
+      configs,
+      undefined,
+      false,
+      false,
+      false,
+      vi.fn(),
+      () => false
+    );
+
+    expect(mockCreateJscadWorker).not.toHaveBeenCalled();
+    expect(mockFolders['cases'].file).toHaveBeenCalledWith(
+      'left.jscad',
+      'jscad-code'
+    );
+    expect(mockFolders['cases'].file).not.toHaveBeenCalledWith(
+      'left.stl',
+      expect.anything()
+    );
+
+    vi.clearAllMocks();
+    mockFolders = {};
+
+    await exportConfigsProgressively(
+      configs,
+      undefined,
+      false,
+      true,
+      false,
+      vi.fn(),
+      () => false
+    );
+
+    expect(mockCreateJscadWorker).toHaveBeenCalledTimes(1);
+    expect(jscadRequests).toHaveLength(1);
+    expect(mockFolders['cases'].file).toHaveBeenCalledWith(
+      'left.stl',
+      'stl-data'
+    );
+  });
+
+  it('filters worker injections by feature flags while keeping user injections in archive and sends debug option', async () => {
+    mockIsFeatureEnabled.mockImplementation((f: string) => f !== 'outlines');
+    const ergogenRequests: any[] = [];
+
+    mockCreateErgogenWorker.mockImplementation(() => {
+      const worker: any = {
+        onmessage: null,
+        onerror: null,
+        terminate: vi.fn(),
+        postMessage: vi.fn((req: any) => {
+          ergogenRequests.push(req);
+          queueMicrotask(() => {
+            worker.onmessage?.({
+              data: {
+                type: 'success',
+                requestId: req.requestId,
+                results: {},
+                warnings: [],
+              },
+            });
+          });
+        }),
+      };
+      return worker;
+    });
+
+    const injections = [
+      ['footprint', 'fp1', 'fp-content'],
+      ['outline', 'disabled_out', 'outline-content'],
+    ];
+
+    await exportConfigsProgressively(
+      [{ name: 'FlagBoard', config: 'points: {}' }],
+      injections,
+      true,
+      false,
+      false,
+      vi.fn(),
+      () => false
+    );
+
+    expect(ergogenRequests).toHaveLength(1);
+    expect(ergogenRequests[0].injectionInput).toEqual([
+      ['footprint', 'fp1', 'fp-content'],
+    ]);
+    expect(ergogenRequests[0].options).toEqual({ debug: true });
+    expect(mockFolders['outlines'].file).toHaveBeenCalledWith(
+      'disabled_out.js',
+      'outline-content'
+    );
+  });
+
+  it('deduplicates colliding sanitized folder names in full compilation mode', async () => {
+    mockCreateErgogenWorker.mockImplementation(() => {
+      const worker: any = {
+        onmessage: null,
+        onerror: null,
+        terminate: vi.fn(),
+        postMessage: vi.fn((req: any) => {
+          queueMicrotask(() => {
+            worker.onmessage?.({
+              data: {
+                type: 'success',
+                requestId: req.requestId,
+                results: {},
+                warnings: [],
+              },
+            });
+          });
+        }),
+      };
+      return worker;
+    });
+
+    const summary = await exportConfigsProgressively(
+      [
+        { name: 'Board/A', config: 'points: { first: {} }' },
+        { name: 'Board_A', config: 'points: { second: {} }' },
+      ],
+      undefined,
+      false,
+      false,
+      false,
+      vi.fn(),
+      () => false
+    );
+
+    expect(summary).toEqual({ succeededCount: 2, failedCount: 0 });
+    expect(mockZip.folder).toHaveBeenCalledWith('Board_A');
+    expect(mockZip.folder).toHaveBeenCalledWith('Board_A_1');
+    expect(mockFolders['Board_A'].file).toHaveBeenCalledWith(
+      'config.yaml',
+      'points: { first: {} }'
+    );
+    expect(mockFolders['Board_A_1'].file).toHaveBeenCalledWith(
+      'config.yaml',
+      'points: { second: {} }'
     );
   });
 });
