@@ -118,7 +118,7 @@ Recommended local iteration loop:
 1. Targeted unit test while changing logic: `pnpm exec vitest run <path> --reporter=verbose`
 2. Pre-commit checks: `pnpm precommit` (formatting, lint, Knip, typecheck, unit tests)
 3. Targeted browser check for root-UI changes: `pnpm test:e2e:root e2e/<spec>.ts`
-4. Full build + subpath + SW update verification before handoff: `pnpm validate` or `pnpm validate:extended`
+4. Before handoff: `pnpm validate` for the production build, and `pnpm validate:extended` (or `pnpm test:e2e`) for the root, subpath and service-worker update browser tests
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
 including those made by service workers and dedicated workers; provider tests
