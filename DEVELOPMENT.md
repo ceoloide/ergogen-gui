@@ -7,11 +7,9 @@ self-hosting steps live in [README.md](README.md); rules for every change live i
 
 ## Validation
 
-Install exactly as in the README (Node from `.node-version`, pnpm from
-`packageManager`, `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install
---frozen-lockfile`). Validation also needs the native tools listed in the README;
-on Linux x86_64 run `pnpm tools:install` and add `$PWD/.tools/bin` to `PATH`. CI
-uses the same installer and commands.
+Follow [Run locally](README.md#run-locally) to install dependencies and
+[Contributing](README.md#contributing) to install the native validation tools on
+`PATH`. CI uses the same installer and commands.
 
 | Command                                          | Checks                                                                                                                                                     |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -68,7 +66,7 @@ This is a bounded rule, not a complete record of which errors our files cause:
 an error that our declaration causes but that TypeScript reports on another
 symbol, with no related information pointing to us, is still treated as a
 dependency error and filtered out. Checking every declaration file takes most of
-the command's time, about 26 seconds locally. Our files are the `*.d.ts`,
+`pnpm typecheck`'s runtime. Our files are the `*.d.ts`,
 `*.d.mts` and `*.d.cts` files Git lists, tracked or untracked, outside
 `node_modules`; one that belongs to neither project fails the check. Code that
 uses the declarations is type-checked by `tsc` as usual.
@@ -117,7 +115,7 @@ Recommended local iteration loop:
 
 1. Targeted unit test while changing logic: `pnpm exec vitest run <path> --reporter=verbose`
 2. Pre-commit checks: `pnpm precommit` (formatting, lint, Knip, typecheck, unit tests)
-3. Targeted browser check for root-UI changes: `pnpm test:e2e:root e2e/<spec>.ts`
+3. Targeted browser check for root-UI changes: `pnpm test:e2e:root e2e/<name>.spec.ts`
 4. Before handoff: `pnpm validate` for the production build, and `pnpm validate:extended` (or `pnpm test:e2e`) for the root, subpath and service-worker update browser tests
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
@@ -148,12 +146,14 @@ Two parallel tests and other load may therefore exceed these waits without any
 change in the app; the `readiness` attachment helps tell such a failure from an
 app fault, as a diagnostic rather than proof of the cause.
 
-Other test suites worth knowing: `tests/workflow-security.test.ts` checks
-workflow policy; `tests/release-publication.test.ts` runs the deploy workflow's
-release and rollback steps against local Git repositories and smoke tests the
-result on a loopback server (see [Releases and rollback](#releases-and-rollback));
-`tests/build-version.test.ts` checks build-time engine identity;
-`tests/analytics-tag-id.test.ts` checks the build-time analytics tag ID.
+Other test suites worth knowing:
+
+- `tests/workflow-security.test.ts` checks workflow policy.
+- `tests/release-publication.test.ts` runs the deploy workflow's release and
+  rollback steps against local Git repositories and smoke tests the result on a
+  loopback server (see [Releases and rollback](#releases-and-rollback)).
+- `tests/build-version.test.ts` checks build-time engine identity.
+- `tests/analytics-tag-id.test.ts` checks the build-time analytics tag ID.
 
 ### Engine contract tests
 
@@ -205,8 +205,10 @@ offline and only read their fixtures.
   missing outline). Expected values are worked
   out by hand in `tests/engine-contract/corpus/corpus.ts`, never copied from
   output.
-- **`tests/engine-contract/engine-corpus.test.ts`** starts with four quick
-  checks that call `ergogen.process` directly on a two-key config. Its corpus
+- **`tests/engine-contract/engine-corpus.test.ts`** starts with direct
+  `ergogen.process` checks covering key pitch, outline size, symmetric mirrored
+  `hull` outlines, pinned vendor footprints (including `infused-kim/diode` and
+  rejecting the old typo) and unknown-footprint errors. Its corpus
   cases generate through the app's own worker handler and injection evaluator
   (`tests/engine-contract/corpus/inProcessWorker.ts` replaces only the `Worker`
   transport).
@@ -233,7 +235,8 @@ offline and only read their fixtures.
 - **`tests/engine-contract/preview-consistency.test.ts`** regenerates the
   geometry of every tracked preview in `public/images/previews` and compares it
   with the file, ignoring path direction and start point, and requires one
-  preview per example. It covers these previews only, not other generated files.
+  preview per drawable example (excluding `Empty YAML configuration`). It covers
+  these previews only, not other generated files.
 - **`tests/corpus-inspect.test.ts`** checks the SVG reader the
   suites share: the viewBox must be four finite numbers that frame the paths
   exactly, and only closed chains count as regions.
@@ -352,8 +355,8 @@ Local probes on 2026-11-15 compared it with the previous gates in two
   dependency-only TS2430.
 - Remaining limit: an error that our declaration causes but that TypeScript
   reports on another symbol, with no related information pointing to us, is
-  still filtered out as a dependency error. This part of #220 stays open until
-  this bounded coverage is accepted.
+  still filtered out as a dependency error. The owner accepted this bounded
+  coverage and closed #220 on 2026-11-16 (recorded in #226).
 - The mutants, logs and hash manifests are kept outside the repository; the pull
   request names their location and the CI run of its final head.
 
@@ -461,28 +464,48 @@ the installed packages; they need no separate browser-global scripts.
 - `ergogen.worker.ts` runs Ergogen; `jscad.worker.ts` turns its output into 3D
   previews and STL. `src/workers/workerFactory.ts` creates both, so tests can mock
   `Worker`.
-- A configuration is generated at once when it opens; auto-generation (debounced
+- `src/utils/generationSession.ts` (used by `src/context/ConfigContext.tsx`)
+  correlates worker replies to the active generation by request ID for
+  `ergogen.worker.ts` and by session version (`configVersion`) for
+  `jscad.worker.ts`. Late replies from another configuration or an older request
+  are dropped. Background preview replies carry a `background-preview-<configId>`
+  request ID and update only their own saved configuration.
+- A configuration is generated at once when it opens. Auto-generation (debounced
   300 ms) skips a request identical to the one behind the current or pending
-  results (configuration, injections, points-only, debug). Each new result
-  marks STL files pending again and an STL preview without a file falls back to
-  the demo outline, so a repeated request used to undo a finished conversion.
+  results (configuration, injections, points-only, debug). `src/utils/preview.ts`
+  (`resolvePreview`) resolves the active preview payload purely during render,
+  falling back to `demo.svg` when the selected output is absent. Because each new
+  result marks STL files pending again until the JSCAD worker finishes, skipping
+  duplicate requests avoids undoing a finished conversion.
 - Opening configurations saved by an older version (a single legacy
   configuration or storage version 1) queues background previews for saved
   configurations without one, except the configuration the load-time
   generation is for: its own results set its preview.
 - Ergogen keeps injected footprints, templates and outlines in a module-level
-  registry. Closing the settings panel therefore terminates and recreates the
-  Ergogen worker, then regenerates, so renamed or deleted injections cannot
-  linger. Auto-generation is paused while settings are open.
+  registry. Closing the settings panel therefore invalidates the generation
+  session, terminates and recreates the Ergogen worker, and regenerates, so
+  renamed or deleted injections cannot linger. Toggling settings such as STL
+  preview does not restart either worker. Auto-generation is paused while
+  settings are open.
 - `src/utils/injectionEvaluator.ts` evaluates injection code with `new Function`
   inside the worker, with a `require` that only resolves `makerjs` and Ergogen
   internals. This is not a sandbox: injected code, including code from share links
   and imported repositories, runs in a same-origin worker with no further
   isolation, so loading it means trusting it.
 - The Monaco editor is uncontrolled. Keystrokes update context after a 500 ms
-  debounce (context updates re-render widely and persist all configurations);
-  blur flushes it. Download and generate actions read the current buffer through
-  `getRealtimeConfigInput()` rather than the debounced state.
+  debounce (context updates re-render widely and persist all configurations), and
+  blur flushes pending edits. **Share**, **Archive**, **Generate** and the
+  `Ctrl`/`Cmd`+`Enter` shortcut read the latest editor buffer through
+  `getLatestConfigInput()` in `src/utils/generationHelpers.ts`, which prefers
+  `getRealtimeConfigInput()` over debounced state (inside Monaco,
+  `Ctrl`/`Cmd`+`Enter` reads `editor.getValue()` and flushes immediately).
+  Single-file YAML download reads `getRealtimeConfigInput()` with the same
+  fallback.
+- Download rows (`src/atoms/DownloadRow.tsx`) revoke blob URLs and remove
+  temporary anchors after downloads, injection rows
+  (`src/atoms/InjectionRow.tsx`) revoke their blob URLs on content change or
+  unmount, and `src/atoms/StlPreview.tsx` disposes replaced geometries on update
+  or unmount.
 
 ## Loading and injections
 
@@ -547,23 +570,32 @@ gate the UI with `isFeatureEnabled`. A deployment on an
 older engine then hides it; GUI tests see the canonical engine (see
 [Engine contract tests](#engine-contract-tests)).
 
-Gates apply in the injections panel, local and repository loaders, and on the main
-thread before generation, so stale stored injections cannot reach an engine that
-rejects them.
+Gates apply in the injections panel, local and repository loaders, on the main
+thread before generation, and during bulk export (`src/utils/zip.ts`), so stale
+stored injections cannot reach an engine that rejects them.
 
 ## Configurations and storage
 
 `ConfigContext` keeps several configurations in `localStorage` under
 `ergogen:multi-config` (version 2 stores an SVG preview per configuration) and
-migrates the older single-config keys on startup. Configurations without a preview
-are compiled in the background without the STL stage. Bulk export (`src/utils/zip.ts`) compiles every
-configuration with a worker pool.
+migrates the older single-config keys on startup. Deleting an inactive
+configuration keeps the active configuration and its results intact; deleting
+the active or last configuration clears them. Migrated configurations without a
+preview are compiled in the background without the STL stage.
+
+`src/utils/zip.ts` provides `createZip` for a single configuration and
+`exportConfigsProgressively` for bulk export. Bulk export either packages
+selected configs and injections only (**Only download configs**) or compiles
+each selected configuration with a worker pool. Compiled bulk exports honor the
+STL preview setting (omitting STL conversion and `.stl` files when off), filter
+injections by feature flags like single-config generation, and deduplicate
+colliding folder or file names (`Board_One`, `Board_One_1`).
 
 ## Engine and footprints
 
 The installed `ergogen` package is read-only: pnpm hard-links it from a shared
 store. `patch/patch_ergogen.sh` (`pnpm build-ergogen`, run by `postinstall`,
-`predev`, `prestart`, `prebuild` and `pretest:unit`) copies it to
+`predev`, `prestart`, `prebuild`, `pretest:unit` and `pretest:contract`) copies it to
 `node_modules/.ergogen-engine`, links its installed dependencies, fetches the two
 footprint libraries at full commit SHAs, installs `patch/footprints_index.js` and
 checks that the engine loads. It never runs a nested install or build or changes
@@ -680,8 +712,8 @@ with `pnpm generate-previews` and review the diff; builds never rewrite them.
   GitHub keeps one pending run per group, so a newer run replaces a queued older
   one (not FIFO). Manual runs on other branches build in their own group and
   never publish.
-- Build variables come from repository variables; see the README configuration
-  section. `ERGOGEN_VERSION` selects the deployed engine; see
+- Build variables come from repository variables; see
+  [Configuration in README.md](README.md#configuration). `ERGOGEN_VERSION` selects the deployed engine; see
   [Deployment engine](#deployment-engine). The analytics tag ID comes only from
   `VITE_GTAG_ID`, in both workflows and `vite.config.mts`.
 - Actions are pinned by commit and updated by Dependabot with a seven-day
@@ -804,7 +836,10 @@ change, byte identity, rollback and the smoke check.
 job `lint-and-test` of `ci.yaml`, its four named steps, and two JUnit reports that
 each hold at least one test with no failures, errors or skipped tests (Vitest and
 Playwright exit 0 when tests are skipped). The browser report must include every
-Playwright project. Test counts are deliberately not pinned.
+Playwright project. Test counts are deliberately not pinned. Because
+`.github/workflows/ci.yaml` triggers only on pull requests targeting `main`,
+stacked pull requests targeting another branch get no `lint-and-test` check or
+evidence artifact until they are retargeted to `main`.
 
 In CI, `pnpm test:reports` runs even after a failed step. It fails the job when
 the reports break the contract, and writes the identities, step outcomes, counts
@@ -867,18 +902,20 @@ GitHub still enforces them:
   `gh-pages`, also declares its own (`contents: read`, `pages: write` in its
   logs).
 
-While the ruleset is active, nobody can push to `main`, the owner included, and
-merges require an up-to-date pull request whose required `lint-and-test` check
-GitHub accepts (use **Update branch**, `gh pr update-branch` or a rebase); see
-the limitations below. The ruleset does not cover `gh-pages`, so releases and
-rollbacks are unchanged. Open pull requests without such a check are blocked, as
-intended.
+While the ruleset is active, nobody can push to `main`, the owner included.
+Merges require a fresh `lint-and-test` run on a branch that is up to date with
+`main` (use **Update branch**, `gh pr update-branch` or a rebase); see the
+limitations below. Because `.github/workflows/ci.yaml` runs only for pull
+requests targeting `main`, stacked pull requests get no `lint-and-test` check
+until they are retargeted to `main`. The ruleset does not cover `gh-pages`, so
+releases and rollbacks are unchanged. Open pull requests without such a check
+are blocked, as intended.
 
 This is a merge gate for ordinary pull requests, not confinement:
 
 - GitHub accepts a required check that concludes `success`, `skipped` or
-  `neutral`
-  ([source](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
+  `neutral` (see
+  [GitHub's required status checks documentation](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks)).
   Skipped tests in a job that runs fail the job and block, but a PR that skips
   the whole job, for example with a job-level `if:` in its own `ci.yaml`,
   passes. The [assessor](#pull-request-evidence) rejects a skipped job and a
@@ -1097,15 +1134,17 @@ Drill results (merge states read with `gh pr view`):
 - #93 and #209 show that the ruleset now blocks both, but #93 is behind `main`
   as well as missing the check, and GitHub reports one state. The drill
   therefore did not isolate the missing-check row from the stale one.
-- #247, which adds this record, read `CLEAN` at head `c2cc92c`, up to date
+- #247, which added this record, read `CLEAN` at head `c2cc92c`, up to date
   with `main` at `81604c2`. Its run 43667010586 (job 132668524192) passed 724
   unit tests and 26 browser tests, none skipped, and `pnpm check:settings`
-  still reported `ENFORCED`. This holds for that head only: every later push
-  needs its own passing run before the pull request can merge.
-- The first release under the new defaults (step 5) is pending until the owner
-  merges #247. The #247 result and that release will be recorded in #226. The
-  last release before the cutover (run 43655577978) already listed
-  `Contents: write` for `deploy`, from the job's own permissions.
+  still reported `ENFORCED`. That check applied to that head only; every later
+  push needs its own passing run before a pull request can merge.
+- #247 merged at `40061af` on 2026-11-15 (UTC), and its release
+  ([run 43670475998](https://github.com/ceoloide/ergogen-gui/actions/runs/43670475998))
+  deployed under the new defaults and passed its `smoke` job. The rollout
+  tracker #226 is closed. The last release before the cutover (run 43655577978)
+  had already listed `Contents: write` for `deploy`, from the job's own
+  permissions.
 
 #### Rollback
 
@@ -1204,7 +1243,7 @@ them.
 
 ```shell
 pnpm ga:setup -- --property <id> [--stream <id>] [--prune-retired] [--apply]
-pnpm ga:teardown -- --property <id> --apply --confirm <id>
+pnpm ga:teardown -- --property <id> [--apply --confirm <id>]
 ```
 
 Without `--apply` both commands only print the plan, but they still authenticate
