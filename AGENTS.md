@@ -15,7 +15,7 @@ These rules apply to people and coding agents alike.
 - Canonical work uses the committed `package.json`, `pnpm-lock.yaml`, engine
   specifier and footprint pins. Change them only on purpose, in review. Never
   commit inputs or generated previews from an engine experiment
-  ([procedure](DEVELOPMENT.md#engine-experiments)).
+  ([engine experiments](DEVELOPMENT.md#engine-experiments)).
 
 ## Validation
 
