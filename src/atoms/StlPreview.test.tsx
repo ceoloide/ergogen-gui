@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import * as THREE from 'three';
 import StlPreview from './StlPreview';
 
 // Mock react-three-fiber and drei
@@ -154,5 +155,44 @@ endsolid test`;
 
     // Assert
     expect(screen.getByTestId('stl-uint8array-preview')).toBeInTheDocument();
+  });
+
+  it('disposes previous BufferGeometry on stl change and unmount, and clears stale mesh on empty stl', () => {
+    const disposeSpy = vi.spyOn(THREE.BufferGeometry.prototype, 'dispose');
+    const secondStl = `solid second
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 2 0 0
+      vertex 0 2 0
+    endloop
+  endfacet
+endsolid second`;
+
+    try {
+      const { container, rerender, unmount } = render(
+        <StlPreview stl={mockStl} data-testid="stl-dispose-test" />
+      );
+      expect(container.querySelector('mesh')).not.toBeNull();
+      expect(disposeSpy).not.toHaveBeenCalled();
+
+      // Updating stl disposes previous geometry
+      rerender(<StlPreview stl={secondStl} data-testid="stl-dispose-test" />);
+      expect(disposeSpy).toHaveBeenCalledTimes(1);
+      expect(container.querySelector('mesh')).not.toBeNull();
+
+      // Empty stl clears the rendered mesh instead of keeping stale geometry
+      rerender(<StlPreview stl="" data-testid="stl-dispose-test" />);
+      expect(disposeSpy).toHaveBeenCalledTimes(2);
+      expect(container.querySelector('mesh')).toBeNull();
+
+      // Restore valid geometry and verify unmount disposes it
+      rerender(<StlPreview stl={mockStl} data-testid="stl-dispose-test" />);
+      expect(container.querySelector('mesh')).not.toBeNull();
+      unmount();
+      expect(disposeSpy).toHaveBeenCalledTimes(3);
+    } finally {
+      disposeSpy.mockRestore();
+    }
   });
 });
