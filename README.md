@@ -65,9 +65,9 @@ repository imports, fonts and analytics still need the network.
 ## Run locally
 
 Requirements: Git, a POSIX `sh`, network access to the npm registry and GitHub
-during install, [Node.js 24.22.3](.node-version) and pnpm 11.12.0 (the
-`packageManager` in [package.json](package.json); `corepack enable` provides it).
-Docker and Python are not needed.
+during install, [Node.js 24.22.3](.node-version) and the pnpm version in the
+`packageManager` field of [package.json](package.json) (`corepack enable`
+provides it). Docker and Python are not needed.
 
 ```shell
 git clone https://github.com/ceoloide/ergogen-gui.git

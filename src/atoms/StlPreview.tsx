@@ -216,6 +216,8 @@ const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
   }, []);
 
   React.useEffect(() => {
+    let createdGeometry: THREE.BufferGeometry | null = null;
+
     try {
       // Parse STL data
       const parseStl = (stlData: string | ArrayBuffer | Uint8Array) => {
@@ -391,6 +393,7 @@ const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
       // Validate parsed data
       if (vertices.length === 0) {
         console.error('No vertices found in STL data');
+        setGeometry(null);
         return;
       }
 
@@ -412,10 +415,16 @@ const SceneContent: React.FC<{ stl: string | ArrayBuffer | Uint8Array }> = ({
         newGeometry.translate(-center.x, -center.y, -center.z);
       }
 
+      createdGeometry = newGeometry;
       setGeometry(newGeometry);
     } catch (error) {
       console.error('Error parsing STL:', error);
+      setGeometry(null);
     }
+
+    return () => {
+      createdGeometry?.dispose();
+    };
   }, [stl]);
 
   if (!geometry) {
