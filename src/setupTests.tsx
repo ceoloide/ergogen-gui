@@ -9,6 +9,7 @@ import type { LinkProps } from 'react-router-dom';
 
 if (typeof window !== 'undefined') {
   window.URL.createObjectURL = vi.fn();
+  window.URL.revokeObjectURL = vi.fn();
 }
 
 // Polyfill for TextEncoder and TextDecoder

@@ -223,4 +223,30 @@ describe('Header', () => {
       screen.getByText('Shareable Configuration Link')
     ).toBeInTheDocument();
   });
+
+  it('prefers getRealtimeConfigInput over debounced configInput for download archive and share', () => {
+    (useConfigContext as Mock).mockReturnValue({
+      ...mockContextValue,
+      results: { canonical: 'canonical_yaml' },
+      configInput: 'points: { stale: {} }',
+      getRealtimeConfigInput: () => 'points: { realtime: {} }',
+    });
+    renderComponent();
+
+    fireEvent.click(screen.getByTestId('header-download-outputs-button'));
+    expect(mockCreateZip).toHaveBeenCalledWith(
+      { canonical: 'canonical_yaml' },
+      'points: { realtime: {} }',
+      [],
+      false,
+      false
+    );
+
+    fireEvent.click(screen.getByTestId('header-share-button'));
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+    expect(mockCreateShareableUri).toHaveBeenCalledWith({
+      config: 'points: { realtime: {} }',
+      injections: undefined,
+    });
+  });
 });
