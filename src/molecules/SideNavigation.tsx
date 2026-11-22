@@ -392,7 +392,7 @@ const SideNavigation: React.FC<SideNavigationProps> = ({
                         type="text"
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
-                        // eslint-disable-next-line
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
                         autoFocus
                         aria-label="Rename input"
                       />

@@ -19,7 +19,8 @@ uses the same installer and commands.
 | `pnpm validate`                                  | `validate:fast` plus the production build (what deployment requires; PR CI also runs Playwright).                                                          |
 | `pnpm validate:extended`                         | `validate:fast` plus a fresh production build, all Playwright tests and `pnpm test:reports`.                                                               |
 | `pnpm test:reports`                              | Checks the JUnit reports against the [evidence contract](#pull-request-evidence).                                                                          |
-| `pnpm test:e2e`                                  | Playwright only. Install the browser once with `pnpm exec playwright install chromium`.                                                                    |
+| `pnpm test:e2e`                                  | Playwright across root, subpath, and service-worker update builds. Install Chromium once with `pnpm exec playwright install chromium`.                     |
+| `pnpm test:e2e:root`                             | Fast local Playwright run (`PLAYWRIGHT_ROOT_ONLY=1`) building and serving only root `dist/`. Ignored in `CI`.                                              |
 | `pnpm test:contract`                             | Only the [engine contract tests](#engine-contract-tests), with any installed engine. Writes `reports/contract.xml`.                                        |
 | `pnpm fix`                                       | Applies Prettier and supported ESLint/markdownlint fixes.                                                                                                  |
 | `pnpm exec vitest run <path> --reporter=verbose` | One test file with per-test output. (`pnpm test:unit --verbose` is not a valid form.)                                                                      |
@@ -110,8 +111,14 @@ then checks that the real worker waits, shows **Update Available** and activates
 and that no other worker installs.
 Each drill changes the served copy, so it needs a fresh `pnpm test:e2e` run; do not
 use `--repeat-each` or retries. Playwright routes cannot stand in for that
-deployment: Chromium fetches the worker script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the
-`PLAYWRIGHT_*` variables in the config can pin ports and IDs.
+deployment: Chromium fetches the worker script for update checks outside the page. `pnpm exec playwright test --project chromium-subpath` selects tests, but every server still builds; the `PLAYWRIGHT_*` variables in the config can pin ports and IDs. For fast local iteration on root-served workflows, `pnpm test:e2e:root <spec>` sets `PLAYWRIGHT_ROOT_ONLY=1` so only the root `dist/` server builds and starts (ignored when `CI` is set).
+
+Recommended local iteration loop:
+
+1. Targeted unit test while changing logic: `pnpm exec vitest run <path> --reporter=verbose`
+2. Pre-commit checks: `pnpm precommit` (formatting, lint, Knip, typecheck, unit tests)
+3. Targeted browser check for root-UI changes: `pnpm test:e2e:root e2e/<spec>.ts`
+4. Full build + subpath + SW update verification before handoff: `pnpm validate` or `pnpm validate:extended`
 
 `CI` forbids `.only` and sets two workers. The fixture blocks external requests,
 including those made by service workers and dedicated workers; provider tests

@@ -8,8 +8,7 @@
  * - name: The unique name of the injection
  * - content: The code/content of the injection
  *
- * The module includes both generic functions (recommended) and deprecated
- * footprint-specific wrappers for backward compatibility.
+ * All functions operate on generic `[type, name, content]` injections.
  */
 
 /**
@@ -103,21 +102,6 @@ export const getInjectionConflicts = (
 };
 
 /**
- * Checks if a footprint name conflicts with existing injections.
- * This is a footprint-specific wrapper around checkForInjectionConflict.
- * @param name - The name of the footprint to check.
- * @param existingInjections - The array of existing injections.
- * @returns A conflict check result indicating if there's a conflict and the name.
- * @deprecated Use checkForInjectionConflict instead for generic injection type support.
- */
-export const checkForConflict = (
-  name: string,
-  existingInjections: string[][] | undefined
-): ConflictCheckResult => {
-  return checkForInjectionConflict('footprint', name, existingInjections);
-};
-
-/**
  * Generates a unique name by appending an incremental number.
  * @param type - The type of injection (e.g., 'footprint', 'template').
  * @param baseName - The base name to make unique.
@@ -148,76 +132,6 @@ export const generateUniqueInjectionName = (
   }
 
   return newName;
-};
-
-/**
- * Generates a unique footprint name by appending an incremental number.
- * This is a footprint-specific wrapper around generateUniqueInjectionName.
- * @param baseName - The base name to make unique.
- * @param existingInjections - The array of existing injections.
- * @returns A unique name.
- * @deprecated Use generateUniqueInjectionName instead for generic injection type support.
- */
-export const generateUniqueName = (
-  baseName: string,
-  existingInjections: string[][] | undefined
-): string => {
-  return generateUniqueInjectionName('footprint', baseName, existingInjections);
-};
-
-/**
- * Merges new footprints into existing injections based on the resolution strategy.
- * This is a footprint-specific wrapper that converts footprint objects to the generic
- * injection format and uses mergeInjectionArraysWithResolution internally.
- * @param newFootprints - Array of new footprints to merge.
- * @param existingInjections - The current array of injections.
- * @param resolution - The conflict resolution strategy.
- * @returns The merged array of injections.
- * @deprecated For new code, use mergeInjectionArraysWithResolution directly with
- *   injections in the format [type, name, content] for generic injection type support.
- */
-export const mergeInjections = (
-  newFootprints: Array<{ name: string; content: string }>,
-  existingInjections: string[][] | undefined,
-  resolution: ConflictResolutionStrategy
-): string[][] => {
-  const result = existingInjections ? [...existingInjections] : [];
-
-  for (const footprint of newFootprints) {
-    const conflictCheck = checkForConflict(footprint.name, result);
-
-    if (!conflictCheck.hasConflict) {
-      // No conflict, add directly
-      result.push(['footprint', footprint.name, footprint.content]);
-    } else {
-      // Handle conflict based on resolution strategy
-      if (resolution === 'skip') {
-        // Do nothing
-        continue;
-      } else if (resolution === 'overwrite') {
-        // Find and replace the existing injection
-        const index = result.findIndex(
-          (inj) =>
-            isValidInjection(inj) &&
-            inj[0] === 'footprint' &&
-            inj[1] === footprint.name
-        );
-        if (index !== -1) {
-          result[index] = ['footprint', footprint.name, footprint.content];
-        }
-      } else if (resolution === 'keep-both') {
-        // Generate a unique name and add
-        const uniqueName = generateUniqueInjectionName(
-          'footprint',
-          footprint.name,
-          result
-        );
-        result.push(['footprint', uniqueName, footprint.content]);
-      }
-    }
-  }
-
-  return result;
 };
 
 /**

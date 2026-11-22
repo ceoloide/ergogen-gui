@@ -51,6 +51,7 @@
     "test:unit:watch": "vitest",
     "test:contract": "vitest run --mode contract tests/engine-contract",
     "test:e2e": "playwright test",
+    "test:e2e:root": "PLAYWRIGHT_ROOT_ONLY=1 playwright test",
     "test:reports": "node scripts/ci/check-reports.mts",
     "assess:pr": "node scripts/ci/assess-pr.mts",
     "check:settings": "node scripts/ci/check-settings.mts",
