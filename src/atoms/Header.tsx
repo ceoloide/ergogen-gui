@@ -8,6 +8,7 @@ import UpdateChip from './UpdateChip';
 
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';
+import { getLatestConfigInput } from '../utils/generationHelpers';
 import { trackEvent } from '../utils/analytics';
 import ShareDialog from '../molecules/ShareDialog';
 
@@ -265,10 +266,12 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
     navigate('/new');
   };
 
+  const latestConfigInput = getLatestConfigInput(configContext);
+
   const handleDownloadArchive = () => {
     if (
       !configContext?.results ||
-      !configContext?.configInput ||
+      !latestConfigInput ||
       configContext?.isGenerating ||
       configContext?.isJscadConverting
     ) {
@@ -282,7 +285,7 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
     });
     createZip(
       configContext.results,
-      configContext.configInput,
+      latestConfigInput,
       configContext.injectionInput,
       configContext.debug,
       configContext.stlPreview
@@ -295,7 +298,7 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
    * Non-footprint injections (templates, etc.) are always included.
    */
   const handleShare = () => {
-    if (!configContext?.configInput) {
+    if (!configContext || !latestConfigInput) {
       return;
     }
 
@@ -321,7 +324,7 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
     <>
       {showShareDialog && (
         <ShareDialog
-          config={configContext?.configInput || ''}
+          config={latestConfigInput}
           injections={configContext?.injectionInput || []}
           onClose={() => setShowShareDialog(false)}
           data-testid="share-dialog"
@@ -382,7 +385,7 @@ const Header = ({ onUpdate }: HeaderProps): JSX.Element => {
                       onChange={(e) => setEditValue(e.target.value)}
                       onBlur={handleSaveEdit}
                       onKeyDown={handleKeyDown}
-                      // eslint-disable-next-line
+                      // eslint-disable-next-line jsx-a11y/no-autofocus
                       autoFocus
                       data-testid="header-config-name-input"
                       aria-label="Edit configuration name"
