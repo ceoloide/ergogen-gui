@@ -52,15 +52,15 @@ makes these network requests:
   GitHub, Codeberg, Forgejo or Gitea host.
 - Google Analytics only when the build includes a tag ID (see
   [Configuration](#configuration)). Without one, no analytics script loads and the
-  "Send Usage Metrics" switch is off and disabled; a saved choice is kept. With an ID,
+  **Send Usage Metrics** switch is off and disabled; a saved choice is kept. With an ID,
   metrics default to on in a browser tab and off in the installed app; a saved
   choice wins (an explicit one over a legacy opt-out), unreadable storage counts
   as an opt-out, and development builds and loopback hosts never send. Hits are not queued offline. DEVELOPMENT.md lists
   [what is collected](DEVELOPMENT.md#analytics-and-privacy).
 
 Editor, KiCanvas and worker code are served locally. After a visit with a service
-worker (HTTPS or localhost production build), the app can start offline, but
-repository imports, fonts and analytics still need the network.
+worker (HTTPS or localhost production build), the app can start offline, while
+repository imports, uncached fonts and analytics still need the network.
 
 ## Run locally
 
@@ -130,7 +130,7 @@ Vite reads these settings at build time from the shell or `.env*` files and bake
 them into `dist/`. Changing variables on the server does not reconfigure an
 existing build. Only Vite reads `.env*` files, but a shell `ERGOGEN_VERSION` is also
 read by `scripts/preinstall.js` and engine preparation (`postinstall`, `predev`,
-`prestart`, `prebuild`, `pretest:unit`), which fails unless it matches the
+`prestart`, `prebuild`, `pretest:unit`, `pretest:contract`), which fails unless it matches the
 installed specifier, so it can break a canonical frozen install. Use
 `VITE_ERGOGEN_VERSION` to change only the displayed identity.
 
@@ -158,7 +158,7 @@ URL parameters change a running page: `?ff_templates=true|false` and
 decoded share links and shows 3D preview diagnostics.
 
 Installing a different engine is a contributor experiment; see
-[DEVELOPMENT.md](DEVELOPMENT.md#engine-and-footprints).
+[Engine experiments in DEVELOPMENT.md](DEVELOPMENT.md#engine-experiments).
 
 ## Share links
 
@@ -174,7 +174,7 @@ interface ShareableConfig {
     name: string,
     code: string,
   ][];
-  guiVersion?: string; // e.g. '0.19.2'
+  guiVersion?: string; // e.g. '0.19.3'
   ergogenVersion?: string; // e.g. 'github:ceoloide/ergogen#v4.3.0'
 }
 ```
