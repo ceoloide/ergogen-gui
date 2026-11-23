@@ -30,7 +30,7 @@ import Title from './atoms/Title';
 import { theme } from './theme/theme';
 import { SettingsCard, SettingsGroupTitle } from './atoms/SettingsLayout';
 import OfflineOption from './atoms/OfflineOption';
-import { PwaState } from './App';
+import type { PwaState } from './App';
 
 import { trackEvent } from './utils/analytics';
 import ShareDialog from './molecules/ShareDialog';

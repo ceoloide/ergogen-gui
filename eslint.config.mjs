@@ -7,6 +7,76 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import jest from 'eslint-plugin-jest';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importPlugin from 'eslint-plugin-import';
+import path from 'node:path';
+
+const LAYER_ORDER = [
+  'types',
+  'theme',
+  'utils',
+  'workers',
+  'hooks',
+  'context',
+  'atoms',
+  'molecules',
+  'organisms',
+  'pages',
+];
+
+// R20-10 (#283) removes these imports.
+const LAYER_EXCEPTIONS = [
+  {
+    file: 'src/atoms/Header.tsx',
+    imports: 'src/molecules/ShareDialog.tsx',
+    expires: '2027-01-31',
+  },
+  {
+    file: 'src/context/ConfigContext.tsx',
+    imports: 'src/molecules/ConflictResolutionDialog.tsx',
+    expires: '2027-01-31',
+  },
+  {
+    file: 'src/utils/preview.ts',
+    imports: 'src/atoms/DownloadRow.tsx',
+    expires: '2027-01-31',
+  },
+  {
+    file: 'src/utils/gitProvider.ts',
+    imports: 'src/context/constants.ts',
+    expires: '2027-01-31',
+  },
+  {
+    file: 'src/utils/zip.ts',
+    imports: 'src/workers/ergogen.worker.types.ts',
+    expires: '2027-01-31',
+  },
+  {
+    file: 'src/utils/zip.ts',
+    imports: 'src/workers/workerFactory.ts',
+    expires: '2027-01-31',
+  },
+];
+
+const today = new Date().toISOString().slice(0, 10);
+const activeLayerExceptions = LAYER_EXCEPTIONS.filter(
+  ({ expires }) => today <= expires
+);
+
+function layerOrderRule(exceptions) {
+  const zones = LAYER_ORDER.flatMap((layer, index) =>
+    LAYER_ORDER.slice(index + 1).map((laterLayer) => {
+      const from = `src/${laterLayer}`;
+      return {
+        target: `src/${layer}`,
+        from,
+        except: exceptions
+          .filter(({ imports }) => imports.startsWith(`${from}/`))
+          .map(({ imports }) => `./${path.relative(from, imports)}`),
+        message: `src/${layer} must not import ${from}. A folder imports only from the folders before it in ${LAYER_ORDER.join(', ')}. Move what both need to an earlier folder, such as a shared type to src/types.`,
+      };
+    })
+  );
+  return ['error', { basePath: import.meta.dirname, zones }];
+}
 
 export default tseslint.config(
   {
@@ -81,6 +151,14 @@ export default tseslint.config(
         },
       ],
       ...jsxA11y.configs.recommended.rules,
+      'import/no-cycle': 'error',
+      'import/no-restricted-paths': layerOrderRule([]),
+    },
+    // eslint-plugin-import skips modules it cannot resolve, and by default it
+    // resolves only .js files, so without these both rules pass silently.
+    settings: {
+      'import/extensions': ['.ts', '.tsx'],
+      'import/resolver': { node: { extensions: ['.ts', '.tsx'] } },
     },
     languageOptions: {
       ecmaVersion: 2022,
@@ -91,6 +169,12 @@ export default tseslint.config(
       },
     },
   },
+  ...Object.entries(
+    Object.groupBy(activeLayerExceptions, ({ file }) => file)
+  ).map(([file, exceptions]) => ({
+    files: [file],
+    rules: { 'import/no-restricted-paths': layerOrderRule(exceptions) },
+  })),
   {
     files: ['src/**/*.test.{ts,tsx}', 'src/setupTests.tsx'],
     ...jest.configs['flat/recommended'],
