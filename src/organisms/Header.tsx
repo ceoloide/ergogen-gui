@@ -3,8 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';
 import { getErgogenVersionInfo } from '../utils/version';
-import { DevChip } from './DevChip';
-import UpdateChip from './UpdateChip';
+import { DevChip } from '../atoms/DevChip';
+import UpdateChip from '../atoms/UpdateChip';
 
 import { theme } from '../theme/theme';
 import { createZip } from '../utils/zip';

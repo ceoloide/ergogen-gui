@@ -25,11 +25,6 @@ const LAYER_ORDER = [
 // R20-10 (#283) removes these imports.
 const LAYER_EXCEPTIONS = [
   {
-    file: 'src/atoms/Header.tsx',
-    imports: 'src/molecules/ShareDialog.tsx',
-    expires: '2027-01-31',
-  },
-  {
     file: 'src/utils/zip.ts',
     imports: 'src/workers/ergogen.worker.types.ts',
     expires: '2027-01-31',

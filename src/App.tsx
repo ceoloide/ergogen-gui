@@ -4,7 +4,7 @@ import styled from 'styled-components';
 
 import Ergogen from './Ergogen';
 import Welcome from './pages/Welcome';
-import Header from './atoms/Header';
+import Header from './organisms/Header';
 import LoadingBar from './atoms/LoadingBar';
 import Banners from './organisms/Banners';
 import SideNavigation from './molecules/SideNavigation';
