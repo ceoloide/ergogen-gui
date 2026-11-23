@@ -678,6 +678,15 @@ const AppContent = ({
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </PageWrapper>
+      {configContext?.currentConflict && (
+        <ConflictResolutionDialog
+          injectionName={configContext.currentConflict.name}
+          injectionType={configContext.currentConflict.type}
+          onResolve={configContext.handleConflictResolution}
+          onCancel={configContext.handleConflictCancel}
+          data-testid="conflict-resolution-dialog"
+        />
+      )}
     </>
   );
 };

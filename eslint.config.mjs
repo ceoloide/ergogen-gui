@@ -30,11 +30,6 @@ const LAYER_EXCEPTIONS = [
     expires: '2027-01-31',
   },
   {
-    file: 'src/context/ConfigContext.tsx',
-    imports: 'src/molecules/ConflictResolutionDialog.tsx',
-    expires: '2027-01-31',
-  },
-  {
     file: 'src/utils/zip.ts',
     imports: 'src/workers/ergogen.worker.types.ts',
     expires: '2027-01-31',

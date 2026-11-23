@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   getInjectionConflicts,
   mergeInjectionArraysWithResolution,
@@ -324,13 +324,19 @@ export const useInjectionConflictResolution = (
     callbacks.setError?.('Loading cancelled by user');
   }, [callbacks, conflictQueue.length]);
 
+  const currentConflictSummary = useMemo(
+    () =>
+      currentConflict
+        ? {
+            name: currentConflict.injection[1],
+            type: currentConflict.injection[0],
+          }
+        : null,
+    [currentConflict]
+  );
+
   return {
-    currentConflict: currentConflict
-      ? {
-          name: currentConflict.injection[1],
-          type: currentConflict.injection[0],
-        }
-      : null,
+    currentConflict: currentConflictSummary,
     processInjectionsWithConflictResolution,
     handleConflictResolution,
     handleConflictCancel,
