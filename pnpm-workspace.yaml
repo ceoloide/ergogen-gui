@@ -1,3 +1,8 @@
+# Ergogen depends on kle-serial from a Git repository. pnpm 11 blocks Git
+# subdependencies by default whenever it resolves dependencies (`pnpm add`, a
+# lockfile change, or an engine experiment).
+blockExoticSubdeps: false
+
 allowBuilds:
   core-js: true
   core-js-pure: true

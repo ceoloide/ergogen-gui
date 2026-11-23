@@ -9,8 +9,7 @@ validation, and procedures. These rules apply to people and coding agents.
 
 - Use only pnpm, matching the Node.js version in `.node-version` and the pnpm
   version in `packageManager`. Install dependencies with
-  `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile`. Keep
-  that prefix on every `pnpm install` or `pnpm add`.
+  `pnpm install --frozen-lockfile`.
 - Declare every directly imported package in `package.json`. Never rely on
   transitive hoisting.
 - Canonical work uses the committed `package.json`, `pnpm-lock.yaml`, engine

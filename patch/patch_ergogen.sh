@@ -62,14 +62,14 @@ require_commit_sha CEOLOIDE_FOOTPRINTS_COMMIT "$CEOLOIDE_FOOTPRINTS_COMMIT"
 require_commit_sha INFUSED_KIM_FOOTPRINTS_COMMIT "$INFUSED_KIM_FOOTPRINTS_COMMIT"
 
 if [ ! -f "$INSTALLED_ERGOGEN/package.json" ]; then
-  fail "node_modules/ergogen not found. Run 'PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install' first."
+  fail "node_modules/ergogen not found. Run 'pnpm install' first."
 fi
 
 if [ -n "${ERGOGEN_VERSION:-}" ]; then
   requested_specifier=${ERGOGEN_VERSION#ergogen@}
   installed_specifier=$(installed_ergogen_specifier)
   if [ "$installed_specifier" != "$requested_specifier" ]; then
-    fail "ERGOGEN_VERSION is '$ERGOGEN_VERSION' but the installed ergogen is '${installed_specifier:-unknown}'. Install it with: ERGOGEN_VERSION='$ERGOGEN_VERSION' node scripts/preinstall.js && PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile"
+    fail "ERGOGEN_VERSION is '$ERGOGEN_VERSION' but the installed ergogen is '${installed_specifier:-unknown}'. Install it with: ERGOGEN_VERSION='$ERGOGEN_VERSION' node scripts/preinstall.js && pnpm install --no-frozen-lockfile"
   fi
 fi
 

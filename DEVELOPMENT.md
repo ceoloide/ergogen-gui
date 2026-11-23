@@ -716,7 +716,7 @@ manifest before the root `preinstall` hook:
 ```shell
 export ERGOGEN_VERSION=github:ceoloide/ergogen#develop   # or ergogen@<version>
 node scripts/preinstall.js
-PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
+pnpm install --no-frozen-lockfile
 pnpm dev
 ```
 

@@ -86,14 +86,12 @@ field of [package.json](package.json). Run `corepack enable` to provide that
 pnpm version. You also need network access to the npm registry and GitHub during
 installation. You do not need Docker or Python.
 
-Keep `PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false` on the install command. Without
-it, pnpm blocks Ergogen's Git subdependencies, and pnpm 11 ignores that setting
-in `.npmrc`. Clone the repository and install dependencies:
+Clone the repository and install dependencies:
 
 ```shell
 git clone https://github.com/ceoloide/ergogen-gui.git
 cd ergogen-gui
-PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile
 ```
 
 Installation also uses Git to fetch the pinned footprint libraries and prepare a
