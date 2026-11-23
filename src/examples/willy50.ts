@@ -1,4 +1,4 @@
-import { ConfigExample } from './index';
+import type { ConfigExample } from './index';
 
 /** The pictured Willy 50 half, including a point for its thumb scroll wheel. */
 const Willy50: ConfigExample = {

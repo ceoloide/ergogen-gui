@@ -1,4 +1,4 @@
-import { ConfigExample } from './index';
+import type { ConfigExample } from './index';
 
 /** A 56-key unibody layout with separate body and central outlines. */
 const Briefs56: ConfigExample = {
