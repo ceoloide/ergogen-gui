@@ -110,7 +110,7 @@ describe('HC-013a deployment policy', () => {
       },
       repository_dispatch: null,
     });
-    expect(ci.on).toEqual({ pull_request: { branches: ['main'] } });
+    expect(ci.on).toEqual({ pull_request: null });
     expect(Object.keys(deployment.jobs).sort()).toEqual([
       'build',
       'deploy',
