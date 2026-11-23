@@ -180,7 +180,13 @@ class GitHubProvider extends BaseGitProvider {
     ref: string
   ): Promise<string> {
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`;
-    const res = await fetch(rawUrl);
+    const token =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('ergogen:github_token')
+        : null;
+    const res = await (token
+      ? fetch(rawUrl, { headers: { Authorization: `token ${token}` } })
+      : fetch(rawUrl));
     this.checkRateLimits(res, rawUrl);
     if (!res.ok) {
       throw new Error(
@@ -197,7 +203,13 @@ class GitHubProvider extends BaseGitProvider {
     ref: string
   ): Promise<GitFileItem[]> {
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
-    const res = await fetch(apiUrl);
+    const token =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem('ergogen:github_token')
+        : null;
+    const res = await (token
+      ? fetch(apiUrl, { headers: { Authorization: `token ${token}` } })
+      : fetch(apiUrl));
     this.checkRateLimits(res, apiUrl);
     if (!res.ok) {
       throw new Error(`Failed to list directory from GitHub: ${res.status}`);
