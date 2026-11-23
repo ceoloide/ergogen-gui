@@ -386,8 +386,7 @@ describe('HC-013a deployment policy', () => {
 describe('deployment engine selection', () => {
   const step = (name: string) => build.steps.find((s) => s.name === name);
   const resolved = '${{ steps.engine.outputs.specifier }}';
-  const frozenInstall =
-    'PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile';
+  const frozenInstall = 'pnpm install --frozen-lockfile';
 
   /** Runs the install step's script with stub pnpm and node commands. */
   const runInstall = (ergogenVersion: string) => {
@@ -396,7 +395,7 @@ describe('deployment engine selection', () => {
     for (const command of ['pnpm', 'node']) {
       writeFileSync(
         join(bin, command),
-        `#!/bin/sh\necho "${command} $* blocked=$PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS" >> "${calls}"\n`,
+        `#!/bin/sh\necho "${command} $*" >> "${calls}"\n`,
         { mode: 0o755 }
       );
     }
@@ -416,6 +415,18 @@ describe('deployment engine selection', () => {
     expect(result.status, result.stderr).toBe(0);
     return log.trim().split('\n');
   };
+
+  it('allows Git subdependencies in the workspace, not per command', () => {
+    // Arrange
+    const workspace = yaml.load(
+      readFileSync(resolve(projectRoot, 'pnpm-workspace.yaml'), 'utf8')
+    ) as Record<string, unknown>;
+
+    // Assert
+    // Ergogen depends on kle-serial from Git. Without this setting, pnpm 11
+    // fails with ERR_PNPM_EXOTIC_SUBDEP whenever it resolves dependencies.
+    expect(workspace.blockExoticSubdeps).toBe(false);
+  });
 
   it('keeps pull request CI on the canonical frozen install', () => {
     // Assert
@@ -472,7 +483,7 @@ describe('deployment engine selection', () => {
     const calls = runInstall('');
 
     // Assert
-    expect(calls).toEqual(['pnpm install --frozen-lockfile blocked=false']);
+    expect(calls).toEqual(['pnpm install --frozen-lockfile']);
   });
 
   it('patches the manifest and re-resolves when an engine is configured', () => {
@@ -481,8 +492,8 @@ describe('deployment engine selection', () => {
 
     // Assert
     expect(calls).toEqual([
-      'node scripts/preinstall.js blocked=',
-      'pnpm install --no-frozen-lockfile blocked=false',
+      'node scripts/preinstall.js',
+      'pnpm install --no-frozen-lockfile',
     ]);
   });
 });

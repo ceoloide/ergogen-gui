@@ -73,10 +73,10 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -z "$ERGOGEN_VERSION" ]; then
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --frozen-lockfile
+            pnpm install --frozen-lockfile
           else
             node scripts/preinstall.js
-            PNPM_CONFIG_BLOCK_EXOTIC_SUBDEPS=false pnpm install --no-frozen-lockfile
+            pnpm install --no-frozen-lockfile
           fi
         env:
           ERGOGEN_VERSION: ${{ steps.engine.outputs.specifier }}
