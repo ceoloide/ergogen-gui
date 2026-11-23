@@ -741,3 +741,9 @@ credentials in this order:
 
 `CHANGELOG.md` holds user-facing changes, newest first. Follow the conventions
 in the [changelog skill](.agents/skills/ergogen-gui-changelog/SKILL.md).
+
+## Weekly quota
+
+`pnpm queue:quota` tells an agent whether each provider's weekly quota allows a
+new task. The [quota skill](.agents/skills/ergogen-gui-quota/SKILL.md) explains
+each result.
