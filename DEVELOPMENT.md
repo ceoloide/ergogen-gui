@@ -516,6 +516,16 @@ UI components follow atomic design in `src/atoms`, `src/molecules`,
 state, `src/utils` holds pure logic, `src/workers` holds Web Workers, and
 `src/theme/theme.ts` defines theme tokens.
 
+ESLint enforces the layer order `types`, `theme`, `utils`, `workers`, `hooks`,
+`context`, `atoms`, `molecules`, `organisms`, and `pages`.
+`import/no-restricted-paths` checks that a folder in `src` imports only from the
+folders before it. When code in two layers needs the same thing, move it to the
+earlier layer, such as a shared type to `src/types`. `LAYER_EXCEPTIONS` in
+`eslint.config.mjs` lists each import that still breaks the order, with one
+file, one import, and an expiry date. After that date, the import fails lint.
+`import/no-cycle` rejects import cycles in `src`. It skips `import type`
+declarations, because the build removes them.
+
 `public/dependencies` contains KiCanvas, which `index.html` loads for PCB
 previews, and OpenJSCAD, which `jscad.worker.ts` imports for case previews and
 STL conversion. The build bundles Ergogen's dependencies, including Maker.js,

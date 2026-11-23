@@ -1,4 +1,4 @@
-import { ConfigExample } from './index';
+import type { ConfigExample } from './index';
 
 /**
  * An example Ergogen configuration for the Tiny20 keyboard.
