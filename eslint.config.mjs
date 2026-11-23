@@ -35,11 +35,6 @@ const LAYER_EXCEPTIONS = [
     expires: '2027-01-31',
   },
   {
-    file: 'src/utils/gitProvider.ts',
-    imports: 'src/context/constants.ts',
-    expires: '2027-01-31',
-  },
-  {
     file: 'src/utils/zip.ts',
     imports: 'src/workers/ergogen.worker.types.ts',
     expires: '2027-01-31',
