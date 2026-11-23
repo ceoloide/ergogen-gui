@@ -58,7 +58,7 @@
     "queue:quota": "node scripts/queue/quota.mts",
     "test": "pnpm test:unit && pnpm test:e2e",
     "format": "prettier --write \"*.{js,mjs,ts,mts,json,jsonc,md}\" \"{src,e2e,patch,tests,scripts}/**/*.{ts,mts,tsx,js,mjs,jsx,json,css,md}\" \".github/**/*.{yml,yaml}\" \".lintstagedrc.json\" \"index.html\" \"pnpm-workspace.yaml\" \".agents/**/*.md\"",
-    "lint:js": "eslint \"{src,e2e,patch,tests,scripts}/**/*.{ts,mts,tsx,js,mjs,jsx}\" \"*.{js,mjs,ts,mts}\"",
+    "lint:js": "eslint --max-warnings 0 \"{src,e2e,patch,tests,scripts}/**/*.{ts,mts,tsx,js,mjs,jsx}\" \"*.{js,mjs,ts,mts}\"",
     "lint:md": "markdownlint \"**/*.md\" \".agents/**/*.md\"",
     "lint:workflows": "actionlint -shellcheck=shellcheck -pyflakes=",
     "lint": "pnpm lint:md && pnpm lint:js && pnpm knip && pnpm lint:workflows && pnpm lint:security && pnpm lint:shell",
