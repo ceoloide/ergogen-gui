@@ -1,12 +1,15 @@
 // Tells whether each provider's weekly quota leaves room for new work:
 //
-//   pnpm queue:quota
+//   pnpm queue:quota [--ahead=<points>]
 //
 // For each provider it prints the percent of the weekly window used, the
 // percent of the window elapsed, and a result:
 //
-// - go: the percent used is at most 20 points above the percent elapsed;
-// - wait: the percent used is further ahead;
+// - go: the percent used is at most 25 points above the percent elapsed, or
+//   the number of points that --ahead gives;
+// - wait: the percent used is further ahead. The line also prints the time,
+//   in UTC, at which it turns to go if no more quota is used, and the hours
+//   until then;
 // - unknown: the quota could not be read, and the line says why.
 //
 // The percent elapsed is the pace. There is no reserve, so a provider used at
@@ -30,6 +33,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { parseArgs } from 'node:util';
 
 export type Provider = 'claude' | 'antigravity' | 'codex';
 
@@ -45,20 +49,29 @@ export interface Reading {
 }
 
 export type Line = { provider: Provider; limit: string; note: string } & (
-  | { result: 'go' | 'wait'; usedPercent: number; elapsedPercent: number }
+  | { result: 'go'; usedPercent: number; elapsedPercent: number }
+  | {
+      result: 'wait';
+      usedPercent: number;
+      elapsedPercent: number;
+      /** Epoch milliseconds at which the line turns to go. */
+      goAt: number;
+      waitHours: number;
+    }
   | { result: 'unknown' }
 );
 
 /** Thrown when a quota cannot be read. Its message is safe to print. */
 export class Unreadable extends Error {}
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_POINTS_AHEAD_OF_PACE = 20;
+const HOUR_MS = 60 * 60 * 1000;
+const WEEK_MS = 7 * 24 * HOUR_MS;
+const DEFAULT_POINTS_AHEAD = 25;
 const ALL_MODELS = 'all models';
 const GEMINI_MODELS = 'Gemini models';
 
-const time = (epochMs: number) =>
-  `${new Date(epochMs).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+const iso = (epochMs: number) =>
+  new Date(epochMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 function age(ms: number): string {
   const minutes = Math.floor(ms / 60_000);
@@ -67,34 +80,54 @@ function age(ms: number): string {
   return hours < 48 ? `${hours} h` : `${Math.floor(hours / 24)} days`;
 }
 
-/** Applies the pace rule to a reading at the time `now`. */
-export function assess(reading: Reading, now: number): Line {
-  const { provider, limit, resetsAt } = reading;
-  if (resetsAt !== undefined && resetsAt <= now) {
+/**
+ * Applies the pace rule to a reading at the time `now`: go while the percent
+ * used is at most `pointsAhead` points above the percent elapsed.
+ */
+export function assess(
+  reading: Reading,
+  now: number,
+  pointsAhead: number
+): Line {
+  const { provider, limit, usedPercent } = reading;
+  if (reading.resetsAt !== undefined && reading.resetsAt <= now) {
     return {
       provider,
       limit,
       result: 'unknown',
-      note: `the newest reading is from the window that ended ${time(resetsAt)}`,
+      note: `the newest reading is from the window that ended ${iso(reading.resetsAt)}`,
     };
   }
-  const left = resetsAt === undefined ? WEEK_MS : resetsAt - now;
-  const elapsedPercent = Math.round(Math.max(0, 100 * (1 - left / WEEK_MS)));
-  const usedPercent = Math.round(reading.usedPercent);
   const notes = [
-    resetsAt === undefined ? 'window not started' : `resets ${time(resetsAt)}`,
+    reading.resetsAt === undefined
+      ? 'window not started'
+      : `resets ${iso(reading.resetsAt)}`,
   ];
   if (now - reading.readAt >= 60_000) {
     notes.push(`read ${age(now - reading.readAt)} ago`);
   }
-  return {
+  // A window that has not started starts with the next request.
+  const resetsAt = reading.resetsAt ?? now + WEEK_MS;
+  const windowStart = resetsAt - WEEK_MS;
+  const elapsedPercent = Math.max(0, (100 * (now - windowStart)) / WEEK_MS);
+  const line = {
     provider,
     limit,
-    result:
-      usedPercent - elapsedPercent <= MAX_POINTS_AHEAD_OF_PACE ? 'go' : 'wait',
     usedPercent,
     elapsedPercent,
     note: notes.join(', '),
+  };
+  if (usedPercent - elapsedPercent <= pointsAhead) {
+    return { ...line, result: 'go' };
+  }
+  const paceCatchesUp =
+    windowStart + (WEEK_MS * (usedPercent - pointsAhead)) / 100;
+  const goAt = Math.ceil(Math.min(paceCatchesUp, resetsAt) / 1000) * 1000;
+  return {
+    ...line,
+    result: 'wait',
+    goAt,
+    waitHours: Math.ceil((goAt - now) / HOUR_MS),
   };
 }
 
@@ -237,12 +270,21 @@ const claudeFolder = join(home, '.claude');
 const antigravityFolder = join(home, '.t3/userdata/providers/antigravity');
 const codexFolder = join(home, '.codex');
 
-async function requestJson(url: string, init: RequestInit): Promise<unknown> {
+/**
+ * Sends a request that carries a credential. It refuses a redirect, because
+ * fetch would send the body of a 307 or 308, which can hold the refresh
+ * credentials, to the new address.
+ */
+export async function requestJson(
+  url: string,
+  init: RequestInit
+): Promise<unknown> {
   const { host } = new URL(url);
   let response: Response;
   try {
     response = await fetch(url, {
       ...init,
+      redirect: 'manual',
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
@@ -398,15 +440,18 @@ const providers: {
   },
 ];
 
+const percent = (value: number) => `${value.toFixed(1)}%`;
+
 function render(lines: Line[]): string {
   const rows = [
-    ['provider', 'limit', 'used', 'elapsed', 'result', 'note'],
+    ['provider', 'limit', 'used', 'elapsed', 'result', 'go at', 'note'],
     ...lines.map((line) => [
       line.provider,
       line.limit,
-      line.result === 'unknown' ? '-' : `${line.usedPercent}%`,
-      line.result === 'unknown' ? '-' : `${line.elapsedPercent}%`,
-      line.result,
+      line.result === 'unknown' ? '-' : percent(line.usedPercent),
+      line.result === 'unknown' ? '-' : percent(line.elapsedPercent),
+      line.result === 'wait' ? `wait ${line.waitHours}h` : line.result,
+      line.result === 'wait' ? iso(line.goAt) : '-',
       line.note,
     ]),
   ];
@@ -429,14 +474,28 @@ function render(lines: Line[]): string {
     .join('\n');
 }
 
-async function main() {
+function parsePointsAhead(args: string[]): number {
+  const { values } = parseArgs({
+    args,
+    options: { ahead: { type: 'string' } },
+  });
+  if (values.ahead === undefined) return DEFAULT_POINTS_AHEAD;
+  if (!/^-?\d+(\.\d+)?$/.test(values.ahead)) {
+    throw new Error(
+      `--ahead takes a number of points, such as --ahead=25, not "${values.ahead}".`
+    );
+  }
+  return Number(values.ahead);
+}
+
+async function main(pointsAhead: number) {
   const enabled = providers.filter(({ folder }) => existsSync(folder));
   const lines = await Promise.all(
     enabled.map(async ({ provider, mainLimit, read }): Promise<Line[]> => {
       try {
         const readings = await read();
         const now = Date.now();
-        return readings.map((reading) => assess(reading, now));
+        return readings.map((reading) => assess(reading, now, pointsAhead));
       } catch (error) {
         const note =
           error instanceof Unreadable
@@ -450,5 +509,14 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  await main();
+  let pointsAhead: number;
+  try {
+    pointsAhead = parsePointsAhead(process.argv.slice(2));
+  } catch (error) {
+    console.error(
+      `${(error as Error).message}\nUsage: pnpm queue:quota [--ahead=<points>]`
+    );
+    process.exit(2);
+  }
+  await main(pointsAhead);
 }
