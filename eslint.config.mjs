@@ -22,19 +22,7 @@ const LAYER_ORDER = [
   'pages',
 ];
 
-// R20-10 (#283) removes these imports.
-const LAYER_EXCEPTIONS = [
-  {
-    file: 'src/utils/zip.ts',
-    imports: 'src/workers/ergogen.worker.types.ts',
-    expires: '2027-01-31',
-  },
-  {
-    file: 'src/utils/zip.ts',
-    imports: 'src/workers/workerFactory.ts',
-    expires: '2027-01-31',
-  },
-];
+const LAYER_EXCEPTIONS = [];
 
 const today = new Date().toISOString().slice(0, 10);
 const activeLayerExceptions = LAYER_EXCEPTIONS.filter(
@@ -186,7 +174,7 @@ export default tseslint.config(
   },
   // Workers and service workers configurations
   {
-    files: ['src/workers/**/*.ts', 'src/service-worker.ts'],
+    files: ['src/workers/*.worker.ts', 'src/service-worker.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'warn',

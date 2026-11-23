@@ -104,7 +104,7 @@ export const generate = (
   });
 
 /**
- * The `Worker` surface that src/utils/zip.ts uses, backed by
+ * The `Worker` surface that src/workers/bulkExport.ts uses, backed by
  * `runWorkerRequest`. Return it from a mocked `createErgogenWorker`.
  */
 export class InProcessErgogenWorker {

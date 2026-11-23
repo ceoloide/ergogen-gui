@@ -2,10 +2,10 @@ import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import BulkDownloadDialog from './BulkDownloadDialog';
-import { exportConfigsProgressively } from '../utils/zip';
+import { exportConfigsProgressively } from '../workers/bulkExport';
 import { trackEvent } from '../utils/analytics';
 
-vi.mock('../utils/zip', () => ({
+vi.mock('../workers/bulkExport', () => ({
   exportConfigsProgressively: vi.fn(),
 }));
 
