@@ -6,6 +6,8 @@ export interface JUnitSummary {
   failures: number;
   errors: number;
   skipped: number;
+  /** Test suites. Vitest writes one per test file. */
+  suites: number;
   /** Playwright project names; Vitest writes the machine name here instead. */
   projects: string[];
   /** Names of failed or errored tests, for triage. */
@@ -65,6 +67,7 @@ export function summarizeJUnit(xml: string): JUnitSummary {
     failures: Math.max(counted('failure'), declared('failures')),
     errors: Math.max(counted('error'), declared('errors')),
     skipped: Math.max(counted('skipped'), declared('skipped')),
+    suites: elements('testsuite').length,
     projects: [...projects].sort(),
     failing: cases
       .filter((testcase) => childNamed(testcase, 'failure'))
