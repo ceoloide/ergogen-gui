@@ -946,10 +946,9 @@ identity, rollback, and the smoke check.
 reports that each hold at least one test with no failures, errors, or skipped
 tests. Explicit skipped-test checks are required because Vitest and Playwright
 exit 0 when tests are skipped. The browser report must include every Playwright
-project. Test counts are deliberately not pinned. Because
-`.github/workflows/ci.yaml` triggers only on pull requests targeting `main`,
-stacked pull requests targeting another branch get no `lint-and-test` check or
-evidence artifact until you retarget them to `main`.
+project. Test counts are deliberately not pinned. `.github/workflows/ci.yaml`
+runs on every pull request, including stacked ones, but `pnpm assess:pr` accepts
+only pull requests that target `main`.
 
 In CI, `pnpm test:reports` runs even after a failed step. It fails the job when
 the reports break the contract, and it writes the identities, step outcomes,
@@ -1016,11 +1015,9 @@ read-only. Two reviewed payloads define these settings, and
 
 While the ruleset is active, nobody can push to `main`, including the owner.
 Merges require a fresh `lint-and-test` run on a branch that is up to date with
-`main` using **Update branch**, `gh pr update-branch`, or a rebase. Because
-`.github/workflows/ci.yaml` runs only for pull requests targeting `main`,
-stacked pull requests get no `lint-and-test` check until you retarget them to
-`main`. The ruleset does not cover `gh-pages`, so releases and rollbacks are
-unchanged. Open pull requests without such a check are blocked as intended.
+`main` using **Update branch**, `gh pr update-branch`, or a rebase. The ruleset
+does not cover `gh-pages`, so releases and rollbacks are unchanged. Open pull
+requests without such a check are blocked as intended.
 
 These branch rules are a merge gate for ordinary pull requests, not confinement:
 

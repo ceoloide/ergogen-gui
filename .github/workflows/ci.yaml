@@ -1,8 +1,9 @@
 name: CI
 
+# Every pull request runs CI, including stacked pull requests that target
+# another branch. Only pull requests that target main can merge into it.
 on:
   pull_request:
-    branches: ['main']
 
 # Pull request validation only needs to read the repository. Declaring this
 # explicitly avoids inheriting a write-scoped repository default token.
