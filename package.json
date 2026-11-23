@@ -74,6 +74,7 @@
     "validate": "pnpm validate:fast && pnpm build",
     "typecheck": "tsc --project tsconfig.json && pnpm typecheck:tooling && pnpm typecheck:declarations",
     "validate:extended": "pnpm validate:fast && pnpm test:e2e && pnpm test:reports",
+    "metrics": "node scripts/ci/metrics.mts",
     "predev": "pnpm run build-ergogen",
     "pretest:unit": "pnpm build-ergogen",
     "pretest:contract": "pnpm build-ergogen"
