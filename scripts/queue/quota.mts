@@ -117,12 +117,15 @@ export function assess(
     elapsedPercent,
     note: notes.join(', '),
   };
-  if (usedPercent - elapsedPercent <= pointsAhead) {
+  // Percents with decimals carry floating-point error: 100 * (1 - 0.7) is
+  // 30.000000000000004. The 1e-9 points absorb it and are far below the
+  // 1.65e-7 points of one millisecond.
+  if (usedPercent - elapsedPercent <= pointsAhead + 1e-9) {
     return { ...line, result: 'go' };
   }
   const paceCatchesUp =
     windowStart + (WEEK_MS * (usedPercent - pointsAhead)) / 100;
-  const goAt = Math.ceil(Math.min(paceCatchesUp, resetsAt) / 1000) * 1000;
+  const goAt = Math.min(Math.ceil(paceCatchesUp / 1000) * 1000, resetsAt);
   return {
     ...line,
     result: 'wait',
@@ -481,9 +484,7 @@ function parsePointsAhead(args: string[]): number {
   });
   if (values.ahead === undefined) return DEFAULT_POINTS_AHEAD;
   if (!/^-?\d+(\.\d+)?$/.test(values.ahead)) {
-    throw new Error(
-      `--ahead takes a number of points, such as --ahead=25, not "${values.ahead}".`
-    );
+    throw new Error('--ahead is not a number');
   }
   return Number(values.ahead);
 }
@@ -512,9 +513,11 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   let pointsAhead: number;
   try {
     pointsAhead = parsePointsAhead(process.argv.slice(2));
-  } catch (error) {
+  } catch {
+    // A parseArgs error repeats the raw argument, which can hold control
+    // characters, so the script prints a fixed text instead.
     console.error(
-      `${(error as Error).message}\nUsage: pnpm queue:quota [--ahead=<points>]`
+      '--ahead takes a number of points, such as --ahead=25.\nUsage: pnpm queue:quota [--ahead=<points>]'
     );
     process.exit(2);
   }

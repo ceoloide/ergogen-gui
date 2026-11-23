@@ -76,7 +76,7 @@ const antigravitySummary = {
   ],
 };
 
-const codexLog = (readAt: number, resetsAtMs: number) =>
+const codexLog = (readAt: number, resetsAtMs: number, usedPercent = 60) =>
   [
     {
       timestamp: new Date(readAt - 60 * 60 * 1000).toISOString(),
@@ -91,7 +91,7 @@ const codexLog = (readAt: number, resetsAtMs: number) =>
         rate_limits: {
           limit_id: 'codex',
           primary: {
-            used_percent: 60,
+            used_percent: usedPercent,
             window_minutes: 10080,
             resets_at: resetsAtMs / 1000,
           },
@@ -199,17 +199,52 @@ describe('the pace rule', () => {
     });
   });
 
-  it('ends a wait at the reset when the pace cannot catch up before it', () => {
+  it('gives go at exactly the allowance, despite floating-point error', () => {
+    // Arrange: 100 * (1 - 0.7) is 30.000000000000004, at 5% of the week.
+    const now = Date.parse(resetsAt) - 0.95 * week;
+    const [gemini] = antigravityReadings(
+      {
+        groups: [
+          {
+            buckets: [
+              {
+                bucketId: 'gemini-weekly',
+                window: 'weekly',
+                resetTime: resetsAt,
+                remainingFraction: 0.7,
+              },
+            ],
+          },
+        ],
+      },
+      now
+    );
+
     // Act
-    const line = assess(claudeReading(100), early, -5);
+    const line = assess(gemini, now, 25);
 
     // Assert
-    expect(line).toMatchObject({
-      result: 'wait',
-      goAt: Date.parse(resetsAt),
-      waitHours: 118,
-    });
+    expect(line).toMatchObject({ elapsedPercent: 5, result: 'go' });
   });
+
+  it.each(['2026-01-15T12:00:00Z', '2026-01-15T11:59:59.500Z'])(
+    'ends a wait at the reset %s when the pace cannot catch up before it',
+    (reset) => {
+      // Act
+      const line = assess(
+        { ...claudeReading(100), resetsAt: Date.parse(reset) },
+        early,
+        -5
+      );
+
+      // Assert
+      expect(line).toMatchObject({
+        result: 'wait',
+        goAt: Date.parse(reset),
+        waitHours: 118,
+      });
+    }
+  );
 });
 
 describe('requestJson', () => {
@@ -268,15 +303,18 @@ describe('pnpm queue:quota', () => {
   const script = join(projectRoot, 'scripts', 'queue', 'quota.mts');
 
   // Runs the command in a home folder with one Codex session log, so it reads
-  // no saved sign-in and sends no request. The log reads 60% used at 50% of
-  // the week elapsed.
-  function run(args: string[]) {
+  // no saved sign-in and sends no request. The log reads `usedPercent` at 50%
+  // of the week elapsed.
+  function run(args: string[], usedPercent = 60) {
     const home = mkdtempSync(join(tmpdir(), 'queue-quota-'));
     const now = Date.now();
     const resetsAtMs = Math.ceil(now / 1000) * 1000 + 3.5 * day;
     const sessions = join(home, '.codex', 'sessions');
     mkdirSync(sessions, { recursive: true });
-    writeFileSync(join(sessions, 'rollout.jsonl'), codexLog(now, resetsAtMs));
+    writeFileSync(
+      join(sessions, 'rollout.jsonl'),
+      codexLog(now, resetsAtMs, usedPercent)
+    );
     const result = spawnSync(process.execPath, [script, ...args], {
       env: { PATH: process.env.PATH, HOME: home },
       encoding: 'utf8',
@@ -301,6 +339,21 @@ describe('pnpm queue:quota', () => {
     );
   });
 
+  it('takes 25 points as the default allowance', () => {
+    // Act
+    const { status, stdout, resetsAtMs } = run([], 80);
+
+    // Assert
+    expect(status).toBe(0);
+    const windowStart = resetsAtMs - week;
+    const goAt = iso(windowStart + 0.55 * week); // 80% used, less 25 points
+    expect(stdout.trim().split('\n')[1]).toMatch(
+      new RegExp(
+        `^codex\\s+all models\\s+80\\.0%\\s+50\\.0%\\s+wait 9h\\s+${goAt}\\s+resets ${iso(resetsAtMs)}$`
+      )
+    );
+  });
+
   it('takes the allowance from --ahead and prints when a wait ends', () => {
     // Act
     const { status, stdout, resetsAtMs } = run(['--ahead=5']);
@@ -316,13 +369,18 @@ describe('pnpm queue:quota', () => {
     );
   });
 
-  it('rejects an --ahead that is not a number', () => {
-    // Act
-    const { status, stdout, stderr } = run(['--ahead=five']);
+  // Each argument holds the escape sequence that clears a terminal.
+  it.each(['--ahead=\u001b[2Jfive', '--\u001b[2J', '\u001b[2J'])(
+    'rejects the argument %j without printing it',
+    (argument) => {
+      // Act
+      const { status, stdout, stderr } = run([argument]);
 
-    // Assert
-    expect(status).toBe(2);
-    expect(stdout).toBe('');
-    expect(stderr).toContain('--ahead takes a number of points');
-  });
+      // Assert
+      expect(status).toBe(2);
+      expect(stdout).toBe('');
+      expect(stderr).toContain('--ahead takes a number of points');
+      expect(stderr).not.toContain('\u001b');
+    }
+  );
 });
