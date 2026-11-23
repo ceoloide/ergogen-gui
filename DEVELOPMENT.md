@@ -190,8 +190,8 @@ app fault, not as proof of the cause.
 
 ### Other test suites
 
-These test suites in `tests/` check workflows, releases, and build-time
-settings:
+These test suites in `tests/` check workflows, releases, documentation, and
+build-time settings:
 
 - `tests/workflow-security.test.ts` checks workflow security policy.
 - `tests/release-publication.test.ts` runs the deploy workflow's release and
@@ -199,6 +199,8 @@ settings:
   loopback server. See [Releases and rollback](#releases-and-rollback).
 - `tests/build-version.test.ts` checks build-time engine identity.
 - `tests/analytics-tag-id.test.ts` checks the build-time analytics tag ID.
+- `tests/markdown-links.test.ts` checks that every relative link in Markdown
+  files reaches an existing file and heading.
 
 ### Engine contract tests
 
