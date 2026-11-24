@@ -582,6 +582,12 @@ export async function addToQueue(
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Calls the GitHub API with the arguments of `gh api` and a JSON request
+ * body, and returns the JSON reply.
+ */
+type Api = (args: string[], body: unknown) => Promise<unknown>;
+
 /** Runs `gh api` with a JSON request body and returns the JSON reply. */
 async function ghApi(args: string[], body: unknown): Promise<unknown> {
   const call = execFileAsync('gh', ['api', ...args, '--input', '-'], {
@@ -589,13 +595,6 @@ async function ghApi(args: string[], body: unknown): Promise<unknown> {
   });
   call.child.stdin?.end(JSON.stringify(body));
   return JSON.parse((await call).stdout);
-}
-
-async function graphql<T>(
-  query: string,
-  variables: Record<string, unknown>
-): Promise<T> {
-  return ((await ghApi(['graphql'], { query, variables })) as { data: T }).data;
 }
 
 interface NamedNode {
@@ -728,8 +727,15 @@ const SET_STATUS = `mutation ($project: ID!, $item: ID!, $field: ID!, $option: S
   updateProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $field, value: { singleSelectOptionId: $option } }) { clientMutationId }
 }`;
 
-/** GitHub through the login of the GitHub CLI. */
-function githubCli(): GitHub {
+/** GitHub through `api`, by default `gh api` with the login of the GitHub CLI. */
+export function githubCli(api: Api = ghApi): GitHub {
+  async function graphql<T>(
+    query: string,
+    variables: Record<string, unknown>
+  ): Promise<T> {
+    return ((await api(['graphql'], { query, variables })) as { data: T }).data;
+  }
+
   const nodeIds = new Map<string, string>();
   const idOf = (key: string) => {
     const id = nodeIds.get(key);
@@ -840,7 +846,7 @@ function githubCli(): GitHub {
     async write(change) {
       switch (change.kind) {
         case 'createRelease':
-          await ghApi(
+          await api(
             [`repos/${REPOSITORY_NAME}/milestones`, '--method', 'POST'],
             {
               title: change.title,
