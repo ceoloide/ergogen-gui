@@ -8,12 +8,8 @@
   "project": ["src/**/*.{ts,tsx}"],
   // Native release binary installed separately from the Node dependency graph.
   "ignoreBinaries": ["actionlint", "shellcheck", "zizmor"],
-  "ignoreDependencies": [
-    "@jscad/csg",
-    "@jscad/stl-serializer",
-    "@typescript-eslint/parser",
-    "baseline-browser-mapping",
-    "eslint-plugin-prettier",
-    "markdownlint",
-  ],
+  // vite build loads this package through Babel and browserslist, and the app
+  // never imports it. It is declared so that Dependabot, which updates only
+  // declared packages, keeps the browser data that browserslist reads current.
+  "ignoreDependencies": ["baseline-browser-mapping"],
 }
