@@ -19,7 +19,8 @@
 //     "evidence": "...",
 //     "change": "...",
 //     "exitCondition": "...",
-//     "dependsOn": [274, 273]    the issues that block this one, or []
+//     "dependsOn": [274, 273]    the issues of ceoloide/ergogen-gui that block
+//                                this one, or []
 //   }
 //
 // The script sets the issue type, the milestone, and the track, size, mode,
@@ -27,7 +28,10 @@
 // writes the release table and the Evidence, Change, Exit condition, and
 // Depends on sections into the body, and keeps the text that the body had
 // before the first run under the heading Report. It makes the issue blocked
-// by exactly the issues in dependsOn. A new item enters the Project with the
+// by exactly the issues in dependsOn, and keeps each blocker from another
+// repository. It adds new blockers before it removes old ones, so a failed
+// run leaves the issue blocked by more issues, not fewer. A new item enters
+// the Project with the
 // status Proposed for a Feature and Todo for any other type. The script never
 // changes the status of an item that has one.
 //
@@ -241,8 +245,8 @@ function parseItem(input: unknown): Item {
   if (!Array.isArray(dependsOn) || !dependsOn.every(isIssueNumber)) {
     problems.push(
       dependsOn === undefined
-        ? 'dependsOn is missing. Give the numbers of the issues that block this one, or [].'
-        : `dependsOn is ${quoted(dependsOn)}. Give a list of issue numbers, or [].`
+        ? `dependsOn is missing. Give the numbers of the issues in ${REPOSITORY_NAME} that block this one, or [].`
+        : `dependsOn is ${quoted(dependsOn)}. Give the numbers of issues in ${REPOSITORY_NAME}, or []. Add a dependency on an issue of another repository on GitHub, and pnpm queue:add keeps it.`
     );
   }
   if (isIssueNumber(issue)) {
@@ -286,12 +290,18 @@ interface Milestone {
   closed: boolean;
 }
 
-/** An issue of the repository, in the graph of blocked-by relations. */
+/**
+ * An issue in the graph of blocked-by relations: its number for an issue of
+ * this repository, or `owner/name#number` for an issue of another one.
+ */
+export type IssueRef = number | `${string}#${number}`;
+
+/** An issue in the graph of blocked-by relations. */
 interface GraphIssue {
   title: string;
   closed: boolean;
-  /** The issues of the same repository that block this one. */
-  blockedBy: readonly number[];
+  /** The issues that block this one, in any repository. */
+  blockedBy: readonly IssueRef[];
 }
 
 /** What the plan reads from the repository and the Project. */
@@ -303,8 +313,11 @@ export interface Repository {
   /** The options of the Status field of the Project. */
   statuses: ReadonlySet<string>;
   projectTitle: string;
-  /** Every issue of the repository by number, without pull requests. */
-  issues: ReadonlyMap<number, GraphIssue>;
+  /**
+   * Every issue of the repository, without pull requests, and every issue of
+   * another repository that blocks one of them, directly or through others.
+   */
+  issues: ReadonlyMap<IssueRef, GraphIssue>;
 }
 
 /** What the plan reads from the issue that an item adds. */
@@ -346,20 +359,20 @@ export interface GitHub {
 
 /**
  * Finds a path of blocked-by relations from `issue` back to itself, once the
- * blockers of `issue` are `dependsOn`. The blockers of every other issue come
+ * blockers of `issue` are `blockers`. The blockers of every other issue come
  * from `issues`. Returns undefined when there is no cycle.
  */
 function findCycle(
-  issues: ReadonlyMap<number, GraphIssue>,
+  issues: ReadonlyMap<IssueRef, GraphIssue>,
   issue: number,
-  dependsOn: readonly number[]
-): number[] | undefined {
-  const visited = new Set<number>();
-  const walk = (path: number[]): number[] | undefined => {
+  blockers: readonly IssueRef[]
+): IssueRef[] | undefined {
+  const visited = new Set<IssueRef>();
+  const walk = (path: IssueRef[]): IssueRef[] | undefined => {
     const last = path[path.length - 1];
-    const blockers =
-      last === issue ? dependsOn : (issues.get(last)?.blockedBy ?? []);
-    for (const blocker of blockers) {
+    const next =
+      last === issue ? blockers : (issues.get(last)?.blockedBy ?? []);
+    for (const blocker of next) {
       if (blocker === issue) return [...path, blocker];
       if (visited.has(blocker)) continue;
       visited.add(blocker);
@@ -447,7 +460,7 @@ function planIssue(
   item: IssueItem,
   repository: Repository,
   issue: IssueState | undefined
-): Change[] {
+): { changes: Change[]; kept: IssueRef[] } {
   const number = item.issue;
   const problems: string[] = [];
   const known = repository.issues.get(number);
@@ -493,13 +506,22 @@ function planIssue(
     }
     return found ? [{ number: blocker, title: found.title }] : [];
   });
-  const cycle = findCycle(repository.issues, number, item.dependsOn);
+  const kept = (known?.blockedBy ?? []).filter(
+    (blocker) => typeof blocker === 'string'
+  );
+  const cycle = findCycle(repository.issues, number, [
+    ...item.dependsOn,
+    ...kept,
+  ]);
   if (cycle) {
     const steps = cycle
       .slice(1)
-      .map((blocker, index) => `#${cycle[index]} is blocked by #${blocker}`);
+      .map(
+        (blocker, index) =>
+          `${nameOf(cycle[index])} is blocked by ${nameOf(blocker)}`
+      );
     problems.push(
-      `dependsOn forms a cycle: ${steps.length === 1 ? steps[0] : `${steps.slice(0, -1).join(', ')}, and ${steps[steps.length - 1]}`}.`
+      `The dependencies form a cycle: ${steps.length === 1 ? steps[0] : `${steps.slice(0, -1).join(', ')}, and ${steps[steps.length - 1]}`}.`
     );
   }
   if (problems.length > 0 || !issue || !known) throw new Rejected(problems);
@@ -525,14 +547,14 @@ function planIssue(
   if (body !== issue.body) {
     changes.push({ kind: 'setBody', issue: number, body });
   }
-  for (const blocker of known.blockedBy) {
-    if (!item.dependsOn.includes(blocker)) {
-      changes.push({ kind: 'removeDependency', issue: number, blocker });
-    }
-  }
   for (const blocker of item.dependsOn) {
     if (!known.blockedBy.includes(blocker)) {
       changes.push({ kind: 'addDependency', issue: number, blocker });
+    }
+  }
+  for (const blocker of known.blockedBy) {
+    if (typeof blocker === 'number' && !item.dependsOn.includes(blocker)) {
+      changes.push({ kind: 'removeDependency', issue: number, blocker });
     }
   }
   if (!issue.project) {
@@ -540,12 +562,16 @@ function planIssue(
   } else if (!issue.project.status) {
     changes.push({ kind: 'setStatus', issue: number, status });
   }
-  return changes;
+  return { changes, kept };
 }
 
+const nameOf = (ref: IssueRef) => (typeof ref === 'number' ? `#${ref}` : ref);
+
+/** The name and the title of an issue, such as "#274 R20-01 Load the queue". */
+const titled = (ref: IssueRef, repository: Repository) =>
+  `${nameOf(ref)} ${repository.issues.get(ref)?.title ?? ''}`.trim();
+
 function describe(change: Change, repository: Repository): string {
-  const issue = (number: number) =>
-    `#${number} ${repository.issues.get(number)?.title ?? ''}`.trim();
   switch (change.kind) {
     case 'createRelease':
       return `create the milestone ${change.title}${change.dueOn ? `, due ${change.dueOn}` : ' with no due date'}`;
@@ -560,9 +586,9 @@ function describe(change: Change, repository: Repository): string {
     case 'setBody':
       return 'write the release table and the sections into the body';
     case 'removeDependency':
-      return `remove the dependency ${issue(change.blocker)}`;
+      return `remove the dependency ${titled(change.blocker, repository)}`;
     case 'addDependency':
-      return `add the dependency ${issue(change.blocker)}`;
+      return `add the dependency ${titled(change.blocker, repository)}`;
     case 'addToProject':
       return `add the issue to the Project "${repository.projectTitle}" with the status ${change.status}`;
     case 'setStatus':
@@ -591,8 +617,14 @@ export async function addToQueue(
     const issue = repository.issues.has(item.issue)
       ? await github.readIssue(item.issue)
       : undefined;
-    changes = planIssue(item, repository, issue);
+    const plan = planIssue(item, repository, issue);
+    changes = plan.changes;
     print(`#${item.issue} ${repository.issues.get(item.issue)?.title}`);
+    for (const blocker of plan.kept) {
+      print(
+        `  keep the dependency ${titled(blocker, repository)}, which is in another repository`
+      );
+    }
   }
   if (changes.length === 0) {
     print('Nothing to change. GitHub already holds these values.');
@@ -673,37 +705,48 @@ interface RepositoryReply {
   };
 }
 
+/** The fields of an issue in the graph of blocked-by relations. */
+const GRAPH_ISSUE = `id number title closed repository { nameWithOwner }
+  blockedBy(first: 100) { nodes { id number repository { nameWithOwner } } }`;
+
 const ISSUES_QUERY = `query ($owner: String!, $name: String!, $after: String) {
   repository(owner: $owner, name: $name) {
     issues(first: 100, after: $after, states: [OPEN, CLOSED]) {
       pageInfo { hasNextPage endCursor }
-      nodes {
-        id
-        number
-        title
-        closed
-        blockedBy(first: 100) { nodes { number repository { nameWithOwner } } }
-      }
+      nodes { ${GRAPH_ISSUE} }
     }
   }
 }`;
+
+const NODES_QUERY = `query ($ids: [ID!]!) {
+  nodes(ids: $ids) { ... on Issue { ${GRAPH_ISSUE} } }
+}`;
+
+interface IssueNode {
+  id: string;
+  number: number;
+  repository: { nameWithOwner: string };
+}
+
+interface GraphIssueNode extends IssueNode {
+  title: string;
+  closed: boolean;
+  blockedBy: { nodes: IssueNode[] };
+}
 
 interface IssuesReply {
   repository: {
     issues: {
       pageInfo: { hasNextPage: boolean; endCursor: string };
-      nodes: {
-        id: string;
-        number: number;
-        title: string;
-        closed: boolean;
-        blockedBy: {
-          nodes: { number: number; repository: { nameWithOwner: string } }[];
-        };
-      }[];
+      nodes: GraphIssueNode[];
     };
   };
 }
+
+const refOf = ({ number, repository }: IssueNode): IssueRef =>
+  repository.nameWithOwner === REPOSITORY_NAME
+    ? number
+    : `${repository.nameWithOwner}#${number}`;
 
 const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
@@ -810,29 +853,42 @@ export function githubCli(api: Api = ghApi): GitHub {
         nodeIds.set(`status ${name}`, id);
       }
 
-      const issues = new Map<number, GraphIssue>();
+      const issues = new Map<IssueRef, GraphIssue>();
+      const addIssue = (node: GraphIssueNode) => {
+        for (const issue of [node, ...node.blockedBy.nodes]) {
+          nodeIds.set(`issue ${refOf(issue)}`, issue.id);
+        }
+        issues.set(refOf(node), {
+          title: node.title,
+          closed: node.closed,
+          blockedBy: node.blockedBy.nodes.map(refOf),
+        });
+      };
       let after: string | null = null;
       do {
         const page: IssuesReply = await graphql<IssuesReply>(ISSUES_QUERY, {
           ...variables,
           after,
         });
-        for (const node of page.repository.issues.nodes) {
-          nodeIds.set(`issue ${node.number}`, node.id);
-          issues.set(node.number, {
-            title: node.title,
-            closed: node.closed,
-            blockedBy: node.blockedBy.nodes
-              .filter(
-                (blocker) =>
-                  blocker.repository.nameWithOwner === REPOSITORY_NAME
-              )
-              .map((blocker) => blocker.number),
-          });
-        }
+        page.repository.issues.nodes.forEach(addIssue);
         const { hasNextPage, endCursor } = page.repository.issues.pageInfo;
         after = hasNextPage ? endCursor : null;
       } while (after);
+
+      // Reads each issue of another repository that blocks an issue in the
+      // graph, so that the cycle check follows every path.
+      const requested = new Set<IssueRef>();
+      const unread = () =>
+        [...new Set([...issues.values()].flatMap(({ blockedBy }) => blockedBy))]
+          .filter((ref) => !issues.has(ref) && !requested.has(ref))
+          .slice(0, 100);
+      for (let batch = unread(); batch.length > 0; batch = unread()) {
+        batch.forEach((ref) => requested.add(ref));
+        const reply = await graphql<{ nodes: GraphIssueNode[] }>(NODES_QUERY, {
+          ids: batch.map((ref) => idOf(`issue ${ref}`)),
+        });
+        reply.nodes.forEach(addIssue);
+      }
 
       return {
         milestones: new Map(

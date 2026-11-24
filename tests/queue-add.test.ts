@@ -7,9 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   addToQueue,
+  githubCli,
   Rejected,
   type Change,
   type GitHub,
+  type IssueRef,
   type IssueState,
   type Repository,
 } from '../scripts/queue/add.mts';
@@ -21,7 +23,7 @@ interface FakeIssue {
   type?: string;
   release?: string;
   labels?: string[];
-  blockedBy?: number[];
+  blockedBy?: IssueRef[];
   project?: { status?: string };
 }
 
@@ -69,7 +71,7 @@ function fakeGitHub(
           closed: false,
           body: '',
           labels: [] as string[],
-          blockedBy: [] as number[],
+          blockedBy: [] as IssueRef[],
           ...issue,
         },
       ])
@@ -154,6 +156,138 @@ function fakeGitHub(
     },
   };
   return { github, state, writes };
+}
+
+/**
+ * The GitHub API in memory, for `githubCli`. `issues` holds the issues of
+ * ceoloide/ergogen-gui by number and the issues of other repositories by
+ * `owner/name#number`. `statusAtWrite` is the status that the Project item
+ * of the issue has by the time the script writes, which someone can set after
+ * the script reads the issue. GitHub returns the item with that status when
+ * the script adds the issue to the Project. `requests` lists each GraphQL
+ * request.
+ */
+function fakeApi(
+  issues: Record<string, FakeIssue>,
+  { statusAtWrite }: { statusAtWrite?: string } = {}
+) {
+  const requests: { query: string; variables: Record<string, unknown> }[] = [];
+  const refs = Object.keys(issues).map(
+    (key): IssueRef => (/^\d+$/.test(key) ? Number(key) : (key as IssueRef))
+  );
+  const nodeOf = (ref: IssueRef) => {
+    const [repository, number] =
+      typeof ref === 'number'
+        ? ['ceoloide/ergogen-gui', String(ref)]
+        : ref.split('#');
+    return {
+      id: `node ${ref}`,
+      number: Number(number),
+      repository: { nameWithOwner: repository },
+    };
+  };
+  const issueNode = (ref: IssueRef) => {
+    const { title, closed = false, blockedBy = [] } = issues[ref];
+    return {
+      ...nodeOf(ref),
+      title,
+      closed,
+      blockedBy: { nodes: blockedBy.map(nodeOf) },
+    };
+  };
+  const named = (kind: string, names: string[]) =>
+    names.map((name) => ({ id: `${kind} ${name}`, name }));
+  const status = (name?: string) => (name ? { name } : null);
+
+  function reply(query: string, variables: Record<string, unknown>) {
+    if (query.includes('addProjectV2ItemById')) {
+      return {
+        addProjectV2ItemById: {
+          item: { id: 'item', fieldValueByName: status(statusAtWrite) },
+        },
+      };
+    }
+    if (query.startsWith('mutation')) return {};
+    if (query.includes('issueTypes')) {
+      return {
+        repository: {
+          issueTypes: { nodes: named('type', ['Task', 'Bug', 'Feature']) },
+          milestones: {
+            nodes: [
+              {
+                id: 'milestone v0.20',
+                title: 'v0.20',
+                description: 'Baseline and limits.',
+                dueOn: null,
+                closed: false,
+              },
+            ],
+          },
+          labels: { nodes: named('label', ['bug', ...queueLabels]) },
+        },
+        user: {
+          projectV2: {
+            id: 'project',
+            title: 'Ergogen GUI 2027',
+            field: {
+              id: 'status',
+              options: named('status', ['Proposed', 'Todo', 'In progress']),
+            },
+          },
+        },
+      };
+    }
+    if (query.includes('nodes(ids')) {
+      const ids = variables.ids as string[];
+      return {
+        nodes: refs
+          .filter((ref) => ids.includes(nodeOf(ref).id))
+          .map(issueNode),
+      };
+    }
+    if (query.includes('issues(first')) {
+      return {
+        repository: {
+          issues: {
+            pageInfo: { hasNextPage: false, endCursor: '' },
+            nodes: refs.filter((ref) => typeof ref === 'number').map(issueNode),
+          },
+        },
+      };
+    }
+    const issue = issues[variables.number as number];
+    return {
+      repository: {
+        issue: {
+          body: issue.body ?? '',
+          issueType: issue.type ? { name: issue.type } : null,
+          milestone: issue.release ? { title: issue.release } : null,
+          labels: { nodes: (issue.labels ?? []).map((name) => ({ name })) },
+          projectItems: {
+            nodes: issue.project
+              ? [
+                  {
+                    id: 'item',
+                    project: { id: 'project' },
+                    fieldValueByName: status(issue.project.status),
+                  },
+                ]
+              : [],
+          },
+        },
+      },
+    };
+  }
+
+  const api = async (_args: string[], body: unknown) => {
+    const { query, variables } = body as (typeof requests)[number];
+    requests.push({ query, variables });
+    return { data: reply(query, variables) };
+  };
+  /** Whether the script sent a request that names `field`. */
+  const sent = (field: string) =>
+    requests.some(({ query }) => query.includes(field));
+  return { api, requests, sent };
 }
 
 async function add(github: GitHub, input: unknown, dryRun = false) {
@@ -343,6 +477,23 @@ describe('pnpm queue:add rejects an incomplete item', () => {
     ]);
     expect(writes).toEqual([]);
   });
+
+  it('rejects an issue of another repository in dependsOn and says how to add one', async () => {
+    // Arrange
+    const { github, writes } = fakeGitHub(reported());
+
+    // Act
+    const problems = await problemsOf(github, {
+      ...bug,
+      dependsOn: ['ergogen/ergogen#12'],
+    });
+
+    // Assert
+    expect(problems).toEqual([
+      'dependsOn is ["ergogen/ergogen#12"]. Give the numbers of issues in ceoloide/ergogen-gui, or []. Add a dependency on an issue of another repository on GitHub, and pnpm queue:add keeps it.',
+    ]);
+    expect(writes).toEqual([]);
+  });
 });
 
 describe('the cycle rule', () => {
@@ -364,7 +515,7 @@ describe('the cycle rule', () => {
 
     // Assert
     expect(problems).toEqual([
-      'dependsOn forms a cycle: #13 is blocked by #10, #10 is blocked by #11, and #11 is blocked by #13.',
+      'The dependencies form a cycle: #13 is blocked by #10, #10 is blocked by #11, and #11 is blocked by #13.',
     ]);
     expect(writes).toEqual([]);
   });
@@ -378,7 +529,7 @@ describe('the cycle rule', () => {
 
     // Assert
     expect(problems).toEqual([
-      'dependsOn forms a cycle: #13 is blocked by #13.',
+      'The dependencies form a cycle: #13 is blocked by #13.',
     ]);
     expect(writes).toEqual([]);
   });
@@ -426,8 +577,8 @@ describe('adding an issue', () => {
       '  add the labels track:verification, size:S, mode:auto, priority:P1',
       '  remove the labels size:M',
       '  write the release table and the sections into the body',
-      '  remove the dependency #376 R100-09 Release 1.0',
       '  add the dependency #274 R20-01 Load the queue',
+      '  remove the dependency #376 R100-09 Release 1.0',
       '  add the issue to the Project "Ergogen GUI 2027" with the status Todo',
       'Made 8 changes.',
     ]);
@@ -464,6 +615,19 @@ describe('adding an issue', () => {
 
     // Assert
     expect(state.issues.get(400)).toEqual(once.state.issues.get(400));
+  });
+
+  it('keeps the old blockers when a new one fails to be written', async () => {
+    // Arrange
+    const { github, state } = fakeGitHub(reported(), {
+      failAt: 'addDependency',
+    });
+
+    // Act
+    await expect(add(github, bug)).rejects.toThrow('dropped');
+
+    // Assert
+    expect(state.issues.get(400)?.blockedBy).toEqual([376]);
   });
 
   it('puts a Feature in the Project as Proposed', async () => {
@@ -632,6 +796,73 @@ describe('the issue text from before intake', () => {
       // Assert
       expect(problems).toEqual([expect.stringMatching(new RegExp(`^${key} `))]);
       expect(writes).toEqual([]);
+    }
+  );
+});
+
+describe('a blocker in another repository', () => {
+  it('stays, and a dry run shows it as kept', async () => {
+    // Arrange
+    const issues = reported();
+    issues[400].blockedBy = [376, 'ergogen/ergogen#12'];
+    const { api } = fakeApi({
+      ...issues,
+      'ergogen/ergogen#12': { title: 'Export the outline as SVG' },
+    });
+
+    // Act
+    const lines = await add(githubCli(api), bug, true);
+
+    // Assert
+    expect(lines.filter((line) => line.includes('dependency'))).toEqual([
+      '  keep the dependency ergogen/ergogen#12 Export the outline as SVG, which is in another repository',
+      '  add the dependency #274 R20-01 Load the queue',
+      '  remove the dependency #376 R100-09 Release 1.0',
+    ]);
+  });
+
+  it.each<[string, Record<string, FakeIssue>, number[], string]>([
+    [
+      'on a path from dependsOn, through two other repositories',
+      {
+        10: { title: 'Ten', blockedBy: ['ergogen/ergogen#12'] },
+        13: { title: 'Thirteen' },
+        'ergogen/ergogen#12': {
+          title: 'Twelve',
+          blockedBy: ['ceoloide/ergogen-footprints#5'],
+        },
+        'ceoloide/ergogen-footprints#5': { title: 'Five', blockedBy: [13] },
+      },
+      [10],
+      'The dependencies form a cycle: #13 is blocked by #10, #10 is blocked by ergogen/ergogen#12, ergogen/ergogen#12 is blocked by ceoloide/ergogen-footprints#5, and ceoloide/ergogen-footprints#5 is blocked by #13.',
+    ],
+    [
+      'when it blocks the issue already',
+      {
+        13: { title: 'Thirteen', blockedBy: ['ergogen/ergogen#12'] },
+        'ergogen/ergogen#12': { title: 'Twelve', blockedBy: [13] },
+      },
+      [],
+      'The dependencies form a cycle: #13 is blocked by ergogen/ergogen#12, and ergogen/ergogen#12 is blocked by #13.',
+    ],
+  ])(
+    'counts in the cycle rule %s',
+    async (_case, issues, dependsOn, problem) => {
+      // Arrange
+      const { api, sent } = fakeApi(issues);
+
+      // Act
+      const problems = await problemsOf(githubCli(api), {
+        ...bug,
+        type: 'Task',
+        priority: undefined,
+        issue: 13,
+        dependsOn,
+      });
+
+      // Assert
+      expect(problems).toEqual([problem]);
+      expect(sent('mutation')).toBe(false);
     }
   );
 });
