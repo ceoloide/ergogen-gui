@@ -158,7 +158,7 @@ describe('HC-013a deployment policy', () => {
     // tests/metrics.test.ts checks that pnpm metrics runs every step of
     // pnpm validate.
     expect(packageJson.scripts.metrics).toBe('node scripts/ci/metrics.mts');
-    for (const command of ['pnpm metrics --repeat 3', 'pnpm test:e2e']) {
+    for (const command of ['pnpm metrics', 'pnpm test:e2e']) {
       const step = job.steps.find((candidate) => candidate.run === command);
       expect(step).toBeDefined();
       expect(step?.if).toBeUndefined();
@@ -171,7 +171,7 @@ describe('HC-013a deployment policy', () => {
     // pass only the matching repository variable.
     const validations = [
       ci.jobs['lint-and-test'].steps.find(
-        (step) => step.run === 'pnpm metrics --repeat 3'
+        (step) => step.run === 'pnpm metrics'
       ),
       build.steps.find((step) => step.run === 'pnpm validate'),
     ];
