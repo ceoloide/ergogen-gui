@@ -43,11 +43,11 @@ A Vite build does not check types. Only `pnpm typecheck` checks types, and
 `pnpm validate:fast` runs it. Husky and `lint-staged` run quick fixes on staged
 files before a commit, and GitHub enforces full validation on pull requests.
 
-`pnpm validate:fast` checks every maintained file group. A declaration file
-must belong to one of the two TypeScript projects, or
-`pnpm typecheck:declarations` fails.
-[Validation background](docs/records/background.md#validation) lists the
-checks for each file group and the files that validation intentionally skips.
+Prettier checks every file it can parse, except those that `.gitignore` and
+`.prettierignore` list. ESLint checks every JavaScript and TypeScript file,
+except those in the `ignores` of `eslint.config.mjs`.
+[Validation background](docs/records/background.md#validation) lists the other
+checks for each file group.
 
 Vitest writes `reports/unit.xml`, and `pnpm test:reports` writes
 `reports/evidence.json`. Playwright runs without retries and writes

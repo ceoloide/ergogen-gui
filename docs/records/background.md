@@ -12,26 +12,21 @@ This section explains [Validation](../../DEVELOPMENT.md#validation).
 
 ### Checks for each file group
 
-Validation runs these checks on each group of maintained files:
+Prettier and ESLint cover the files that
+[Validation](../../DEVELOPMENT.md#validation) describes. Validation also runs
+these checks on each group of maintained files:
 
-- `src/`: Prettier, ESLint, and TypeScript with the strict `tsconfig.json`.
+- `src/`: TypeScript with the strict `tsconfig.json`.
 - `tests/`, `e2e/`, `scripts/ci/`, `scripts/queue/`, and root `*.config.mts`:
-  Prettier, ESLint, and TypeScript with `tsconfig.tooling.json`.
-- JavaScript in other `scripts/`, `patch/*.js`, `eslint.config.mjs`, and corpus
-  footprints: Prettier and ESLint. JavaScript files are not type-checked.
+  TypeScript with `tsconfig.tooling.json`. JavaScript files are not
+  type-checked.
 - `scripts/*.sh`, `patch/*.sh`, and `.husky/pre-commit`: ShellCheck.
-- `.github/` workflows and configuration: Prettier and zizmor. Workflows also
-  run actionlint, which runs ShellCheck on `run:` blocks.
-- Markdown, including `.agents/`: Prettier and markdownlint. `pnpm format:check`
-  skips `docs/`, where only `lint-staged` runs Prettier.
-- JSON, `index.html`, and `pnpm-workspace.yaml`: Prettier.
+- `.github/` workflows and configuration: zizmor. Workflows also run
+  actionlint, which runs ShellCheck on `run:` blocks.
+- Markdown, including `.agents/`: markdownlint.
 - Declaration files: `pnpm typecheck:declarations`, as
-  [Declaration check](#declaration-check) describes.
-
-Validation intentionally skips the vendored scripts in `public/dependencies/`,
-other files in `public/`, the pnpm-generated `pnpm-lock.yaml`, the byte-exact
-fixtures `tests/ci/reports/*.xml` and `tests/engine-contract/corpus/*.yaml`, and
-Git-ignored output such as `dist*`, `reports/`, and `.tools/`.
+  [Declaration check](#declaration-check) describes. A declaration file must
+  belong to one of the two TypeScript projects, or this check fails.
 
 ### Declaration check
 
