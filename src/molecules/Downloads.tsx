@@ -1,5 +1,5 @@
 import DownloadRow from '../atoms/DownloadRow';
-import { Preview } from '../atoms/DownloadRow';
+import { Preview } from '../types/preview';
 import yaml from 'js-yaml';
 import styled from 'styled-components';
 import { useConfigContext } from '../context/ConfigContext';

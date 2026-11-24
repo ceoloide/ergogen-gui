@@ -15,7 +15,7 @@ import Downloads from './molecules/Downloads';
 import Injections from './molecules/Injections';
 import FilePreview from './molecules/FilePreview';
 import ResizablePanel from './molecules/ResizablePanel';
-import { Preview } from './atoms/DownloadRow';
+import { Preview } from './types/preview';
 
 import { useConfigContext } from './context/ConfigContext';
 import { getLatestConfigInput } from './utils/generationHelpers';

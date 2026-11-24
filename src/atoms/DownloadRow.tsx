@@ -1,6 +1,7 @@
 import styled, { keyframes } from 'styled-components';
 import { theme } from '../theme/theme';
 import { trackEvent } from '../utils/analytics';
+import { Preview } from '../types/preview';
 
 const spin = keyframes`
   from {
@@ -10,19 +11,6 @@ const spin = keyframes`
     transform: rotate(360deg);
   }
 `;
-
-/**
- * Interface for a preview object.
- * @interface Preview
- * @property {string} extension - The file extension of the preview content.
- * @property {string} key - A unique key for the preview.
- * @property {string} content - The content of the preview.
- */
-export interface Preview {
-  extension: string;
-  key: string;
-  content: string | ArrayBuffer | Uint8Array;
-}
 
 /**
  * Props for the DownloadRow component.

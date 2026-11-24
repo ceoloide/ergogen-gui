@@ -40,7 +40,7 @@ vi.mock('./pages/Welcome', () => {
 });
 
 // Mock Header component
-vi.mock('./atoms/Header', () => {
+vi.mock('./organisms/Header', () => {
   const MockHeader = () => <div data-testid="mock-header" />;
   MockHeader.displayName = 'MockHeader';
   return {

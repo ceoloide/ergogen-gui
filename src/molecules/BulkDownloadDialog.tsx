@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { theme } from '../theme/theme';
 import Button from '../atoms/Button';
-import { exportConfigsProgressively } from '../utils/zip';
+import { exportConfigsProgressively } from '../workers/bulkExport';
 import { trackEvent } from '../utils/analytics';
 
 type BulkDownloadDialogProps = {
