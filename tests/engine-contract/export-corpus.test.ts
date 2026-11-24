@@ -1,7 +1,8 @@
 import { saveAs } from 'file-saver';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseZipArchive } from '../../src/utils/ergogenBundleLoader';
-import { createZip, exportConfigsProgressively } from '../../src/utils/zip';
+import { createZip } from '../../src/utils/zip';
+import { exportConfigsProgressively } from '../../src/workers/bulkExport';
 import {
   bulkProbePadInjection,
   bulkStaggeredThumbsConfig,

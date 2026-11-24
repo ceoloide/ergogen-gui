@@ -28,7 +28,6 @@ import {
   analyzeConfiguration,
   KeyboardAnalyticsPayload,
 } from '../utils/configAnalyzer';
-import ConflictResolutionDialog from '../molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from '../hooks/useInjectionConflictResolution';
 import { useConfigLoader } from '../hooks/useConfigLoader';
 import type { WorkerResponse as ErgogenWorkerResponse } from '../workers/ergogen.worker.types';
@@ -59,6 +58,7 @@ import {
   checkForDeprecationWarnings,
   preparePreviewConfig,
 } from '../utils/generationHelpers';
+import type { ConflictResolutionStrategy } from '../utils/injections';
 
 interface SavedConfig {
   id: string;
@@ -206,6 +206,13 @@ type ContextProps = {
   isGenerating: boolean;
   setIsGenerating: Dispatch<SetStateAction<boolean>>;
   isJscadConverting: boolean;
+  /** An injection from a repository named in the URL that has the name of a saved one. */
+  currentConflict: { name: string; type: string } | null;
+  handleConflictResolution: (
+    action: ConflictResolutionStrategy,
+    applyToAllConflicts: boolean
+  ) => Promise<void>;
+  handleConflictCancel: () => void;
 };
 
 /**
@@ -1850,6 +1857,9 @@ const ConfigContextProvider = ({
       isGenerating,
       setIsGenerating,
       isJscadConverting,
+      currentConflict,
+      handleConflictResolution,
+      handleConflictCancel,
     }),
     [
       configInputState,
@@ -1909,21 +1919,15 @@ const ConfigContextProvider = ({
       isGenerating,
       setIsGenerating,
       isJscadConverting,
+      currentConflict,
+      handleConflictResolution,
+      handleConflictCancel,
     ]
   );
 
   return (
     <ConfigContext.Provider value={contextValue}>
       {children}
-      {currentConflict && (
-        <ConflictResolutionDialog
-          injectionName={currentConflict.name}
-          injectionType={currentConflict.type}
-          onResolve={handleConflictResolution}
-          onCancel={handleConflictCancel}
-          data-testid="conflict-resolution-dialog"
-        />
-      )}
     </ConfigContext.Provider>
   );
 };

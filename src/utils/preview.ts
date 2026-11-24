@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import { Preview } from '../atoms/DownloadRow';
+import { Preview } from '../types/preview';
 import { Results } from '../types/results';
 import { findResult } from './object';
 

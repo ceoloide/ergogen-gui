@@ -1,6 +1,11 @@
 import { isFeatureEnabled } from './featureFlags';
 import { enforceFileSizeLimit } from './ergogenBundleLoader';
-import { GIT_BFS_MAX_REQUESTS, GIT_BFS_MAX_DEPTH } from '../context/constants';
+
+/**
+ * Breadth-First Search (BFS) caps for Git Provider repository traversal
+ */
+const GIT_BFS_MAX_REQUESTS = 40;
+const GIT_BFS_MAX_DEPTH = 3;
 
 export class RateLimitError extends Error {
   constructor(message: string) {
