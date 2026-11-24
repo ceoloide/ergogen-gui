@@ -609,6 +609,29 @@ describe('generate-previews.js', () => {
     );
   });
 
+  it('loads the real examples with plain Node', () => {
+    // Arrange: the real examples replace the fixture.
+    cpSync(
+      join(projectRoot, 'src', 'examples'),
+      join(root, 'src', 'examples'),
+      { recursive: true }
+    );
+    writeEngine(
+      "module.exports = { process: async () => ({ demo: { svg: '<svg></svg>' } }) };\n"
+    );
+
+    // Act
+    const result = runGeneratePreviews();
+
+    // Assert: one preview for each tracked preview of a drawable example.
+    expect(result.status, result.stderr).toBe(0);
+    expect(
+      readdirSync(join(root, 'public', 'images', 'previews')).sort()
+    ).toEqual(
+      readdirSync(join(projectRoot, 'public', 'images', 'previews')).sort()
+    );
+  });
+
   it('fails fast when the engine has not been prepared', () => {
     // Act
     const result = runGeneratePreviews();

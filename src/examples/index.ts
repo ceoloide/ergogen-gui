@@ -1,17 +1,19 @@
-import Absolem from './absolem';
-import Atreus from './atreus';
-import Adux from './adux';
-import CorneyIsland from './corney-island';
-import EmptyYAML from './empty_yaml';
-import Wubbo from './wubbo';
-import Sweeplike from './sweeplike';
-import Reviung41 from './reviung41';
-import Tiny20 from './tiny20';
-import Alpha from './alpha';
-import Plank from './plank';
-import Curly45 from './curly45';
-import Briefs56 from './briefs56';
-import Willy50 from './willy50';
+// pnpm generate-previews loads this file with plain Node, which needs the .ts
+// extension in each import.
+import Absolem from './absolem.ts';
+import Atreus from './atreus.ts';
+import Adux from './adux.ts';
+import CorneyIsland from './corney-island.ts';
+import EmptyYAML from './empty_yaml.ts';
+import Wubbo from './wubbo.ts';
+import Sweeplike from './sweeplike.ts';
+import Reviung41 from './reviung41.ts';
+import Tiny20 from './tiny20.ts';
+import Alpha from './alpha.ts';
+import Plank from './plank.ts';
+import Curly45 from './curly45.ts';
+import Briefs56 from './briefs56.ts';
+import Willy50 from './willy50.ts';
 
 /**
  * Represents a group of configuration options for the react-select component.
