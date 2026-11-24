@@ -243,7 +243,8 @@ architecture, validation, and engine preparation. [AGENTS.md](AGENTS.md) lists
 the rules for every change. [CHANGELOG.md](CHANGELOG.md) summarizes user-facing
 changes. While the `main` ruleset is active, merges require an up-to-date pull
 request whose required `lint-and-test` check GitHub accepts. See
-[Branch rules](DEVELOPMENT.md#branch-rules) for limitations.
+[Branch rules](DEVELOPMENT.md#branch-rules) for the merge rules and
+[their limits](docs/records/branch-rules.md#limits).
 
 Validation also requires native
 [actionlint 1.7.12](https://github.com/rhysd/actionlint/releases/tag/v1.7.12),
