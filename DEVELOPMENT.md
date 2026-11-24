@@ -112,8 +112,7 @@ below the base path returns `index.html` with HTTP 200.
 [Browser tests background](docs/records/background.md#browser-tests) explains
 these rules and records timings.
 
-Two parallel tests plus background load may exceed the waits for generated
-outputs without any change in the app. A failed test's `readiness` attachment,
+A failed test's `readiness` attachment,
 from `e2e/utils/readiness.ts`, records how busy the CPUs were, how many
 generation requests the Ergogen worker received and finished, and the app's
 worker milestones. It helps separate CPU starvation from an app fault but does
@@ -153,8 +152,7 @@ contract test file named on the command line, and prints a
 `[vitest] ... excluding tests/engine-contract/**` notice. To run contract tests
 against the installed engine, run one file with
 `pnpm exec vitest run --mode contract tests/engine-contract/<file>` or all of
-them with `pnpm test:contract`. On an older engine, they fail wherever that
-engine lacks canonical behavior.
+them with `pnpm test:contract`.
 
 Every other test runs with every engine:
 
@@ -412,9 +410,10 @@ pnpm dev
 `scripts/preinstall.js` backs up `package.json`, and `postinstall` restores it.
 Keep `ERGOGEN_VERSION` exported while you work in that checkout. Engine
 preparation fails if `ERGOGEN_VERSION` differs from the installed specifier, and
-Vite also reads it as the displayed engine identity. Before you report
-canonical test results, restore canonical inputs and reinstall with
-`--frozen-lockfile`.
+Vite also reads it as the displayed engine identity. While `ERGOGEN_VERSION` is
+set, Vitest excludes the engine contract tests, so validation does not run them.
+[Run them explicitly](#engine-contract-tests). Before you report canonical test
+results, restore canonical inputs and reinstall with `--frozen-lockfile`.
 
 ### Deployment engine
 
@@ -533,9 +532,7 @@ manual run, replaces the pending run, even a newer one, which then shows as
 cancelled. The site stays at the last release until the next push to `main` or
 a [fresh release of its head](#releasing-main-again).
 
-Releases are public because `gh-pages` history records each one and the site
-serves its build ID. Run these commands to inspect what is served and where it
-came from:
+Run these commands to inspect what is served and where it came from:
 
 ```shell
 curl -fsS https://<site>/build-id.txt     # <commit>.<run id>.<run attempt>
@@ -592,15 +589,12 @@ expired.
 `scripts/ci/contract.mts` defines a passing pull request run. It requires the
 `lint-and-test` job of `ci.yaml`, all four of its named steps, and two JUnit
 reports that each hold at least one test and no failures, errors, or skipped
-tests. The browser report must include every Playwright project. Test counts
-are deliberately not pinned.
+tests. The browser report must include every Playwright project.
 
 In CI, `pnpm test:reports` runs even after a failed step. It fails the job when
 the reports break the contract, and it writes the identities, step outcomes,
 counts, and failed tests to the job summary and `reports/evidence.json`. The
-uploaded artifact is named `validation-<PR head>-attempt-<n>`. In pull request
-CI, `github.sha` is not the pull request head but the merge commit that GitHub
-tested, which merges the head into the base at that time.
+uploaded artifact is named `validation-<PR head>-attempt-<n>`.
 
 Always assess a pull request from an up-to-date `main` checkout, never from the
 pull request branch:
@@ -629,9 +623,12 @@ GitHub enforces the ruleset `main: require CI` (ID 27290096) and read-only
 Actions token defaults, defined in `scripts/ci/ruleset-proposal.json` and
 `scripts/ci/workflow-permissions-proposal.json`. Nobody can push to `main`,
 including the owner. A merge needs a pull request with resolved conversations
-and a passing `lint-and-test` check from the GitHub Actions app on a branch that
-is up to date with `main`. Update the branch with **Update branch**,
-`gh pr update-branch`, or a rebase. The ruleset does not cover `gh-pages`.
+and a `lint-and-test` check from the GitHub Actions app on a branch that is up to
+date with `main`. GitHub accepts the conclusions `success`, `skipped`, or
+`neutral` for that check, so a mergeable pull request may not have run its
+validation. [Pull request evidence](#pull-request-evidence) shows how to assess
+one. Update the branch with **Update branch**, `gh pr update-branch`, or a
+rebase. The ruleset does not cover `gh-pages`.
 
 The ruleset checks only the required check's name and conclusion, so review
 every change to workflows and scripts. As the owner, run `pnpm check:settings`

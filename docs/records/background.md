@@ -109,6 +109,9 @@ machine, and 5.8 to 7.1 s into that wait with four other CPU-bound processes
 running. Under that load, the Ergogen and JSCAD workers stayed busy 2.3 to 2.8
 times longer for 1.1 to 1.25 times their CPU time.
 
+Two parallel tests plus background load may exceed the waits for generated
+outputs without any change in the app.
+
 ## Engine contract tests
 
 This section explains why GUI tests need a version in the `package.json` engine
@@ -118,6 +121,9 @@ describes.
 If the specifier names no version while a deployment selects an older engine,
 that deployment's GUI tests use its older engine, and tests that expect
 canonical behavior fail.
+
+Contract tests that run against an older engine fail wherever that engine lacks
+canonical behavior.
 
 ## Generation
 
@@ -218,6 +224,15 @@ The Pages CDN caches each URL, even a 404, for ten minutes and ignores
 `no-cache` request headers. Without a unique query string, a repeated URL could
 keep answering with what Pages served before this release.
 
+## Release visibility
+
+This section explains why
+[Releases and rollback](../../DEVELOPMENT.md#releases-and-rollback) shows how to
+inspect a release.
+
+Releases are public because `gh-pages` history records each one and the site
+serves its build ID.
+
 ## Release history size
 
 This section records the cost of keeping every release on `gh-pages`, as
@@ -239,7 +254,10 @@ This section explains
 [Pull request evidence](../../DEVELOPMENT.md#pull-request-evidence).
 
 The contract checks for skipped tests explicitly because Vitest and Playwright
-exit 0 when tests are skipped.
+exit 0 when tests are skipped. It deliberately does not pin test counts.
+
+In pull request CI, `github.sha` is not the pull request head but the merge
+commit that GitHub tested, which merges the head into the base at that time.
 
 Everything a pull request run produces comes from code that the pull request can
 change, so assess a pull request from an up-to-date `main` checkout, never from

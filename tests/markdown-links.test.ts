@@ -77,8 +77,9 @@ const anchorsOf = (text: string): Set<string> => {
 };
 
 const linkPatterns = [
-  // Inline links and images: [text](target "title").
-  /!?\[(?:[^[\]]|\[[^[\]]*\])*\]\(\s*(<[^>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g,
+  // Inline links and images: [text](target "title"), with a title in double
+  // quotes, single quotes, or parentheses.
+  /!?\[(?:[^[\]]|\[[^[\]]*\])*\]\(\s*(<[^>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:\s+(?:"[^"]*"|'[^']*'|\([^()]*\)))?\s*\)/g,
   // Reference definitions: [label]: target.
   /^ {0,3}\[[^\]\n]+\]:[ \t]*(<[^>\n]*>|\S+)/gm,
 ];
@@ -153,6 +154,8 @@ describe('Markdown links', () => {
           '[the notes](docs/notes.md#first-step), and [license](LICENSE).',
           'Broken: [gone](docs/gone.md), [no heading](docs/notes.md#third).',
           'External: [site](https://example.com/#missing).',
+          'Titled: [quoted](docs/gone.md "Title"), [single](docs/gone.md \'Title\'),',
+          '[parenthesized](docs/gone.md (Title)).',
           'Ignored: `[code](docs/gone.md)`.',
           '',
           '```markdown',
@@ -174,6 +177,9 @@ describe('Markdown links', () => {
     expect(problems).toEqual([
       'README.md:9: docs/gone.md (no file docs/gone.md)',
       'README.md:9: docs/notes.md#third (no heading #third in docs/notes.md)',
+      'README.md:11: docs/gone.md (no file docs/gone.md)',
+      'README.md:11: docs/gone.md (no file docs/gone.md)',
+      'README.md:12: docs/gone.md (no file docs/gone.md)',
       'docs/notes.md:7: #nope (no heading #nope in docs/notes.md)',
     ]);
   });
