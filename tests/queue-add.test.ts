@@ -867,6 +867,43 @@ describe('a blocker in another repository', () => {
   );
 });
 
+describe('the status in the Project', () => {
+  it.each([
+    ['an issue that was outside the Project', undefined],
+    ['an item that had no status', {}],
+  ])(
+    'stays when someone sets it after the read, for %s',
+    async (_case, project) => {
+      // Arrange
+      const issues = reported();
+      issues[400].project = project;
+      const { api, sent } = fakeApi(issues, { statusAtWrite: 'In progress' });
+
+      // Act
+      await add(githubCli(api), bug);
+
+      // Assert
+      expect(sent('updateProjectV2ItemFieldValue')).toBe(false);
+    }
+  );
+
+  it('is set when the item still has none at the write', async () => {
+    // Arrange
+    const { api, requests, sent } = fakeApi(reported());
+
+    // Act
+    await add(githubCli(api), bug);
+
+    // Assert
+    expect(sent('addProjectV2ItemById')).toBe(true);
+    expect(
+      requests
+        .filter(({ query }) => query.includes('updateProjectV2ItemFieldValue'))
+        .map(({ variables }) => variables.option)
+    ).toEqual(['status Todo']);
+  });
+});
+
 describe('a release item', () => {
   const release = {
     type: 'Release',

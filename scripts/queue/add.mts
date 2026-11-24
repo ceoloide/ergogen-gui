@@ -31,9 +31,8 @@
 // by exactly the issues in dependsOn, and keeps each blocker from another
 // repository. It adds new blockers before it removes old ones, so a failed
 // run leaves the issue blocked by more issues, not fewer. A new item enters
-// the Project with the
-// status Proposed for a Feature and Todo for any other type. The script never
-// changes the status of an item that has one.
+// the Project with the status Proposed for a Feature and Todo for any other
+// type. The script never changes the status of an item that has one.
 //
 // A release item creates a milestone, with an optional due date:
 //
@@ -396,12 +395,10 @@ const reportMarker = (issue: number) =>
 
 /**
  * The text that the body of `issue` held before `pnpm queue:add` first wrote
- * it. A body that the script wrote starts with the release table. None of
- * the script's own lines is the hidden line: its table rows, headings, and
- * dependency lines start with another character, and `parseItem` rejects an
- * item whose text holds the line. So the text after the first hidden line is
- * the earlier text, whatever that text holds. Any other body is the earlier
- * text as a whole.
+ * it. In a body that starts with the release table, that is the text after
+ * the first hidden line. The script never writes the hidden line above its
+ * own, because `parseItem` rejects an item whose text holds it. Any other
+ * body is the earlier text as a whole.
  */
 function reportOf(body: string, issue: number): string {
   const lines = body.split('\n');
@@ -757,7 +754,6 @@ const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
       labels(first: 100) { nodes { name } }
       projectItems(first: 50) {
         nodes {
-          id
           project { id }
           fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
         }
@@ -775,7 +771,6 @@ interface IssueReply {
       labels: { nodes: { name: string }[] };
       projectItems: {
         nodes: {
-          id: string;
           project: { id: string };
           fieldValueByName: { name: string } | null;
         }[];
@@ -797,8 +792,17 @@ const DEPENDENCY = (mutation: string) =>
     ${mutation}(input: { issueId: $id, blockingIssueId: $blocker }) { clientMutationId }
   }`;
 const ADD_TO_PROJECT = `mutation ($project: ID!, $id: ID!) {
-  addProjectV2ItemById(input: { projectId: $project, contentId: $id }) { item { id } }
+  addProjectV2ItemById(input: { projectId: $project, contentId: $id }) {
+    item { id fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } }
+  }
 }`;
+
+interface AddToProjectReply {
+  addProjectV2ItemById: {
+    item: { id: string; fieldValueByName: { name: string } | null };
+  };
+}
+
 const SET_STATUS = `mutation ($project: ID!, $item: ID!, $field: ID!, $option: String!) {
   updateProjectV2ItemFieldValue(input: { projectId: $project, itemId: $item, fieldId: $field, value: { singleSelectOptionId: $option } }) { clientMutationId }
 }`;
@@ -819,15 +823,6 @@ export function githubCli(api: Api = ghApi): GitHub {
     return id;
   };
   const variables = { owner: REPOSITORY.owner, name: REPOSITORY.name };
-
-  async function setStatus(item: string, status: Status) {
-    await graphql(SET_STATUS, {
-      project: idOf('project'),
-      item,
-      field: idOf('status'),
-      option: idOf(`status ${status}`),
-    });
-  }
 
   return {
     async readRepository() {
@@ -875,8 +870,6 @@ export function githubCli(api: Api = ghApi): GitHub {
         after = hasNextPage ? endCursor : null;
       } while (after);
 
-      // Reads each issue of another repository that blocks an issue in the
-      // graph, so that the cycle check follows every path.
       const requested = new Set<IssueRef>();
       const unread = () =>
         [...new Set([...issues.values()].flatMap(({ blockedBy }) => blockedBy))]
@@ -918,7 +911,6 @@ export function githubCli(api: Api = ghApi): GitHub {
       const item = issue.projectItems.nodes.find(
         (node) => node.project.id === idOf('project')
       );
-      if (item) nodeIds.set(`project item ${number}`, item.id);
       return {
         body: issue.body,
         ...(issue.issueType && { type: issue.issueType.name }),
@@ -990,19 +982,26 @@ export function githubCli(api: Api = ghApi): GitHub {
             }
           );
           return;
-        case 'addToProject': {
-          const reply = await graphql<{
-            addProjectV2ItemById: { item: { id: string } };
-          }>(ADD_TO_PROJECT, {
+        case 'addToProject':
+        case 'setStatus': {
+          // For an issue that is in the Project already, GitHub returns the
+          // existing item with its status at this moment. Someone can set
+          // that status after the script reads the issue.
+          const { item } = (
+            await graphql<AddToProjectReply>(ADD_TO_PROJECT, {
+              project: idOf('project'),
+              id: idOf(`issue ${change.issue}`),
+            })
+          ).addProjectV2ItemById;
+          if (item.fieldValueByName) return;
+          await graphql(SET_STATUS, {
             project: idOf('project'),
-            id: idOf(`issue ${change.issue}`),
+            item: item.id,
+            field: idOf('status'),
+            option: idOf(`status ${change.status}`),
           });
-          await setStatus(reply.addProjectV2ItemById.item.id, change.status);
           return;
         }
-        case 'setStatus':
-          await setStatus(idOf(`project item ${change.issue}`), change.status);
-          return;
       }
     },
   };
