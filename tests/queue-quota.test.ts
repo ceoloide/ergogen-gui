@@ -18,7 +18,7 @@ import {
 } from '../scripts/queue/quota.mts';
 
 // Replies in the recorded shapes, with invented numbers and placeholder
-// identifiers. Each weekly window resets at `resetsAt` and is 60% used, or 70%
+// identifiers. Each weekly window resets at `resetsAt` and is 45% used, or 55%
 // for a limit on some of the models.
 const resetsAt = '2026-01-15T12:00:00Z';
 const day = 24 * 60 * 60 * 1000;
@@ -28,14 +28,14 @@ const early = Date.parse(resetsAt) - 4.9 * day; // 30% of the week elapsed
 
 const claudeUsage = {
   five_hour: { utilization: 95, resets_at: '2026-01-11T03:00:00Z' },
-  seven_day: { utilization: 60, resets_at: resetsAt },
+  seven_day: { utilization: 45, resets_at: resetsAt },
   seven_day_opus: null,
   limits: [
     { kind: 'session', percent: 95, resets_at: '2026-01-11T03:00:00Z' },
-    { kind: 'weekly_all', percent: 60, resets_at: resetsAt, scope: null },
+    { kind: 'weekly_all', percent: 45, resets_at: resetsAt, scope: null },
     {
       kind: 'weekly_scoped',
-      percent: 70,
+      percent: 55,
       resets_at: resetsAt,
       scope: { model: { id: null, display_name: 'Example Model' } },
     },
@@ -52,7 +52,7 @@ const antigravitySummary = {
           bucketId: 'gemini-weekly',
           window: 'weekly',
           resetTime: resetsAt,
-          remainingFraction: 0.4,
+          remainingFraction: 0.55,
         },
         {
           bucketId: 'gemini-5h',
@@ -69,14 +69,14 @@ const antigravitySummary = {
           bucketId: '3p-weekly',
           window: 'weekly',
           resetTime: resetsAt,
-          remainingFraction: 0.3,
+          remainingFraction: 0.45,
         },
       ],
     },
   ],
 };
 
-const codexLog = (readAt: number, resetsAtMs: number, usedPercent = 60) =>
+const codexLog = (readAt: number, resetsAtMs: number, usedPercent = 45) =>
   [
     {
       timestamp: new Date(readAt - 60 * 60 * 1000).toISOString(),
@@ -108,38 +108,38 @@ const codexLog = (readAt: number, resetsAtMs: number, usedPercent = 60) =>
     .map((entry) => JSON.stringify(entry))
     .join('\n');
 
-// At 30% of the week elapsed and 25 points allowed, a window 60% used turns
-// to go at 35% of the week, 8.4 hours later. One 70% used turns to go at 45%,
+// At 30% of the week elapsed and 10 points allowed, a window 45% used turns
+// to go at 35% of the week, 8.4 hours later. One 55% used turns to go at 45%,
 // 25.2 hours later.
-const wait60 = { goAt: Date.parse('2026-01-10T22:48:00Z'), waitHours: 9 };
-const wait70 = { goAt: Date.parse('2026-01-11T15:36:00Z'), waitHours: 26 };
+const wait45 = { goAt: Date.parse('2026-01-10T22:48:00Z'), waitHours: 9 };
+const wait55 = { goAt: Date.parse('2026-01-11T15:36:00Z'), waitHours: 26 };
 
 const readAt = early - 60 * 60 * 1000;
 const providers: [
   string,
   () => Reading[],
-  [string, number, typeof wait60][],
+  [string, number, typeof wait45][],
 ][] = [
   [
     'Claude',
     () => claudeReadings(claudeUsage, readAt),
     [
-      ['all models', 60, wait60],
-      ['Example Model', 70, wait70],
+      ['all models', 45, wait45],
+      ['Example Model', 55, wait55],
     ],
   ],
   [
     'Antigravity',
     () => antigravityReadings(antigravitySummary, readAt),
     [
-      ['Gemini models', 60, wait60],
-      ['Claude and GPT models', 70, wait70],
+      ['Gemini models', 45, wait45],
+      ['Claude and GPT models', 55, wait55],
     ],
   ],
   [
     'Codex',
     () => [codexReading(codexLog(readAt, Date.parse(resetsAt)))!],
-    [['all models', 60, wait60]],
+    [['all models', 45, wait45]],
   ],
 ];
 
@@ -153,14 +153,14 @@ const claudeReading = (usedPercent: number): Reading => ({
 
 describe('the pace rule', () => {
   it.each(providers)(
-    'gives %s go up to 25 points ahead of the pace, and wait beyond with the time and hours of the wait',
+    'gives %s go up to 10 points ahead of the pace, and wait beyond with the time and hours of the wait',
     (_provider, read, limits) => {
       // Arrange
       const weekly = read();
 
       // Act
-      const atHalfway = weekly.map((reading) => assess(reading, halfway, 25));
-      const atEarly = weekly.map((reading) => assess(reading, early, 25));
+      const atHalfway = weekly.map((reading) => assess(reading, halfway, 10));
+      const atEarly = weekly.map((reading) => assess(reading, early, 10));
 
       // Assert
       expect(atHalfway).toMatchObject(
@@ -183,15 +183,15 @@ describe('the pace rule', () => {
     }
   );
 
-  it('compares the exact percents, so 25.4 points ahead is a wait', () => {
+  it('compares the exact percents, so 10.4 points ahead is a wait', () => {
     // Act
-    const atLimit = assess(claudeReading(75), halfway, 25);
-    const beyond = assess(claudeReading(75.4), halfway, 25);
+    const atLimit = assess(claudeReading(60), halfway, 10);
+    const beyond = assess(claudeReading(60.4), halfway, 10);
 
     // Assert
     expect(atLimit).toMatchObject({ result: 'go' });
     expect(beyond).toMatchObject({
-      usedPercent: 75.4,
+      usedPercent: 60.4,
       elapsedPercent: 50,
       result: 'wait',
       goAt: Date.parse('2026-01-12T00:40:20Z'),
@@ -200,8 +200,8 @@ describe('the pace rule', () => {
   });
 
   it('gives go at exactly the allowance, despite floating-point error', () => {
-    // Arrange: 100 * (1 - 0.7) is 30.000000000000004, at 5% of the week.
-    const now = Date.parse(resetsAt) - 0.95 * week;
+    // Arrange: 100 * (1 - 0.7) is 30.000000000000004, at 20% of the week.
+    const now = Date.parse(resetsAt) - 0.8 * week;
     const [gemini] = antigravityReadings(
       {
         groups: [
@@ -221,10 +221,10 @@ describe('the pace rule', () => {
     );
 
     // Act
-    const line = assess(gemini, now, 25);
+    const line = assess(gemini, now, 10);
 
     // Assert
-    expect(line).toMatchObject({ elapsedPercent: 5, result: 'go' });
+    expect(line).toMatchObject({ elapsedPercent: 20, result: 'go' });
   });
 
   it('gives unknown under its own limit to a reading from a window that has ended', () => {
@@ -246,7 +246,7 @@ describe('the pace rule', () => {
     );
 
     // Act
-    const lines = readings.map((reading) => assess(reading, halfway, 25));
+    const lines = readings.map((reading) => assess(reading, halfway, 10));
 
     // Assert
     expect(lines).toEqual([
@@ -362,30 +362,30 @@ describe('pnpm queue:quota', () => {
   const iso = (epochMs: number) =>
     new Date(epochMs).toISOString().replace('.000Z', 'Z');
 
-  it('gives go up to 25 points ahead of the pace by default', () => {
+  it('gives go up to 10 points ahead of the pace by default', () => {
     // Act
-    const { status, stdout } = run([]);
+    const { status, stdout } = run([], 59.9);
 
     // Assert
     expect(status).toBe(0);
     const lines = stdout.trim().split('\n');
     expect(lines).toHaveLength(2);
     expect(lines[1]).toMatch(
-      /^codex\s+all models\s+60\.0%\s+50\.0%\s+go\s+-\s+resets /
+      /^codex\s+all models\s+59\.9%\s+50\.0%\s+go\s+-\s+resets /
     );
   });
 
   // The wait ends when the pace catches up to the percent used less the
-  // allowance, rounded up to the second. At 80% used, that is 55% of the week.
-  // A default of 25.00001 moves the pace 60 ms earlier and 24.99999 moves it 60
+  // allowance, rounded up to the second. At 65% used, that is 55% of the week.
+  // A default of 10.00001 moves the pace 60 ms earlier and 9.99999 moves it 60
   // ms later, so one used percent cannot tell both apart. The first value
-  // sits on a whole second and catches a default below 25. The second sits
-  // 30 ms past it and catches a default above 25.
+  // sits on a whole second and catches a default below 10. The second sits
+  // 30 ms past it and catches a default above 10.
   it.each([
-    ['exactly on a second', 80, 0],
-    ['30 ms past a second', 80.000005, 1000],
+    ['exactly on a second', 65, 0],
+    ['30 ms past a second', 65.000005, 1000],
   ])(
-    'takes 25 points as the default allowance with the wait ending %s',
+    'takes 10 points as the default allowance with the wait ending %s',
     (_position, usedPercent, roundUpMs) => {
       // Act
       const { status, stdout, resetsAtMs } = run([], usedPercent);
@@ -396,7 +396,7 @@ describe('pnpm queue:quota', () => {
       const goAt = iso(windowStart + (55 * week) / 100 + roundUpMs);
       expect(stdout.trim().split('\n')[1]).toMatch(
         new RegExp(
-          `^codex\\s+all models\\s+80\\.0%\\s+50\\.0%\\s+wait 9h\\s+${goAt}\\s+resets ${iso(resetsAtMs)}$`
+          `^codex\\s+all models\\s+65\\.0%\\s+50\\.0%\\s+wait 9h\\s+${goAt}\\s+resets ${iso(resetsAtMs)}$`
         )
       );
     }
@@ -410,7 +410,7 @@ describe('pnpm queue:quota', () => {
     ];
 
     // Act
-    const { status, stdout } = run([], 60, foldersWithoutSignIn);
+    const { status, stdout } = run([], 55, foldersWithoutSignIn);
 
     // Assert
     expect(status).toBe(0);
@@ -422,7 +422,7 @@ describe('pnpm queue:quota', () => {
     expect(lines[2]).toMatch(
       /^antigravity\s+all models\s+-\s+-\s+unknown\s+-\s+no Antigravity sign-in in T3 Code$/
     );
-    expect(lines[3]).toMatch(/^codex\s+all models\s+60\.0%\s+50\.0%\s+go\s/);
+    expect(lines[3]).toMatch(/^codex\s+all models\s+55\.0%\s+50\.0%\s+go\s/);
   });
 
   it('takes the allowance from --ahead and prints when a wait ends', () => {

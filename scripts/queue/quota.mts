@@ -5,7 +5,7 @@
 // For each provider it prints the percent of the weekly window used, the
 // percent of the window elapsed, and a result:
 //
-// - go: the percent used is at most 25 points above the percent elapsed, or
+// - go: the percent used is at most 10 points above the percent elapsed, or
 //   the number of points that --ahead gives;
 // - wait: the percent used is further ahead. The line also prints the time,
 //   in UTC, at which it turns to go if no more quota is used, and the hours
@@ -67,7 +67,7 @@ export class Unreadable extends Error {}
 
 const HOUR_MS = 60 * 60 * 1000;
 const WEEK_MS = 7 * 24 * HOUR_MS;
-const DEFAULT_POINTS_AHEAD = 25;
+const DEFAULT_POINTS_AHEAD = 10;
 const ALL_MODELS = 'all models';
 const GEMINI_MODELS = 'Gemini models';
 
@@ -502,7 +502,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     // A parseArgs error repeats the raw argument, which can hold control
     // characters, so the script prints a fixed text instead.
     console.error(
-      '--ahead takes a number of points, such as --ahead=25.\nUsage: pnpm queue:quota [--ahead=<points>]'
+      '--ahead takes a number of points, such as --ahead=10.\nUsage: pnpm queue:quota [--ahead=<points>]'
     );
     process.exit(2);
   }
