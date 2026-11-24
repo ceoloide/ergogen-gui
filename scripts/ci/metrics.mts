@@ -11,6 +11,7 @@
 // stages n times, one round after another, and records the median of each.
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -19,7 +20,7 @@ import {
   renameSync,
   writeFileSync,
 } from 'node:fs';
-import { availableParallelism, loadavg } from 'node:os';
+import { availableParallelism, cpus, loadavg } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -358,6 +359,8 @@ export interface Metrics {
     node: string;
     platform: string;
     cpus: number;
+    /** GitHub-hosted runners of one label differ in CPU, and so in speed. */
+    cpuModel: string;
     /** The one-minute load average before the first stage. */
     loadAverage: number;
   };
@@ -478,13 +481,18 @@ function main() {
       node: process.version,
       platform: process.platform,
       cpus: availableParallelism(),
+      cpuModel: cpus()[0]?.model ?? 'unknown',
       loadAverage,
     },
   };
   mkdirSync(dirname(metricsPath), { recursive: true });
   writeFileSync(`${metricsPath}.tmp`, JSON.stringify(metrics, null, 2) + '\n');
   renameSync(`${metricsPath}.tmp`, metricsPath);
-  process.stdout.write(`\n${renderTable(metrics)}\nWrote ${metricsPath}\n`);
+  const table = renderTable(metrics);
+  process.stdout.write(`\n${table}\nWrote ${metricsPath}\n`);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, table);
+  }
   process.exitCode = stages.every((stage) => stage.passed) ? 0 : 1;
 }
 
