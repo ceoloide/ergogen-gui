@@ -339,20 +339,32 @@ describe('pnpm queue:quota', () => {
     );
   });
 
-  it('takes 25 points as the default allowance', () => {
-    // Act
-    const { status, stdout, resetsAtMs } = run([], 80);
+  // The wait ends when the pace catches up to the percent used less the
+  // allowance, rounded up to the second. At 80% used, that is 55% of the week.
+  // A default of 25.00001 moves the pace 60 ms earlier and 24.99999 moves it 60
+  // ms later, so one used percent cannot tell both apart. The first value
+  // sits on a whole second and catches a default below 25. The second sits
+  // 30 ms past it and catches a default above 25.
+  it.each([
+    ['exactly on a second', 80, 0],
+    ['30 ms past a second', 80.000005, 1000],
+  ])(
+    'takes 25 points as the default allowance with the wait ending %s',
+    (_position, usedPercent, roundUpMs) => {
+      // Act
+      const { status, stdout, resetsAtMs } = run([], usedPercent);
 
-    // Assert
-    expect(status).toBe(0);
-    const windowStart = resetsAtMs - week;
-    const goAt = iso(windowStart + 0.55 * week); // 80% used, less 25 points
-    expect(stdout.trim().split('\n')[1]).toMatch(
-      new RegExp(
-        `^codex\\s+all models\\s+80\\.0%\\s+50\\.0%\\s+wait 9h\\s+${goAt}\\s+resets ${iso(resetsAtMs)}$`
-      )
-    );
-  });
+      // Assert
+      expect(status).toBe(0);
+      const windowStart = resetsAtMs - week;
+      const goAt = iso(windowStart + (55 * week) / 100 + roundUpMs);
+      expect(stdout.trim().split('\n')[1]).toMatch(
+        new RegExp(
+          `^codex\\s+all models\\s+80\\.0%\\s+50\\.0%\\s+wait 9h\\s+${goAt}\\s+resets ${iso(resetsAtMs)}$`
+        )
+      );
+    }
+  );
 
   it('takes the allowance from --ahead and prints when a wait ends', () => {
     // Act

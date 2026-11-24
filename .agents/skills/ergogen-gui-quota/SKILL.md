@@ -43,8 +43,9 @@ codex        all models             48.0%    35.0%  go        -                 
   `Gemini models` line counts, not `Claude and GPT models`.
 - `used` is the percent of the weekly window used. `elapsed` is the percent of
   the window that has passed, which is the pace.
-- `result` is `go` while `used` is at most 25 points above `elapsed`, and
-  `wait` beyond that. It is `unknown` when the quota could not be read.
+- `result` is `go` while `used` is at most the allowance above `elapsed`, and
+  `wait` beyond that. The allowance is 25 points unless the run passed
+  `--ahead=<points>`. It is `unknown` when the quota could not be read.
 - `go at` is the UTC time at which a `wait` turns to `go` if no more quota is
   used.
 - `note` gives the reset time, the reason for `unknown`, or the age of an old
@@ -53,15 +54,28 @@ codex        all models             48.0%    35.0%  go        -                 
 
 ## Act on the result
 
-A task goes to a provider only when every line that binds the task says `go`.
+A task goes to a provider only when all three of these hold:
 
-- `go`: the provider can take new work.
+1. At least one line of the provider covers the model of the task.
+2. Every line of the provider that covers the model says `go`.
+3. No line of the provider says `unknown`.
+
+A line that is missing never counts as `go`. When a request fails, the provider
+gets one `unknown` line and no other, and that line is named after its main
+limit: `all models` for Claude and Codex, `Gemini models` for Antigravity. A
+failed Antigravity request leaves no line for `Claude and GPT models`, and
+rule 3 stops work for those models too.
+
+Each result means this for its line:
+
+- `go`: the line allows new work.
   [Choose the task size](#choose-the-task-size) from its headroom.
 - `wait`: start no new task on that provider. Store the `go at` timestamp, and
   run the command again at that time. The hours, such as `wait 17h`, tell a
   person how long the wait lasts, so that the person can decide whether to
   override it.
-- `unknown`: send no new work to that provider. The note says why.
+- `unknown`: send no new work to that provider, for any of its models. The note
+  says why.
 
 When no provider can take the task, run the command again at the earliest
 `go at` time.
@@ -73,8 +87,9 @@ a person tells you to.
 ## Choose the task size
 
 The headroom of a line is the number of points that the line can use before it
-turns to `wait`: `elapsed + 25 - used`, and at most `100 - used`. In the
-example, the `Claude and GPT models` line has 40 points of headroom. The Codex
+turns to `wait`: `elapsed + allowance - used`, and at most `100 - used`. The
+allowance is the one that the run used, which is 25 points unless the run passed
+`--ahead=<points>`. In the example, the `Claude and GPT models` line has 40 points of headroom. The Codex
 line shows 12 points, but its reading is 3 hours old, so Codex has fewer. The
 pace adds about 14 points a day, so the headroom of a provider grows while it
 does no work.

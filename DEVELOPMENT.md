@@ -277,9 +277,9 @@ share links with these rules:
   GitHub provider handles `github.com` and bare `owner/repo` strings, the
   Codeberg provider handles `codeberg.org`, and the Forgejo provider handles any
   other HTTP or HTTPS host because Forgejo and Gitea share that API. All
-  requests are unauthenticated and bounded by `GIT_BFS_MAX_REQUESTS` and
-  `GIT_BFS_MAX_DEPTH` in `src/context/constants.ts`. GitHub rate-limit responses
-  appear as user-facing messages.
+  requests are unauthenticated and bounded by the private constants
+  `GIT_BFS_MAX_REQUESTS` and `GIT_BFS_MAX_DEPTH` in `src/utils/gitProvider.ts`.
+  GitHub rate-limit responses appear as user-facing messages.
   [#164](https://github.com/ceoloide/ergogen-gui/issues/164) tracks
   authenticated requests.
 - **Repository and archive layout.** Expect `config.yaml` at the root and
@@ -333,7 +333,7 @@ minor and patch version at least as high.
 
 Feature gates apply in the injections panel, in local and repository loaders, on
 the main thread before generation, and during bulk export in
-`src/utils/zip.ts`.
+`src/workers/bulkExport.ts`.
 
 ### Adding a feature flag
 
@@ -361,8 +361,9 @@ each one that lacks a preview in the background, without the STL stage. It
 skips the configuration that the load-time generation targets, whose results
 set its preview.
 
-`src/utils/zip.ts` provides `createZip` for a single configuration and
-`exportConfigsProgressively` for bulk export. With **Only download configs**
+`src/utils/zip.ts` provides `createZip` for a single configuration, and
+`src/workers/bulkExport.ts` provides `exportConfigsProgressively` for bulk
+export. With **Only download configs**
 selected, bulk export packages only the selected configurations and their
 injections. Otherwise, it compiles each selected configuration with a worker
 pool. Compiled bulk exports omit STL conversion and `.stl` files when the STL
