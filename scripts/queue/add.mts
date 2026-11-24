@@ -1,6 +1,7 @@
 // Adds an issue to the queue, or creates the milestone of a new release:
 //
 //   pnpm queue:add <item.json> [--dry-run]
+//   pnpm queue:add --help
 //
 // The queue is the Project "Ergogen GUI 2027", Project 3 of the user
 // ceoloide, and holds issues of ceoloide/ergogen-gui. The item file holds
@@ -25,32 +26,67 @@
 //
 // The script sets the issue type, the milestone, and the track, size, mode,
 // and priority labels, and removes the other labels of those four kinds. It
-// writes the release table and the Evidence, Change, Exit condition, and
-// Depends on sections into the body, and keeps the text that the body had
-// before the first run under the heading Report. It makes the issue blocked
-// by exactly the issues in dependsOn, and keeps each blocker from another
-// repository. It adds new blockers before it removes old ones, so a failed
-// run leaves the issue blocked by more issues, not fewer. A new item enters
-// the Project with the status Proposed for a Feature and Todo for any other
-// type. The script never changes the status of an item that has one.
+// makes the issue blocked by exactly the issues in dependsOn, and keeps each
+// blocker from another repository. It adds new blockers before it removes old
+// ones, so a failed run leaves the issue blocked by more issues, not fewer. A
+// new item enters the Project with the status Proposed for a Feature and Todo
+// for any other type. The script never changes the status of an item that
+// has one.
 //
-// A release item creates a milestone, with an optional due date:
+// In the body, the script owns one block and nothing else:
+//
+//   <!-- pnpm queue:add #400 start sha256:<checksum> -->
+//
+//   | Release | Track | Size | Mode |
+//   ...
+//   ## Depends on
+//
+//   - #274 R20-01 Load the queue
+//   - ergogen/ergogen#12 Export the outline as SVG
+//
+//   <!-- pnpm queue:add #400 end -->
+//
+// Both markers name the issue. The checksum is the SHA-256 of the text
+// between the markers, read with LF line endings, because an edit on GitHub
+// turns every line ending of the body into CRLF. The block holds the release
+// table and the Evidence, Change, Exit condition, and Depends on sections.
+// Depends on lists every blocker, also one in another repository. A body
+// without a marker gets the block at its end. A body with one block of this
+// issue whose checksum matches gets the new block in its place. The script
+// refuses any other body that holds "<!-- pnpm queue:add": a marker without
+// its pair, a marker that appears twice, a marker of another issue, or a
+// block that someone changed by hand. Text outside the block stays as it is,
+// byte for byte.
+//
+// A release item creates a milestone, with an optional due date. The
+// milestone description holds the description and the exit condition:
 //
 //   { "type": "Release", "title": "v0.20.1", "description": "...",
-//     "dueOn": "2027-02-15" }
+//     "exitCondition": "...", "dueOn": "2027-02-15" }
 //
 // The script reads GitHub and checks the whole item before its first write,
 // so a rejected item changes nothing. It rejects an item when a value is
 // missing or invalid, when the issue, the milestone, a label, or a dependency
-// does not exist, and when the dependencies form a cycle. A second run of the
-// same item writes nothing. After a failed write, run the item again. The
-// script compares the item with GitHub and writes only what still differs.
+// does not exist, when the dependencies form a cycle, and when it refuses the
+// body. A second run of the same item writes nothing. After a failed write,
+// run the item again. The script compares the item with GitHub and writes
+// only what still differs.
+//
+// The GitHub API cannot write a value only while it is unchanged, so two
+// windows remain in which the change of another person can be lost:
+//
+// - The body is the first write, a moment after the read. An edit of the
+//   body that someone saves in that moment is lost.
+// - The script reads the status of the Project item again right before it
+//   sets the status, and sets it only when the item still has none. A status
+//   that someone sets between that read and the write is overwritten.
 //
 // --dry-run prints the changes and the body that a run would write, and
 // writes nothing. The script uses the login of the GitHub CLI, `gh`.
 // Exit status: 0 when GitHub holds the item, 2 when the item is rejected or
 // the arguments are wrong, 1 when a read or a write fails.
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs, promisify } from 'node:util';
@@ -106,6 +142,7 @@ interface ReleaseItem {
   type: 'Release';
   title: string;
   description: string;
+  exitCondition: string;
   /** A date in the form YYYY-MM-DD. */
   dueOn?: string;
 }
@@ -136,7 +173,7 @@ const ISSUE_KEYS = [
   'exitCondition',
   'dependsOn',
 ];
-const RELEASE_KEYS = ['type', 'title', 'description', 'dueOn'];
+const RELEASE_KEYS = ['type', 'title', 'description', 'exitCondition', 'dueOn'];
 
 /** Joins words as in a sentence: "a, b, or c". */
 const either = (words: readonly string[]) =>
@@ -202,9 +239,10 @@ function parseItem(input: unknown): Item {
     if (title && !/^v\d+\.\d+(\.\d+)?$/.test(title)) {
       problems.push(`title is "${title}". Give a version, such as v0.20.1.`);
     }
-    const description = text(
-      'description',
-      'Write the goal and the exit condition of the release.'
+    const description = text('description', 'Write the goal of the release.');
+    const exitCondition = text(
+      'exitCondition',
+      'Write the check that proves the release is done.'
     );
     const dueOn = fields.dueOn;
     if (dueOn !== undefined && !isDate(dueOn)) {
@@ -214,8 +252,8 @@ function parseItem(input: unknown): Item {
     }
     if (problems.length > 0) throw new Rejected(problems);
     return isDate(dueOn)
-      ? { type, title, description, dueOn }
-      : { type, title, description };
+      ? { type, title, description, exitCondition, dueOn }
+      : { type, title, description, exitCondition };
   }
 
   const issue = fields.issue;
@@ -247,20 +285,6 @@ function parseItem(input: unknown): Item {
         ? `dependsOn is missing. Give the numbers of the issues in ${REPOSITORY_NAME} that block this one, or [].`
         : `dependsOn is ${quoted(dependsOn)}. Give the numbers of issues in ${REPOSITORY_NAME}, or []. Add a dependency on an issue of another repository on GitHub, and pnpm queue:add keeps it.`
     );
-  }
-  if (isIssueNumber(issue)) {
-    const marker = reportMarker(issue);
-    for (const [key, value] of Object.entries({
-      evidence,
-      change,
-      exitCondition,
-    })) {
-      if (value.includes(marker)) {
-        problems.push(
-          `${key} holds the hidden line that pnpm queue:add writes above the earlier text of #${issue}. Remove that line.`
-        );
-      }
-    }
   }
   if (problems.length > 0 || !isIssueNumber(issue)) {
     throw new Rejected(problems);
@@ -383,71 +407,149 @@ function findCycle(
   return walk([issue]);
 }
 
-/** The first line of every body that `pnpm queue:add` writes. */
-const TABLE_HEADER = '| Release | Track | Size | Mode |';
+const nameOf = (ref: IssueRef) => (typeof ref === 'number' ? `#${ref}` : ref);
 
+/** The name and the title of an issue, such as "#274 R20-01 Load the queue". */
+const titled = (ref: IssueRef, repository: Repository) =>
+  `${nameOf(ref)} ${repository.issues.get(ref)?.title ?? ''}`.trim();
+
+/** The text with which every marker of the block in an issue body starts. */
+const MARKER_OPENING = '<!-- pnpm queue:add';
 /**
- * The hidden line that `pnpm queue:add` writes into the body of `issue`,
- * below its own text and above the issue text from before intake.
+ * A marker of the block: `<!-- pnpm queue:add #400 start sha256:<checksum> -->`
+ * or `<!-- pnpm queue:add #400 end -->`.
  */
-const reportMarker = (issue: number) =>
-  `<!-- pnpm queue:add writes the text of #${issue} above this line. The text below is the issue text from before intake. -->`;
+const MARKER =
+  /<!-- pnpm queue:add #([1-9]\d*) (?:start sha256:([0-9a-f]{64})|end) -->/y;
 
-/**
- * The text that the body of `issue` held before `pnpm queue:add` first wrote
- * it. In a body that starts with the release table, that is the text after
- * the first hidden line. The script never writes the hidden line above its
- * own, because `parseItem` rejects an item whose text holds it. Any other
- * body is the earlier text as a whole.
- */
-function reportOf(body: string, issue: number): string {
-  const lines = body.split('\n');
-  const marker = lines.findIndex(
-    (line) => line.trimEnd() === reportMarker(issue)
-  );
-  const written = lines[0].trimEnd() === TABLE_HEADER && marker >= 0;
-  return (written ? lines.slice(marker + 1).join('\n') : body).trim();
-}
+/** The SHA-256 of `content` read with LF line endings, in hexadecimal. */
+const checksum = (content: string) =>
+  createHash('sha256').update(content.replace(/\r\n/g, '\n')).digest('hex');
 
-function renderBody(
-  item: IssueItem,
-  dependencies: { number: number; title: string }[],
-  report: string
-): string {
+/** The block of `issue` around `content`, the text between the markers. */
+const renderBlock = (issue: number, content: string) =>
+  `${MARKER_OPENING} #${issue} start sha256:${checksum(content)} -->${content}${MARKER_OPENING} #${issue} end -->`;
+
+/** The text between the markers of the block of `item`. */
+function renderContent(item: IssueItem, dependencies: string[]): string {
   const table = [
-    TABLE_HEADER,
+    '| Release | Track | Size | Mode |',
     '|---|---|---|---|',
     `| ${item.release} | ${TRACKS[item.track]} | ${SIZES[item.size]} | \`${item.mode}\` |`,
   ].join('\n');
   const dependsOn =
     dependencies.length === 0
       ? 'Nothing.'
-      : dependencies
-          .map(({ number, title }) => `- #${number} ${title}`)
-          .join('\n');
-  return (
-    [
-      table,
-      `## Evidence\n\n${item.evidence}`,
-      `## Change\n\n${item.change}`,
-      `## Exit condition\n\n${item.exitCondition}`,
-      `## Depends on\n\n${dependsOn}`,
-      ...(report === ''
-        ? [reportMarker(item.issue)]
-        : ['## Report', reportMarker(item.issue), report]),
-    ].join('\n\n') + '\n'
-  );
+      : dependencies.map((dependency) => `- ${dependency}`).join('\n');
+  const sections = [
+    table,
+    `## Evidence\n\n${item.evidence}`,
+    `## Change\n\n${item.change}`,
+    `## Exit condition\n\n${item.exitCondition}`,
+    `## Depends on\n\n${dependsOn}`,
+  ];
+  return `\n\n${sections.join('\n\n')}\n\n`;
+}
+
+/** What an issue body holds of the block of `pnpm queue:add`. */
+type BlockSearch =
+  | { kind: 'none' }
+  /** The block spans `body.slice(from, to)`. */
+  | { kind: 'found'; from: number; to: number; content: string }
+  | { kind: 'refused'; cause: string };
+
+/** Finds the block of `issue` in `body`, or the reason to leave `body` alone. */
+function findBlock(body: string, issue: number): BlockSearch {
+  const lineOf = (index: number) => body.slice(0, index).split('\n').length;
+  const refused = (cause: string): BlockSearch => ({ kind: 'refused', cause });
+  const starts: { at: number; after: number; checksum: string }[] = [];
+  const ends: { at: number; after: number }[] = [];
+  for (
+    let at = body.indexOf(MARKER_OPENING);
+    at !== -1;
+    at = body.indexOf(MARKER_OPENING, at + 1)
+  ) {
+    MARKER.lastIndex = at;
+    const match = MARKER.exec(body);
+    if (!match) {
+      return refused(
+        `line ${lineOf(at)} holds "${MARKER_OPENING}" without a valid marker.`
+      );
+    }
+    if (Number(match[1]) !== issue) {
+      return refused(
+        `the marker on line ${lineOf(at)} names #${match[1]}, not #${issue}.`
+      );
+    }
+    const after = MARKER.lastIndex;
+    if (match[2]) starts.push({ at, after, checksum: match[2] });
+    else ends.push({ at, after });
+  }
+  for (const [name, markers] of [
+    ['start', starts],
+    ['end', ends],
+  ] as const) {
+    if (markers.length > 1) {
+      return refused(
+        `the ${name} marker appears ${markers.length} times, on lines ${markers.map(({ at }) => lineOf(at)).join(', ')}.`
+      );
+    }
+  }
+  const [start] = starts;
+  const [end] = ends;
+  if (!start && !end) return { kind: 'none' };
+  if (!end) {
+    return refused(
+      `the start marker on line ${lineOf(start.at)} has no end marker.`
+    );
+  }
+  if (!start) {
+    return refused(
+      `the end marker on line ${lineOf(end.at)} has no start marker.`
+    );
+  }
+  if (end.at < start.at) {
+    return refused(
+      `the end marker on line ${lineOf(end.at)} comes before the start marker on line ${lineOf(start.at)}.`
+    );
+  }
+  const content = body.slice(start.after, end.at);
+  if (checksum(content) !== start.checksum) {
+    return refused(
+      `the text between the markers on lines ${lineOf(start.at)} and ${lineOf(end.at)} changed after pnpm queue:add wrote it.`
+    );
+  }
+  return { kind: 'found', from: start.at, to: end.after, content };
+}
+
+/**
+ * `body` with the block of `issue` around `content`: in place of the block
+ * that `findBlock` found, or after the text of a body without one.
+ */
+function withBlock(
+  body: string,
+  found: BlockSearch & { kind: 'none' | 'found' },
+  issue: number,
+  content: string
+): string {
+  if (found.kind === 'none') {
+    const separator = body === '' ? '' : body.endsWith('\n') ? '\n' : '\n\n';
+    return `${body}${separator}${renderBlock(issue, content)}\n`;
+  }
+  if (found.content.replace(/\r\n/g, '\n') === content) return body;
+  return `${body.slice(0, found.from)}${renderBlock(issue, content)}${body.slice(found.to)}`;
 }
 
 function planRelease(item: ReleaseItem, repository: Repository): Change[] {
-  const { title, description, dueOn } = item;
+  const { title, dueOn } = item;
+  const description = `${item.description}\n\nExit condition: ${item.exitCondition}`;
   const existing = repository.milestones.get(title);
   if (!existing) {
     return [{ kind: 'createRelease', title, description, dueOn }];
   }
   if (existing.description !== description || existing.dueOn !== dueOn) {
     throw new Rejected([
-      `The milestone ${title} already exists with another description or due date. Change it on GitHub.`,
+      `The milestone ${title} already exists with another description, exit condition, or due date. Change it on GitHub.`,
     ]);
   }
   return [];
@@ -494,15 +596,13 @@ function planIssue(
       problems.push(`The label ${label} does not exist in ${REPOSITORY_NAME}.`);
     }
   }
-  const dependencies = item.dependsOn.flatMap((blocker) => {
-    const found = repository.issues.get(blocker);
-    if (!found) {
+  for (const blocker of item.dependsOn) {
+    if (!repository.issues.has(blocker)) {
       problems.push(
         `dependsOn lists #${blocker}, which is not an issue of ${REPOSITORY_NAME}.`
       );
     }
-    return found ? [{ number: blocker, title: found.title }] : [];
-  });
+  }
   const kept = (known?.blockedBy ?? []).filter(
     (blocker) => typeof blocker === 'string'
   );
@@ -521,9 +621,36 @@ function planIssue(
       `The dependencies form a cycle: ${steps.length === 1 ? steps[0] : `${steps.slice(0, -1).join(', ')}, and ${steps[steps.length - 1]}`}.`
     );
   }
-  if (problems.length > 0 || !issue || !known) throw new Rejected(problems);
+  const content = renderContent(
+    item,
+    [...item.dependsOn, ...kept].map((blocker) => titled(blocker, repository))
+  );
+  if (content.includes(MARKER_OPENING)) {
+    problems.push(
+      `The block for #${number} would hold "${MARKER_OPENING}", which only a marker may hold. Remove it from evidence, change, exitCondition, or the title of a dependency.`
+    );
+  }
+  const found = issue ? findBlock(issue.body, number) : undefined;
+  if (found?.kind === 'refused') {
+    problems.push(
+      `pnpm queue:add leaves the body of #${number} alone, because ${found.cause} On GitHub, move the text that you want to keep out of the block, and remove each "${MARKER_OPENING}" marker. The next run appends a new block.`
+    );
+  }
+  if (
+    problems.length > 0 ||
+    !issue ||
+    !known ||
+    !found ||
+    found.kind === 'refused'
+  ) {
+    throw new Rejected(problems);
+  }
 
   const changes: Change[] = [];
+  const body = withBlock(issue.body, found, number, content);
+  if (body !== issue.body) {
+    changes.push({ kind: 'setBody', issue: number, body });
+  }
   if (issue.type !== item.type) {
     changes.push({ kind: 'setType', issue: number, type: item.type });
   }
@@ -539,10 +666,6 @@ function planIssue(
   );
   if (removed.length > 0) {
     changes.push({ kind: 'removeLabels', issue: number, labels: removed });
-  }
-  const body = renderBody(item, dependencies, reportOf(issue.body, number));
-  if (body !== issue.body) {
-    changes.push({ kind: 'setBody', issue: number, body });
   }
   for (const blocker of item.dependsOn) {
     if (!known.blockedBy.includes(blocker)) {
@@ -561,12 +684,6 @@ function planIssue(
   }
   return { changes, kept };
 }
-
-const nameOf = (ref: IssueRef) => (typeof ref === 'number' ? `#${ref}` : ref);
-
-/** The name and the title of an issue, such as "#274 R20-01 Load the queue". */
-const titled = (ref: IssueRef, repository: Repository) =>
-  `${nameOf(ref)} ${repository.issues.get(ref)?.title ?? ''}`.trim();
 
 function describe(change: Change, repository: Repository): string {
   switch (change.kind) {
@@ -792,15 +909,21 @@ const DEPENDENCY = (mutation: string) =>
     ${mutation}(input: { issueId: $id, blockingIssueId: $blocker }) { clientMutationId }
   }`;
 const ADD_TO_PROJECT = `mutation ($project: ID!, $id: ID!) {
-  addProjectV2ItemById(input: { projectId: $project, contentId: $id }) {
-    item { id fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } }
-  }
+  addProjectV2ItemById(input: { projectId: $project, contentId: $id }) { item { id } }
 }`;
 
 interface AddToProjectReply {
-  addProjectV2ItemById: {
-    item: { id: string; fieldValueByName: { name: string } | null };
-  };
+  addProjectV2ItemById: { item: { id: string } };
+}
+
+const ITEM_STATUS = `query ($item: ID!) {
+  node(id: $item) {
+    ... on ProjectV2Item { fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } }
+  }
+}`;
+
+interface ItemStatusReply {
+  node: { fieldValueByName: { name: string } | null };
 }
 
 const SET_STATUS = `mutation ($project: ID!, $item: ID!, $field: ID!, $option: String!) {
@@ -985,15 +1108,20 @@ export function githubCli(api: Api = ghApi): GitHub {
         case 'addToProject':
         case 'setStatus': {
           // For an issue that is in the Project already, GitHub returns the
-          // existing item with its status at this moment. Someone can set
-          // that status after the script reads the issue.
+          // existing item.
           const { item } = (
             await graphql<AddToProjectReply>(ADD_TO_PROJECT, {
               project: idOf('project'),
               id: idOf(`issue ${change.issue}`),
             })
           ).addProjectV2ItemById;
-          if (item.fieldValueByName) return;
+          // Someone can set the status after the script read the issue. A
+          // status set between this read and the write below is lost, as
+          // the header comment says.
+          const { node } = await graphql<ItemStatusReply>(ITEM_STATUS, {
+            item: item.id,
+          });
+          if (node.fieldValueByName) return;
           await graphql(SET_STATUS, {
             project: idOf('project'),
             item: item.id,
@@ -1009,15 +1137,50 @@ export function githubCli(api: Api = ghApi): GitHub {
 
 const USAGE = 'Usage: pnpm queue:add <item.json> [--dry-run]';
 
+const HELP = `${USAGE}
+
+Adds an issue to the Project "Ergogen GUI 2027" with its type, milestone,
+labels, and dependencies, or creates the milestone of a release. The header
+comment of scripts/queue/add.mts describes the item file. The script checks
+the whole item before its first write, so a rejected item changes nothing.
+
+In the issue body, the script writes only its own block, between two markers
+that name the issue and a checksum of the block. It refuses a body with a
+marker without its pair, a doubled marker, a marker of another issue, or a
+block that someone changed by hand. Text outside the block stays as it is.
+
+The GitHub API cannot write a value only while it is unchanged, so two
+windows remain in which the change of another person can be lost:
+- The body is the first write, a moment after the read. An edit of the body
+  that someone saves in that moment is lost.
+- The script reads the status of the Project item again right before it sets
+  the status, and sets it only when the item still has none. A status that
+  someone sets between that read and the write is overwritten.
+
+Options:
+  --dry-run  Print the changes and the body that a run would write, and
+             write nothing.
+  --help     Print this text.
+
+Exit status: 0 when GitHub holds the item, 2 when the item is rejected or the
+arguments are wrong, 1 when a read or a write fails.`;
+
 async function main(args: string[]): Promise<number> {
   let path: string;
   let dryRun: boolean;
   try {
     const { values, positionals } = parseArgs({
       args,
-      options: { 'dry-run': { type: 'boolean', default: false } },
+      options: {
+        'dry-run': { type: 'boolean', default: false },
+        help: { type: 'boolean', default: false },
+      },
       allowPositionals: true,
     });
+    if (values.help) {
+      console.log(HELP);
+      return 0;
+    }
     if (positionals.length !== 1) throw new Error('Give one item file.');
     [path] = positionals;
     dryRun = values['dry-run'];

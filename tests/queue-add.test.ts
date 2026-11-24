@@ -42,12 +42,18 @@ const queueLabels = [
   ...['P0', 'P1', 'P2', 'P3', 'P4'].map((priority) => `priority:${priority}`),
 ];
 
+/** The issue of a key of `issues`: a number, or `owner/name#number`. */
+const refOf = (key: string): IssueRef =>
+  /^\d+$/.test(key) ? Number(key) : (key as IssueRef);
+
 /**
- * GitHub in memory. `state` is what GitHub holds after the writes, and
- * `writes` lists them. With `failAt`, the write of that kind throws once.
+ * GitHub in memory. `issues` holds the issues of ceoloide/ergogen-gui by
+ * number and the issues of other repositories by `owner/name#number`.
+ * `state` is what GitHub holds after the writes, and `writes` lists them.
+ * With `failAt`, the write of that kind throws once.
  */
 function fakeGitHub(
-  issues: Record<number, FakeIssue>,
+  issues: Record<string, FakeIssue>,
   { failAt }: { failAt?: Change['kind'] } = {}
 ) {
   const state = {
@@ -65,8 +71,8 @@ function fakeGitHub(
       ['Backlog', { description: 'Issues for after v1.0.', closed: false }],
     ]),
     issues: new Map(
-      Object.entries(issues).map(([number, issue]) => [
-        Number(number),
+      Object.entries(issues).map(([key, issue]) => [
+        refOf(key),
         {
           closed: false,
           body: '',
@@ -79,7 +85,7 @@ function fakeGitHub(
   };
   const writes: Change[] = [];
   let failure = failAt;
-  const issue = (number: number) => {
+  const issue = (number: IssueRef) => {
     const found = state.issues.get(number);
     if (!found) throw new Error(`The script read or wrote #${number}.`);
     return found;
@@ -159,22 +165,22 @@ function fakeGitHub(
 }
 
 /**
- * The GitHub API in memory, for `githubCli`. `issues` holds the issues of
- * ceoloide/ergogen-gui by number and the issues of other repositories by
- * `owner/name#number`. `statusAtWrite` is the status that the Project item
- * of the issue has by the time the script writes, which someone can set after
- * the script reads the issue. GitHub returns the item with that status when
- * the script adds the issue to the Project. `requests` lists each GraphQL
- * request.
+ * The GitHub API in memory, for `githubCli`, with `issues` as in
+ * `fakeGitHub`. Someone sets the status of the Project item to `statusAtAdd`
+ * after the script reads the issue and before it adds the issue to the
+ * Project, and to `statusAfterAdd` right after the add. `requests` lists
+ * each GraphQL request.
  */
 function fakeApi(
   issues: Record<string, FakeIssue>,
-  { statusAtWrite }: { statusAtWrite?: string } = {}
+  {
+    statusAtAdd,
+    statusAfterAdd,
+  }: { statusAtAdd?: string; statusAfterAdd?: string } = {}
 ) {
+  let itemStatus = statusAtAdd;
   const requests: { query: string; variables: Record<string, unknown> }[] = [];
-  const refs = Object.keys(issues).map(
-    (key): IssueRef => (/^\d+$/.test(key) ? Number(key) : (key as IssueRef))
-  );
+  const refs = Object.keys(issues).map(refOf);
   const nodeOf = (ref: IssueRef) => {
     const [repository, number] =
       typeof ref === 'number'
@@ -201,13 +207,18 @@ function fakeApi(
 
   function reply(query: string, variables: Record<string, unknown>) {
     if (query.includes('addProjectV2ItemById')) {
-      return {
+      const added = {
         addProjectV2ItemById: {
-          item: { id: 'item', fieldValueByName: status(statusAtWrite) },
+          item: { id: 'item', fieldValueByName: status(itemStatus) },
         },
       };
+      itemStatus = statusAfterAdd ?? itemStatus;
+      return added;
     }
     if (query.startsWith('mutation')) return {};
+    if (query.includes('node(id')) {
+      return { node: { fieldValueByName: status(itemStatus) } };
+    }
     if (query.includes('issueTypes')) {
       return {
         repository: {
@@ -322,7 +333,7 @@ const bug = {
   dependsOn: [274],
 };
 
-const reported = (): Record<number, FakeIssue> => ({
+const reported = (): Record<string, FakeIssue> => ({
   274: { title: 'R20-01 Load the queue' },
   376: { title: 'R100-09 Release 1.0' },
   400: {
@@ -333,8 +344,10 @@ const reported = (): Record<number, FakeIssue> => ({
   },
 });
 
-/** The text that the script writes into the body of #400 for `bug`. */
-const bugSections = `| Release | Track | Size | Mode |
+/** The block that the script writes into the body of #400 for `bug`. */
+const bugBlock = `<!-- pnpm queue:add #400 start sha256:e6c0b150bc36a6f4210dfc0d23ff1dc2e7ed9e7bdba3e0854b91ee8c21f342a1 -->
+
+| Release | Track | Size | Mode |
 |---|---|---|---|
 | v0.20 | Verification | Small, one pull request | \`auto\` |
 
@@ -354,14 +367,10 @@ An end-to-end test exports a PCB in WebKit.
 
 - #274 R20-01 Load the queue
 
-`;
+<!-- pnpm queue:add #400 end -->`;
 
-const bugBody = `${bugSections}## Report
-
-<!-- pnpm queue:add writes the text of #400 above this line. The text below is the issue text from before intake. -->
-
-Nothing happens when I click Export in Safari.
-`;
+/** The body of #400 after the script adds `bug`. */
+const bugBody = `Nothing happens when I click Export in Safari.\r\n\n${bugBlock}\n`;
 
 describe('pnpm queue:add rejects an incomplete item', () => {
   it.each([
@@ -498,7 +507,7 @@ describe('pnpm queue:add rejects an incomplete item', () => {
 
 describe('the cycle rule', () => {
   // #10 is blocked by #11 and #13, and #11 is blocked by #13. #12 is free.
-  const graph = (): Record<number, FakeIssue> => ({
+  const graph = (): Record<string, FakeIssue> => ({
     10: { title: 'Ten', blockedBy: [11, 13] },
     11: { title: 'Eleven', blockedBy: [13] },
     12: { title: 'Twelve' },
@@ -572,11 +581,11 @@ describe('adding an issue', () => {
     ]);
     expect(lines).toEqual([
       '#400 Export fails in Safari',
+      '  write the release table and the sections into the body',
       '  set the type to Bug',
       '  set the milestone to v0.20',
       '  add the labels track:verification, size:S, mode:auto, priority:P1',
       '  remove the labels size:M',
-      '  write the release table and the sections into the body',
       '  add the dependency #274 R20-01 Load the queue',
       '  remove the dependency #376 R100-09 Release 1.0',
       '  add the issue to the Project "Ergogen GUI 2027" with the status Todo',
@@ -683,124 +692,238 @@ describe('adding an issue', () => {
   });
 });
 
-describe('the issue text from before intake', () => {
-  /** The hidden line that the script writes above the earlier text of #400. */
-  async function writtenMarker() {
-    const { github, state } = fakeGitHub({
-      ...reported(),
-      400: { title: 'Export fails in Safari' },
-    });
-    await add(github, bug);
-    return state.issues.get(400)?.body.trimEnd().split('\n').at(-1) ?? '';
+describe('the block in the issue body', () => {
+  const START = '<!-- pnpm queue:add #400 start';
+  const END = '<!-- pnpm queue:add #400 end -->';
+
+  /** The body of #400 after a run of `item` on an issue with `body`. */
+  async function processed(body: string, item: object = bug) {
+    const issues = reported();
+    issues[400].body = body;
+    const { github, state } = fakeGitHub(issues);
+    await add(github, item);
+    return state.issues.get(400)?.body ?? '';
   }
 
-  it('writes the sections and the hidden line into a body with no text, once', async () => {
-    // Arrange
-    const marker = await writtenMarker();
+  /** Runs `item` twice on an issue with `body`. */
+  async function runTwice(body: string, item: object = bug) {
     const issues = reported();
-    issues[400].body = '';
+    issues[400].body = body;
     const { github, state, writes } = fakeGitHub(issues);
+    await add(github, item);
+    const firstRun = [...writes];
+    await add(github, item);
+    return {
+      body: state.issues.get(400)?.body ?? '',
+      firstRun,
+      secondRun: writes.slice(firstRun.length),
+    };
+  }
 
-    // Act
-    await add(github, bug);
-    const firstRun = writes.length;
-    await add(github, bug);
-
-    // Assert
-    expect(state.issues.get(400)?.body).toBe(`${bugSections}${marker}\n`);
-    expect(writes).toHaveLength(firstRun);
-  });
+  const blockOf = (body: string) =>
+    body.slice(body.indexOf(START), body.indexOf(END) + END.length);
 
   it.each([
+    ['no text', ''],
+    ['text without a final line break', 'Steps: open, export.'],
     [
-      'the hidden line of the script',
-      (marker: string) =>
-        `Steps before the line.\n${marker}\nSteps after the line.`,
-    ],
-    [
-      'headings named like the sections of the script',
-      () =>
-        '## Evidence\n\nThe console shows an error.\n\n## Report\n\nI clicked Export.',
-    ],
-    [
-      'a release table of its own',
-      () =>
-        '| Release | Track | Size | Mode |\n|---|---|---|---|\n| v0.21 | Docs | Small, one pull request | `auto` |\n\n## Evidence\n\nAn older plan.',
+      'CRLF line endings, trailing spaces, and emoji',
+      'Steps:  \r\n1. Open 🎹\r\n\r\n2. Export\t\r\n',
     ],
   ])(
-    'keeps the whole text of a body with %s, and a second run writes nothing',
-    async (_case, earlierText) => {
-      // Arrange
-      const marker = await writtenMarker();
-      const earlier = earlierText(marker);
-      const issues = reported();
-      issues[400].body = earlier;
-      const { github, state, writes } = fakeGitHub(issues);
-
+    'appends the block to a body with %s, keeps every byte of it, and a second run writes nothing',
+    async (_case, earlier) => {
       // Act
-      await add(github, bug);
-      const firstRun = writes.length;
-      await add(github, bug);
+      const { body, secondRun } = await runTwice(earlier);
 
       // Assert
-      expect(state.issues.get(400)?.body).toBe(
-        `${bugSections}## Report\n\n${marker}\n\n${earlier}\n`
-      );
-      expect(writes).toHaveLength(firstRun);
+      expect(body.startsWith(earlier)).toBe(true);
+      expect(body.slice(earlier.length).trim()).toBe(bugBlock);
+      expect(secondRun).toEqual([]);
     }
   );
 
-  it('rewrites only the sections of a body that went through a run', async () => {
+  it('replaces only the block of a processed issue', async () => {
     // Arrange
-    const { github, state } = fakeGitHub(reported());
-    await add(github, bug);
-    const first = state.issues.get(400)?.body ?? '';
     const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
+    const first = await processed('Nothing happens.');
+    const issues = reported();
+    issues[400].body = first;
+    const { github, state } = fakeGitHub(issues);
 
     // Act
     await add(github, { ...bug, evidence });
 
     // Assert
     expect(state.issues.get(400)?.body).toBe(
-      first.replace(bug.evidence, evidence)
+      await processed('Nothing happens.', { ...bug, evidence })
     );
   });
 
-  it('finds its hidden line after an edit on GitHub changed the line endings to CRLF', async () => {
+  it('keeps the notes that a person put above and below the block', async () => {
     // Arrange
-    const { github, state } = fakeGitHub(reported());
-    await add(github, bug);
-    const issue = state.issues.get(400);
-    if (issue) issue.body = issue.body.replace(/\n/g, '\r\n');
+    const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
+    const first = await processed('Nothing happens.');
+    const above = 'Maintainer note: reproduced on macOS 15.\r\n\r\n';
+    const below = '\r\n> Also seen in Firefox.';
+    const edited =
+      first.slice(0, first.indexOf(START)) +
+      above +
+      first.slice(first.indexOf(START)) +
+      below;
+    const issues = reported();
+    issues[400].body = edited;
+    const { github, state, writes } = fakeGitHub(issues);
 
     // Act
     await add(github, bug);
+    const unchanged = writes.filter(({ kind }) => kind === 'setBody');
+    await add(github, { ...bug, evidence });
 
     // Assert
-    expect(state.issues.get(400)?.body).toBe(bugBody);
+    expect(unchanged).toEqual([]);
+    const newBlock = blockOf(
+      await processed('Nothing happens.', { ...bug, evidence })
+    );
+    expect(state.issues.get(400)?.body).toBe(
+      edited.replace(blockOf(edited), newBlock)
+    );
   });
 
+  it('writes nothing after an edit on GitHub changed every line ending to CRLF, and keeps them outside the block', async () => {
+    // Arrange
+    const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
+    const crlf = (await processed('Nothing happens.\n')).replace(
+      /\r?\n/g,
+      '\r\n'
+    );
+
+    // Act
+    const unchanged = await runTwice(crlf);
+    const changed = await processed(crlf, { ...bug, evidence });
+
+    // Assert
+    expect(unchanged.firstRun.filter(({ kind }) => kind === 'setBody')).toEqual(
+      []
+    );
+    const newBlock = blockOf(
+      await processed('Nothing happens.\n', { ...bug, evidence })
+    );
+    expect(changed).toBe(crlf.replace(blockOf(crlf), newBlock));
+  });
+
+  it.each<[string, (block: string) => string, RegExp]>([
+    [
+      'a body that starts with the release table and quotes its marker',
+      () =>
+        '| Release | Track | Size | Mode |\n|---|---|---|---|\n| v0.21 | Docs | Small, one pull request | `auto` |\n\nThe script ends its block with `<!-- pnpm queue:add #400 end -->`.\n',
+      /because the end marker on line 5 has no start marker\./,
+    ],
+    [
+      'a processed body that quotes its start marker',
+      (block) =>
+        `Nothing happens.\n\n${block}\n\nThe block starts with ${block.split('\n')[0]}`,
+      /because the start marker appears 2 times, on lines 3, 27\./,
+    ],
+    [
+      'a doubled block',
+      (block) => `Nothing happens.\n\n${block}\n\n${block}\n`,
+      /because the start marker appears 2 times, on lines 3, 27\./,
+    ],
+    [
+      'a block that a person edited by hand',
+      (block) =>
+        `Nothing happens.\n\n${block.replace('Safari 18.', 'Safari 18. Maybe 17 too.')}\n`,
+      /because the text between the markers on lines 3 and 25 changed after pnpm queue:add wrote it\./,
+    ],
+    [
+      'a block without its end marker',
+      (block) => `Nothing happens.\n\n${block.replace(END, '')}\n`,
+      /because the start marker on line 3 has no end marker\./,
+    ],
+    [
+      'an end marker above the start marker',
+      (block) => `${END}\n\nNothing happens.\n\n${block.replace(END, '')}\n`,
+      /because the end marker on line 1 comes before the start marker on line 5\./,
+    ],
+    [
+      'the block of another issue',
+      (block) => `Nothing happens.\n\n${block.replace(/#400 /g, '#401 ')}\n`,
+      /because the marker on line 3 names #401, not #400\./,
+    ],
+    [
+      'a marker without a checksum',
+      (block) =>
+        `Nothing happens.\n\n${block.replace(/ sha256:[0-9a-f]+/, '')}\n`,
+      /because line 3 holds "<!-- pnpm queue:add" without a valid marker\./,
+    ],
+  ])(
+    'refuses %s, and writes nothing of any kind',
+    async (_case, bodyOf, cause) => {
+      // Arrange
+      const body = bodyOf(bugBlock);
+      const issues = reported();
+      issues[400].body = body;
+      const { github, state, writes } = fakeGitHub(issues);
+
+      // Act
+      const problems = await problemsOf(github, bug);
+
+      // Assert
+      expect(problems).toEqual([
+        expect.stringMatching(
+          new RegExp(
+            `^pnpm queue:add leaves the body of #400 alone, ${cause.source} On GitHub, move the text that you want to keep out of the block, and remove each "<!-- pnpm queue:add" marker\\. The next run appends a new block\\.$`
+          )
+        ),
+      ]);
+      expect(writes).toEqual([]);
+      expect(state.issues.get(400)?.body).toBe(body);
+    }
+  );
+
   it.each(['evidence', 'change', 'exitCondition'])(
-    'rejects an item whose %s holds the hidden line, and writes nothing',
+    'rejects an item whose %s holds the opening of a marker, and writes nothing',
     async (key) => {
       // Arrange
-      const marker = await writtenMarker();
       const { github, writes } = fakeGitHub(reported());
 
       // Act
       const problems = await problemsOf(github, {
         ...bug,
-        [key]: `Text before the line.\n${marker}\nText after the line.`,
+        [key]: `Text before the marker.\n${END}\nText after the marker.`,
       });
 
       // Assert
-      expect(problems).toEqual([expect.stringMatching(new RegExp(`^${key} `))]);
+      expect(problems).toEqual([
+        'The block for #400 would hold "<!-- pnpm queue:add", which only a marker may hold. Remove it from evidence, change, exitCondition, or the title of a dependency.',
+      ]);
       expect(writes).toEqual([]);
     }
   );
 });
 
 describe('a blocker in another repository', () => {
+  it('stays, and Depends on lists it with the other blockers', async () => {
+    // Arrange
+    const issues = reported();
+    issues[400].blockedBy = [376, 'ergogen/ergogen#12'];
+    const { github, state } = fakeGitHub({
+      ...issues,
+      'ergogen/ergogen#12': { title: 'Export the outline as SVG' },
+    });
+
+    // Act
+    await add(github, bug);
+
+    // Assert
+    const issue = state.issues.get(400);
+    expect(issue?.blockedBy).toEqual(['ergogen/ergogen#12', 274]);
+    expect(issue?.body).toContain(
+      '## Depends on\n\n- #274 R20-01 Load the queue\n- ergogen/ergogen#12 Export the outline as SVG\n\n<!-- pnpm queue:add #400 end -->'
+    );
+  });
+
   it('stays, and a dry run shows it as kept', async () => {
     // Arrange
     const issues = reported();
@@ -869,38 +992,62 @@ describe('a blocker in another repository', () => {
 
 describe('the status in the Project', () => {
   it.each([
-    ['an issue that was outside the Project', undefined],
-    ['an item that had no status', {}],
-  ])(
-    'stays when someone sets it after the read, for %s',
-    async (_case, project) => {
-      // Arrange
-      const issues = reported();
-      issues[400].project = project;
-      const { api, sent } = fakeApi(issues, { statusAtWrite: 'In progress' });
-
-      // Act
-      await add(githubCli(api), bug);
-
-      // Assert
-      expect(sent('updateProjectV2ItemFieldValue')).toBe(false);
-    }
-  );
-
-  it('is set when the item still has none at the write', async () => {
+    [
+      'before the add, for an issue that was outside the Project',
+      undefined,
+      { statusAtAdd: 'In progress' },
+    ],
+    [
+      'before the add, for an item that had no status',
+      {},
+      { statusAtAdd: 'In progress' },
+    ],
+    [
+      'after the add, for an issue that was outside the Project',
+      undefined,
+      { statusAfterAdd: 'In progress' },
+    ],
+    [
+      'after the add, for an item that had no status',
+      {},
+      { statusAfterAdd: 'In progress' },
+    ],
+  ])('stays when someone sets it %s', async (_case, project, race) => {
     // Arrange
-    const { api, requests, sent } = fakeApi(reported());
+    const issues = reported();
+    issues[400].project = project;
+    const { api, sent } = fakeApi(issues, race);
 
     // Act
     await add(githubCli(api), bug);
 
     // Assert
-    expect(sent('addProjectV2ItemById')).toBe(true);
+    expect(sent('updateProjectV2ItemFieldValue')).toBe(false);
+  });
+
+  it('is read again right before the write, and set when the item still has none', async () => {
+    // Arrange
+    const { api, requests } = fakeApi(reported());
+
+    // Act
+    await add(githubCli(api), bug);
+
+    // Assert
+    const project = requests.filter(({ query }) =>
+      /addProjectV2ItemById|node\(id|updateProjectV2ItemFieldValue/.test(query)
+    );
     expect(
-      requests
-        .filter(({ query }) => query.includes('updateProjectV2ItemFieldValue'))
-        .map(({ variables }) => variables.option)
-    ).toEqual(['status Todo']);
+      project.map(({ query }) =>
+        query.includes('mutation')
+          ? query.split('(input')[0].trim().split(/\s+/).at(-1)
+          : 'read'
+      )
+    ).toEqual([
+      'addProjectV2ItemById',
+      'read',
+      'updateProjectV2ItemFieldValue',
+    ]);
+    expect(project.at(-1)?.variables.option).toBe('status Todo');
   });
 });
 
@@ -908,7 +1055,8 @@ describe('a release item', () => {
   const release = {
     type: 'Release',
     title: 'v0.20.1',
-    description: 'Fix #400. Exit condition: #400 is closed.',
+    description: 'Fix #400.',
+    exitCondition: '#400 is closed.',
     dueOn: '2027-02-15',
   };
 
@@ -922,7 +1070,7 @@ describe('a release item', () => {
 
     // Assert
     expect(state.milestones.get('v0.20.1')).toEqual({
-      description: release.description,
+      description: 'Fix #400.\n\nExit condition: #400 is closed.',
       dueOn: '2027-02-15',
       closed: false,
     });
@@ -953,6 +1101,25 @@ describe('a release item', () => {
     expect(problems).toEqual([expect.stringMatching(new RegExp(`^${word} `))]);
     expect(writes).toEqual([]);
   });
+  it.each([
+    ['without an exit condition', undefined],
+    ['with a blank exit condition', ' \n '],
+  ])(
+    'rejects a release %s and writes nothing',
+    async (_case, exitCondition) => {
+      // Arrange
+      const { github, writes } = fakeGitHub({});
+
+      // Act
+      const problems = await problemsOf(github, { ...release, exitCondition });
+
+      // Assert
+      expect(problems).toEqual([
+        'exitCondition is missing. Write the check that proves the release is done.',
+      ]);
+      expect(writes).toEqual([]);
+    }
+  );
 });
 
 describe('the command', () => {
@@ -987,6 +1154,21 @@ describe('the command', () => {
     expect(stdout).toBe('');
     expect(stderr).toBe(
       'pnpm queue:add rejected the item:\n- exitCondition is missing. Write the check that proves the item is done.\n'
+    );
+  });
+
+  it('prints the help, with the windows in which a change can be lost', () => {
+    // Act
+    const { status, stdout } = run(() => ['--help']);
+
+    // Assert
+    expect(status).toBe(0);
+    expect(stdout).toContain('Usage: pnpm queue:add <item.json> [--dry-run]');
+    expect(stdout).toContain(
+      'An edit of the body\n  that someone saves in that moment is lost.'
+    );
+    expect(stdout).toContain(
+      'A status that\n  someone sets between that read and the write is overwritten.'
     );
   });
 
