@@ -11,6 +11,7 @@
 // stages n times, one round after another, and records the median of each.
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -484,7 +485,11 @@ function main() {
   mkdirSync(dirname(metricsPath), { recursive: true });
   writeFileSync(`${metricsPath}.tmp`, JSON.stringify(metrics, null, 2) + '\n');
   renameSync(`${metricsPath}.tmp`, metricsPath);
-  process.stdout.write(`\n${renderTable(metrics)}\nWrote ${metricsPath}\n`);
+  const table = renderTable(metrics);
+  process.stdout.write(`\n${table}\nWrote ${metricsPath}\n`);
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, table);
+  }
   process.exitCode = stages.every((stage) => stage.passed) ? 0 : 1;
 }
 
