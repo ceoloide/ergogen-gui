@@ -199,7 +199,8 @@ const reported = (): Record<number, FakeIssue> => ({
   },
 });
 
-const bugBody = `| Release | Track | Size | Mode |
+/** The text that the script writes into the body of #400 for `bug`. */
+const bugSections = `| Release | Track | Size | Mode |
 |---|---|---|---|
 | v0.20 | Verification | Small, one pull request | \`auto\` |
 
@@ -219,9 +220,11 @@ An end-to-end test exports a PCB in WebKit.
 
 - #274 R20-01 Load the queue
 
-## Report
+`;
 
-<!-- pnpm queue:add writes the text above this line. The text below is the issue text from before intake. -->
+const bugBody = `${bugSections}## Report
+
+<!-- pnpm queue:add writes the text of #400 above this line. The text below is the issue text from before intake. -->
 
 Nothing happens when I click Export in Safari.
 `;
@@ -514,6 +517,123 @@ describe('adding an issue', () => {
       'Dry run. Nothing was written. A run without --dry-run makes 8 changes.'
     );
   });
+});
+
+describe('the issue text from before intake', () => {
+  /** The hidden line that the script writes above the earlier text of #400. */
+  async function writtenMarker() {
+    const { github, state } = fakeGitHub({
+      ...reported(),
+      400: { title: 'Export fails in Safari' },
+    });
+    await add(github, bug);
+    return state.issues.get(400)?.body.trimEnd().split('\n').at(-1) ?? '';
+  }
+
+  it('writes the sections and the hidden line into a body with no text, once', async () => {
+    // Arrange
+    const marker = await writtenMarker();
+    const issues = reported();
+    issues[400].body = '';
+    const { github, state, writes } = fakeGitHub(issues);
+
+    // Act
+    await add(github, bug);
+    const firstRun = writes.length;
+    await add(github, bug);
+
+    // Assert
+    expect(state.issues.get(400)?.body).toBe(`${bugSections}${marker}\n`);
+    expect(writes).toHaveLength(firstRun);
+  });
+
+  it.each([
+    [
+      'the hidden line of the script',
+      (marker: string) =>
+        `Steps before the line.\n${marker}\nSteps after the line.`,
+    ],
+    [
+      'headings named like the sections of the script',
+      () =>
+        '## Evidence\n\nThe console shows an error.\n\n## Report\n\nI clicked Export.',
+    ],
+    [
+      'a release table of its own',
+      () =>
+        '| Release | Track | Size | Mode |\n|---|---|---|---|\n| v0.21 | Docs | Small, one pull request | `auto` |\n\n## Evidence\n\nAn older plan.',
+    ],
+  ])(
+    'keeps the whole text of a body with %s, and a second run writes nothing',
+    async (_case, earlierText) => {
+      // Arrange
+      const marker = await writtenMarker();
+      const earlier = earlierText(marker);
+      const issues = reported();
+      issues[400].body = earlier;
+      const { github, state, writes } = fakeGitHub(issues);
+
+      // Act
+      await add(github, bug);
+      const firstRun = writes.length;
+      await add(github, bug);
+
+      // Assert
+      expect(state.issues.get(400)?.body).toBe(
+        `${bugSections}## Report\n\n${marker}\n\n${earlier}\n`
+      );
+      expect(writes).toHaveLength(firstRun);
+    }
+  );
+
+  it('rewrites only the sections of a body that went through a run', async () => {
+    // Arrange
+    const { github, state } = fakeGitHub(reported());
+    await add(github, bug);
+    const first = state.issues.get(400)?.body ?? '';
+    const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
+
+    // Act
+    await add(github, { ...bug, evidence });
+
+    // Assert
+    expect(state.issues.get(400)?.body).toBe(
+      first.replace(bug.evidence, evidence)
+    );
+  });
+
+  it('finds its hidden line after an edit on GitHub changed the line endings to CRLF', async () => {
+    // Arrange
+    const { github, state } = fakeGitHub(reported());
+    await add(github, bug);
+    const issue = state.issues.get(400);
+    if (issue) issue.body = issue.body.replace(/\n/g, '\r\n');
+
+    // Act
+    await add(github, bug);
+
+    // Assert
+    expect(state.issues.get(400)?.body).toBe(bugBody);
+  });
+
+  it.each(['evidence', 'change', 'exitCondition'])(
+    'rejects an item whose %s holds the hidden line, and writes nothing',
+    async (key) => {
+      // Arrange
+      const marker = await writtenMarker();
+      const { github, writes } = fakeGitHub(reported());
+
+      // Act
+      const problems = await problemsOf(github, {
+        ...bug,
+        [key]: `Text before the line.\n${marker}\nText after the line.`,
+      });
+
+      // Assert
+      expect(problems).toEqual([expect.stringMatching(new RegExp(`^${key} `))]);
+      expect(writes).toEqual([]);
+    }
+  );
 });
 
 describe('a release item', () => {

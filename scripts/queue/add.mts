@@ -245,6 +245,20 @@ function parseItem(input: unknown): Item {
         : `dependsOn is ${quoted(dependsOn)}. Give a list of issue numbers, or [].`
     );
   }
+  if (isIssueNumber(issue)) {
+    const marker = reportMarker(issue);
+    for (const [key, value] of Object.entries({
+      evidence,
+      change,
+      exitCondition,
+    })) {
+      if (value.includes(marker)) {
+        problems.push(
+          `${key} holds the hidden line that pnpm queue:add writes above the earlier text of #${issue}. Remove that line.`
+        );
+      }
+    }
+  }
   if (problems.length > 0 || !isIssueNumber(issue)) {
     throw new Rejected(problems);
   }
@@ -357,13 +371,32 @@ function findCycle(
   return walk([issue]);
 }
 
-const REPORT_MARKER =
-  '<!-- pnpm queue:add writes the text above this line. The text below is the issue text from before intake. -->';
+/** The first line of every body that `pnpm queue:add` writes. */
+const TABLE_HEADER = '| Release | Track | Size | Mode |';
 
-/** The text that the body held before `pnpm queue:add` first wrote it. */
-function reportOf(body: string): string {
-  const marker = body.indexOf(REPORT_MARKER);
-  return (marker < 0 ? body : body.slice(marker + REPORT_MARKER.length)).trim();
+/**
+ * The hidden line that `pnpm queue:add` writes into the body of `issue`,
+ * below its own text and above the issue text from before intake.
+ */
+const reportMarker = (issue: number) =>
+  `<!-- pnpm queue:add writes the text of #${issue} above this line. The text below is the issue text from before intake. -->`;
+
+/**
+ * The text that the body of `issue` held before `pnpm queue:add` first wrote
+ * it. A body that the script wrote starts with the release table. None of
+ * the script's own lines is the hidden line: its table rows, headings, and
+ * dependency lines start with another character, and `parseItem` rejects an
+ * item whose text holds the line. So the text after the first hidden line is
+ * the earlier text, whatever that text holds. Any other body is the earlier
+ * text as a whole.
+ */
+function reportOf(body: string, issue: number): string {
+  const lines = body.split('\n');
+  const marker = lines.findIndex(
+    (line) => line.trimEnd() === reportMarker(issue)
+  );
+  const written = lines[0].trimEnd() === TABLE_HEADER && marker >= 0;
+  return (written ? lines.slice(marker + 1).join('\n') : body).trim();
 }
 
 function renderBody(
@@ -372,7 +405,7 @@ function renderBody(
   report: string
 ): string {
   const table = [
-    '| Release | Track | Size | Mode |',
+    TABLE_HEADER,
     '|---|---|---|---|',
     `| ${item.release} | ${TRACKS[item.track]} | ${SIZES[item.size]} | \`${item.mode}\` |`,
   ].join('\n');
@@ -390,8 +423,8 @@ function renderBody(
       `## Exit condition\n\n${item.exitCondition}`,
       `## Depends on\n\n${dependsOn}`,
       ...(report === ''
-        ? [REPORT_MARKER]
-        : ['## Report', REPORT_MARKER, report]),
+        ? [reportMarker(item.issue)]
+        : ['## Report', reportMarker(item.issue), report]),
     ].join('\n\n') + '\n'
   );
 }
@@ -488,7 +521,7 @@ function planIssue(
   if (removed.length > 0) {
     changes.push({ kind: 'removeLabels', issue: number, labels: removed });
   }
-  const body = renderBody(item, dependencies, reportOf(issue.body));
+  const body = renderBody(item, dependencies, reportOf(issue.body, number));
   if (body !== issue.body) {
     changes.push({ kind: 'setBody', issue: number, body });
   }
