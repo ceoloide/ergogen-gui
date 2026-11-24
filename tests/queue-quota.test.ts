@@ -227,6 +227,39 @@ describe('the pace rule', () => {
     expect(line).toMatchObject({ elapsedPercent: 5, result: 'go' });
   });
 
+  it('gives unknown under its own limit to a reading from a window that has ended', () => {
+    // Arrange
+    const endedBeforeHalfway = '2026-01-08T12:00:00Z';
+    const readings = claudeReadings(
+      {
+        ...claudeUsage,
+        limits: [
+          {
+            kind: 'weekly_scoped',
+            percent: 70,
+            resets_at: endedBeforeHalfway,
+            scope: { model: { id: null, display_name: 'Example Model' } },
+          },
+        ],
+      },
+      halfway
+    );
+
+    // Act
+    const lines = readings.map((reading) => assess(reading, halfway, 25));
+
+    // Assert
+    expect(lines).toEqual([
+      expect.objectContaining({ limit: 'all models', result: 'go' }),
+      {
+        provider: 'claude',
+        limit: 'Example Model',
+        result: 'unknown',
+        note: `the newest reading is from the window that ended ${endedBeforeHalfway}`,
+      },
+    ]);
+  });
+
   it.each(['2026-01-15T12:00:00Z', '2026-01-15T11:59:59.500Z'])(
     'ends a wait at the reset %s when the pace cannot catch up before it',
     (reset) => {
@@ -305,12 +338,15 @@ describe('pnpm queue:quota', () => {
   // Runs the command in a home folder with one Codex session log, so it reads
   // no saved sign-in and sends no request. The log reads `usedPercent` at 50%
   // of the week elapsed.
-  function run(args: string[], usedPercent = 60) {
+  function run(args: string[], usedPercent = 60, emptyFolders: string[] = []) {
     const home = mkdtempSync(join(tmpdir(), 'queue-quota-'));
     const now = Date.now();
     const resetsAtMs = Math.ceil(now / 1000) * 1000 + 3.5 * day;
     const sessions = join(home, '.codex', 'sessions');
     mkdirSync(sessions, { recursive: true });
+    for (const folder of emptyFolders) {
+      mkdirSync(join(home, folder), { recursive: true });
+    }
     writeFileSync(
       join(sessions, 'rollout.jsonl'),
       codexLog(now, resetsAtMs, usedPercent)
@@ -365,6 +401,29 @@ describe('pnpm queue:quota', () => {
       );
     }
   );
+
+  it('prints one unknown line for all models of a provider whose read fails', () => {
+    // Arrange
+    const foldersWithoutSignIn = [
+      '.claude',
+      '.t3/userdata/providers/antigravity',
+    ];
+
+    // Act
+    const { status, stdout } = run([], 60, foldersWithoutSignIn);
+
+    // Assert
+    expect(status).toBe(0);
+    const lines = stdout.trim().split('\n');
+    expect(lines).toHaveLength(4);
+    expect(lines[1]).toMatch(
+      /^claude\s+all models\s+-\s+-\s+unknown\s+-\s+no Claude sign-in in ~\/\.claude\/\.credentials\.json$/
+    );
+    expect(lines[2]).toMatch(
+      /^antigravity\s+all models\s+-\s+-\s+unknown\s+-\s+no Antigravity sign-in in T3 Code$/
+    );
+    expect(lines[3]).toMatch(/^codex\s+all models\s+60\.0%\s+50\.0%\s+go\s/);
+  });
 
   it('takes the allowance from --ahead and prints when a wait ends', () => {
     // Act

@@ -14,7 +14,8 @@
 //
 // The percent elapsed is the pace. There is no reserve, so a provider used at
 // that pace can spend its whole weekly quota. A weekly limit that a provider
-// reports for some of its models gets its own line.
+// reports for some of its models gets its own line. A provider whose read
+// fails gets one unknown line for all models.
 //
 // The script uses the sign-in that each tool saved on this machine:
 //
@@ -419,28 +420,12 @@ async function readCodex(): Promise<Reading[]> {
 
 const providers: {
   provider: Provider;
-  mainLimit: string;
   folder: string;
   read: () => Promise<Reading[]>;
 }[] = [
-  {
-    provider: 'claude',
-    mainLimit: ALL_MODELS,
-    folder: claudeFolder,
-    read: readClaude,
-  },
-  {
-    provider: 'antigravity',
-    mainLimit: GEMINI_MODELS,
-    folder: antigravityFolder,
-    read: readAntigravity,
-  },
-  {
-    provider: 'codex',
-    mainLimit: ALL_MODELS,
-    folder: codexFolder,
-    read: readCodex,
-  },
+  { provider: 'claude', folder: claudeFolder, read: readClaude },
+  { provider: 'antigravity', folder: antigravityFolder, read: readAntigravity },
+  { provider: 'codex', folder: codexFolder, read: readCodex },
 ];
 
 const percent = (value: number) => `${value.toFixed(1)}%`;
@@ -492,7 +477,7 @@ function parsePointsAhead(args: string[]): number {
 async function main(pointsAhead: number) {
   const enabled = providers.filter(({ folder }) => existsSync(folder));
   const lines = await Promise.all(
-    enabled.map(async ({ provider, mainLimit, read }): Promise<Line[]> => {
+    enabled.map(async ({ provider, read }): Promise<Line[]> => {
       try {
         const readings = await read();
         const now = Date.now();
@@ -502,7 +487,7 @@ async function main(pointsAhead: number) {
           error instanceof Unreadable
             ? error.message
             : `failed with ${error instanceof Error ? error.name : 'an error'}`;
-        return [{ provider, limit: mainLimit, result: 'unknown', note }];
+        return [{ provider, limit: ALL_MODELS, result: 'unknown', note }];
       }
     })
   );
