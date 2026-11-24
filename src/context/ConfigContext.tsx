@@ -9,7 +9,6 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { DebouncedFunc } from 'lodash-es';
 import yaml from 'js-yaml';
 import debounce from 'lodash.debounce';
 import { useLocalStorage } from 'react-use';
@@ -156,12 +155,14 @@ type ContextProps = {
   pruneDeletedConfigs: () => void;
   injectionInput: string[][] | undefined;
   setInjectionInput: Dispatch<SetStateAction<string[][] | undefined>>;
-  processInput: DebouncedFunc<
-    (
-      textInput: string | undefined,
-      injectionInput: string[][] | undefined,
-      options?: ProcessOptions
-    ) => Promise<void>
+  processInput: ReturnType<
+    typeof debounce<
+      (
+        textInput: string | undefined,
+        injectionInput: string[][] | undefined,
+        options?: ProcessOptions
+      ) => Promise<void>
+    >
   >;
   generateNow: (
     textInput: string | undefined,
