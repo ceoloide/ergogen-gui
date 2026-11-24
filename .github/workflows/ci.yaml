@@ -31,12 +31,13 @@ jobs:
         run: |
           pnpm tools:install
           echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
-      # Runs the steps of pnpm validate one at a time and records their times
-      # and counts in reports/metrics.json. Unlike pnpm validate, it keeps going
-      # after a failing step and fails at the end.
+      # Runs the steps of pnpm validate three times, one step at a time, and
+      # records the median time of each step and the counts in
+      # reports/metrics.json. Unlike pnpm validate, it keeps going after a
+      # failing step and fails at the end.
       - name: Validate
         id: validate
-        run: pnpm metrics
+        run: pnpm metrics --repeat 3
         env:
           VITE_GTAG_ID: ${{ vars.VITE_GTAG_ID }}
           VITE_PUBLIC_URL: ${{ vars.PUBLIC_URL }}
