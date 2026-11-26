@@ -52,6 +52,7 @@
     "test:reports": "node scripts/ci/check-reports.mts",
     "assess:pr": "node scripts/ci/assess-pr.mts",
     "check:settings": "node scripts/ci/check-settings.mts",
+    "queue:add": "node scripts/queue/add.mts",
     "queue:quota": "node scripts/queue/quota.mts",
     "test": "pnpm test:unit && pnpm test:e2e",
     "format": "prettier --write \"*.{js,mjs,ts,mts,json,jsonc,md}\" \"{src,e2e,patch,tests,scripts}/**/*.{ts,mts,tsx,js,mjs,jsx,json,css,md}\" \".github/**/*.{yml,yaml}\" \".lintstagedrc.json\" \"index.html\" \"pnpm-workspace.yaml\" \".agents/**/*.md\"",
