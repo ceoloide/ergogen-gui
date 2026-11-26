@@ -90,15 +90,17 @@
 // writes nothing. The script uses the login of the GitHub CLI, `gh`.
 // Exit status: 0 when GitHub holds the item, 2 when the item is rejected or
 // the arguments are wrong, 1 when a read or a write fails.
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { parseArgs, promisify } from 'node:util';
-
-const REPOSITORY = { owner: 'ceoloide', name: 'ergogen-gui' };
-const REPOSITORY_NAME = `${REPOSITORY.owner}/${REPOSITORY.name}`;
-const PROJECT = { owner: 'ceoloide', number: 3 };
+import { parseArgs } from 'node:util';
+import {
+  type Api,
+  ghApi,
+  PROJECT,
+  REPOSITORY,
+  REPOSITORY_NAME,
+} from './github.mts';
 
 const ISSUE_TYPES = ['Task', 'Bug', 'Feature'] as const;
 /** The name of each track in the release table of an issue body. */
@@ -749,23 +751,6 @@ export async function addToQueue(
       ? `Dry run. Nothing was written. A run without --dry-run makes ${count}.`
       : `Made ${count}.`
   );
-}
-
-const execFileAsync = promisify(execFile);
-
-/**
- * Calls the GitHub API with the arguments of `gh api` and a JSON request
- * body, and returns the JSON reply.
- */
-type Api = (args: string[], body: unknown) => Promise<unknown>;
-
-/** Runs `gh api` with a JSON request body and returns the JSON reply. */
-async function ghApi(args: string[], body: unknown): Promise<unknown> {
-  const call = execFileAsync('gh', ['api', ...args, '--input', '-'], {
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  call.child.stdin?.end(JSON.stringify(body));
-  return JSON.parse((await call).stdout);
 }
 
 interface NamedNode {
