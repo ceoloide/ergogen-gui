@@ -76,10 +76,11 @@ can change the priority later.
 
 ## 5. Choose the release
 
-The current release is the open release milestone with the lowest version:
+List the open release milestones in version order. The first line is the
+current release:
 
 ```sh
-gh api --paginate repos/ceoloide/ergogen-gui/milestones --jq '.[].title' | grep '^v' | sort -V | head -n 1
+gh api --paginate repos/ceoloide/ergogen-gui/milestones --jq '.[].title' | grep '^v' | sort -V
 ```
 
 The priority chooses the release of a bug and of a feature request. For a
@@ -92,8 +93,11 @@ feature request, the fix is the change that the request asks for.
   Change of each task that touches the same code. When that task is in the last
   release, use that release. When no open task makes the fix smaller, use the
   current release.
-- `P2`: the release that `P3` gives. The item moves into the current release
-  only after the owner confirms it. Ask in your reply.
+- `P2`: never the current release before the owner confirms it. Use the
+  release that `P3` gives when it comes after the current release. Otherwise,
+  use the first open release after the current release. When no open release
+  comes after the current release, write nothing for the item: skip steps 6
+  and 7, and ask the owner in your reply.
 
 Do not add the task that makes the fix small to `dependsOn`. `pnpm queue:next`
 puts `P3` and `P4` items after every other ready item, whatever their release.
@@ -148,10 +152,12 @@ When the changes are right, run the command again without `--dry-run`.
 To accept a feature request, the owner sets its status to `Todo` in the
 Project. An agent never does.
 
-When the owner gives another priority, or confirms a `P2` item for the current
-release, write the item again. Take its values from the issue and from the
-comment that `pnpm queue:add` wrote on it. Choose the release with the new
-priority as step 5 says, and run step 7.
+When the owner confirms a `P2` item for the current release, set `release` to
+the current release. When the owner asks for a new release for it, add the
+release as [Add a release](#add-a-release) says, and set `release` to it. When
+the owner gives another priority, choose the release for that priority as step
+5 says. Take each value that did not change from the issue and, when it exists,
+from the comment that `pnpm queue:add` wrote on it. Then run steps 6 and 7.
 
 ## Add a release
 
@@ -165,7 +171,9 @@ End with one reply. For each issue that you added, give its number, type,
 priority, release, and the result of step 3. Put a `P0` or `P1` bug first.
 Then ask the owner each open question:
 
-- For a `P2` item, whether it moves into the current release.
+- For a `P2` item that you added, whether it moves into the current release.
+- For a `P2` item that step 5 stopped, its number, type, and the result of step
+  3, and whether it goes into the current release or into a new release.
 - For a feature request, whether to accept it by setting its status to `Todo`.
 
 Name each issue that you skipped, and the reason.
