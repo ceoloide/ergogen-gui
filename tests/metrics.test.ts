@@ -5,12 +5,15 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   countPatterns,
-  stageNames,
+  summarizeRounds,
   summarizeUnitTests,
-  timeStages,
   type SourceFile,
-  type StageRun,
 } from '../scripts/ci/metrics.mts';
+import {
+  validationStages,
+  type StageRun,
+  type ValidationRun,
+} from '../scripts/ci/validate.mts';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -103,49 +106,57 @@ describe('unit tests', () => {
 });
 
 describe('stage times', () => {
-  it('times the steps of pnpm validate', () => {
-    // Arrange
-    const { scripts } = JSON.parse(
-      readFileSync(join(projectRoot, 'package.json'), 'utf8')
-    ) as { scripts: Record<string, string> };
-    const steps = (script: string) =>
-      scripts[script].split(' && ').map((step) => step.replace(/^pnpm /, ''));
+  it('keeps the median of each stage and of the whole round', () => {
+    // Arrange: lint takes 300, 100 and 200 ms, build fails in round 2, and
+    // test:unit does not run in round 3.
+    const round = (index: number): ValidationRun => ({
+      stages: validationStages.map(({ name }): StageRun => {
+        const timing = { startMilliseconds: 0, milliseconds: 50 };
+        if (name === 'lint') {
+          return {
+            name,
+            result: 'passed',
+            ...timing,
+            milliseconds: [300, 100, 200][index],
+          };
+        }
+        if (name === 'build' && index === 1) {
+          return { name, result: 'failed', reason: 'exit code 1', ...timing };
+        }
+        if (name === 'test:unit' && index === 2) {
+          return {
+            name,
+            result: 'not run',
+            reason: 'build-ergogen did not pass',
+          };
+        }
+        return { name, result: 'passed', ...timing };
+      }),
+      milliseconds: [400, 500, 900][index],
+      stopped: false,
+    });
 
     // Act
-    const validateSteps = steps('validate').flatMap((step) =>
-      step === 'validate:fast' ? steps(step) : [step]
+    const { stages, totalMilliseconds } = summarizeRounds([0, 1, 2].map(round));
+
+    // Assert
+    const stage = (name: string) => stages.find((each) => each.name === name);
+    expect(stages.map(({ name }) => name)).toEqual(
+      validationStages.map(({ name }) => name)
     );
-
-    // Assert
-    expect(stageNames).toEqual(validateSteps);
-  });
-
-  it('runs all stages in each round and keeps the median of each', () => {
-    // Arrange
-    const calls: string[] = [];
-    const lintTimes = [300, 100, 200];
-    const run = (name: string, round: number): StageRun => {
-      calls.push(`${round} ${name}`);
-      return {
-        milliseconds: name === 'lint' ? lintTimes[round - 1] : 50,
-        exitCode: name === 'build' && round === 2 ? 1 : 0,
-      };
-    };
-
-    // Act
-    const stages = timeStages(3, run);
-
-    // Assert
-    expect(calls.slice(0, stageNames.length + 1)).toEqual([
-      ...stageNames.map((name) => `1 ${name}`),
-      `2 ${stageNames[0]}`,
-    ]);
-    expect(stages.find(({ name }) => name === 'lint')).toEqual({
+    expect(stage('lint')).toEqual({
       name: 'lint',
       milliseconds: 200,
       samples: [300, 100, 200],
       passed: true,
     });
-    expect(stages.find(({ name }) => name === 'build')?.passed).toBe(false);
+    expect(stage('build')?.passed).toBe(false);
+    expect(stage('test:unit')).toEqual({
+      name: 'test:unit',
+      milliseconds: 50,
+      samples: [50, 50, 0],
+      passed: false,
+    });
+    expect(totalMilliseconds).toBe(500);
   });
 });

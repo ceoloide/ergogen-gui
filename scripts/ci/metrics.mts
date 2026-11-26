@@ -1,15 +1,17 @@
 // Records the baseline that later roadmap tasks compare against. `pnpm metrics`
-// times each stage of `pnpm validate`, reads the unit test report and the
-// bundle that those stages produce, counts patterns in the source, writes
-// reports/metrics.json and prints a table.
+// runs the stages of `pnpm validate` through scripts/ci/validate.mts, which
+// starts independent stages at the same time, and times each stage. It reads
+// the unit test report and the bundle that those stages produce, counts
+// patterns in the source, writes reports/metrics.json and prints a table.
 //
 // The counts port source/measure.sh from the 2027 roadmap report and keep its
 // names, so both give the same numbers on one commit. They read only the files
 // that Git tracks or would track, so they do not depend on the machine.
 //
-// Stage times do depend on the machine. With --repeat <n>, the script runs all
-// stages n times, one round after another, and records the median of each.
-import { execFileSync, spawnSync } from 'node:child_process';
+// Stage times do depend on the machine, and on the stages that run at the same
+// time. With --repeat <n>, the script runs all stages n times, one round after
+// another, and records the median of each.
+import { execFileSync } from 'node:child_process';
 import {
   appendFileSync,
   existsSync,
@@ -25,20 +27,15 @@ import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { summarizeJUnit } from './junit.mts';
+import {
+  runStages,
+  validationStages,
+  type ValidationRun,
+} from './validate.mts';
 
 export const metricsPath = 'reports/metrics.json';
 const unitReportPath = 'reports/unit.xml';
 const bundleDirectory = 'dist';
-
-/** The steps of `pnpm validate`, with `validate:fast` split into its steps. */
-export const stageNames = [
-  'format:check',
-  'lint',
-  'typecheck',
-  'test:unit',
-  'build',
-] as const;
-type StageName = (typeof stageNames)[number];
 
 export interface SourceFile {
   /** Relative to the repository root, with forward slashes. */
@@ -291,17 +288,13 @@ export function summarizeUnitTests(xml: string): UnitTests {
   return { files: suites, tests, failures, errors, skipped };
 }
 
-export interface StageRun {
-  milliseconds: number;
-  exitCode: number | null;
-}
-
 export interface StageResult {
-  name: StageName;
+  name: string;
   /** The median of the samples, which are in round order. */
   milliseconds: number;
+  /** A stage that did not run in a round counts 0 in that round. */
   samples: number[];
-  /** True when the stage exited with 0 in every round. */
+  /** True when the stage passed in every round. */
   passed: boolean;
 }
 
@@ -314,26 +307,29 @@ const median = (values: readonly number[]) => {
 };
 
 /**
- * Runs every stage once per round, so that a slow period on the machine
- * affects all stages alike, and keeps the median of each stage.
+ * Keeps the median time of each stage and of the whole round. Every round
+ * runs all stages, so that a slow period on the machine affects all stages
+ * alike.
  */
-export function timeStages(
-  rounds: number,
-  run: (name: StageName, round: number) => StageRun
-): StageResult[] {
-  const runsByRound = Array.from({ length: rounds }, (_, index) =>
-    stageNames.map((name) => run(name, index + 1))
-  );
-  return stageNames.map((name, position) => {
-    const runs = runsByRound.map((roundRuns) => roundRuns[position]);
-    const samples = runs.map(({ milliseconds }) => milliseconds);
+export function summarizeRounds(rounds: readonly ValidationRun[]) {
+  const stages: StageResult[] = validationStages.map(({ name }) => {
+    const runs = rounds.map(
+      (round) => round.stages.find((stage) => stage.name === name)!
+    );
+    const samples = runs.map((run) =>
+      run.result === 'not run' ? 0 : Math.round(run.milliseconds)
+    );
     return {
       name,
       milliseconds: median(samples),
       samples,
-      passed: runs.every(({ exitCode }) => exitCode === 0),
+      passed: runs.every((run) => run.result === 'passed'),
     };
   });
+  const totalMilliseconds = median(
+    rounds.map((round) => Math.round(round.milliseconds))
+  );
+  return { stages, totalMilliseconds };
 }
 
 export interface Bundle {
@@ -342,7 +338,8 @@ export interface Bundle {
 }
 
 export interface Metrics {
-  schema: 1;
+  /** 2 since stages run at the same time and build-ergogen is a stage. */
+  schema: 2;
   commit: string;
   /** True when files differ from the commit, so the counts may too. */
   dirty: boolean;
@@ -352,7 +349,7 @@ export interface Metrics {
   /** The files in dist. Null unless build passed in every round. */
   bundle: Bundle | null;
   stages: StageResult[];
-  /** The sum of the stage medians. */
+  /** The median time of a round, in which stages run at the same time. */
   totalMilliseconds: number;
   /** What the stage times depend on. */
   machine: {
@@ -431,15 +428,6 @@ function measureBundle(): Bundle {
   };
 }
 
-function runStage(name: StageName, round: number, rounds: number): StageRun {
-  process.stderr.write(`\n[metrics] ${name}, round ${round} of ${rounds}\n`);
-  const start = performance.now();
-  const result = spawnSync('pnpm', ['run', name], { stdio: 'inherit' });
-  const milliseconds = Math.round(performance.now() - start);
-  if (result.error) throw result.error;
-  return { milliseconds, exitCode: result.status };
-}
-
 function parseRounds(argv: string[]): number {
   const { values } = parseArgs({
     args: argv,
@@ -454,19 +442,27 @@ function parseRounds(argv: string[]): number {
   return rounds;
 }
 
-function main() {
+async function main() {
   const rounds = parseRounds(process.argv.slice(2));
   const commit = git('rev-parse', 'HEAD').trim();
   const dirty = git('status', '--porcelain').trim() !== '';
   const counts = countPatterns(readSourceFiles());
   const loadAverage = Number(loadavg()[0].toFixed(2));
-  const stages = timeStages(rounds, (name, round) =>
-    runStage(name, round, rounds)
-  );
-  const passed = (name: StageName) =>
+  const runs: ValidationRun[] = [];
+  for (let round = 1; round <= rounds; round++) {
+    process.stderr.write(`\n[metrics] Round ${round} of ${rounds}\n`);
+    const run = await runStages(validationStages);
+    if (run.stopped) {
+      process.exitCode = 1;
+      return;
+    }
+    runs.push(run);
+  }
+  const { stages, totalMilliseconds } = summarizeRounds(runs);
+  const passed = (name: string) =>
     stages.find((stage) => stage.name === name)?.passed === true;
   const metrics: Metrics = {
-    schema: 1,
+    schema: 2,
     commit,
     dirty,
     counts,
@@ -476,7 +472,7 @@ function main() {
         : null,
     bundle: passed('build') ? measureBundle() : null,
     stages,
-    totalMilliseconds: sum(stages, ({ milliseconds }) => milliseconds),
+    totalMilliseconds,
     machine: {
       node: process.version,
       platform: process.platform,
@@ -496,4 +492,4 @@ function main() {
   process.exitCode = stages.every((stage) => stage.passed) ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) await main();
