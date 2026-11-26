@@ -320,6 +320,75 @@ describe('runStages', () => {
     expect(await eventually(() => !isRunning(pid))).toBe(true);
   });
 
+  /**
+   * A stage that starts a process that shares its output, writes that
+   * process's id to the file pid, and then runs `end`. The process lives 30
+   * seconds, longer than a test may take, and then ends by itself.
+   */
+  const stageThatLeavesItsOutputOpen = (end: string) =>
+    stage(
+      'unit',
+      `
+      const { spawn } = require('node:child_process');
+      const child = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'inherit' });
+      fs.writeFileSync(at('pid'), String(child.pid));
+      ${end}
+      `
+    );
+
+  it('ends a process that a failed stage left holding its output', async () => {
+    // Arrange
+    const stages = [stageThatLeavesItsOutputOpen('process.exit(1);')];
+
+    // Act
+    const outcome = await run(stages);
+    const pid = Number(readFileSync(file('pid'), 'utf8'));
+
+    // Assert
+    expect(resultOf(outcome, 'unit')).toBe('failed');
+    expect(outcome.output).toContain('FAILED, exit code 1');
+    expect(await eventually(() => !isRunning(pid))).toBe(true);
+  });
+
+  it('ends a process that holds the output of a stage that a signal killed', async () => {
+    // Arrange
+    const stages = [
+      stageThatLeavesItsOutputOpen("process.kill(process.pid, 'SIGKILL');"),
+    ];
+
+    // Act
+    const outcome = await run(stages);
+    const pid = Number(readFileSync(file('pid'), 'utf8'));
+
+    // Assert
+    expect(resultOf(outcome, 'unit')).toBe('failed');
+    expect(outcome.output).toContain('FAILED, killed by SIGKILL');
+    expect(await eventually(() => !isRunning(pid))).toBe(true);
+  });
+
+  it('fails a stopped run, also when every stage exits with 0', async () => {
+    // Arrange: the stage passes when the runner ends it.
+    const stages = [
+      stage(
+        'unit',
+        "process.on('SIGTERM', () => process.exit(0)); touch('ready'); setInterval(() => {}, 1000);"
+      ),
+    ];
+    const stop = new AbortController();
+
+    // Act
+    const running = run(stages, stop.signal);
+    expect(await eventually(() => existsSync(file('ready')))).toBe(true);
+    stop.abort();
+    const outcome = await running;
+
+    // Assert
+    expect(resultOf(outcome, 'unit')).toBe('passed');
+    expect(outcome.result.stopped).toBe(true);
+    expect(passed(outcome.result)).toBe(false);
+    expect(outcome.output).toMatch(/\| Total \| \| [\d.]+ \| FAILED \|\n$/);
+  });
+
   it('stops every running stage and its processes when the run is stopped', async () => {
     // Arrange
     const stages = [

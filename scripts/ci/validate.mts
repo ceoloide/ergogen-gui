@@ -7,8 +7,9 @@
 // `pnpm run <stage>`. The runner keeps the output of each stage and prints it
 // whole when the stage ends, so the output of two stages never mixes. Then it
 // prints a table of start times, durations and results. The exit status is 0
-// only when every stage passed. A stage that a signal ends has failed, and a
-// stage that waits for a stage that did not pass does not run.
+// only when every stage passed and nothing stopped the run. A stage that a
+// signal ends has failed, and a stage that waits for a stage that did not pass
+// does not run.
 //
 // Stages run at the same time only when no stage writes a file that another
 // stage reads or writes. strace showed these files for each stage:
@@ -29,8 +30,9 @@
 // - Every stage writes pnpm's lock files and Node's compile cache. Both are
 //   made for processes that run at the same time.
 //
-// Each stage runs in its own process group. When a stage ends, the runner
-// sends SIGTERM to that group, so nothing the stage started keeps running.
+// Each stage runs in its own process group. When a stage's process exits, the
+// runner sends SIGTERM to that group, so nothing the stage started keeps
+// running or keeps the stage's output open.
 // When the runner gets SIGINT or SIGTERM, it sends SIGTERM to the group of
 // every running stage, waits for each stage to end and fails.
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -82,7 +84,7 @@ export interface ValidationRun {
 }
 
 export const passed = (run: ValidationRun) =>
-  run.stages.every((stage) => stage.result === 'passed');
+  !run.stopped && run.stages.every((stage) => stage.result === 'passed');
 
 /** The named stages and the stages they wait for, in their order. */
 export function selectStages(
@@ -245,17 +247,18 @@ export async function runStages(
         child.once('error', (error) =>
           end(`could not start: ${error.message}`)
         );
-        child.once('close', (code, signal) => {
-          // Ends what the stage started but left running.
-          stopGroup(child);
+        // A process that the stage left running can hold its output open, and
+        // 'close' waits for every holder, so the group ends on 'exit'.
+        child.once('exit', () => stopGroup(child));
+        child.once('close', (code, signal) =>
           end(
             signal !== null
               ? `killed by ${signal}`
               : code === 0
                 ? undefined
                 : `exit code ${code}`
-          );
-        });
+          )
+        );
       };
 
       startReady();
