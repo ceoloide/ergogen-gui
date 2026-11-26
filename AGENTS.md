@@ -3,7 +3,9 @@
 Ergogen Web UI is a React and Vite web interface for
 [Ergogen](https://github.com/ergogen/ergogen). Read [README.md](README.md) for
 setup and hosting, and see [DEVELOPMENT.md](DEVELOPMENT.md) for architecture,
-validation, and procedures. These rules apply to people and coding agents.
+validation, and procedures. These rules apply to people and coding agents. When
+you are told to run the next task, follow the
+[next-task skill](.agents/skills/ergogen-gui-next-task/SKILL.md).
 
 ## Dependencies and inputs
 
