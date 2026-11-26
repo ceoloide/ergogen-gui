@@ -19,8 +19,9 @@ validation was checked.
 These commands run validation and tests:
 
 - `pnpm validate:fast`, alias `pnpm precommit`, runs Prettier, markdownlint,
-  ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, our
-  declaration check, and all Vitest tests. It never modifies files.
+  ESLint, Knip, actionlint, zizmor, ShellCheck, the budget check, both
+  TypeScript projects, our declaration check, and all Vitest tests. It never
+  modifies files.
 - `pnpm validate` also runs the production build. Deployment requires it.
   Both run `scripts/ci/validate.mts`, which runs independent checks at once.
 - `pnpm metrics` runs the same checks and writes their times, test counts,
@@ -53,6 +54,19 @@ checks for each file group. `tests/checked-files.test.ts` fails when Git lists a
 file, tracked or untracked, that neither Prettier, ESLint nor ShellCheck checks.
 Make a check cover the file, or add it to `UNCHECKED` in that test with the
 reason.
+
+The budget check, `pnpm lint:budgets`, is the last step of `pnpm lint`. It
+computes eight of the counts that `pnpm metrics` prints, with the same code. In
+the `.ts` and `.tsx` files of `src/` that are not tests, it counts `useEffect(`
+and `setTimeout(` calls, `localStorage.` uses, `console` calls, `eslint-disable`
+comments, and `as unknown as` casts. In test files, it counts `ByTestId` queries
+in `src/` and `e2e/`, and `vi.mock(` calls in `src/`, `tests/`, and `scripts/`.
+It matches text, so a match inside a comment or a string counts. Each count has
+a ceiling and a message in `budgets.json`. A count above its ceiling fails with
+the message, which names what to write instead. Replace the pattern instead of
+raising the ceiling. A count below its ceiling also fails and prints the new
+ceiling. After you remove a match, set that ceiling in `budgets.json` to the
+printed count in the same commit.
 
 Vitest writes `reports/unit.xml`, and `pnpm test:reports` writes
 `reports/evidence.json`. Playwright runs without retries and writes

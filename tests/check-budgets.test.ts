@@ -86,6 +86,7 @@ describe('budget file', () => {
   it.each([
     ['is not JSON', '{', 'not valid JSON'],
     ['is a list', JSON.stringify([budget]), 'must be an object'],
+    ['has no budget', '{}', 'has no budget'],
     [
       'names an unknown count',
       JSON.stringify({ use_effects: budget }),
