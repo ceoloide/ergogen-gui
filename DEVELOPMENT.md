@@ -49,7 +49,10 @@ Prettier checks every file it can parse, except those that `.gitignore` and
 `.prettierignore` list. ESLint checks every JavaScript and TypeScript file,
 except those in the `ignores` of `eslint.config.mjs`.
 [Validation background](docs/records/background.md#validation) lists the other
-checks for each file group.
+checks for each file group. `tests/checked-files.test.ts` fails when Git lists a
+file, tracked or untracked, that neither Prettier, ESLint nor ShellCheck checks.
+Make a check cover the file, or add it to `UNCHECKED` in that test with the
+reason.
 
 Vitest writes `reports/unit.xml`, and `pnpm test:reports` writes
 `reports/evidence.json`. Playwright runs without retries and writes
