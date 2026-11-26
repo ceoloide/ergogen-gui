@@ -51,14 +51,23 @@ export default tseslint.config(
     ignores: [
       'build',
       'dist',
+      'dist-subpath/',
+      'dist-subpath-next/',
+      'dist-subpath-served/',
       'node_modules',
       '.tools',
       '.generated',
       'reports',
+      'coverage/',
+      'test-results/',
+      'playwright-report/',
       '**/*.timestamp-*.mjs',
       'public',
     ],
   },
+  // ESLint lints only the extensions that a configuration names: .js, .mjs and
+  // .cjs by default, and the TypeScript ones from typescript-eslint.
+  { files: ['**/*.jsx'] },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {

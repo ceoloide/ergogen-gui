@@ -1,32 +1,16 @@
 {
-  "src/**/*.{ts,tsx}": [
-    "eslint --fix --max-warnings 0",
-    "prettier --write",
-    "vitest related --run --passWithNoTests"
+  "**/*.md": ["markdownlint --fix"],
+  "*": [
+    "eslint --fix --max-warnings 0 --no-warn-ignored",
+    "prettier --write --ignore-unknown"
   ],
-  "e2e/**/*.ts": ["eslint --fix --max-warnings 0", "prettier --write"],
-  "tests/**/*.ts": ["eslint --fix --max-warnings 0", "prettier --write"],
+  "src/**/*.{ts,tsx}": ["vitest related --run --passWithNoTests"],
   ".github/workflows/*.{yml,yaml}": [
-    "prettier --write",
     "actionlint -shellcheck=shellcheck -pyflakes=",
     "zizmor --offline",
     "vitest run tests/workflow-security.test.ts"
   ],
-  "patch/**/*.{ts,tsx,js,jsx}": [
-    "eslint --fix --max-warnings 0",
-    "prettier --write"
-  ],
-  "**/*.md": ["markdownlint --fix", "prettier --write"],
-  "scripts/**/*.{ts,js,mjs,mts}": [
-    "eslint --fix --max-warnings 0",
-    "prettier --write"
-  ],
+  ".github/dependabot.yml": ["zizmor --offline"],
   "**/*.sh": ["shellcheck"],
-  ".husky/pre-commit": ["shellcheck"],
-  "index.html": ["prettier --write"],
-  "pnpm-workspace.yaml": ["prettier --write"],
-  "./*.{js,mjs,ts,mts}": ["eslint --fix --max-warnings 0", "prettier --write"],
-  ".github/dependabot.yml": ["prettier --write", "zizmor --offline"],
-  ".github/actionlint.yaml": ["prettier --write"],
-  "**/*.{json,jsonc}": ["prettier --write"]
+  ".husky/pre-commit": ["shellcheck"]
 }
