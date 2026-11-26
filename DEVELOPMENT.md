@@ -22,7 +22,9 @@ These commands run validation and tests:
   ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, our
   declaration check, and all Vitest tests. It never modifies files.
 - `pnpm validate` runs `pnpm validate:fast` and the production build.
-  Deployment requires it, and pull request CI adds Playwright.
+  Deployment requires it.
+- `pnpm metrics` runs the steps of `pnpm validate` and writes their times, test
+  counts, bundle size, and pattern counts to `reports/metrics.json`.
 - `pnpm validate:extended` runs `pnpm validate:fast`, a fresh production build,
   all Playwright tests, and `pnpm test:reports`.
 - `pnpm test:reports` checks the JUnit reports against the
@@ -439,10 +441,8 @@ non-canonical engine in a separate checkout before you select it.
 On every run, `node scripts/ci/deploy-engine.mts resolve` in the `build` job
 pins a branch or tag to one commit. The install step runs the
 [engine experiments](#engine-experiments) procedure with that pinned specifier,
-and `deploy-engine.mts verify` and `pnpm validate` use it too. Like pull request
-CI,
-the deploy workflow runs `pnpm validate`, but without browser tests or
-`pnpm test:reports`.
+and `deploy-engine.mts verify` and `pnpm validate` use it too. The deploy
+workflow runs no browser tests or `pnpm test:reports`.
 [Deployment engine background](docs/records/background.md#deployment-engine)
 describes each step.
 
@@ -469,7 +469,7 @@ them.
 GitHub Actions runs validation and deployment under these rules:
 
 - `ci.yaml` runs on every pull request, including stacked ones, with a
-  read-only token and unpersisted checkout credentials. It runs `pnpm validate`,
+  read-only token and unpersisted checkout credentials. It runs `pnpm metrics`,
   then Playwright, then `pnpm test:reports`, and uploads `reports/` and
   Playwright output. See [Pull request evidence](#pull-request-evidence).
 - `deploy.yaml` runs on pushes to `main`, manual dispatch, and

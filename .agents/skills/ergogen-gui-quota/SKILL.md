@@ -28,9 +28,9 @@ invented numbers:
 $ node scripts/queue/quota.mts
 provider     limit                   used  elapsed  result    go at                 note
 claude       all models                 -        -  unknown   -                     HTTP 429 from api.anthropic.com
-antigravity  Gemini models          70.0%    35.0%  wait 17h  2026-01-11T15:36:00Z  resets 2026-01-15T12:00:00Z
-antigravity  Claude and GPT models  20.0%    35.0%  go        -                     resets 2026-01-15T12:00:00Z
-codex        all models             48.0%    35.0%  go        -                     resets 2026-01-15T12:00:00Z, read 3 h ago
+antigravity  Gemini models          55.0%    35.0%  wait 17h  2026-01-11T15:36:00Z  resets 2026-01-15T12:00:00Z
+antigravity  Claude and GPT models   5.0%    35.0%  go        -                     resets 2026-01-15T12:00:00Z
+codex        all models             33.0%    35.0%  go        -                     resets 2026-01-15T12:00:00Z, read 3 h ago
 ```
 
 ## Read a line
@@ -44,7 +44,7 @@ codex        all models             48.0%    35.0%  go        -                 
   the window that has passed, which is the pace.
 - `result` is `go` while `used` is at most the allowance above `elapsed`, and
   `wait` beyond that, with the hours until `go at`, such as `wait 17h`. The
-  allowance is 25 points unless the run passed `--ahead=<points>`. It is
+  allowance is 10 points unless the run passed `--ahead=<points>`. It is
   `unknown` when the quota could not be read.
 - `go at` is the UTC time at which a `wait` turns to `go` if no more quota is
   used.
@@ -73,7 +73,7 @@ These cases follow from the rule:
 - The `unknown` line of a provider that the script cannot read binds all
   models, so the provider gets no task. An `unknown` line for one model, such
   as a reading from a window that has ended, stops tasks for that model only.
-- With the default allowance, a line at 100% used says `go` from 75% elapsed.
+- With the default allowance, a line at 100% used says `go` from 90% elapsed.
   Its headroom is zero, so it stops the task.
 
 A line stops a task when it binds the task's model but does not say `go` with
@@ -88,7 +88,7 @@ that provider again at this time:
 
 When no provider can take the task, check again at the earliest of these times.
 
-Only a person overrides a wait. `--ahead=<points>` changes the allowance of 25
+Only a person overrides a wait. `--ahead=<points>` changes the allowance of 10
 points for one run, such as `pnpm -s queue:quota --ahead=35`. Pass it only when
 a person tells you to.
 
