@@ -50,6 +50,9 @@ export function parseBudgets(text: string): Budget[] {
   if (!isObject(parsed)) {
     return fail('must be an object with one budget for each count name');
   }
+  if (Object.keys(parsed).length === 0) {
+    return fail('has no budget. Add one for each count that must not grow');
+  }
   return Object.entries(parsed).map(([name, entry]) => {
     if (!isCountName(name)) {
       return fail(
