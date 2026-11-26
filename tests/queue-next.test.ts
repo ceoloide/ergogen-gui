@@ -356,6 +356,73 @@ describe('the next task', () => {
   });
 });
 
+describe('the next decision', () => {
+  /** A decision that is ready, in v0.20, with the given fields changed. */
+  const decision = (fields: FakeIssue = {}): FakeIssue =>
+    ready({ labels: ['size:S', 'mode:owner', 'decision'], ...fields });
+
+  /** The number of the issue that `pnpm queue:next --decision` prints. */
+  async function nextDecision(issues: Record<string, FakeIssue>) {
+    return (await nextTask(fakeApi(issues).api, 'decision'))?.issue ?? null;
+  }
+
+  it('is a ready issue with the label decision, which is never the next task', async () => {
+    // Arrange
+    const issues = {
+      10: decision({ title: 'R20-01 Choose' }),
+      11: ready({ title: 'R20-02 Task' }),
+    };
+
+    // Act
+    const decided = await nextDecision(issues);
+    const task = await next(issues);
+
+    // Assert
+    expect(decided).toBe(10);
+    expect(task).toBe(11);
+  });
+
+  it('is never an issue without the label decision', async () => {
+    // Arrange
+    const issues = { 10: ready({ title: 'R20-01 Task' }) };
+
+    // Act
+    const decided = await nextDecision(issues);
+
+    // Assert
+    expect(decided).toBeNull();
+  });
+
+  /** Each reason alone keeps a decision from being the next decision. */
+  const reasons: [string, FakeIssue][] = [
+    ['is blocked by an open issue', { blockedBy: ['90'] }],
+    ['has the status Proposed', { status: 'Proposed' }],
+    ['has the status In progress', { status: 'In progress' }],
+    ['has the status Done', { status: 'Done' }],
+    ['is outside the Project', { status: undefined }],
+    ['is in the milestone Backlog', { release: 'Backlog' }],
+    ['is in no milestone', { release: undefined }],
+  ];
+
+  it.each(reasons)(
+    'is never a decision that %s, also when it comes first otherwise',
+    async (_reason, fields) => {
+      // Arrange
+      const issues = {
+        10: decision({ title: 'R20-01 First', ...fields }),
+        11: decision({ title: 'R20-02 Second' }),
+        90: { title: 'A blocker', release: 'v0.20' },
+      };
+
+      // Act
+      const decided = await nextDecision(issues);
+
+      // Assert
+      expect(decided).toBe(11);
+    }
+  );
+});
+
 describe('the command', () => {
   const issues = {
     278: ready({
@@ -428,6 +495,49 @@ describe('the command', () => {
     expect(stdout).toBe(expected);
   });
 
+  it.each([
+    [['--decision'], 'No decision is ready.'],
+    [['--decision', '--json'], JSON.stringify({ next: null }, null, 2)],
+  ])(
+    'exits with 0 when no decision is ready, with %j',
+    async (args, expected) => {
+      // Act
+      const { status, stdout } = await run(args);
+
+      // Assert
+      expect(status).toBe(0);
+      expect(stdout).toBe(expected);
+    }
+  );
+
+  it('prints the next decision as JSON with --decision --json', async () => {
+    // Arrange
+    const { api } = fakeApi({
+      ...issues,
+      356: ready({
+        title: 'R25-11 Choose the trust levels in a review session',
+        labels: ['size:S', 'mode:owner', 'decision'],
+      }),
+    });
+
+    // Act
+    const { status, stdout } = await run(['--decision', '--json'], api);
+
+    // Assert
+    expect(status).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({
+      next: {
+        issue: 356,
+        title: 'R25-11 Choose the trust levels in a review session',
+        url: 'https://github.com/ceoloide/ergogen-gui/issues/356',
+        release: 'v0.20',
+        priority: null,
+        size: 'S',
+        mode: 'owner',
+      },
+    });
+  });
+
   it('exits with 1 and prints the error of gh when a read fails', async () => {
     // Arrange
     const failing = async () => {
@@ -448,6 +558,7 @@ describe('the command', () => {
   it.each([
     [[], 1],
     [['--json'], 1],
+    [['--decision', '--json'], 1],
     [['--help'], 0],
     [['--force'], 0],
   ])('sends GitHub only GraphQL queries, with %j', async (args, count) => {
@@ -488,7 +599,7 @@ describe('the command', () => {
 
       // Assert
       expect(status).toBe(0);
-      expect(stdout).toContain('Usage: pnpm queue:next [--json]');
+      expect(stdout).toContain('Usage: pnpm queue:next [--decision] [--json]');
       expect(stdout).toContain('The script only reads GitHub');
     });
 
@@ -500,7 +611,9 @@ describe('the command', () => {
 
         // Assert
         expect(status).toBe(2);
-        expect(stderr).toContain('Usage: pnpm queue:next [--json]');
+        expect(stderr).toContain(
+          'Usage: pnpm queue:next [--decision] [--json]'
+        );
       }
     );
 
