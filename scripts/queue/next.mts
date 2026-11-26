@@ -1,6 +1,6 @@
 // Prints the next task of the queue, the item that a new session takes:
 //
-//   pnpm queue:next [--json]
+//   pnpm queue:next [--decision] [--json]
 //   pnpm queue:next --help
 //
 // The queue is the Project "Ergogen GUI 2027", Project 3 of the user
@@ -26,10 +26,17 @@
 //    as numbers. An item without one comes after the items with one.
 // 5. Then the issue number.
 //
+// With --decision, the script prints the next decision instead. A decision
+// is an issue with the label decision. It is ready under the same rule as a
+// task, except that it can have the label mode:owner, and the same order
+// picks the first one. An agent writes the brief of a decision, and the
+// owner chooses.
+//
 // The script only reads GitHub, with the login of the GitHub CLI, `gh`. It
 // prints the issue and its title, then its release, priority, size, and mode,
-// then its URL. When no item is ready, it prints "No item is ready." With
-// --json it prints {"next": {...}}, or {"next": null} when no item is ready.
+// then its URL. When no item is ready, it prints "No item is ready.", or "No
+// decision is ready." with --decision. With --json it prints
+// {"next": {...}}, or {"next": null} when no item is ready.
 // Exit status: 0 when the script read the queue, also when no item is ready,
 // 2 when the arguments are wrong, 1 when a read fails.
 import { pathToFileURL } from 'node:url';
@@ -42,7 +49,10 @@ type Priority = (typeof PRIORITIES)[number];
 /** The tier of each priority. A lower tier comes first. */
 const TIER: Record<Priority, number> = { P0: 0, P1: 0, P2: 1, P3: 2, P4: 2 };
 
-/** The next task, as `--json` prints it. */
+/** What the script looks for: a task, or with --decision, a decision. */
+type Kind = 'task' | 'decision';
+
+/** The next task or decision, as `--json` prints it. */
 export interface Task {
   issue: number;
   title: string;
@@ -109,11 +119,14 @@ function versionOf(title: string): [number, number, number] | undefined {
 }
 
 /**
- * The task of a ready item and the key that orders it, or undefined when the
- * item is not ready. Keys compare place by place, and the lower key comes
- * first.
+ * The task of an item that is ready as a `kind`, and the key that orders it,
+ * or undefined when the item is not ready. Keys compare place by place, and
+ * the lower key comes first.
  */
-function readyTask(node: IssueNode): { task: Task; key: number[] } | undefined {
+function readyTask(
+  node: IssueNode,
+  kind: Kind
+): { task: Task; key: number[] } | undefined {
   const labels = node.labels.nodes.map(({ name }) => name);
   const release = node.milestone?.title ?? '';
   const version = versionOf(release);
@@ -121,11 +134,14 @@ function readyTask(node: IssueNode): { task: Task; key: number[] } | undefined {
     ({ project }) =>
       project.number === PROJECT.number && project.owner.login === PROJECT.owner
   )?.fieldValueByName?.name;
+  const isKind =
+    kind === 'decision'
+      ? labels.includes('decision')
+      : !labels.includes('mode:owner') && !labels.includes('decision');
   if (
     !version ||
     status !== 'Todo' ||
-    labels.includes('mode:owner') ||
-    labels.includes('decision') ||
+    !isKind ||
     node.blockedBy.nodes.some(({ closed }) => !closed)
   ) {
     return undefined;
@@ -166,9 +182,13 @@ function compareKeys(a: number[], b: number[]): number {
 
 /**
  * Reads every open issue through `api`, page by page, and returns the next
- * task, or null when no item is ready. Sends only GraphQL queries.
+ * task, or the next decision for the kind `decision`, or null when no item
+ * is ready. Sends only GraphQL queries.
  */
-export async function nextTask(api: Api): Promise<Task | null> {
+export async function nextTask(
+  api: Api,
+  kind: Kind = 'task'
+): Promise<Task | null> {
   const ready: { task: Task; key: number[] }[] = [];
   let after: string | null = null;
   do {
@@ -178,7 +198,7 @@ export async function nextTask(api: Api): Promise<Task | null> {
     })) as OpenIssuesReply;
     const { nodes, pageInfo } = reply.data.repository.issues;
     for (const node of nodes) {
-      const item = readyTask(node);
+      const item = readyTask(node, kind);
       if (item) ready.push(item);
     }
     after = pageInfo.hasNextPage ? pageInfo.endCursor : null;
@@ -187,8 +207,8 @@ export async function nextTask(api: Api): Promise<Task | null> {
   return ready[0]?.task ?? null;
 }
 
-function render(task: Task | null): string {
-  if (!task) return 'No item is ready.';
+function render(task: Task | null, kind: Kind): string {
+  if (!task) return `No ${kind === 'decision' ? 'decision' : 'item'} is ready.`;
   const details = [
     `release ${task.release}`,
     `priority ${task.priority ?? 'none'}`,
@@ -200,7 +220,7 @@ function render(task: Task | null): string {
   );
 }
 
-const USAGE = 'Usage: pnpm queue:next [--json]';
+const USAGE = 'Usage: pnpm queue:next [--decision] [--json]';
 
 const HELP = `${USAGE}
 
@@ -212,11 +232,17 @@ P4 comes only when no other item is ready. Then the lowest release, the
 priority, the roadmap id in the title, and the issue number decide. The header
 comment of scripts/queue/next.mts gives the whole rule.
 
+With --decision, the script prints the next decision instead. A decision is
+an issue with the label decision. It is ready under the same rule as a task,
+except that it can have the label mode:owner, and the same order picks the
+first one.
+
 The script only reads GitHub, with the login of the GitHub CLI, gh.
 
 Options:
-  --json  Print {"next": {...}}, or {"next": null} when no item is ready.
-  --help  Print this text.
+  --decision  Print the next decision instead of the next task.
+  --json      Print {"next": {...}}, or {"next": null} when no item is ready.
+  --help      Print this text.
 
 Exit status: 0 when the script read the queue, also when no item is ready,
 2 when the arguments are wrong, 1 when a read fails.`;
@@ -235,11 +261,13 @@ export async function main(
   } = {}
 ): Promise<number> {
   let json: boolean;
+  let kind: Kind;
   try {
     const { values } = parseArgs({
       args,
       options: {
         json: { type: 'boolean', default: false },
+        decision: { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
       },
     });
@@ -248,19 +276,20 @@ export async function main(
       return 0;
     }
     json = values.json;
+    kind = values.decision ? 'decision' : 'task';
   } catch (error) {
     stderr(`${(error as Error).message}\n${USAGE}`);
     return 2;
   }
   let task: Task | null;
   try {
-    task = await nextTask(api);
+    task = await nextTask(api, kind);
   } catch (error) {
     const { stderr: output } = error as { stderr?: string };
     stderr(output?.trim() || (error as Error).message);
     return 1;
   }
-  stdout(json ? JSON.stringify({ next: task }, null, 2) : render(task));
+  stdout(json ? JSON.stringify({ next: task }, null, 2) : render(task, kind));
   return 0;
 }
 
