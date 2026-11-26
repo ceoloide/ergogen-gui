@@ -31,9 +31,9 @@ jobs:
         run: |
           pnpm tools:install
           echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
-      # Runs the steps of pnpm validate one at a time and records their times
-      # and counts in reports/metrics.json. Unlike pnpm validate, it keeps going
-      # after a failing step and fails at the end.
+      # Runs the stages of pnpm validate as pnpm validate does, independent
+      # stages at the same time, and records their times and counts in
+      # reports/metrics.json. It fails when any stage fails.
       - name: Validate
         id: validate
         run: pnpm metrics
