@@ -1,0 +1,34 @@
+{
+  "use_effect": {
+    "ceiling": 50,
+    "message": "Compute the value during render, or do the work in the event handler that causes it. To subscribe to a store outside React, use useSyncExternalStore."
+  },
+  "set_timeout": {
+    "ceiling": 16,
+    "message": "Call the function in the event handler instead of on a zero-delay timer. To stop waiting after a delay, pass AbortSignal.timeout(ms). To delay a change in a component, use useTimeoutFn from react-use, which clears its timer on unmount."
+  },
+  "local_storage": {
+    "ceiling": 20,
+    "message": "Keep the value in a useLocalStorage hook from react-use, as src/context/ConfigContext.tsx does for the settings."
+  },
+  "console": {
+    "ceiling": 79,
+    "message": "Show an error to the user with setError from ConfigContext, or throw it to the caller. Delete debug output before you commit."
+  },
+  "eslint_disable": {
+    "ceiling": 11,
+    "message": "Change the code until the rule passes. If the rule does not fit a kind of file, change it for those files in eslint.config.mjs."
+  },
+  "as_unknown_as": {
+    "ceiling": 7,
+    "message": "Check the shape with a type guard that returns `value is T`, and use the narrowed value."
+  },
+  "by_test_id": {
+    "ceiling": 188,
+    "message": "Query by role, label, or text instead, such as getByRole('button', { name: 'Save' }), and give the element an accessible name if it lacks one."
+  },
+  "vi_mock": {
+    "ceiling": 82,
+    "message": "Pass the dependency in as an argument or a prop, or replace one function for one test with vi.spyOn."
+  }
+}
