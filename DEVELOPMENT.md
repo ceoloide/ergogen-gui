@@ -771,3 +771,18 @@ each result.
 The [next-task skill](.agents/skills/ergogen-gui-next-task/SKILL.md) tells an
 agent how to take the next task of the queue. `pnpm queue:next` picks the task,
 and `pnpm queue:claim` claims it before any work starts.
+
+## Intake
+
+`pnpm queue:add <item.json>` adds an issue to the queue with its type,
+milestone, labels, and dependencies, or creates the milestone of a release. It
+rejects an item with a missing value, a dependency that does not exist, or
+dependencies that form a cycle, and then writes nothing. It never edits the
+body of an issue. It writes the Evidence, Change, Exit condition, and Depends on
+sections into one comment that it owns. `--dry-run` prints the changes without
+writing them. The header comment of `scripts/queue/add.mts` describes the item
+file.
+
+The [intake skill](.agents/skills/ergogen-gui-intake/SKILL.md) tells an agent
+how to add a new bug report or feature request: set its type, reproduce a bug,
+propose a priority from `P0` to `P4`, and choose its release.
