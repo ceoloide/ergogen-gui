@@ -33,9 +33,11 @@
 // for any other type. The script never changes the status of an item that
 // has one.
 //
-// In the body, the script owns one block and nothing else:
+// The script never edits the body of an issue. It writes the release table
+// and the Evidence, Change, Exit condition, and Depends on sections into one
+// comment that it owns, and updates that comment in place on a later run:
 //
-//   <!-- pnpm queue:add #400 start sha256:<checksum> -->
+//   <!-- pnpm queue:add #400 sha256:<checksum> -->
 //
 //   | Release | Track | Size | Mode |
 //   ...
@@ -44,19 +46,19 @@
 //   - #274 R20-01 Load the queue
 //   - ergogen/ergogen#12 Export the outline as SVG
 //
-//   <!-- pnpm queue:add #400 end -->
+// The first line is a hidden marker. It names the issue and holds the SHA-256
+// of the text below it, read with LF line endings and without the blank
+// space around it, because an edit on GitHub turns every line ending into
+// CRLF. Depends on lists every blocker, also one in another repository.
 //
-// Both markers name the issue. The checksum is the SHA-256 of the text
-// between the markers, read with LF line endings, because an edit on GitHub
-// turns every line ending of the body into CRLF. The block holds the release
-// table and the Evidence, Change, Exit condition, and Depends on sections.
-// Depends on lists every blocker, also one in another repository. A body
-// without a marker gets the block at its end. A body with one block of this
-// issue whose checksum matches gets the new block in its place. The script
-// refuses any other body that holds "<!-- pnpm queue:add": a marker without
-// its pair, a marker that appears twice, a marker of another issue, or a
-// block that someone changed by hand. Text outside the block stays as it is,
-// byte for byte.
+// The script owns a comment when the login of `gh` wrote it and the comment
+// starts with the marker of the issue and the text that matches its checksum.
+// It never edits a comment of another author, whatever that comment holds. It
+// refuses the item when a comment of its login starts with
+// "<!-- pnpm queue:add" but is not a comment that it owns: a broken marker, a
+// marker of another issue, or a comment that someone edited by hand. It also
+// refuses the item when it owns two comments on the issue. Without an owned
+// comment, it writes a new one.
 //
 // A release item creates a milestone, with an optional due date. The
 // milestone description holds the description and the exit condition:
@@ -68,20 +70,23 @@
 // so a rejected item changes nothing. It rejects an item when a value is
 // missing or invalid, when the issue, the milestone, a label, or a dependency
 // does not exist, when the dependencies form a cycle, and when it refuses the
-// body. A second run of the same item writes nothing. After a failed write,
-// run the item again. The script compares the item with GitHub and writes
-// only what still differs.
+// comments. A second run of the same item writes nothing. After a failed
+// write, run the item again. The script compares the item with GitHub and
+// writes only what still differs.
 //
-// The GitHub API cannot write a value only while it is unchanged, so two
-// windows remain in which the change of another person can be lost:
+// The GitHub API cannot write a value only while it is unchanged, so a change
+// that someone saves between the last read of the script and its write can
+// be lost:
 //
-// - The body is the first write, a moment after the read. An edit of the
-//   body that someone saves in that moment is lost.
+// - The comment is the first write, a moment after the read. An edit of the
+//   owned comment that someone saves in that moment is lost.
 // - The script reads the status of the Project item again right before it
 //   sets the status, and sets it only when the item still has none. A status
 //   that someone sets between that read and the write is overwritten.
+// - The script reads the blocked-by relations once, before its first write.
+//   A relation that someone changes after that read can be overwritten.
 //
-// --dry-run prints the changes and the body that a run would write, and
+// --dry-run prints the changes and the comment that a run would write, and
 // writes nothing. The script uses the login of the GitHub CLI, `gh`.
 // Exit status: 0 when GitHub holds the item, 2 when the item is rejected or
 // the arguments are wrong, 1 when a read or a write fails.
@@ -343,13 +348,24 @@ export interface Repository {
   issues: ReadonlyMap<IssueRef, GraphIssue>;
 }
 
+/** A comment on an issue. */
+export interface Comment {
+  /** The node ID. */
+  id: string;
+  url: string;
+  body: string;
+  /** Whether the login that runs the script wrote the comment. */
+  byViewer: boolean;
+}
+
 /** What the plan reads from the issue that an item adds. */
 export interface IssueState {
-  body: string;
   type?: string;
   /** The title of its milestone. */
   release?: string;
   labels: readonly string[];
+  /** Every comment on the issue, oldest first. */
+  comments: readonly Comment[];
   /** Undefined while the issue is not in the Project. */
   project?: { status?: string };
 }
@@ -366,7 +382,15 @@ export type Change =
   | { kind: 'setRelease'; issue: number; release: string }
   | { kind: 'addLabels'; issue: number; labels: string[] }
   | { kind: 'removeLabels'; issue: number; labels: string[] }
-  | { kind: 'setBody'; issue: number; body: string }
+  | { kind: 'addComment'; issue: number; body: string }
+  | {
+      kind: 'updateComment';
+      issue: number;
+      /** The node ID of the comment. */
+      id: string;
+      url: string;
+      body: string;
+    }
   | { kind: 'removeDependency'; issue: number; blocker: number }
   | { kind: 'addDependency'; issue: number; blocker: number }
   | { kind: 'addToProject'; issue: number; status: Status }
@@ -413,24 +437,26 @@ const nameOf = (ref: IssueRef) => (typeof ref === 'number' ? `#${ref}` : ref);
 const titled = (ref: IssueRef, repository: Repository) =>
   `${nameOf(ref)} ${repository.issues.get(ref)?.title ?? ''}`.trim();
 
-/** The text with which every marker of the block in an issue body starts. */
+/** The text with which the marker of an owned comment starts. */
 const MARKER_OPENING = '<!-- pnpm queue:add';
+/** The first line of an owned comment. */
+const MARKER = /^<!-- pnpm queue:add #([1-9]\d*) sha256:([0-9a-f]{64}) -->$/;
+
 /**
- * A marker of the block: `<!-- pnpm queue:add #400 start sha256:<checksum> -->`
- * or `<!-- pnpm queue:add #400 end -->`.
+ * `text` with LF line endings and without the blank space around it, because
+ * an edit on GitHub turns every line ending into CRLF.
  */
-const MARKER =
-  /<!-- pnpm queue:add #([1-9]\d*) (?:start sha256:([0-9a-f]{64})|end) -->/y;
+const normalized = (text: string) => text.replace(/\r\n/g, '\n').trim();
 
-/** The SHA-256 of `content` read with LF line endings, in hexadecimal. */
+/** The SHA-256 of `content`, in hexadecimal. */
 const checksum = (content: string) =>
-  createHash('sha256').update(content.replace(/\r\n/g, '\n')).digest('hex');
+  createHash('sha256').update(content).digest('hex');
 
-/** The block of `issue` around `content`, the text between the markers. */
-const renderBlock = (issue: number, content: string) =>
-  `${MARKER_OPENING} #${issue} start sha256:${checksum(content)} -->${content}${MARKER_OPENING} #${issue} end -->`;
+/** The owned comment of `issue` that holds `content`. */
+const renderComment = (issue: number, content: string) =>
+  `${MARKER_OPENING} #${issue} sha256:${checksum(content)} -->\n\n${content}`;
 
-/** The text between the markers of the block of `item`. */
+/** The text below the marker of the owned comment for `item`. */
 function renderContent(item: IssueItem, dependencies: string[]): string {
   const table = [
     '| Release | Track | Size | Mode |',
@@ -447,97 +473,60 @@ function renderContent(item: IssueItem, dependencies: string[]): string {
     `## Change\n\n${item.change}`,
     `## Exit condition\n\n${item.exitCondition}`,
     `## Depends on\n\n${dependsOn}`,
+    '_`pnpm queue:add` wrote this comment. To change it, run the script again with a changed item. The script refuses to update a comment that someone edited by hand._',
   ];
-  return `\n\n${sections.join('\n\n')}\n\n`;
+  return normalized(sections.join('\n\n'));
 }
 
-/** What an issue body holds of the block of `pnpm queue:add`. */
-type BlockSearch =
+/** What the comments of an issue hold of the comment that the script owns. */
+type CommentSearch =
   | { kind: 'none' }
-  /** The block spans `body.slice(from, to)`. */
-  | { kind: 'found'; from: number; to: number; content: string }
+  /** `content` is the text below the marker of `comment`. */
+  | { kind: 'found'; comment: Comment; content: string }
   | { kind: 'refused'; cause: string };
 
-/** Finds the block of `issue` in `body`, or the reason to leave `body` alone. */
-function findBlock(body: string, issue: number): BlockSearch {
-  const lineOf = (index: number) => body.slice(0, index).split('\n').length;
-  const refused = (cause: string): BlockSearch => ({ kind: 'refused', cause });
-  const starts: { at: number; after: number; checksum: string }[] = [];
-  const ends: { at: number; after: number }[] = [];
-  for (
-    let at = body.indexOf(MARKER_OPENING);
-    at !== -1;
-    at = body.indexOf(MARKER_OPENING, at + 1)
-  ) {
-    MARKER.lastIndex = at;
-    const match = MARKER.exec(body);
-    if (!match) {
-      return refused(
-        `line ${lineOf(at)} holds "${MARKER_OPENING}" without a valid marker.`
-      );
-    }
-    if (Number(match[1]) !== issue) {
-      return refused(
-        `the marker on line ${lineOf(at)} names #${match[1]}, not #${issue}.`
-      );
-    }
-    const after = MARKER.lastIndex;
-    if (match[2]) starts.push({ at, after, checksum: match[2] });
-    else ends.push({ at, after });
-  }
-  for (const [name, markers] of [
-    ['start', starts],
-    ['end', ends],
-  ] as const) {
-    if (markers.length > 1) {
-      return refused(
-        `the ${name} marker appears ${markers.length} times, on lines ${markers.map(({ at }) => lineOf(at)).join(', ')}.`
-      );
-    }
-  }
-  const [start] = starts;
-  const [end] = ends;
-  if (!start && !end) return { kind: 'none' };
-  if (!end) {
-    return refused(
-      `the start marker on line ${lineOf(start.at)} has no end marker.`
-    );
-  }
-  if (!start) {
-    return refused(
-      `the end marker on line ${lineOf(end.at)} has no start marker.`
-    );
-  }
-  if (end.at < start.at) {
-    return refused(
-      `the end marker on line ${lineOf(end.at)} comes before the start marker on line ${lineOf(start.at)}.`
-    );
-  }
-  const content = body.slice(start.after, end.at);
-  if (checksum(content) !== start.checksum) {
-    return refused(
-      `the text between the markers on lines ${lineOf(start.at)} and ${lineOf(end.at)} changed after pnpm queue:add wrote it.`
-    );
-  }
-  return { kind: 'found', from: start.at, to: end.after, content };
-}
-
 /**
- * `body` with the block of `issue` around `content`: in place of the block
- * that `findBlock` found, or after the text of a body without one.
+ * Finds the comment that the script owns on `issue`, or the reason to leave
+ * the comments alone. A comment of another author never counts.
  */
-function withBlock(
-  body: string,
-  found: BlockSearch & { kind: 'none' | 'found' },
-  issue: number,
-  content: string
-): string {
-  if (found.kind === 'none') {
-    const separator = body === '' ? '' : body.endsWith('\n') ? '\n' : '\n\n';
-    return `${body}${separator}${renderBlock(issue, content)}\n`;
+function findOwnedComment(
+  comments: readonly Comment[],
+  issue: number
+): CommentSearch {
+  const refused = (cause: string): CommentSearch => ({
+    kind: 'refused',
+    cause,
+  });
+  const owned: { comment: Comment; content: string }[] = [];
+  for (const comment of comments) {
+    const text = normalized(comment.body);
+    if (!comment.byViewer || !text.startsWith(MARKER_OPENING)) continue;
+    const [firstLine] = text.split('\n', 1);
+    const marker = MARKER.exec(firstLine);
+    if (!marker) {
+      return refused(
+        `the comment ${comment.url} starts with "${MARKER_OPENING}", but its first line is not a valid marker.`
+      );
+    }
+    if (Number(marker[1]) !== issue) {
+      return refused(
+        `the marker of the comment ${comment.url} names #${marker[1]}, not #${issue}.`
+      );
+    }
+    const content = text.slice(firstLine.length).trim();
+    if (checksum(content) !== marker[2]) {
+      return refused(
+        `the comment ${comment.url} changed after pnpm queue:add wrote it.`
+      );
+    }
+    owned.push({ comment, content });
   }
-  if (found.content.replace(/\r\n/g, '\n') === content) return body;
-  return `${body.slice(0, found.from)}${renderBlock(issue, content)}${body.slice(found.to)}`;
+  if (owned.length > 1) {
+    return refused(
+      `${owned.length} comments carry the marker of #${issue}: ${owned.map(({ comment }) => comment.url).join(', ')}.`
+    );
+  }
+  return owned.length === 1 ? { kind: 'found', ...owned[0] } : { kind: 'none' };
 }
 
 function planRelease(item: ReleaseItem, repository: Repository): Change[] {
@@ -621,19 +610,10 @@ function planIssue(
       `The dependencies form a cycle: ${steps.length === 1 ? steps[0] : `${steps.slice(0, -1).join(', ')}, and ${steps[steps.length - 1]}`}.`
     );
   }
-  const content = renderContent(
-    item,
-    [...item.dependsOn, ...kept].map((blocker) => titled(blocker, repository))
-  );
-  if (content.includes(MARKER_OPENING)) {
-    problems.push(
-      `The block for #${number} would hold "${MARKER_OPENING}", which only a marker may hold. Remove it from evidence, change, exitCondition, or the title of a dependency.`
-    );
-  }
-  const found = issue ? findBlock(issue.body, number) : undefined;
+  const found = issue ? findOwnedComment(issue.comments, number) : undefined;
   if (found?.kind === 'refused') {
     problems.push(
-      `pnpm queue:add leaves the body of #${number} alone, because ${found.cause} On GitHub, move the text that you want to keep out of the block, and remove each "${MARKER_OPENING}" marker. The next run appends a new block.`
+      `pnpm queue:add leaves the comments of #${number} alone, because ${found.cause} On GitHub, remove the first line, a hidden marker, from each comment that pnpm queue:add must not update, or delete that comment. A run then updates the one comment left with the marker, or writes a new one.`
     );
   }
   if (
@@ -647,9 +627,16 @@ function planIssue(
   }
 
   const changes: Change[] = [];
-  const body = withBlock(issue.body, found, number, content);
-  if (body !== issue.body) {
-    changes.push({ kind: 'setBody', issue: number, body });
+  const content = renderContent(
+    item,
+    [...item.dependsOn, ...kept].map((blocker) => titled(blocker, repository))
+  );
+  const body = renderComment(number, content);
+  if (found.kind === 'none') {
+    changes.push({ kind: 'addComment', issue: number, body });
+  } else if (found.content !== content) {
+    const { id, url } = found.comment;
+    changes.push({ kind: 'updateComment', issue: number, id, url, body });
   }
   if (issue.type !== item.type) {
     changes.push({ kind: 'setType', issue: number, type: item.type });
@@ -697,8 +684,10 @@ function describe(change: Change, repository: Repository): string {
       return `add the labels ${change.labels.join(', ')}`;
     case 'removeLabels':
       return `remove the labels ${change.labels.join(', ')}`;
-    case 'setBody':
-      return 'write the release table and the sections into the body';
+    case 'addComment':
+      return 'write the release table and the sections into a new comment';
+    case 'updateComment':
+      return `update the release table and the sections in the comment ${change.url}`;
     case 'removeDependency':
       return `remove the dependency ${titled(change.blocker, repository)}`;
     case 'addDependency':
@@ -747,7 +736,10 @@ export async function addToQueue(
   for (const change of changes) {
     if (!dryRun) await github.write(change);
     print(`  ${describe(change, repository)}`);
-    if (dryRun && change.kind === 'setBody') {
+    if (
+      dryRun &&
+      (change.kind === 'addComment' || change.kind === 'updateComment')
+    ) {
       print(change.body.trimEnd().replace(/^(?=.)/gm, '    '));
     }
   }
@@ -862,10 +854,9 @@ const refOf = ({ number, repository }: IssueNode): IssueRef =>
     ? number
     : `${repository.nameWithOwner}#${number}`;
 
-const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
+const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $name) {
     issue(number: $number) {
-      body
       issueType { name }
       milestone { title }
       labels(first: 100) { nodes { name } }
@@ -875,6 +866,10 @@ const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
           fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
         }
       }
+      comments(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id url body viewerDidAuthor }
+      }
     }
   }
 }`;
@@ -882,7 +877,6 @@ const ISSUE_QUERY = `query ($owner: String!, $name: String!, $number: Int!) {
 interface IssueReply {
   repository: {
     issue: {
-      body: string;
       issueType: { name: string } | null;
       milestone: { title: string } | null;
       labels: { nodes: { name: string }[] };
@@ -892,14 +886,29 @@ interface IssueReply {
           fieldValueByName: { name: string } | null;
         }[];
       };
+      comments: {
+        pageInfo: { hasNextPage: boolean; endCursor: string };
+        nodes: {
+          id: string;
+          url: string;
+          body: string;
+          viewerDidAuthor: boolean;
+        }[];
+      };
     };
   };
 }
 
 const UPDATE_ISSUE = (field: string) =>
-  `mutation ($id: ID!, $value: ${field === 'body' ? 'String' : 'ID'}!) {
+  `mutation ($id: ID!, $value: ID!) {
     updateIssue(input: { id: $id, ${field}: $value }) { clientMutationId }
   }`;
+const ADD_COMMENT = `mutation ($id: ID!, $body: String!) {
+  addComment(input: { subjectId: $id, body: $body }) { clientMutationId }
+}`;
+const UPDATE_COMMENT = `mutation ($id: ID!, $body: String!) {
+  updateIssueComment(input: { id: $id, body: $body }) { clientMutationId }
+}`;
 const LABELS = (mutation: string) =>
   `mutation ($id: ID!, $labels: [ID!]!) {
     ${mutation}(input: { labelableId: $id, labelIds: $labels }) { clientMutationId }
@@ -1028,17 +1037,30 @@ export function githubCli(api: Api = ghApi): GitHub {
     },
 
     async readIssue(number) {
-      const { issue } = (
-        await graphql<IssueReply>(ISSUE_QUERY, { ...variables, number })
-      ).repository;
+      const comments: Comment[] = [];
+      let issue: IssueReply['repository']['issue'];
+      let after: string | null = null;
+      do {
+        const page: IssueReply = await graphql<IssueReply>(ISSUE_QUERY, {
+          ...variables,
+          number,
+          after,
+        });
+        issue = page.repository.issue;
+        for (const { id, url, body, viewerDidAuthor } of issue.comments.nodes) {
+          comments.push({ id, url, body, byViewer: viewerDidAuthor });
+        }
+        const { hasNextPage, endCursor } = issue.comments.pageInfo;
+        after = hasNextPage ? endCursor : null;
+      } while (after);
       const item = issue.projectItems.nodes.find(
         (node) => node.project.id === idOf('project')
       );
       return {
-        body: issue.body,
         ...(issue.issueType && { type: issue.issueType.name }),
         ...(issue.milestone && { release: issue.milestone.title }),
         labels: issue.labels.nodes.map(({ name }) => name),
+        comments,
         ...(item && {
           project: item.fieldValueByName
             ? { status: item.fieldValueByName.name }
@@ -1085,11 +1107,14 @@ export function githubCli(api: Api = ghApi): GitHub {
             }
           );
           return;
-        case 'setBody':
-          await graphql(UPDATE_ISSUE('body'), {
+        case 'addComment':
+          await graphql(ADD_COMMENT, {
             id: idOf(`issue ${change.issue}`),
-            value: change.body,
+            body: change.body,
           });
+          return;
+        case 'updateComment':
+          await graphql(UPDATE_COMMENT, { id: change.id, body: change.body });
           return;
         case 'addDependency':
         case 'removeDependency':
@@ -1144,21 +1169,27 @@ labels, and dependencies, or creates the milestone of a release. The header
 comment of scripts/queue/add.mts describes the item file. The script checks
 the whole item before its first write, so a rejected item changes nothing.
 
-In the issue body, the script writes only its own block, between two markers
-that name the issue and a checksum of the block. It refuses a body with a
-marker without its pair, a doubled marker, a marker of another issue, or a
-block that someone changed by hand. Text outside the block stays as it is.
+The script never edits the body of an issue. It writes the release table and
+the sections into one comment that it owns, and updates that comment on a
+later run. The first line of the comment is a hidden marker that names the
+issue and holds a checksum of the text below it. The script never edits a
+comment of another author. It refuses the item when a comment of its login
+has a broken marker, a marker of another issue, or text that someone edited
+by hand, and when it owns two comments on the issue.
 
-The GitHub API cannot write a value only while it is unchanged, so two
-windows remain in which the change of another person can be lost:
-- The body is the first write, a moment after the read. An edit of the body
-  that someone saves in that moment is lost.
+The GitHub API cannot write a value only while it is unchanged, so a change
+that someone saves between the last read of the script and its write can be
+lost:
+- The comment is the first write, a moment after the read. An edit of the
+  owned comment that someone saves in that moment is lost.
 - The script reads the status of the Project item again right before it sets
   the status, and sets it only when the item still has none. A status that
   someone sets between that read and the write is overwritten.
+- The script reads the blocked-by relations once, before its first write. A
+  relation that someone changes after that read can be overwritten.
 
 Options:
-  --dry-run  Print the changes and the body that a run would write, and
+  --dry-run  Print the changes and the comment that a run would write, and
              write nothing.
   --help     Print this text.
 

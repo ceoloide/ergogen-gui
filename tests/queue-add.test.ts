@@ -16,6 +16,14 @@ import {
   type Repository,
 } from '../scripts/queue/add.mts';
 
+/** The login that runs the script, in both fakes. */
+const VIEWER = 'maintainer';
+
+interface FakeComment {
+  author: string;
+  body: string;
+}
+
 interface FakeIssue {
   title: string;
   closed?: boolean;
@@ -24,6 +32,7 @@ interface FakeIssue {
   release?: string;
   labels?: string[];
   blockedBy?: IssueRef[];
+  comments?: FakeComment[];
   project?: { status?: string };
 }
 
@@ -46,16 +55,25 @@ const queueLabels = [
 const refOf = (key: string): IssueRef =>
   /^\d+$/.test(key) ? Number(key) : (key as IssueRef);
 
+/** The URL of comment `id` on `issue`. */
+const commentUrl = (issue: IssueRef, id: number) =>
+  `https://github.com/ceoloide/ergogen-gui/issues/${issue}#issuecomment-${id}`;
+
 /**
  * GitHub in memory. `issues` holds the issues of ceoloide/ergogen-gui by
- * number and the issues of other repositories by `owner/name#number`.
- * `state` is what GitHub holds after the writes, and `writes` lists them.
- * With `failAt`, the write of that kind throws once.
+ * number and the issues of other repositories by `owner/name#number`. The
+ * comments get the IDs 1, 2, 3, and so on, in the order of `issues`.
+ * `state` is what GitHub holds after the writes, and `writes` lists every
+ * write that GitHub saved. With `fail`, the first write of that kind throws:
+ * before GitHub saves it, or after, when `saved` is set.
  */
 function fakeGitHub(
   issues: Record<string, FakeIssue>,
-  { failAt }: { failAt?: Change['kind'] } = {}
+  { fail }: { fail?: { kind: Change['kind']; saved: boolean } } = {}
 ) {
+  let nextComment = 1;
+  const withIds = (comments: FakeComment[] = []) =>
+    comments.map((comment) => ({ id: nextComment++, ...comment }));
   const state = {
     labels: new Set(['bug', 'enhancement', ...queueLabels]),
     milestones: new Map([
@@ -79,17 +97,71 @@ function fakeGitHub(
           labels: [] as string[],
           blockedBy: [] as IssueRef[],
           ...issue,
+          comments: withIds(issue.comments),
         },
       ])
     ),
   };
   const writes: Change[] = [];
-  let failure = failAt;
+  let failure = fail;
   const issue = (number: IssueRef) => {
     const found = state.issues.get(number);
     if (!found) throw new Error(`The script read or wrote #${number}.`);
     return found;
   };
+  function save(change: Change) {
+    if (change.kind === 'createRelease') {
+      const { title, description, dueOn } = change;
+      state.milestones.set(title, { description, dueOn, closed: false });
+      return;
+    }
+    const target = issue(change.issue);
+    switch (change.kind) {
+      case 'setType':
+        target.type = change.type;
+        return;
+      case 'setRelease':
+        target.release = change.release;
+        return;
+      case 'addLabels':
+        target.labels.push(...change.labels);
+        return;
+      case 'removeLabels':
+        target.labels = target.labels.filter(
+          (label) => !change.labels.includes(label)
+        );
+        return;
+      case 'addComment':
+        target.comments.push({
+          id: nextComment++,
+          author: VIEWER,
+          body: change.body,
+        });
+        return;
+      case 'updateComment': {
+        const comment = target.comments.find(
+          ({ id }) => `comment ${id}` === change.id
+        );
+        if (!comment) throw new Error(`No comment has the ID ${change.id}.`);
+        comment.body = change.body;
+        return;
+      }
+      case 'addDependency':
+        target.blockedBy.push(change.blocker);
+        return;
+      case 'removeDependency':
+        target.blockedBy = target.blockedBy.filter(
+          (blocker) => blocker !== change.blocker
+        );
+        return;
+      case 'addToProject':
+      case 'setStatus':
+        target.project = { status: change.status };
+        return;
+      default:
+        throw new Error(`The fake has no write ${(change as Change).kind}.`);
+    }
+  }
   const github: GitHub = {
     async readRepository(): Promise<Repository> {
       return {
@@ -107,58 +179,29 @@ function fakeGitHub(
       };
     },
     async readIssue(number): Promise<IssueState> {
-      const { body, type, release, labels, project } = issue(number);
+      const { type, release, labels, comments, project } = issue(number);
       return {
-        body,
         type,
         release,
         labels: [...labels],
+        comments: comments.map(({ id, author, body }) => ({
+          id: `comment ${id}`,
+          url: commentUrl(number, id),
+          body,
+          byViewer: author === VIEWER,
+        })),
         project: project && { ...project },
       };
     },
     async write(change) {
-      if (change.kind === failure) {
-        failure = undefined;
+      const failing = failure?.kind === change.kind ? failure : undefined;
+      if (failing) failure = undefined;
+      if (failing && !failing.saved) {
         throw new Error('The connection to GitHub dropped.');
       }
+      save(change);
       writes.push(change);
-      if (change.kind === 'createRelease') {
-        const { title, description, dueOn } = change;
-        state.milestones.set(title, { description, dueOn, closed: false });
-        return;
-      }
-      const target = issue(change.issue);
-      switch (change.kind) {
-        case 'setType':
-          target.type = change.type;
-          return;
-        case 'setRelease':
-          target.release = change.release;
-          return;
-        case 'addLabels':
-          target.labels.push(...change.labels);
-          return;
-        case 'removeLabels':
-          target.labels = target.labels.filter(
-            (label) => !change.labels.includes(label)
-          );
-          return;
-        case 'setBody':
-          target.body = change.body;
-          return;
-        case 'addDependency':
-          target.blockedBy.push(change.blocker);
-          return;
-        case 'removeDependency':
-          target.blockedBy = target.blockedBy.filter(
-            (blocker) => blocker !== change.blocker
-          );
-          return;
-        case 'addToProject':
-        case 'setStatus':
-          target.project = { status: change.status };
-          return;
-      }
+      if (failing) throw new Error('The connection to GitHub dropped.');
     },
   };
   return { github, state, writes };
@@ -166,10 +209,10 @@ function fakeGitHub(
 
 /**
  * The GitHub API in memory, for `githubCli`, with `issues` as in
- * `fakeGitHub`. Someone sets the status of the Project item to `statusAtAdd`
- * after the script reads the issue and before it adds the issue to the
- * Project, and to `statusAfterAdd` right after the add. `requests` lists
- * each GraphQL request.
+ * `fakeGitHub`. It writes nothing and returns at most 100 comments per page.
+ * Someone sets the status of the Project item to `statusAtAdd` after the
+ * script reads the issue and before it adds the issue to the Project, and to
+ * `statusAfterAdd` right after the add. `calls` lists every call of the API.
  */
 function fakeApi(
   issues: Record<string, FakeIssue>,
@@ -179,7 +222,11 @@ function fakeApi(
   }: { statusAtAdd?: string; statusAfterAdd?: string } = {}
 ) {
   let itemStatus = statusAtAdd;
-  const requests: { query: string; variables: Record<string, unknown> }[] = [];
+  const calls: {
+    args: string[];
+    query: string;
+    variables: Record<string, unknown>;
+  }[] = [];
   const refs = Object.keys(issues).map(refOf);
   const nodeOf = (ref: IssueRef) => {
     const [repository, number] =
@@ -266,11 +313,18 @@ function fakeApi(
         },
       };
     }
-    const issue = issues[variables.number as number];
+    const number = variables.number as number;
+    const issue = issues[number];
+    const comments = (issue.comments ?? []).map(({ author, body }, index) => ({
+      id: `comment ${index + 1}`,
+      url: commentUrl(number, index + 1),
+      body,
+      viewerDidAuthor: author === VIEWER,
+    }));
+    const from = Number(variables.after ?? 0);
     return {
       repository: {
         issue: {
-          body: issue.body ?? '',
           issueType: issue.type ? { name: issue.type } : null,
           milestone: issue.release ? { title: issue.release } : null,
           labels: { nodes: (issue.labels ?? []).map((name) => ({ name })) },
@@ -285,20 +339,39 @@ function fakeApi(
                 ]
               : [],
           },
+          comments: {
+            pageInfo: {
+              hasNextPage: from + 100 < comments.length,
+              endCursor: String(from + 100),
+            },
+            nodes: comments.slice(from, from + 100),
+          },
         },
       },
     };
   }
 
-  const api = async (_args: string[], body: unknown) => {
-    const { query, variables } = body as (typeof requests)[number];
-    requests.push({ query, variables });
+  const api = async (args: string[], body: unknown) => {
+    const { query, variables } = body as (typeof calls)[number];
+    calls.push({ args, query, variables });
     return { data: reply(query, variables) };
   };
   /** Whether the script sent a request that names `field`. */
   const sent = (field: string) =>
-    requests.some(({ query }) => query.includes(field));
-  return { api, requests, sent };
+    calls.some(({ query }) => query.includes(field));
+  /**
+   * Each GraphQL mutation that the script sent, as its name and the fields of
+   * its input, such as `updateIssue(id, milestoneId)`.
+   */
+  const mutations = () =>
+    calls
+      .filter(({ query }) => query.startsWith('mutation'))
+      .map(({ query }) => {
+        const [, name, input] = /(\w+)\(input: \{([^}]*)\}/.exec(query) ?? [];
+        const fields = [...input.matchAll(/(\w+):/g)].map(([, field]) => field);
+        return `${name}(${fields.join(', ')})`;
+      });
+  return { api, calls, sent, mutations };
 }
 
 async function add(github: GitHub, input: unknown, dryRun = false) {
@@ -333,19 +406,23 @@ const bug = {
   dependsOn: [274],
 };
 
+const report = 'Nothing happens when I click Export in Safari.\r\n';
+const reply = { author: 'reporter', body: 'Same on iPadOS 18.' };
+
 const reported = (): Record<string, FakeIssue> => ({
   274: { title: 'R20-01 Load the queue' },
   376: { title: 'R100-09 Release 1.0' },
   400: {
     title: 'Export fails in Safari',
-    body: 'Nothing happens when I click Export in Safari.\r\n',
+    body: report,
     labels: ['bug', 'size:M'],
     blockedBy: [376],
+    comments: [reply],
   },
 });
 
-/** The block that the script writes into the body of #400 for `bug`. */
-const bugBlock = `<!-- pnpm queue:add #400 start sha256:e6c0b150bc36a6f4210dfc0d23ff1dc2e7ed9e7bdba3e0854b91ee8c21f342a1 -->
+/** The comment that the script writes on #400 for `bug`. */
+const bugComment = `<!-- pnpm queue:add #400 sha256:249526a2eb0d22988a35e3bf132da4902ae9d402b2f4b7825ddc12236bb4cfba -->
 
 | Release | Track | Size | Mode |
 |---|---|---|---|
@@ -367,10 +444,13 @@ An end-to-end test exports a PCB in WebKit.
 
 - #274 R20-01 Load the queue
 
-<!-- pnpm queue:add #400 end -->`;
+_\`pnpm queue:add\` wrote this comment. To change it, run the script again with a changed item. The script refuses to update a comment that someone edited by hand._`;
 
-/** The body of #400 after the script adds `bug`. */
-const bugBody = `Nothing happens when I click Export in Safari.\r\n\n${bugBlock}\n`;
+/** The comments on `issue` that start with the marker of the script. */
+const markedComments = (issue?: { comments: FakeComment[] }) =>
+  (issue?.comments ?? []).filter(({ body }) =>
+    body.startsWith('<!-- pnpm queue:add')
+  );
 
 describe('pnpm queue:add rejects an incomplete item', () => {
   it.each([
@@ -515,33 +595,36 @@ describe('the cycle rule', () => {
   });
   const task = { ...bug, type: 'Task', priority: undefined, issue: 13 };
 
-  it('rejects dependencies that close a cycle through existing relations, and writes nothing', async () => {
-    // Arrange
-    const { github, writes } = fakeGitHub(graph());
-
-    // Act
-    const problems = await problemsOf(github, { ...task, dependsOn: [12, 10] });
-
-    // Assert
-    expect(problems).toEqual([
-      'The dependencies form a cycle: #13 is blocked by #10, #10 is blocked by #11, and #11 is blocked by #13.',
-    ]);
-    expect(writes).toEqual([]);
-  });
-
-  it('rejects an issue that depends on itself', async () => {
-    // Arrange
-    const { github, writes } = fakeGitHub(graph());
-
-    // Act
-    const problems = await problemsOf(github, { ...task, dependsOn: [13] });
-
-    // Assert
-    expect(problems).toEqual([
+  it.each([
+    [
+      'of one issue, which depends on itself',
+      [13],
       'The dependencies form a cycle: #13 is blocked by #13.',
-    ]);
-    expect(writes).toEqual([]);
-  });
+    ],
+    [
+      'of two issues',
+      [11],
+      'The dependencies form a cycle: #13 is blocked by #11, and #11 is blocked by #13.',
+    ],
+    [
+      'of three issues, through existing relations',
+      [12, 10],
+      'The dependencies form a cycle: #13 is blocked by #10, #10 is blocked by #11, and #11 is blocked by #13.',
+    ],
+  ])(
+    'rejects a cycle %s, and writes nothing',
+    async (_case, dependsOn, cycle) => {
+      // Arrange
+      const { github, writes } = fakeGitHub(graph());
+
+      // Act
+      const problems = await problemsOf(github, { ...task, dependsOn });
+
+      // Assert
+      expect(problems).toEqual([cycle]);
+      expect(writes).toEqual([]);
+    }
+  );
 
   it('accepts dependencies that share blockers without a cycle', async () => {
     // Arrange
@@ -556,7 +639,7 @@ describe('the cycle rule', () => {
 });
 
 describe('adding an issue', () => {
-  it('writes the type, milestone, labels, body, dependencies, and status', async () => {
+  it('writes the comment, type, milestone, labels, dependencies, and status', async () => {
     // Arrange
     const { github, state } = fakeGitHub(reported());
 
@@ -568,7 +651,11 @@ describe('adding an issue', () => {
     expect(issue).toMatchObject({
       type: 'Bug',
       release: 'v0.20',
-      body: bugBody,
+      body: report,
+      comments: [
+        { id: 1, ...reply },
+        { id: 2, author: VIEWER, body: bugComment },
+      ],
       blockedBy: [274],
       project: { status: 'Todo' },
     });
@@ -581,7 +668,7 @@ describe('adding an issue', () => {
     ]);
     expect(lines).toEqual([
       '#400 Export fails in Safari',
-      '  write the release table and the sections into the body',
+      '  write the release table and the sections into a new comment',
       '  set the type to Bug',
       '  set the milestone to v0.20',
       '  add the labels track:verification, size:S, mode:auto, priority:P1',
@@ -595,7 +682,7 @@ describe('adding an issue', () => {
 
   it('writes nothing on a second run and says so', async () => {
     // Arrange
-    const { github, writes } = fakeGitHub(reported());
+    const { github, state, writes } = fakeGitHub(reported());
     await add(github, bug);
     const firstRun = writes.length;
 
@@ -604,32 +691,52 @@ describe('adding an issue', () => {
 
     // Assert
     expect(writes).toHaveLength(firstRun);
+    expect(markedComments(state.issues.get(400))).toHaveLength(1);
     expect(lines).toEqual([
       '#400 Export fails in Safari',
       'Nothing to change. GitHub already holds these values.',
     ]);
   });
 
-  it('finishes the item when a run after a failed write repeats it', async () => {
-    // Arrange
-    const once = fakeGitHub(reported());
-    await add(once.github, bug);
-    const { github, state } = fakeGitHub(reported(), {
-      failAt: 'addDependency',
-    });
-    await expect(add(github, bug)).rejects.toThrow('dropped');
+  it.each(
+    (
+      [
+        'addComment',
+        'setType',
+        'setRelease',
+        'addLabels',
+        'removeLabels',
+        'addDependency',
+        'removeDependency',
+        'addToProject',
+      ] as const
+    ).flatMap((kind) => [
+      [kind, 'before GitHub saves it', false],
+      [kind, 'after GitHub saved it', true],
+    ])
+  )(
+    'finishes the item when a run after a failed %s, which fails %s, repeats it',
+    async (kind, _case, saved) => {
+      // Arrange
+      const once = fakeGitHub(reported());
+      await add(once.github, bug);
+      const { github, state } = fakeGitHub(reported(), {
+        fail: { kind, saved },
+      });
+      await expect(add(github, bug)).rejects.toThrow('dropped');
 
-    // Act
-    await add(github, bug);
+      // Act
+      await add(github, bug);
 
-    // Assert
-    expect(state.issues.get(400)).toEqual(once.state.issues.get(400));
-  });
+      // Assert
+      expect(state.issues.get(400)).toEqual(once.state.issues.get(400));
+    }
+  );
 
   it('keeps the old blockers when a new one fails to be written', async () => {
     // Arrange
     const { github, state } = fakeGitHub(reported(), {
-      failAt: 'addDependency',
+      fail: { kind: 'addDependency', saved: false },
     });
 
     // Act
@@ -670,7 +777,7 @@ describe('adding an issue', () => {
     expect(state.issues.get(400)?.project).toEqual({ status });
   });
 
-  it('prints the changes and the body on a dry run, and writes nothing', async () => {
+  it('prints the changes and the comment on a dry run, and writes nothing', async () => {
     // Arrange
     const { github, writes } = fakeGitHub(reported());
 
@@ -679,11 +786,10 @@ describe('adding an issue', () => {
 
     // Assert
     expect(writes).toEqual([]);
-    const body = bugBody.trimEnd().replace(/^(?=.)/gm, '    ');
-    expect(lines).toContain(body);
-    expect(lines.indexOf(body)).toBe(
+    const comment = bugComment.replace(/^(?=.)/gm, '    ');
+    expect(lines.indexOf(comment)).toBe(
       lines.indexOf(
-        '  write the release table and the sections into the body'
+        '  write the release table and the sections into a new comment'
       ) + 1
     );
     expect(lines.at(-1)).toBe(
@@ -692,215 +798,259 @@ describe('adding an issue', () => {
   });
 });
 
-describe('the block in the issue body', () => {
-  const START = '<!-- pnpm queue:add #400 start';
-  const END = '<!-- pnpm queue:add #400 end -->';
+describe('the body of the issue', () => {
+  // A body that quotes the marker and has sections named like the comment.
+  const lookalike = [
+    '| Release | Track | Size | Mode |\r\n|---|---|---|---|\r\n| v0.21 | Docs | S | `auto` |\r\n',
+    '## Evidence\r\n\r\nThe script writes `<!-- pnpm queue:add #400 sha256:0 -->` first.\r\n',
+    bugComment,
+    '## Depends on\n\n- #376\n',
+  ].join('\n');
 
-  /** The body of #400 after a run of `item` on an issue with `body`. */
-  async function processed(body: string, item: object = bug) {
-    const issues = reported();
-    issues[400].body = body;
-    const { github, state } = fakeGitHub(issues);
-    await add(github, item);
-    return state.issues.get(400)?.body ?? '';
-  }
-
-  /** Runs `item` twice on an issue with `body`. */
-  async function runTwice(body: string, item: object = bug) {
-    const issues = reported();
-    issues[400].body = body;
-    const { github, state, writes } = fakeGitHub(issues);
-    await add(github, item);
-    const firstRun = [...writes];
-    await add(github, item);
-    return {
-      body: state.issues.get(400)?.body ?? '',
-      firstRun,
-      secondRun: writes.slice(firstRun.length),
-    };
-  }
-
-  const blockOf = (body: string) =>
-    body.slice(body.indexOf(START), body.indexOf(END) + END.length);
-
-  it.each([
-    ['no text', ''],
-    ['text without a final line break', 'Steps: open, export.'],
-    [
-      'CRLF line endings, trailing spaces, and emoji',
-      'Steps:  \r\n1. Open 🎹\r\n\r\n2. Export\t\r\n',
-    ],
-  ])(
-    'appends the block to a body with %s, keeps every byte of it, and a second run writes nothing',
-    async (_case, earlier) => {
-      // Act
-      const { body, secondRun } = await runTwice(earlier);
-
-      // Assert
-      expect(body.startsWith(earlier)).toBe(true);
-      expect(body.slice(earlier.length).trim()).toBe(bugBlock);
-      expect(secondRun).toEqual([]);
-    }
-  );
-
-  it('replaces only the block of a processed issue', async () => {
+  it('stays byte for byte when it quotes the marker and has sections named like the comment', async () => {
     // Arrange
-    const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
-    const first = await processed('Nothing happens.');
     const issues = reported();
-    issues[400].body = first;
-    const { github, state } = fakeGitHub(issues);
-
-    // Act
-    await add(github, { ...bug, evidence });
-
-    // Assert
-    expect(state.issues.get(400)?.body).toBe(
-      await processed('Nothing happens.', { ...bug, evidence })
-    );
-  });
-
-  it('keeps the notes that a person put above and below the block', async () => {
-    // Arrange
-    const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
-    const first = await processed('Nothing happens.');
-    const above = 'Maintainer note: reproduced on macOS 15.\r\n\r\n';
-    const below = '\r\n> Also seen in Firefox.';
-    const edited =
-      first.slice(0, first.indexOf(START)) +
-      above +
-      first.slice(first.indexOf(START)) +
-      below;
-    const issues = reported();
-    issues[400].body = edited;
+    issues[400].body = lookalike;
     const { github, state, writes } = fakeGitHub(issues);
 
     // Act
     await add(github, bug);
-    const unchanged = writes.filter(({ kind }) => kind === 'setBody');
-    await add(github, { ...bug, evidence });
+    await add(github, { ...bug, evidence: 'Also in Safari 26.' });
+
+    // Assert
+    expect(state.issues.get(400)?.body).toBe(lookalike);
+    expect(writes.map(({ kind }) => kind)).toEqual([
+      'addComment',
+      'setType',
+      'setRelease',
+      'addLabels',
+      'removeLabels',
+      'addDependency',
+      'removeDependency',
+      'addToProject',
+      'updateComment',
+    ]);
+  });
+
+  it('gets no write from the script, which sends GitHub only the comment and the queue values', async () => {
+    // Arrange
+    const issues = reported();
+    issues[400].body = lookalike;
+    const { api, calls, mutations } = fakeApi(issues);
+
+    // Act
+    await add(githubCli(api), bug);
+
+    // Assert
+    expect(calls.every(({ args }) => args.join(' ') === 'graphql')).toBe(true);
+    expect(mutations()).toEqual([
+      'addComment(subjectId, body)',
+      'updateIssue(id, issueTypeId)',
+      'updateIssue(id, milestoneId)',
+      'addLabelsToLabelable(labelableId, labelIds)',
+      'removeLabelsFromLabelable(labelableId, labelIds)',
+      'addBlockedBy(issueId, blockingIssueId)',
+      'removeBlockedBy(issueId, blockingIssueId)',
+      'addProjectV2ItemById(projectId, contentId)',
+      'updateProjectV2ItemFieldValue(projectId, itemId, fieldId, value, singleSelectOptionId)',
+    ]);
+    expect(
+      calls.find(({ query }) => query.includes('addComment('))?.variables
+    ).toEqual({ id: 'node 400', body: bugComment });
+  });
+});
+
+describe('the comment that the script owns', () => {
+  const later = {
+    ...bug,
+    evidence: 'Export does nothing in Safari 18 and 26.',
+  };
+
+  it('is updated in place, and every other comment stays', async () => {
+    // Arrange
+    const { github, state, writes } = fakeGitHub(reported());
+    await add(github, bug);
+    const firstRun = writes.length;
+
+    // Act
+    await add(github, later);
+
+    // Assert
+    expect(writes.slice(firstRun)).toEqual([
+      {
+        kind: 'updateComment',
+        issue: 400,
+        id: 'comment 2',
+        url: commentUrl(400, 2),
+        body: expect.stringContaining(
+          '## Evidence\n\nExport does nothing in Safari 18 and 26.\n\n'
+        ),
+      },
+    ]);
+    const comments = state.issues.get(400)?.comments;
+    expect(comments?.map(({ id }) => id)).toEqual([1, 2]);
+    expect(comments?.[0]).toEqual({ id: 1, ...reply });
+  });
+
+  it('counts as unchanged after an edit on GitHub turned its line endings into CRLF', async () => {
+    // Arrange
+    const { github, state, writes } = fakeGitHub(reported());
+    await add(github, bug);
+    const [, owned] = state.issues.get(400)?.comments ?? [];
+    owned.body = `${owned.body.replace(/\n/g, '\r\n')}\r\n`;
+    const firstRun = writes.length;
+
+    // Act
+    await add(github, bug);
+    const unchanged = writes.slice(firstRun);
+    await add(github, later);
 
     // Assert
     expect(unchanged).toEqual([]);
-    const newBlock = blockOf(
-      await processed('Nothing happens.', { ...bug, evidence })
-    );
-    expect(state.issues.get(400)?.body).toBe(
-      edited.replace(blockOf(edited), newBlock)
-    );
+    expect(writes.slice(firstRun).map(({ kind }) => kind)).toEqual([
+      'updateComment',
+    ]);
   });
 
-  it('writes nothing after an edit on GitHub changed every line ending to CRLF, and keeps them outside the block', async () => {
+  it('is never a comment of another author, also one that carries or quotes the marker', async () => {
     // Arrange
-    const evidence = 'Export to KiCad does nothing in Safari 18 and 26.';
-    const crlf = (await processed('Nothing happens.\n')).replace(
-      /\r?\n/g,
-      '\r\n'
-    );
+    const others = [
+      { author: 'reporter', body: bugComment },
+      { author: 'reporter', body: `> ${bugComment.replace(/\n/g, '\n> ')}` },
+      {
+        author: 'reporter',
+        body: `The script writes ${bugComment.split('\n')[0]} first.`,
+      },
+    ];
+    const issues = reported();
+    issues[400].comments = others;
+    const { github, state, writes } = fakeGitHub(issues);
 
     // Act
-    const unchanged = await runTwice(crlf);
-    const changed = await processed(crlf, { ...bug, evidence });
+    await add(github, bug);
+    await add(github, later);
 
     // Assert
-    expect(unchanged.firstRun.filter(({ kind }) => kind === 'setBody')).toEqual(
-      []
-    );
-    const newBlock = blockOf(
-      await processed('Nothing happens.\n', { ...bug, evidence })
-    );
-    expect(changed).toBe(crlf.replace(blockOf(crlf), newBlock));
+    expect(state.issues.get(400)?.comments).toEqual([
+      ...others.map((comment, index) => ({ id: index + 1, ...comment })),
+      {
+        id: 4,
+        author: VIEWER,
+        body: expect.stringContaining('Safari 18 and 26'),
+      },
+    ]);
+    expect(
+      writes
+        .filter(({ kind }) => kind.endsWith('Comment'))
+        .map((change) => ('id' in change ? change.id : change.kind))
+    ).toEqual(['addComment', 'comment 4']);
   });
 
-  it.each<[string, (block: string) => string, RegExp]>([
+  it.each<[string, FakeComment[], string]>([
     [
-      'a body that starts with the release table and quotes its marker',
-      () =>
-        '| Release | Track | Size | Mode |\n|---|---|---|---|\n| v0.21 | Docs | Small, one pull request | `auto` |\n\nThe script ends its block with `<!-- pnpm queue:add #400 end -->`.\n',
-      /because the end marker on line 5 has no start marker\./,
+      'two comments that both carry the marker',
+      [
+        { author: VIEWER, body: bugComment },
+        { author: VIEWER, body: bugComment },
+      ],
+      `2 comments carry the marker of #400: ${commentUrl(400, 2)}, ${commentUrl(400, 3)}.`,
     ],
     [
-      'a processed body that quotes its start marker',
-      (block) =>
-        `Nothing happens.\n\n${block}\n\nThe block starts with ${block.split('\n')[0]}`,
-      /because the start marker appears 2 times, on lines 3, 27\./,
+      'a comment that a person edited by hand',
+      [
+        {
+          author: VIEWER,
+          body: bugComment.replace('Safari 18.', 'Safari 18. Maybe 17 too.'),
+        },
+      ],
+      `the comment ${commentUrl(400, 2)} changed after pnpm queue:add wrote it.`,
     ],
     [
-      'a doubled block',
-      (block) => `Nothing happens.\n\n${block}\n\n${block}\n`,
-      /because the start marker appears 2 times, on lines 3, 27\./,
+      'a marker of another issue',
+      [
+        {
+          author: VIEWER,
+          body: bugComment.replace('queue:add #400', 'queue:add #401'),
+        },
+      ],
+      `the marker of the comment ${commentUrl(400, 2)} names #401, not #400.`,
     ],
     [
-      'a block that a person edited by hand',
-      (block) =>
-        `Nothing happens.\n\n${block.replace('Safari 18.', 'Safari 18. Maybe 17 too.')}\n`,
-      /because the text between the markers on lines 3 and 25 changed after pnpm queue:add wrote it\./,
-    ],
-    [
-      'a block without its end marker',
-      (block) => `Nothing happens.\n\n${block.replace(END, '')}\n`,
-      /because the start marker on line 3 has no end marker\./,
-    ],
-    [
-      'an end marker above the start marker',
-      (block) => `${END}\n\nNothing happens.\n\n${block.replace(END, '')}\n`,
-      /because the end marker on line 1 comes before the start marker on line 5\./,
-    ],
-    [
-      'the block of another issue',
-      (block) => `Nothing happens.\n\n${block.replace(/#400 /g, '#401 ')}\n`,
-      /because the marker on line 3 names #401, not #400\./,
-    ],
-    [
-      'a marker without a checksum',
-      (block) =>
-        `Nothing happens.\n\n${block.replace(/ sha256:[0-9a-f]+/, '')}\n`,
-      /because line 3 holds "<!-- pnpm queue:add" without a valid marker\./,
+      'a broken marker',
+      [
+        {
+          author: VIEWER,
+          body: bugComment.replace(/ sha256:[0-9a-f]+/, ''),
+        },
+      ],
+      `the comment ${commentUrl(400, 2)} starts with "<!-- pnpm queue:add", but its first line is not a valid marker.`,
     ],
   ])(
     'refuses %s, and writes nothing of any kind',
-    async (_case, bodyOf, cause) => {
+    async (_case, own, cause) => {
       // Arrange
-      const body = bodyOf(bugBlock);
       const issues = reported();
-      issues[400].body = body;
+      issues[400].comments = [reply, ...own];
       const { github, state, writes } = fakeGitHub(issues);
+      const before = structuredClone(state.issues.get(400));
 
       // Act
-      const problems = await problemsOf(github, bug);
+      const problems = await problemsOf(github, later);
 
       // Assert
       expect(problems).toEqual([
-        expect.stringMatching(
-          new RegExp(
-            `^pnpm queue:add leaves the body of #400 alone, ${cause.source} On GitHub, move the text that you want to keep out of the block, and remove each "<!-- pnpm queue:add" marker\\. The next run appends a new block\\.$`
-          )
-        ),
+        `pnpm queue:add leaves the comments of #400 alone, because ${cause} On GitHub, remove the first line, a hidden marker, from each comment that pnpm queue:add must not update, or delete that comment. A run then updates the one comment left with the marker, or writes a new one.`,
       ]);
       expect(writes).toEqual([]);
-      expect(state.issues.get(400)?.body).toBe(body);
+      expect(state.issues.get(400)).toEqual(before);
     }
   );
 
-  it.each(['evidence', 'change', 'exitCondition'])(
-    'rejects an item whose %s holds the opening of a marker, and writes nothing',
-    async (key) => {
-      // Arrange
-      const { github, writes } = fakeGitHub(reported());
+  /** #400 with 150 comments of another author, and `own` at their places. */
+  function crowded(own: Record<number, string>): Record<string, FakeIssue> {
+    const issues = reported();
+    issues[400].comments = Array.from({ length: 150 }, (_, index) =>
+      own[index]
+        ? { author: VIEWER, body: own[index] }
+        : { author: 'reporter', body: `Comment ${index + 1}.` }
+    );
+    return issues;
+  }
 
-      // Act
-      const problems = await problemsOf(github, {
-        ...bug,
-        [key]: `Text before the marker.\n${END}\nText after the marker.`,
-      });
+  it('is found again among more than 100 comments', async () => {
+    // Arrange
+    const { api, calls, mutations } = fakeApi(crowded({ 120: bugComment }));
 
-      // Assert
-      expect(problems).toEqual([
-        'The block for #400 would hold "<!-- pnpm queue:add", which only a marker may hold. Remove it from evidence, change, exitCondition, or the title of a dependency.',
-      ]);
-      expect(writes).toEqual([]);
-    }
-  );
+    // Act
+    await add(githubCli(api), later);
+
+    // Assert
+    const comments = calls.filter(({ query }) =>
+      /addComment\(|updateIssueComment\(/.test(query)
+    );
+    expect(mutations()).not.toContain('addComment(subjectId, body)');
+    expect(comments.map(({ variables }) => variables.id)).toEqual([
+      'comment 121',
+    ]);
+  });
+
+  it('refuses a second comment with the marker beyond the first 100 comments', async () => {
+    // Arrange
+    const { api, mutations } = fakeApi(
+      crowded({ 10: bugComment, 140: bugComment })
+    );
+
+    // Act
+    const problems = await problemsOf(githubCli(api), later);
+
+    // Assert
+    expect(problems).toEqual([
+      expect.stringContaining(
+        `because 2 comments carry the marker of #400: ${commentUrl(400, 11)}, ${commentUrl(400, 141)}.`
+      ),
+    ]);
+    expect(mutations()).toEqual([]);
+  });
 });
 
 describe('a blocker in another repository', () => {
@@ -919,8 +1069,8 @@ describe('a blocker in another repository', () => {
     // Assert
     const issue = state.issues.get(400);
     expect(issue?.blockedBy).toEqual(['ergogen/ergogen#12', 274]);
-    expect(issue?.body).toContain(
-      '## Depends on\n\n- #274 R20-01 Load the queue\n- ergogen/ergogen#12 Export the outline as SVG\n\n<!-- pnpm queue:add #400 end -->'
+    expect(markedComments(issue)[0]?.body).toContain(
+      '## Depends on\n\n- #274 R20-01 Load the queue\n- ergogen/ergogen#12 Export the outline as SVG\n\n'
     );
   });
 
@@ -1027,13 +1177,13 @@ describe('the status in the Project', () => {
 
   it('is read again right before the write, and set when the item still has none', async () => {
     // Arrange
-    const { api, requests } = fakeApi(reported());
+    const { api, calls } = fakeApi(reported());
 
     // Act
     await add(githubCli(api), bug);
 
     // Assert
-    const project = requests.filter(({ query }) =>
+    const project = calls.filter(({ query }) =>
       /addProjectV2ItemById|node\(id|updateProjectV2ItemFieldValue/.test(query)
     );
     expect(
@@ -1101,6 +1251,7 @@ describe('a release item', () => {
     expect(problems).toEqual([expect.stringMatching(new RegExp(`^${word} `))]);
     expect(writes).toEqual([]);
   });
+
   it.each([
     ['without an exit condition', undefined],
     ['with a blank exit condition', ' \n '],
@@ -1138,24 +1289,33 @@ describe('the command', () => {
     return result;
   }
 
-  it('rejects an item without an exit condition before it reads GitHub', () => {
-    // Act
-    const { status, stdout, stderr } = run((folder) => {
-      const file = join(folder, 'item.json');
-      writeFileSync(
-        file,
-        JSON.stringify({ ...bug, exitCondition: undefined }, null, 2)
-      );
-      return [file, '--dry-run'];
-    });
+  it.each([
+    ['an issue item', bug],
+    [
+      'a release item',
+      { type: 'Release', title: 'v0.20.1', description: 'Fix #400.' },
+    ],
+  ])(
+    'rejects %s without an exit condition before it reads GitHub',
+    (_case, item) => {
+      // Act
+      const { status, stdout, stderr } = run((folder) => {
+        const file = join(folder, 'item.json');
+        writeFileSync(
+          file,
+          JSON.stringify({ ...item, exitCondition: undefined }, null, 2)
+        );
+        return [file];
+      });
 
-    // Assert
-    expect(status).toBe(2);
-    expect(stdout).toBe('');
-    expect(stderr).toBe(
-      'pnpm queue:add rejected the item:\n- exitCondition is missing. Write the check that proves the item is done.\n'
-    );
-  });
+      // Assert
+      expect(status).toBe(2);
+      expect(stdout).toBe('');
+      expect(stderr).toMatch(
+        /^pnpm queue:add rejected the item:\n- exitCondition is missing\. Write the check that proves the (item|release) is done\.\n$/
+      );
+    }
+  );
 
   it('prints the help, with the windows in which a change can be lost', () => {
     // Act
@@ -1164,11 +1324,15 @@ describe('the command', () => {
     // Assert
     expect(status).toBe(0);
     expect(stdout).toContain('Usage: pnpm queue:add <item.json> [--dry-run]');
+    expect(stdout).toContain('The script never edits the body of an issue.');
     expect(stdout).toContain(
-      'An edit of the body\n  that someone saves in that moment is lost.'
+      'An edit of the\n  owned comment that someone saves in that moment is lost.'
     );
     expect(stdout).toContain(
       'A status that\n  someone sets between that read and the write is overwritten.'
+    );
+    expect(stdout).toContain(
+      'A\n  relation that someone changes after that read can be overwritten.'
     );
   });
 
