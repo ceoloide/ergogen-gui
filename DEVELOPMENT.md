@@ -748,3 +748,9 @@ in the [changelog skill](.agents/skills/ergogen-gui-changelog/SKILL.md).
 `pnpm queue:quota` tells an agent whether each provider's weekly quota allows a
 new task. The [quota skill](.agents/skills/ergogen-gui-quota/SKILL.md) explains
 each result.
+
+## Next task
+
+The [next-task skill](.agents/skills/ergogen-gui-next-task/SKILL.md) tells an
+agent how to take the next task of the queue. `pnpm queue:next` picks the task,
+and `pnpm queue:claim` claims it before any work starts.
