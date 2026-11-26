@@ -155,8 +155,8 @@ describe('HC-013a deployment policy', () => {
     // Assert
     expect(job.if).toBeUndefined();
     expect(job['continue-on-error']).not.toBe(true);
-    // tests/metrics.test.ts checks that pnpm metrics runs every step of
-    // pnpm validate.
+    // pnpm metrics runs every stage of scripts/ci/validate.mts, and
+    // tests/validate.test.ts checks that pnpm validate runs the same stages.
     expect(packageJson.scripts.metrics).toBe('node scripts/ci/metrics.mts');
     for (const command of ['pnpm metrics', 'pnpm test:e2e']) {
       const step = job.steps.find((candidate) => candidate.run === command);

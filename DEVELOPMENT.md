@@ -21,10 +21,10 @@ These commands run validation and tests:
 - `pnpm validate:fast`, alias `pnpm precommit`, runs Prettier, markdownlint,
   ESLint, Knip, actionlint, zizmor, ShellCheck, both TypeScript projects, our
   declaration check, and all Vitest tests. It never modifies files.
-- `pnpm validate` runs `pnpm validate:fast` and the production build.
-  Deployment requires it.
-- `pnpm metrics` runs the steps of `pnpm validate` and writes their times, test
-  counts, bundle size, and pattern counts to `reports/metrics.json`.
+- `pnpm validate` also runs the production build. Deployment requires it.
+  Both run `scripts/ci/validate.mts`, which runs independent checks at once.
+- `pnpm metrics` runs the same checks and writes their times, test counts,
+  bundle size, and pattern counts to `reports/metrics.json`.
 - `pnpm validate:extended` runs `pnpm validate:fast`, a fresh production build,
   all Playwright tests, and `pnpm test:reports`.
 - `pnpm test:reports` checks the JUnit reports against the
