@@ -429,6 +429,63 @@ describe('planStages', () => {
     );
   });
 
+  it('passes no deleted file to a tool and runs every test after a deletion or a rename', () => {
+    // Arrange: a rename is a deletion and an addition.
+    const changes = [
+      deleted('src/utils/old.ts'),
+      added('src/utils/new.ts'),
+      deleted('src/utils/gone.ts'),
+    ];
+
+    // Act
+    const { stages, lines } = plan(...changes);
+
+    // Assert
+    stages.forEach(({ command }) => {
+      expect(command.join(' ')).not.toContain('old.ts');
+      expect(command.join(' ')).not.toContain('gone.ts');
+    });
+    expect(commandOf(changes, 'format:check')).toEqual([
+      ...['pnpm', 'exec', 'prettier', '--check', '--ignore-unknown'],
+      './src/utils/new.ts',
+    ]);
+    expect(commandOf(changes, 'lint')).toEqual([
+      'sh',
+      '-c',
+      'pnpm exec eslint --max-warnings 0 --no-warn-ignored "$@" && pnpm knip && pnpm lint:budgets',
+      'sh',
+      './src/utils/new.ts',
+    ]);
+    expect(commandOf(changes, 'test:unit')).toEqual(full('test:unit'));
+    expect(lines).toContain(
+      'test:unit runs in full: src/utils/old.ts is gone, and vitest related cannot find the tests that imported it.'
+    );
+  });
+
+  it('skips Prettier and ESLint and runs every test when every changed file is gone', () => {
+    // Arrange
+    const changes = [deleted('src/utils/gone.ts')];
+
+    // Act
+    const { stages, lines } = plan(...changes);
+
+    // Assert
+    expect(stages.map(({ name }) => name)).not.toContain('format:check');
+    expect(commandOf(changes, 'lint')).toEqual([
+      'sh',
+      '-c',
+      'pnpm knip && pnpm lint:budgets',
+      'sh',
+    ]);
+    expect(commandOf(changes, 'test:unit')).toEqual(full('test:unit'));
+    expect(lines).toEqual(
+      expect.arrayContaining([
+        'format:check does not run: every changed file is gone.',
+        'lint does not run ESLint: every changed file is gone.',
+      ])
+    );
+  });
+
   it.each([
     ['package.json', ['format:check', 'lint', 'test:unit']],
     ['pnpm-lock.yaml', ['format:check', 'lint', 'test:unit']],
