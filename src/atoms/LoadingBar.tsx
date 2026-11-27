@@ -60,7 +60,11 @@ const LoadingBar = ({ visible, 'data-testid': testId }: LoadingBarProps) => {
   }
 
   return (
-    <LoadingBarContainer data-testid={testId}>
+    <LoadingBarContainer
+      role="progressbar"
+      aria-label="Loading"
+      data-testid={testId}
+    >
       <LoadingBarProgress />
     </LoadingBarContainer>
   );
