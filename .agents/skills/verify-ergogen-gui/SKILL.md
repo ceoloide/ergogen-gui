@@ -159,6 +159,9 @@ These handles are stable. An element that has a label but no role needs
 | Rename or delete in the navigation     | button `Rename configuration <name>` or `Delete configuration <name>`      |
 | New name in the navigation             | textbox `Rename input`, then the button `Save name`                        |
 | A recent configuration on `/new`       | label `Load <name> configuration`. It has no role                          |
+| Choose File on `/new`                  | button `Select local file to load`, which opens the file dialog            |
+| Repository field on `/new`             | textbox `Repository URL or path`                                           |
+| Load from the repository field         | button `Load configuration from repository`                                |
 
 Text that you type in the editor gets the automatic indentation of the editor
 on each new line, which breaks YAML. Paste the text through the clipboard with
@@ -240,7 +243,8 @@ stop processes by name.
 - `e2e/journeys/journey.ts` is the `journey` fixture.
 - `e2e/journeys/app.ts` holds what more than one journey needs: the paste
   into the editor, the size of the SVG preview, a download, a custom
-  footprint and the PCB that places it, and a page in a new browser context.
+  footprint and the PCB that places it, the files of that PCB as a repository
+  or an archive holds them, and a page in a new browser context.
 - `tests/verify.test.ts` tests `pnpm verify` without a browser.
 
 ## Feature map
@@ -258,6 +262,9 @@ journeys:
   `pnpm verify configurations`.
 - [Settings and feature flags](features/settings.md): `pnpm verify settings`.
 - [Routing and base path](features/routing.md): `pnpm verify routing`.
+- [Repository loading](features/repository.md): `pnpm verify repository`.
+- [Local files and archives](features/local-files.md):
+  `pnpm verify local-files`.
 
 Read the file of a feature before you drive or change it. When you add a
 journey, add its feature file in the same pull request. When a change alters a

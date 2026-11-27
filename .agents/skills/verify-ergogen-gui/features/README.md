@@ -81,3 +81,9 @@ observable proof. Keep details of the code out of the map.
 - [Routing and base path](./routing.md): the address and the stored
   configurations decide whether the Welcome page or the editor shows, below
   the base of the build. Journey: `pnpm verify routing`.
+- [Repository loading](./repository.md): the user names a GitHub, Codeberg, or
+  Forgejo repository, and its configuration and footprints open in the editor
+  and Custom Libraries. Journey: `pnpm verify repository`.
+- [Local files and archives](./local-files.md): the user opens a
+  configuration file or an archive with footprints from the computer. Journey:
+  `pnpm verify local-files`.
