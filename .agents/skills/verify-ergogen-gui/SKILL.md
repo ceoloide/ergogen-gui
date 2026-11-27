@@ -152,6 +152,13 @@ These handles are stable. An element that has a label but no role needs
 | New custom footprint, in the settings  | button `Add new custom footprint`                                          |
 | Name of the custom footprint           | textbox `Footprint name`                                                   |
 | A custom footprint in Custom Libraries | link `download injection <name>`                                           |
+| A tab of Custom Libraries              | button `Footprints`, `Outlines`, or `Templates`                            |
+| New configuration, at `/` only         | button `Start new configuration`                                           |
+| Name of the open configuration         | text inside the role `banner`                                              |
+| A configuration in the navigation      | `getByTitle('<name>', { exact: true })`, its tooltip                       |
+| Rename or delete in the navigation     | button `Rename configuration <name>` or `Delete configuration <name>`      |
+| New name in the navigation             | textbox `Rename input`, then the button `Save name`                        |
+| A recent configuration on `/new`       | label `Load <name> configuration`. It has no role                          |
 
 Text that you type in the editor gets the automatic indentation of the editor
 on each new line, which breaks YAML. Paste the text through the clipboard with
@@ -246,6 +253,11 @@ journeys:
 - [Downloads and bulk export](features/download.md): `pnpm verify download`.
 - [Injections](features/injections.md): `pnpm verify injections`.
 - [Share links](features/share.md): `pnpm verify share`.
+- [Welcome page and examples](features/welcome.md): `pnpm verify welcome`.
+- [Configuration management](features/configurations.md):
+  `pnpm verify configurations`.
+- [Settings and feature flags](features/settings.md): `pnpm verify settings`.
+- [Routing and base path](features/routing.md): `pnpm verify routing`.
 
 Read the file of a feature before you drive or change it. When you add a
 journey, add its feature file in the same pull request. When a change alters a
