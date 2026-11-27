@@ -133,14 +133,19 @@ These handles are stable. An element that has a label but no role needs
 | Output file, which selects its preview | text of the file name, such as `board.dxf`                                 |
 | Download of one output                 | label `Download board.dxf`. It has no role                                 |
 | SVG preview                            | img `Ergogen SVG Output preview`. Its `src` holds the SVG                  |
+| Text preview                           | role `code` inside the label `YAML preview for points-<n>`                 |
 | Error banner                           | button `Close error message`                                               |
 | Settings                               | button `Show settings panel`                                               |
+| A setting, such as Debug               | checkbox `Enable debug mode`. Choose the text `Debug` to switch it         |
 | Share                                  | button `Share configuration`                                               |
+| Download of the configuration          | button `Download configuration`                                            |
 | Archive of all outputs                 | button `Download archive of all generated files`                           |
+| Navigation                             | button `Show navigation panel`                                             |
+| Archive of the stored configurations   | button `Download All`, then the button `Download (<count>)`                |
 
 Text that you type in the editor gets the automatic indentation of the editor
-on each new line, which breaks YAML. Paste the text through the clipboard, as
-`pasteIntoEditor` in `e2e/journeys/generate.journey.ts` does.
+on each new line, which breaks YAML. Paste the text through the clipboard with
+`pasteIntoEditor` from `e2e/journeys/app.ts`.
 
 ## Evidence
 
@@ -172,7 +177,8 @@ Follow these standards for a proof:
   affects. A passed status proves only what the checks of the journey check.
 - Check the result of an action, not only that a control appeared. The
   `generate` journey reads the size of the generated SVG, which only a
-  generation of the pasted configuration can give.
+  generation of the pasted configuration can give. The `download` journey
+  reads the name and the content of each file that the browser saves.
 - To prove a fix, run the journey before the fix too, and keep both results.
   A journey that cannot fail proves nothing.
 - In a pull request, give the command, its exit status, the commit in
@@ -213,15 +219,22 @@ stop processes by name.
   a journey that could not run.
 - `scripts/verify/proof.mts` defines `result.json`.
 - `e2e/journeys/journey.ts` is the `journey` fixture.
+- `e2e/journeys/app.ts` pastes into the editor and reads the size of the SVG
+  preview, for each journey that needs it.
 - `tests/verify.test.ts` tests `pnpm verify` without a browser.
 
 ## Feature map
 
 [features/README.md](features/README.md) lists the features and their
-journeys. Read the file of a feature before you drive or change it. When you
-add a journey, add its feature file in the same pull request. When a change
-alters a user path, change the feature file and the journey in the same pull
-request.
+journeys:
+
+- [Generate](features/generate.md): `pnpm verify generate`.
+- [Preview](features/preview.md): `pnpm verify preview`.
+- [Downloads and bulk export](features/download.md): `pnpm verify download`.
+
+Read the file of a feature before you drive or change it. When you add a
+journey, add its feature file in the same pull request. When a change alters a
+user path, change the feature file and the journey in the same pull request.
 
 These traps apply to every journey:
 
