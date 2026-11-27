@@ -139,8 +139,8 @@ These handles are stable. An element that has a label but no role needs
 | Archive of all outputs                 | button `Download archive of all generated files`                           |
 
 Text that you type in the editor gets the automatic indentation of the editor
-on each new line, which breaks YAML. Paste the text through the clipboard, as
-`pasteIntoEditor` in `e2e/journeys/generate.journey.ts` does.
+on each new line, which breaks YAML. Paste the text through the clipboard with
+`pasteIntoEditor` from `e2e/journeys/app.ts`.
 
 ## Evidence
 
@@ -213,6 +213,8 @@ stop processes by name.
   a journey that could not run.
 - `scripts/verify/proof.mts` defines `result.json`.
 - `e2e/journeys/journey.ts` is the `journey` fixture.
+- `e2e/journeys/app.ts` pastes into the editor and reads the size of the SVG
+  preview, for each journey that needs it.
 - `tests/verify.test.ts` tests `pnpm verify` without a browser.
 
 ## Feature map
