@@ -37,6 +37,9 @@ export const gaConfig = {
     { parameterName: 'description', displayName: 'Exception Description' },
     { parameterName: 'fatal', displayName: 'Exception Fatal' },
     { parameterName: 'error_stack', displayName: 'Error Stack' },
+    { parameterName: 'error_code', displayName: 'Error Code' },
+    { parameterName: 'error_kind', displayName: 'Error Kind' },
+    { parameterName: 'error_location', displayName: 'Error Location' },
 
     // Settings (settings_loaded, setting_changed)
     { parameterName: 'setting_name', displayName: 'Setting Name' },

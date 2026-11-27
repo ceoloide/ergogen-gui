@@ -1,4 +1,5 @@
-import type { Mock } from 'vitest';
+import type { Mock, MockInstance } from 'vitest';
+import { DiagnosticError } from '../diagnostics/diagnostic';
 import {
   trackEvent,
   initAnalytics,
@@ -16,8 +17,10 @@ import ergogenPkg from 'ergogen/package.json';
 
 describe('Analytics Utility', () => {
   const originalGtag = window.gtag;
+  let consoleError: MockInstance<typeof console.error>;
 
   beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     // Reset window.gtag before each test
     window.gtag = vi.fn();
     // Reset environment variable before each test
@@ -39,6 +42,7 @@ describe('Analytics Utility', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    consoleError.mockRestore();
   });
 
   afterAll(() => {
@@ -493,35 +497,115 @@ describe('Analytics Utility', () => {
   });
 
   describe('trackError', () => {
-    it('should call window.gtag with exception event and string message', () => {
+    it('should send an error without a code as UNCLASSIFIED and keep the other parameters', () => {
       setSendUsageMetricsEnabled(true);
-      trackError('test error message', true, 'test_context');
+      trackError('test error message', true, 'unhandled_error');
 
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
         page_location: `${window.location.origin}/`,
-        description: '[test_context] test error message',
+        description: '[unhandled_error] test error message',
         fatal: true,
         error_stack: undefined,
+        error_code: 'UNCLASSIFIED',
+        error_kind: 'app',
+        error_location: 'unhandled_error',
       });
     });
 
     it('should extract error message and stack from Error object', () => {
       setSendUsageMetricsEnabled(true);
       const err = new Error('nested failure');
-      trackError(err, false);
+      trackError(err, false, 'canvas_renderer');
 
       expect(window.gtag).toHaveBeenCalledWith('event', 'exception', {
         gui_version: guiPkg.version,
         ergogen_version: `github:ergogen/ergogen#v${ergogenPkg.version}`,
         is_pwa: false,
         page_location: `${window.location.origin}/`,
-        description: 'nested failure',
+        description: '[canvas_renderer] nested failure',
         fatal: false,
         error_stack: expect.any(String),
+        error_code: 'UNCLASSIFIED',
+        error_kind: 'app',
+        error_location: 'canvas_renderer',
       });
+    });
+
+    it('should send the code of the reporter for an error without its own code', () => {
+      setSendUsageMetricsEnabled(true);
+
+      trackError(
+        'Worker crash',
+        false,
+        'ergogen_worker',
+        'GENERATION_WORKER_FAILED'
+      );
+
+      expect(window.gtag).toHaveBeenCalledWith(
+        'event',
+        'exception',
+        expect.objectContaining({
+          description: '[ergogen_worker] Worker crash',
+          error_stack: undefined,
+          error_code: 'GENERATION_WORKER_FAILED',
+          error_kind: 'app',
+          error_location: 'ergogen_worker',
+        })
+      );
+    });
+
+    it('should send the code of a DiagnosticError over the code of the reporter', () => {
+      setSendUsageMetricsEnabled(true);
+
+      trackError(
+        new DiagnosticError('STL_WORKER_FAILED'),
+        false,
+        'canvas_renderer',
+        'STL_PREVIEW_FAILED'
+      );
+
+      expect(window.gtag).toHaveBeenCalledWith(
+        'event',
+        'exception',
+        expect.objectContaining({
+          description:
+            '[canvas_renderer] The STL conversion worker failed to load or threw an uncaught error.',
+          error_code: 'STL_WORKER_FAILED',
+          error_location: 'canvas_renderer',
+        })
+      );
+    });
+
+    it('should accept only a code of the catalog', () => {
+      // pnpm typecheck fails when a line under @ts-expect-error compiles.
+      const misuse = () =>
+        // @ts-expect-error UNKNOWN_CODE is not a code of the catalog.
+        trackError('x', false, 'unhandled_error', 'UNKNOWN_CODE');
+
+      expect(misuse).toBeTypeOf('function');
+    });
+
+    it('should print the diagnostic to the console when usage metrics are off', () => {
+      setSendUsageMetricsEnabled(false);
+
+      trackError('Worker crash', false, 'jscad_worker', 'STL_WORKER_FAILED');
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      const lines = String(consoleError.mock.calls[0][0]).split('\n');
+      expect(lines[0]).toMatch(/^STL_WORKER_FAILED: /);
+      expect(lines[1]).toBe('Error: Worker crash');
+      expect(lines[2]).toBe('Location: jscad_worker');
+      expect(lines.at(-1)).toBe(
+        'Agents: .agents/skills/ergogen-gui-diagnostics/SKILL.md#stl_worker_failed'
+      );
+      expect(window.gtag).not.toHaveBeenCalledWith(
+        'event',
+        'exception',
+        expect.anything()
+      );
     });
   });
 
@@ -590,6 +674,8 @@ describe('Analytics Utility', () => {
         expect.objectContaining({
           description: '[unhandled_error] unhandled crash',
           fatal: false,
+          error_code: 'UNCLASSIFIED',
+          error_location: 'unhandled_error',
         })
       );
 
@@ -606,6 +692,8 @@ describe('Analytics Utility', () => {
         expect.objectContaining({
           description: '[unhandled_rejection] promise failure',
           fatal: false,
+          error_code: 'UNCLASSIFIED',
+          error_location: 'unhandled_rejection',
         })
       );
     });
