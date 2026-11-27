@@ -68,3 +68,16 @@ observable proof. Keep details of the code out of the map.
 - [Share links](./share.md): the user shares the configuration and the
   libraries that it uses as a link, which opens them in another browser.
   Journey: `pnpm verify share`.
+- [Welcome page and examples](./welcome.md): the Welcome page lists the
+  examples of the engine with their previews, and one of them opens in the
+  editor. Journey: `pnpm verify welcome`.
+- [Configuration management](./configurations.md): the user creates, renames,
+  switches, and deletes stored configurations, and they stay after a reload.
+  Journey: `pnpm verify configurations`.
+- [Settings and feature flags](./settings.md): a switch in the settings
+  changes what the automatic generation makes and stays after a reload, and a
+  flag in the address turns custom outlines off. Journey:
+  `pnpm verify settings`.
+- [Routing and base path](./routing.md): the address and the stored
+  configurations decide whether the Welcome page or the editor shows, below
+  the base of the build. Journey: `pnpm verify routing`.
