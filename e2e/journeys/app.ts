@@ -73,6 +73,14 @@ export const markerBoardFootprints = ['JM1', 'JM2', 'JM3', 'JM4'].map(
   (reference) => ({ name: markerFootprint.name, reference })
 );
 
+// The files of a keyboard whose configuration is the marker board and whose
+// footprints folder holds the marker footprint, by their path in a repository
+// or an archive.
+export const markerBoardFiles: Record<string, string> = {
+  'config.yaml': markerBoardConfig,
+  [`footprints/${markerFootprint.name}.js`]: markerFootprint.code,
+};
+
 // Opens Settings and adds a custom footprint as a user does: Add new custom
 // footprint, then the name, then the code pasted into the editor of the
 // footprint. Settings stay open.
