@@ -51,31 +51,10 @@ const App = () => {
 
   const initialInjectionInput: string[][] = [];
   let hashError: string | null = null;
-
-  // Store shared config data for deferred processing with conflict resolution
-  // Use a ref to capture synchronously, then state to trigger re-renders
-  const pendingSharedConfigRef = useRef<{
-    config: string;
-    injections?: string[][];
-    guiVersion?: string;
-    ergogenVersion?: string;
-  } | null>(null);
+  const pendingSharedConfig = hashResult?.success ? hashResult.config : null;
 
   if (hashResult) {
     if (hashResult.success) {
-      // Use shared config from hash fragment
-      const sharedConfig = hashResult.config;
-
-      // Store the shared config data to process with conflict resolution after React renders
-      if (pendingSharedConfigRef.current === null) {
-        pendingSharedConfigRef.current = {
-          config: sharedConfig.config,
-          injections: sharedConfig.injections,
-          guiVersion: sharedConfig.guiVersion,
-          ergogenVersion: sharedConfig.ergogenVersion,
-        };
-      }
-
       // Clear the hash fragment after reading it
       window.history.replaceState(
         null,
@@ -98,22 +77,6 @@ const App = () => {
       );
     }
   }
-
-  // Convert ref to state so it can be passed as a prop and trigger re-renders
-  const [pendingSharedConfig, setPendingSharedConfig] = useState<{
-    config: string;
-    injections?: string[][];
-    guiVersion?: string;
-    ergogenVersion?: string;
-  } | null>(null);
-
-  // Set state from ref on mount to ensure it's available for AppContent
-  // This must run synchronously or the ref value will be lost
-  useEffect(() => {
-    if (pendingSharedConfigRef.current) {
-      setPendingSharedConfig(pendingSharedConfigRef.current);
-    }
-  }, []); // Only run once on mount
 
   return (
     <ConfigContextProvider
@@ -342,14 +305,11 @@ const AppContent = ({
 
   // Track if we've already processed the initial pending shared config
   const hasProcessedInitialSharedConfig = useRef(false);
-  // Store pending shared config in a ref so it persists across renders
-  // Initialize with the prop value - this captures it on first render
-  const pendingSharedConfigRef = useRef(pendingSharedConfig);
-
-  // Update ref if prop changes (though it should only be set on initial mount)
-  if (pendingSharedConfig !== pendingSharedConfigRef.current) {
-    pendingSharedConfigRef.current = pendingSharedConfig;
-  }
+  // The ref stops the second effect run of StrictMode. The state renders the
+  // route / again once the effect below has processed the shared config.
+  const [initialSharedConfigPending, setInitialSharedConfigPending] = useState(
+    Boolean(pendingSharedConfig)
+  );
 
   // Use the injection conflict resolution hook
   const {
@@ -507,7 +467,6 @@ const AppContent = ({
   /**
    * Effect to process pending shared config from initial hash fragment load.
    * This processes the config with conflict resolution after React has rendered.
-   * Uses the prop directly so it re-runs when pendingSharedConfig is set.
    */
   useEffect(() => {
     // Wait for configContext to be available
@@ -526,6 +485,7 @@ const AppContent = ({
 
     // Mark as processed to prevent re-processing on re-renders
     hasProcessedInitialSharedConfig.current = true;
+    setInitialSharedConfigPending(false);
 
     // Perform version check!
     const report = checkVersionCompatibility(
@@ -616,6 +576,11 @@ const AppContent = ({
     };
   }, [configContext, loadSharedConfig]);
 
+  const sharedConfigUndecided =
+    initialSharedConfigPending ||
+    sharedConfigToConfirm !== null ||
+    currentConflict !== null;
+
   return (
     <>
       {sharedConfigToConfirm && (
@@ -661,11 +626,12 @@ const AppContent = ({
         <Routes>
           <Route
             path="/"
-            // The routing decision is now based on the reactive `configInput` state.
+            // Until a share link has loaded or the user has answered its
+            // dialog, the route waits instead of sending the user to /new.
             element={
               configInput ? (
                 <Ergogen pwaState={pwaState} />
-              ) : (
+              ) : sharedConfigUndecided ? null : (
                 // Keep the query so /new can still load ?github= and similar.
                 <Navigate
                   to={{ pathname: '/new', search: location.search }}

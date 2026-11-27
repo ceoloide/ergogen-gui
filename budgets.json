@@ -1,6 +1,6 @@
 {
   "use_effect": {
-    "ceiling": 50,
+    "ceiling": 49,
     "message": "Compute the value during render, or do the work in the event handler that causes it. To subscribe to a store outside React, use useSyncExternalStore."
   },
   "set_timeout": {
