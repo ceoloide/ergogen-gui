@@ -1,0 +1,54 @@
+name: Mutation testing
+
+# Stryker changes the source of four files in src/utils in small ways and
+# reports each change that no unit test detects. A run takes longer than pull
+# request CI, so it runs each night on main and on demand, never on a pull
+# request. DEVELOPMENT.md ("Mutation testing") describes it.
+on:
+  schedule:
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+# The run only reads the repository. Its results leave only as an artifact.
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      - name: Setup Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install validation tools
+        run: |
+          pnpm tools:install
+          echo "$PWD/.tools/bin" >> "$GITHUB_PATH"
+      # Writes reports/mutation/mutation.json and mutation.html.
+      - name: Mutation testing
+        run: pnpm test:mutation
+      # Runs the stages of pnpm validate, as CI does, and writes
+      # reports/metrics.json with the mutation score from the report above.
+      - name: Record metrics
+        run: pnpm metrics
+      - name: Upload mutation reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mutation-${{ github.sha }}-attempt-${{ github.run_attempt }}
+          path: |
+            reports/metrics.json
+            reports/mutation/
+          if-no-files-found: warn
+          retention-days: 30

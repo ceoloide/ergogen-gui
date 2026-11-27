@@ -60,6 +60,8 @@ const readWorkflow = (name: string) =>
   ) as Workflow;
 const ci = readWorkflow('ci.yaml');
 const deployment = readWorkflow('deploy.yaml');
+const mutation = readWorkflow('mutation.yaml');
+const workflows = [ci, deployment, mutation];
 const { build, deploy, rollback, smoke } = deployment.jobs;
 const writeJobs = ['deploy', 'rollback'];
 const action = (job: Job, name: string) =>
@@ -82,7 +84,7 @@ describe('workflow validation tools', () => {
 describe('HC-013a deployment policy', () => {
   it('pins a runner supported by the locked browser toolchain', () => {
     // Assert: ubuntu-latest advanced to an unsupported OS in real CI.
-    for (const workflow of [ci, deployment]) {
+    for (const workflow of workflows) {
       for (const job of Object.values(workflow.jobs)) {
         expect(job['runs-on']).toBe('ubuntu-26.04');
       }
@@ -92,7 +94,7 @@ describe('HC-013a deployment policy', () => {
     // Assert
     expect(
       readdirSync(resolve(projectRoot, '.github/workflows')).sort()
-    ).toEqual(['ci.yaml', 'deploy.yaml']);
+    ).toEqual(['ci.yaml', 'deploy.yaml', 'mutation.yaml']);
   });
   it('keeps deployment off PR events while retaining PR validation', () => {
     // Assert
@@ -121,7 +123,7 @@ describe('HC-013a deployment policy', () => {
 
   it('uses read-only defaults and grants write only to publishing', () => {
     // Assert
-    for (const workflow of [ci, deployment]) {
+    for (const workflow of workflows) {
       expect(workflow.permissions).toEqual({ contents: 'read' });
       for (const [name, job] of Object.entries(workflow.jobs)) {
         const access =
@@ -137,7 +139,7 @@ describe('HC-013a deployment policy', () => {
 
   it('does not leave checkout credentials available to repository code', () => {
     // Assert
-    for (const workflow of [ci, deployment]) {
+    for (const workflow of workflows) {
       for (const job of Object.values(workflow.jobs)) {
         for (const step of job.steps) {
           if (step.uses?.startsWith('actions/checkout@')) {
@@ -145,6 +147,21 @@ describe('HC-013a deployment policy', () => {
           }
         }
       }
+    }
+  });
+
+  it('pins every action to a full commit SHA', () => {
+    // Arrange
+    const uses = workflows.flatMap((workflow) =>
+      Object.values(workflow.jobs).flatMap((job) =>
+        job.steps.flatMap((step) => (step.uses ? [step.uses] : []))
+      )
+    );
+
+    // Assert
+    expect(uses.length).toBeGreaterThan(0);
+    for (const reference of uses) {
+      expect(reference).toMatch(/^[\w./-]+@[0-9a-f]{40}$/);
     }
   });
 
@@ -383,6 +400,60 @@ describe('HC-013a deployment policy', () => {
         "${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-build-only-{0}', github.run_id) }}",
       'cancel-in-progress': false,
     });
+  });
+});
+
+describe('nightly mutation testing', () => {
+  const job = mutation.jobs.mutation;
+  const readText = (name: string) =>
+    readFileSync(resolve(projectRoot, '.github/workflows', name), 'utf8');
+
+  it('runs on a schedule and on demand, never for a pull request or a push', () => {
+    // Assert
+    expect(Object.keys(mutation.jobs)).toEqual(['mutation']);
+    expect(mutation.on).toEqual({
+      schedule: [{ cron: expect.any(String) }],
+      workflow_dispatch: null,
+    });
+  });
+
+  it('reads no secret and runs no command that can push or write to GitHub', () => {
+    // Assert: the read-only policy above covers the token. No job widens it.
+    const text = readText('mutation.yaml');
+    expect(job.permissions).toBeUndefined();
+    expect(text).not.toContain('secrets.');
+    expect(text).not.toMatch(/\bgit push\b|\bgh\b|\bcurl\b/);
+  });
+
+  it('runs Stryker, then pnpm metrics, and uploads both reports', () => {
+    // Arrange
+    const commands = job.steps.map((step) => step.run);
+    const upload = action(job, 'actions/upload-artifact');
+
+    // Assert
+    expect(packageJson.scripts['test:mutation']).toBe('stryker run');
+    expect(commands.indexOf('pnpm test:mutation')).toBeGreaterThan(
+      commands.indexOf('pnpm install --frozen-lockfile')
+    );
+    expect(commands.indexOf('pnpm metrics')).toBeGreaterThan(
+      commands.indexOf('pnpm test:mutation')
+    );
+    for (const command of ['pnpm test:mutation', 'pnpm metrics']) {
+      const step = job.steps.find((candidate) => candidate.run === command);
+      expect(step?.if).toBeUndefined();
+      expect(step?.['continue-on-error']).not.toBe(true);
+    }
+    expect(upload?.if).toBe('${{ !cancelled() }}');
+    expect(String(upload?.with?.path).trim().split('\n')).toEqual([
+      'reports/metrics.json',
+      'reports/mutation/',
+    ]);
+  });
+
+  it('keeps Stryker out of pull request CI', () => {
+    // Assert: pnpm metrics runs only the stages that tests/validate.test.ts
+    // lists, and none of them is test:mutation.
+    expect(readText('ci.yaml')).not.toMatch(/mutation|stryker/i);
   });
 });
 
