@@ -59,8 +59,10 @@ whose item has the status `Todo`.
 
 ## 4. Do the task and open the pull request
 
-1. Read the issue with `gh issue view <issue> --comments`. Its Change section
-   says what to do. Its Exit condition says when the task is done.
+1. Read the issue with `gh issue view <issue>`, and its comments with
+   `gh issue view <issue> --comments`. Run both, because outside a terminal each
+   command prints only its own part. The Change section of the issue says what
+   to do. Its Exit condition says when the task is done.
 2. Read [AGENTS.md](../../../AGENTS.md) and follow it in every step.
 3. Create a branch from the latest `origin/main`.
 4. Make the change. Install the native tools as
