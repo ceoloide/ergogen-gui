@@ -303,6 +303,9 @@ Configuration generation and preview updates work as follows:
   results, so a duplicate request cannot clear a finished STL conversion. During
   render, `resolvePreview` in `src/utils/preview.ts` selects the active preview
   payload and uses `demo.svg` when the selected output is absent.
+- When `ergogen.worker.ts` fails to load or start, `ConfigContext` terminates it
+  and shows the error. Auto-generation leaves the error in place, and the next
+  **Generate**, or any other `generateNow` call, starts a new worker.
 - Ergogen keeps injected footprints, templates, and outlines in a module-level
   registry. Closing the settings panel therefore invalidates the generation
   session, terminates and recreates `ergogen.worker.ts`, and regenerates.

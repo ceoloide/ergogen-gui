@@ -1355,6 +1355,107 @@ describe('ConfigContextProvider', () => {
     });
   });
 
+  // A worker whose script fails to load fires one error event and then never
+  // answers, so requests posted to it after the error hung forever (#414).
+  describe('Ergogen worker load failure', () => {
+    const createMockWorker = () => ({
+      postMessage: vi.fn(),
+      terminate: vi.fn(),
+      onmessage: (_e: MessageEvent) => {},
+      onerror: (_e: Event) => {},
+    });
+
+    let capturedContext: any = null;
+    const CaptureContext = () => {
+      capturedContext = useConfigContext();
+      return null;
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockInitialConfig('points: {}');
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('keeps the load error and stops generating after the load-time auto-generation', () => {
+      // Arrange
+      const failedWorker = createMockWorker();
+      mockCreateErgogenWorker.mockReturnValue(
+        failedWorker as unknown as Worker
+      );
+      render(
+        <ConfigContextProvider>
+          <CaptureContext />
+        </ConfigContextProvider>
+      );
+
+      // Act: the script fails before the debounced auto-generation runs
+      act(() => {
+        failedWorker.onerror(new Event('error'));
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Assert
+      expect(capturedContext.error).toBe('Ergogen worker error');
+      expect(capturedContext.isGenerating).toBe(false);
+      expect(failedWorker.terminate).toHaveBeenCalled();
+    });
+
+    it('starts one new worker on Generate and completes the generation', async () => {
+      // Arrange
+      const failedWorker = createMockWorker();
+      const recoveredWorker = createMockWorker();
+      mockCreateErgogenWorker
+        .mockReturnValueOnce(failedWorker as unknown as Worker)
+        .mockReturnValue(recoveredWorker as unknown as Worker);
+      render(
+        <ConfigContextProvider>
+          <CaptureContext />
+        </ConfigContextProvider>
+      );
+      act(() => {
+        failedWorker.onerror(new Event('error'));
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      // Act: two quick Generate clicks, then the new worker answers
+      const generate = () =>
+        capturedContext.generateNow('points: {}', undefined, {
+          pointsonly: false,
+          isManual: true,
+        });
+      await act(async () => {
+        await Promise.all([generate(), generate()]);
+      });
+      const request = recoveredWorker.postMessage.mock.lastCall?.[0];
+      act(() => {
+        recoveredWorker.onmessage({
+          data: {
+            type: 'success',
+            requestId: request?.requestId,
+            results: { points: { recovered: { x: 0, y: 0 } } },
+          },
+        } as MessageEvent);
+      });
+
+      // Assert
+      expect(mockCreateErgogenWorker).toHaveBeenCalledTimes(2);
+      expect(failedWorker.terminate).toHaveBeenCalled();
+      expect(capturedContext.results).toEqual({
+        points: { recovered: { x: 0, y: 0 } },
+      });
+      expect(capturedContext.isGenerating).toBe(false);
+      expect(capturedContext.error).toBeNull();
+    });
+  });
+
   describe('GA4 Keyboard Generation Tracking & Debouncing', () => {
     const getKeyboardGeneratedCalls = () => {
       return (trackEvent as Mock).mock.calls.filter(

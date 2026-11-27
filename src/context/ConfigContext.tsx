@@ -1052,7 +1052,15 @@ const ConfigContextProvider = ({
     if (worker) {
       worker.onmessage = (event) =>
         handleErgogenWorkerMessageRef.current(event);
+      // The worker's own onerror handles errors once its script has started,
+      // so this fires only when the script failed to load or start. Such a
+      // worker never answers, so drop it and let runGeneration start another.
       worker.onerror = (e) => {
+        worker.terminate();
+        if (ergogenWorkerRef.current === worker) {
+          ergogenWorkerRef.current = null;
+          setWorkerReady(false);
+        }
         const errorMessage = e.message || 'Ergogen worker error';
         failActiveGeneration(generationSessionRef.current);
         setError(errorMessage);
@@ -1273,7 +1281,8 @@ const ConfigContextProvider = ({
         preparePreviewConfig(parsedConfig, options.pointsonly) || targetInput;
 
       try {
-        if (!ergogenWorkerRef.current) {
+        const worker = ergogenWorkerRef.current ?? startErgogenWorker();
+        if (!worker) {
           console.error('Worker not available for processing request.');
           failActiveGeneration(generationSessionRef.current);
           setIsGenerating(false);
@@ -1287,7 +1296,7 @@ const ConfigContextProvider = ({
           targetConfigId: activeConfigIdRef.current,
           isManual: Boolean(options.isManual),
         });
-        ergogenWorkerRef.current.postMessage({
+        worker.postMessage({
           type: 'generate',
           inputConfig,
           injectionInput: inputInjection,
@@ -1323,12 +1332,14 @@ const ConfigContextProvider = ({
       setIsGenerating,
       debug,
       queueGenerationEvent,
+      startErgogenWorker,
     ]
   );
 
   /**
    * A debounced version of runGeneration for auto-generation. It does not
-   * repeat the request behind the current results.
+   * repeat the request behind the current results. It does not replace a
+   * worker that failed to load, so that error stays until Generate does.
    */
   const processInput = useMemo(
     () =>
@@ -1337,11 +1348,15 @@ const ConfigContextProvider = ({
           textInput: string | undefined,
           injectionInput: string[][] | undefined,
           options: ProcessOptions = { pointsonly: true }
-        ) =>
-          runGeneration(textInput, injectionInput, {
+        ) => {
+          if (!ergogenWorkerRef.current) {
+            return;
+          }
+          return runGeneration(textInput, injectionInput, {
             ...options,
             skipIfCurrent: true,
-          }),
+          });
+        },
         300
       ),
     [runGeneration]
