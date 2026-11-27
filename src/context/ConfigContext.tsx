@@ -58,21 +58,12 @@ import {
   preparePreviewConfig,
 } from '../utils/generationHelpers';
 import type { ConflictResolutionStrategy } from '../utils/injections';
-
-interface SavedConfig {
-  id: string;
-  name: string;
-  config: string;
-  createdAt: string;
-  updatedAt: string;
-  previewSvg?: string;
-}
-
-interface MultiConfigContainer {
-  version: number;
-  activeConfigId: string | null;
-  configs: SavedConfig[];
-}
+import {
+  migrateConfigStorage,
+  type MultiConfigContainer,
+  type SavedConfig,
+  type StoredConfigs,
+} from '../utils/configStorage';
 
 import { Results } from '../types/results';
 
@@ -359,39 +350,6 @@ const formatPreviewSvg = (svgContent: unknown): string | undefined => {
   return content;
 };
 
-const loadMultiConfigFromStorage = (): MultiConfigContainer => {
-  if (typeof window === 'undefined') {
-    return { version: 2, activeConfigId: null, configs: [] };
-  }
-  const stored = localStorage.getItem(MULTI_CONFIG_STORAGE_KEY);
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed.version === 'number') {
-        const now = new Date().toISOString();
-        const migratedConfigs = (parsed.configs || []).map(
-          (cfg: Partial<SavedConfig>) => ({
-            ...cfg,
-            createdAt: cfg.createdAt || now,
-            updatedAt: cfg.updatedAt || now,
-          })
-        );
-        return {
-          ...parsed,
-          configs: migratedConfigs,
-        };
-      }
-    } catch (e) {
-      console.error('Failed to parse multi-config storage:', e);
-    }
-  }
-  return {
-    version: 2,
-    activeConfigId: null,
-    configs: [],
-  };
-};
-
 const saveMultiConfigToStorage = (
   configs: SavedConfig[],
   activeConfigId: string | null,
@@ -407,49 +365,34 @@ const saveMultiConfigToStorage = (
 };
 
 const migrateLegacyConfig = (): MultiConfigContainer => {
-  const initialData = loadMultiConfigFromStorage();
-  if (typeof window === 'undefined') return initialData;
-
-  const legacyConfigValue1 = localStorage.getItem(LEGACY_STORAGE_CONFIG_KEY);
-  const legacyConfigValue2 = localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY);
-
-  let legacyText = '';
-  if (legacyConfigValue1) {
-    try {
-      legacyText = JSON.parse(legacyConfigValue1);
-    } catch {
-      legacyText = legacyConfigValue1;
-    }
-  } else if (legacyConfigValue2) {
-    try {
-      legacyText = JSON.parse(legacyConfigValue2);
-    } catch {
-      legacyText = legacyConfigValue2;
-    }
+  if (typeof window === 'undefined') {
+    return { version: 2, activeConfigId: null, configs: [] };
   }
-
-  if (legacyText && legacyText.trim() !== '') {
-    const hasLegacyConfig = initialData.configs.some(
-      (c) => c.name === 'Legacy Config'
-    );
-    if (!hasLegacyConfig) {
-      const newId = generateUUID();
-      const legacyConfig: SavedConfig = {
-        id: newId,
-        name: 'Legacy Config',
-        config: legacyText,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      initialData.configs.push(legacyConfig);
-      initialData.activeConfigId = newId;
-      saveMultiConfigToStorage(initialData.configs, newId, 2);
-    }
-    localStorage.removeItem(LEGACY_STORAGE_CONFIG_KEY);
-    localStorage.removeItem(CONFIG_LOCAL_STORAGE_KEY);
+  const stored: StoredConfigs = {
+    multiConfig: localStorage.getItem(MULTI_CONFIG_STORAGE_KEY),
+    legacyConfig: localStorage.getItem(LEGACY_STORAGE_CONFIG_KEY),
+    singleConfig: localStorage.getItem(CONFIG_LOCAL_STORAGE_KEY),
+  };
+  const migration = migrateConfigStorage(
+    stored,
+    new Date().toISOString(),
+    generateUUID()
+  );
+  if (migration.readError) {
+    console.error('Failed to parse multi-config storage:', migration.readError);
   }
-
-  return initialData;
+  const keys = [
+    [MULTI_CONFIG_STORAGE_KEY, 'multiConfig'],
+    [LEGACY_STORAGE_CONFIG_KEY, 'legacyConfig'],
+    [CONFIG_LOCAL_STORAGE_KEY, 'singleConfig'],
+  ] as const;
+  for (const [key, field] of keys) {
+    const text = migration.stored[field];
+    if (text === stored[field]) continue;
+    if (text === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, text);
+  }
+  return migration.container;
 };
 
 /**
