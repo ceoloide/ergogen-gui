@@ -24,6 +24,9 @@ These commands run validation and tests:
   modifies files.
 - `pnpm validate` also runs the production build. Deployment requires it.
   Both run `scripts/ci/validate.mts`, which runs independent checks at once.
+- `pnpm validate:changed` runs the stages of `pnpm validate:fast` on the files
+  that differ from `origin/main`, as the paragraph after this list describes.
+  It does not replace `pnpm precommit`.
 - `pnpm metrics` runs the same checks and writes their times, test counts,
   bundle size, and pattern counts to `reports/metrics.json`.
 - `pnpm validate:extended` runs `pnpm validate:fast`, a fresh production build,
@@ -41,6 +44,37 @@ These commands run validation and tests:
 - `pnpm fix` applies Prettier and supported ESLint and markdownlint fixes.
 - `pnpm exec vitest run <path> --reporter=verbose` runs one test file with
   per-test output. `pnpm test:unit --verbose` is not a valid form.
+
+`pnpm validate:changed` gives a faster answer while you work. It compares the
+working tree with the merge base of `HEAD` and your local `origin/main`, so the
+changed files include your commits, your staged and unstaged changes, and your
+untracked files. Without `origin/main`, the command fails. Run
+`git fetch origin main` to create or update it. Prettier and ESLint check only
+the changed files. knip and the budget check run in full. markdownlint,
+actionlint, zizmor, and ShellCheck run only when a file that they read changed.
+`tsc` checks both TypeScript projects in full, as two stages at the same time.
+The declaration check, `pnpm typecheck:declarations`, runs only when a
+declaration file, a `tsconfig*.json`, a package file, a `.gitignore`, or the
+check itself changed, or when a changed module is gone, has no import or export,
+or declares a global or a module. `vitest related` runs the test files that
+import a changed file, directly or through other modules. A stage runs in full
+when a change can affect files that did not change, such as a change to
+`package.json`, to a Prettier or ESLint configuration, or to
+`src/setupTests.tsx`. Every test runs when a file is deleted or renamed, and
+when a changed file is neither a TypeScript module in `src/` nor a test file.
+The output says why each stage or step runs in full, runs on the changed files,
+or does not run. `scripts/ci/validate-changed.mts` lists these rules.
+
+A pass of `pnpm validate:changed` is not a pass of `pnpm validate:fast`. It
+checks only what the changed files can break, so it assumes that the merge base
+passes `pnpm validate:fast`. It misses a test that reaches a changed file other
+than through an import that Vite resolves, such as a worker that `new URL()`
+names or an import with a computed path. It misses an error in a declaration
+file that a changed module causes when the declaration file imports that module.
+No declaration file imports a module of the repository today. It also misses a
+changed file that a tool reads for every file it checks, when the rules in the
+script do not list that file. Run `pnpm precommit` before every commit, as
+`AGENTS.md` requires.
 
 A Vite build does not check types. Only `pnpm typecheck` checks types, and
 `pnpm validate:fast` runs it. Husky and `lint-staged` run quick fixes on staged
