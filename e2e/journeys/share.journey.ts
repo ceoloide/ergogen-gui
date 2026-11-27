@@ -65,7 +65,6 @@ test('opens a share link with its configuration and footprint in a new browser',
     await expect(
       page.getByRole('heading', { name: 'Share Configuration' })
     ).toBeVisible();
-    // The dialog generates the configuration to find the footprints it uses.
     await expect(
       page.getByRole('checkbox', { name: markerFootprint.name })
     ).toBeChecked({ timeout: 30_000 });
@@ -78,7 +77,6 @@ test('opens a share link with its configuration and footprint in a new browser',
     ).toBeVisible();
     link = await page.getByRole('textbox', { name: 'Share link' }).inputValue();
     expect(link).toMatch(/^http:\/\/[^/]+\/#.+/);
-    // The dialog copies the link, which the user then pastes elsewhere.
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(link);

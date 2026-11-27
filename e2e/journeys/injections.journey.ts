@@ -39,7 +39,6 @@ test('places a custom footprint that the user adds in the settings', async ({
     'Paste a PCB that places journey_marker before it exists',
     async () => {
       await pasteIntoEditor(page, markerBoardConfig);
-      // Ergogen has no such footprint, so the PCB cannot generate yet.
       await expect(errorBanner).toBeVisible({ timeout: 30_000 });
       await expect(
         page.getByText('pcbs.board.footprints.marker.what')

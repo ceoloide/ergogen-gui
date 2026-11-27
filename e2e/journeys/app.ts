@@ -69,7 +69,6 @@ pcbs:
         where: true
 `;
 
-// The footprints of the marker in board.kicad_pcb, one at each key.
 export const markerBoardFootprints = ['JM1', 'JM2', 'JM3', 'JM4'].map(
   (reference) => ({ name: markerFootprint.name, reference })
 );

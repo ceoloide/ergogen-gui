@@ -45,7 +45,6 @@ function dxfGeometry(dxf: string) {
   return { lines: count, x: range(xs), y: range(ys) };
 }
 
-// The text of each file in a ZIP archive, by its path.
 async function archiveTexts(content: Buffer) {
   const zip = await JSZip.loadAsync(content);
   const texts: Record<string, string> = {};

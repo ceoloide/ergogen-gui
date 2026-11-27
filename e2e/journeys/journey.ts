@@ -72,8 +72,7 @@ export const test = base.extend<{ journey: Journey }>({
       followed.on('console', (message) => readiness.record(message.text()));
       followed.on('pageerror', (error) => pageErrors.push(error.message));
     };
-    // The page whose screenshot and ARIA snapshot the steps save.
-    let shown = page;
+    let proofPage = page;
     listen(page);
     const steps: StepProof[] = [];
     // The step that runs now. A closure sets it, so TypeScript must not narrow
@@ -98,14 +97,14 @@ export const test = base.extend<{ journey: Journey }>({
           proof.status = 'passed';
           Object.assign(
             proof,
-            await capture(shown, folder, stepFileName(steps.length, name))
+            await capture(proofPage, folder, stepFileName(steps.length, name))
           );
         }),
       observe: (name, value) => {
         observed[name] = value;
       },
       follow: (followed) => {
-        shown = followed;
+        proofPage = followed;
         listen(followed);
       },
     });
@@ -116,7 +115,7 @@ export const test = base.extend<{ journey: Journey }>({
     let failure: JourneyResult['failure'];
     if (!passed) {
       try {
-        failure = await capture(shown, folder, 'failed');
+        failure = await capture(proofPage, folder, 'failed');
       } catch (error) {
         failure = { captureError: String(error) };
       }
