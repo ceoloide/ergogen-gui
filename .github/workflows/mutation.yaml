@@ -42,6 +42,11 @@ jobs:
       # reports/metrics.json with the mutation score from the report above.
       - name: Record metrics
         run: pnpm metrics
+      # Lists each undetected mutant that docs/records/mutation-survivors.md
+      # does not name, and each entry of that file that names no undetected
+      # mutant, in the log and in the run summary. Either list fails the run.
+      - name: Check undetected mutants
+        run: pnpm check:survivors
       - name: Upload mutation reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

@@ -37,7 +37,7 @@ import {
 export const metricsPath = 'reports/metrics.json';
 const unitReportPath = 'reports/unit.xml';
 /** The jsonReporter default of Stryker, which stryker.config.json keeps. */
-const mutationReportPath = 'reports/mutation/mutation.json';
+export const mutationReportPath = 'reports/mutation/mutation.json';
 const bundleDirectory = 'dist';
 
 export interface SourceFile {
@@ -297,7 +297,7 @@ export function summarizeUnitTests(xml: string): UnitTests {
  * undetected mutant passed every test or ran in none. The score leaves out the
  * other statuses.
  */
-const scoredStatuses = {
+export const scoredStatuses = {
   Killed: 'detected',
   Timeout: 'detected',
   Survived: 'undetected',
