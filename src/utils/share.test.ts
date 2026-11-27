@@ -29,9 +29,24 @@ describe('share utilities', () => {
       expect(typeof encoded).toBe('string');
       expect(encoded.length).toBeGreaterThan(0);
     });
+
+    it('leaves an empty injection list out of the link', () => {
+      // Act
+      const decoded = decodeConfig(encodeConfig(testConfig, []));
+
+      // Assert
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config).not.toHaveProperty('injections');
+      }
+    });
   });
 
   describe('decodeConfig', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('decodes config without injections', () => {
       const encoded = encodeConfig(testConfig);
       const decoded = decodeConfig(encoded);
@@ -112,6 +127,95 @@ describe('share utilities', () => {
         expect(decoded.config.guiVersion).toBe(customGui);
         expect(decoded.config.ergogenVersion).toBe(customErgogen);
       }
+    });
+
+    it('reports a link whose data is not JSON as a decode error', () => {
+      // Arrange
+      const encoded = compressToEncodedURIComponent('points: {}');
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Act
+      const decoded = decodeConfig(encoded);
+
+      // Assert
+      expect(decoded).toEqual({
+        success: false,
+        error: 'DECODE_ERROR',
+        message: expect.stringContaining('is not valid JSON'),
+      });
+    });
+
+    it('reports a link that lz-string cannot decompress as a decode error', () => {
+      // Arrange: lz-string throws a TypeError for this text.
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Act
+      const decoded = decodeConfig('y43Mb9wWm');
+
+      // Assert
+      expect(decoded).toEqual({
+        success: false,
+        error: 'DECODE_ERROR',
+        message: expect.stringContaining('An unexpected error occurred'),
+      });
+    });
+
+    it('replaces versions that are not strings with the fallback versions', () => {
+      // Arrange
+      const encoded = compressToEncodedURIComponent(
+        JSON.stringify({ config: testConfig, guiVersion: 1, ergogenVersion: 4 })
+      );
+
+      // Act
+      const decoded = decodeConfig(encoded);
+
+      // Assert
+      expect(decoded.success).toBe(true);
+      if (decoded.success) {
+        expect(decoded.config.guiVersion).toBe('0.9.0');
+        expect(decoded.config.ergogenVersion).toBe(
+          'github:ergogen/ergogen#v4.2.1'
+        );
+      }
+    });
+
+    it.each([
+      ['has four fields', ['footprint', 'switch', 'code', 'extra']],
+      ['has a type that is not a string', [1, 'switch', 'code']],
+      ['has a name that is not a string', ['footprint', 1, 'code']],
+      ['has content that is not a string', ['footprint', 'switch', 1]],
+    ])('rejects a link with an injection that %s', (_, malformed) => {
+      // Arrange
+      const encoded = compressToEncodedURIComponent(
+        JSON.stringify({
+          config: testConfig,
+          injections: [['footprint', 'diode', 'code'], malformed],
+        })
+      );
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Act
+      const decoded = decodeConfig(encoded);
+
+      // Assert
+      expect(decoded.success).toBe(false);
+      if (!decoded.success) {
+        expect(decoded.error).toBe('VALIDATION_ERROR');
+      }
+    });
+
+    it('decodes a link without injections when the page URL has ?debug', () => {
+      // Arrange
+      const pageUrl = window.location.href;
+      window.history.replaceState(null, '', '?debug');
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Act
+      const decoded = decodeConfig(encodeConfig(testConfig));
+      window.history.replaceState(null, '', pageUrl);
+
+      // Assert
+      expect(decoded.success).toBe(true);
     });
 
     it('uses fallback values for guiVersion and ergogenVersion when they are missing in payload', () => {
@@ -483,6 +587,17 @@ describe('share utilities', () => {
       expect(filtered).toEqual([]);
     });
 
+    it('keeps an injection of a type that it does not know', () => {
+      // Arrange
+      const injections: string[][] = [['keyboard_layout', 'kle', 'data']];
+
+      // Act
+      const filtered = filterInjectionsForSharing(injections, usedWith({}));
+
+      // Assert
+      expect(filtered).toEqual(injections);
+    });
+
     it('handles footprints with nested names (slashes)', () => {
       // Arrange
       const injections: string[][] = [
@@ -767,6 +882,39 @@ describe('share utilities', () => {
       expect(result.footprints).toEqual(new Set());
       expect(result.templates).toEqual(new Set());
       expect(result.outlines).toEqual(new Set());
+    });
+
+    it('returns empty sets when the pcbs and outlines sections are null', () => {
+      // Arrange: the engine keeps an empty `pcbs:` or `outlines:` section as
+      // null in its canonical output.
+      const canonical = { pcbs: null, outlines: null };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result).toEqual({
+        footprints: new Set(),
+        templates: new Set(),
+        outlines: new Set(),
+      });
+    });
+
+    it('reads the other PCBs when one PCB or its footprints section is null', () => {
+      // Arrange
+      const canonical = {
+        pcbs: {
+          left: null,
+          right: { template: 'kicad8', footprints: null },
+        },
+      };
+
+      // Act
+      const result = extractUsedInjectionsFromCanonical(canonical);
+
+      // Assert
+      expect(result.templates).toEqual(new Set(['kicad8']));
+      expect(result.footprints).toEqual(new Set());
     });
 
     it('deduplicates across multiple pcbs and outlines', () => {

@@ -1,4 +1,8 @@
-import { mergeInjectionArrays, getInjectionConflicts } from './injections';
+import {
+  mergeInjectionArrays,
+  getInjectionConflicts,
+  mergeInjectionArraysWithResolution,
+} from './injections';
 
 describe('injections utilities', () => {
   describe('mergeInjectionArrays', () => {
@@ -178,6 +182,84 @@ describe('injections utilities', () => {
       const newOne = result.find((inj) => inj[1] === 'new_one');
       expect(newOne).toEqual(['footprint', 'new_one', 'new_content']);
     });
+
+    it.each([
+      ['has four fields', ['footprint', 'switch', 'code', 'extra']],
+      ['has a type that is not a string', [1, 'switch', 'code']],
+      ['has content that is not a string', ['footprint', 'switch', 1]],
+    ])('skips an injection that %s', (_, malformed) => {
+      // Arrange
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const existingInjections = [['footprint', 'diode', 'code']];
+
+      // Act
+      const result = mergeInjectionArrays(
+        [malformed as string[]],
+        existingInjections
+      );
+      vi.restoreAllMocks();
+
+      // Assert
+      expect(result).toEqual([['footprint', 'diode', 'code']]);
+    });
+
+    it('adds an injection whose name only another type uses', () => {
+      // Arrange
+      const newInjections = [['template', 'shared_name', 'template_content']];
+      const existingInjections = [['footprint', 'shared_name', 'footprint']];
+
+      // Act
+      const result = mergeInjectionArrays(newInjections, existingInjections);
+
+      // Assert
+      expect(result).toEqual([
+        ['footprint', 'shared_name', 'footprint'],
+        ['template', 'shared_name', 'template_content'],
+      ]);
+    });
+
+    it('overwrites the injection with the same name, not the first of its type', () => {
+      // Arrange
+      const newInjections = [['footprint', 'diode', 'new_diode']];
+      const existingInjections = [
+        ['footprint', 'switch', 'switch'],
+        ['footprint', 'diode', 'old_diode'],
+      ];
+
+      // Act
+      const result = mergeInjectionArrays(newInjections, existingInjections);
+
+      // Assert
+      expect(result).toEqual([
+        ['footprint', 'switch', 'switch'],
+        ['footprint', 'diode', 'new_diode'],
+      ]);
+    });
+  });
+
+  describe('mergeInjectionArraysWithResolution', () => {
+    it('keeps both injections on a conflict, with the new one under the next free number', () => {
+      // Arrange
+      const newInjections = [['footprint', 'diode', 'new_diode']];
+      const existingInjections = [
+        ['footprint', 'diode', 'old_diode'],
+        ['footprint', 'diode_1', 'other_diode'],
+      ];
+
+      // Act
+      const result = mergeInjectionArraysWithResolution(
+        newInjections,
+        existingInjections,
+        'keep-both'
+      );
+
+      // Assert
+      expect(result).toEqual([
+        ['footprint', 'diode', 'old_diode'],
+        ['footprint', 'diode_1', 'other_diode'],
+        ['footprint', 'diode_2', 'new_diode'],
+      ]);
+    });
   });
 
   describe('getInjectionConflicts', () => {
@@ -227,6 +309,39 @@ describe('injections utilities', () => {
         'new_content',
       ]);
       expect(result[1].conflict.hasConflict).toBe(true);
+    });
+
+    it('returns no conflicts when there are no existing injections', () => {
+      // Act
+      const result = getInjectionConflicts(
+        [['footprint', 'diode', 'code']],
+        undefined
+      );
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('reports no conflict for a name that only another type uses', () => {
+      // Act
+      const result = getInjectionConflicts(
+        [['template', 'shared_name', 'code']],
+        [['footprint', 'shared_name', 'code']]
+      );
+
+      // Assert
+      expect(result).toEqual([]);
+    });
+
+    it('reports no conflict for a malformed new injection', () => {
+      // Act
+      const result = getInjectionConflicts(
+        [['footprint', 'diode']],
+        [['footprint', 'diode', 'code']]
+      );
+
+      // Assert
+      expect(result).toEqual([]);
     });
   });
 });
