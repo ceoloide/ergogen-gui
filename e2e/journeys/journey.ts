@@ -23,6 +23,11 @@ export interface Journey {
   step(name: string, body: () => Promise<void>): Promise<void>;
   /** Keeps a value that the journey read from the page in result.json. */
   observe(name: string, value: unknown): void;
+  /**
+   * Makes the steps after this call save the proof of another page, such as
+   * a page in a new browser context, and records its console and errors.
+   */
+  follow(page: Page): void;
 }
 
 // A file name for a step, such as `04-choose-generate`.
@@ -63,8 +68,12 @@ export const test = base.extend<{ journey: Journey }>({
 
     const readiness = new ReadinessLog();
     const pageErrors: string[] = [];
-    page.on('console', (message) => readiness.record(message.text()));
-    page.on('pageerror', (error) => pageErrors.push(error.message));
+    const listen = (followed: Page) => {
+      followed.on('console', (message) => readiness.record(message.text()));
+      followed.on('pageerror', (error) => pageErrors.push(error.message));
+    };
+    let proofPage = page;
+    listen(page);
     const steps: StepProof[] = [];
     // The step that runs now. A closure sets it, so TypeScript must not narrow
     // it to null.
@@ -88,11 +97,15 @@ export const test = base.extend<{ journey: Journey }>({
           proof.status = 'passed';
           Object.assign(
             proof,
-            await capture(page, folder, stepFileName(steps.length, name))
+            await capture(proofPage, folder, stepFileName(steps.length, name))
           );
         }),
       observe: (name, value) => {
         observed[name] = value;
+      },
+      follow: (followed) => {
+        proofPage = followed;
+        listen(followed);
       },
     });
 
@@ -102,7 +115,7 @@ export const test = base.extend<{ journey: Journey }>({
     let failure: JourneyResult['failure'];
     if (!passed) {
       try {
-        failure = await capture(page, folder, 'failed');
+        failure = await capture(proofPage, folder, 'failed');
       } catch (error) {
         failure = { captureError: String(error) };
       }

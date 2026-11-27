@@ -118,6 +118,10 @@ Follow these rules in each journey:
 - When the app lacks a state that the journey needs, let the journey fail and
   write the reason in the Gotchas of the feature file. Never weaken a check to
   make a journey pass.
+- To drive a second browser, such as a new visitor who opens a share link,
+  open its page with `newContextPage` from `e2e/journeys/app.ts`. Call
+  `journey.follow(page)` before the first step on that page, so that the
+  steps after it keep the proof of that page.
 
 These handles are stable. An element that has a label but no role needs
 `getByLabel(name, { exact: true })`.
@@ -138,14 +142,22 @@ These handles are stable. An element that has a label but no role needs
 | Settings                               | button `Show settings panel`                                               |
 | A setting, such as Debug               | checkbox `Enable debug mode`. Choose the text `Debug` to switch it         |
 | Share                                  | button `Share configuration`                                               |
+| Share dialog                           | heading `Share Configuration`, then the button `Share`                     |
+| Share link                             | textbox `Share link`                                                       |
+| A library in the share dialog          | checkbox named after the library, such as `journey_marker`                 |
 | Download of the configuration          | button `Download configuration`                                            |
 | Archive of all outputs                 | button `Download archive of all generated files`                           |
 | Navigation                             | button `Show navigation panel`                                             |
 | Archive of the stored configurations   | button `Download All`, then the button `Download (<count>)`                |
+| New custom footprint, in the settings  | button `Add new custom footprint`                                          |
+| Name of the custom footprint           | textbox `Footprint name`                                                   |
+| A custom footprint in Custom Libraries | link `download injection <name>`                                           |
 
 Text that you type in the editor gets the automatic indentation of the editor
 on each new line, which breaks YAML. Paste the text through the clipboard with
-`pasteIntoEditor` from `e2e/journeys/app.ts`.
+`pasteIntoEditor` from `e2e/journeys/app.ts`. While the settings show, the
+code editor of a custom footprint is the textbox `Editor content`, and the
+same paste reaches it.
 
 ## Evidence
 
@@ -219,8 +231,9 @@ stop processes by name.
   a journey that could not run.
 - `scripts/verify/proof.mts` defines `result.json`.
 - `e2e/journeys/journey.ts` is the `journey` fixture.
-- `e2e/journeys/app.ts` pastes into the editor and reads the size of the SVG
-  preview, for each journey that needs it.
+- `e2e/journeys/app.ts` holds what more than one journey needs: the paste
+  into the editor, the size of the SVG preview, a download, a custom
+  footprint and the PCB that places it, and a page in a new browser context.
 - `tests/verify.test.ts` tests `pnpm verify` without a browser.
 
 ## Feature map
@@ -231,6 +244,8 @@ journeys:
 - [Generate](features/generate.md): `pnpm verify generate`.
 - [Preview](features/preview.md): `pnpm verify preview`.
 - [Downloads and bulk export](features/download.md): `pnpm verify download`.
+- [Injections](features/injections.md): `pnpm verify injections`.
+- [Share links](features/share.md): `pnpm verify share`.
 
 Read the file of a feature before you drive or change it. When you add a
 journey, add its feature file in the same pull request. When a change alters a

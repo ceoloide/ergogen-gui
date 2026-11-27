@@ -62,3 +62,9 @@ observable proof. Keep details of the code out of the map.
 - [Downloads and bulk export](./download.md): the user saves one output, the
   configuration, an archive of all outputs, and an archive of the stored
   configurations. Journey: `pnpm verify download`.
+- [Injections](./injections.md): the user adds custom footprints, outlines,
+  and templates in the settings, and a configuration uses them by name.
+  Journey: `pnpm verify injections`.
+- [Share links](./share.md): the user shares the configuration and the
+  libraries that it uses as a link, which opens them in another browser.
+  Journey: `pnpm verify share`.
