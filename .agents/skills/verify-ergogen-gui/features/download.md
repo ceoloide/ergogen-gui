@@ -21,10 +21,11 @@ file. No file goes to a server.
 - `bulk-outputs` generates each selected configuration again and saves
   `ergogen-export-all-<date>.zip`, with one folder for each configuration that
   holds `config.yaml` and `outputs/`, while `Only download configs` is off.
-- `download-narrow` puts the download controls in the bar above the panels,
-  at widths below 640 px. The bar has `Download configuration` while the
-  editor shows, and `Download archive of all generated files` while Outputs
-  shows.
+- `download-narrow` moves the download controls to the bar above the panels.
+  At widths below 640 px, the bar has `Download configuration` while the
+  editor shows, in place of the button under the editor. At a width of
+  475 px or less, `Download archive of all generated files` moves from the
+  header to the bar, which shows it while Outputs shows.
 
 `<date>` is the date in UTC, as `YYYY-MM-DD`.
 

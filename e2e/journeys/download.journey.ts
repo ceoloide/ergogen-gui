@@ -1,7 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import type { Locator, Page } from '@playwright/test';
 import JSZip from 'jszip';
-import { pasteIntoEditor } from './app';
+import { download, pasteIntoEditor } from './app';
 import { test, expect } from './journey';
 
 // Rectangles 14 mm wide and 10 mm high at the four keys of a matrix, whose
@@ -23,17 +21,6 @@ outlines:
       size: [14, 10]
 `;
 const plateGeometry = { lines: 16, x: [-7, 26], y: [-5, 24] };
-
-async function download(page: Page, control: Locator) {
-  const [file] = await Promise.all([
-    page.waitForEvent('download'),
-    control.click(),
-  ]);
-  return {
-    name: file.suggestedFilename(),
-    content: await readFile(await file.path()),
-  };
-}
 
 // The lines of a DXF file and the range of their ends. A DXF file is a list
 // of pairs of lines: a group code, then its value. In the ENTITIES section,
@@ -66,6 +53,11 @@ async function archiveTexts(content: Buffer) {
   }
   return texts;
 }
+
+// The paths of the files in an archive, sorted, because the order in which
+// the app adds them is not part of what the user gets.
+const sortedNames = (files: Record<string, string>) =>
+  Object.keys(files).sort();
 
 test('downloads the outputs and configurations that the user chooses', async ({
   page,
@@ -132,7 +124,7 @@ test('downloads the outputs and configurations that the user chooses', async ({
     );
     expect(file.name).toMatch(/^ergogen-\d{4}-\d{2}-\d{2}\.zip$/);
     const files = await archiveTexts(file.content);
-    expect(Object.keys(files)).toEqual([
+    expect(sortedNames(files)).toEqual([
       'config.yaml',
       'outputs/demo.svg',
       'outputs/outlines/plate.dxf',
@@ -146,7 +138,7 @@ test('downloads the outputs and configurations that the user chooses', async ({
       dxfGeometry(files['outputs/outlines/plate.dxf']),
       'the lines of plate.dxf in the archive'
     ).toEqual(plateGeometry);
-    journey.observe('archive', { name: file.name, files: Object.keys(files) });
+    journey.observe('archive', { name: file.name, files: sortedNames(files) });
   });
 
   await journey.step('Open Download All in the navigation', async () => {
@@ -167,7 +159,7 @@ test('downloads the outputs and configurations that the user chooses', async ({
     );
     expect(file.name).toMatch(/^ergogen-config-all-\d{4}-\d{2}-\d{2}\.zip$/);
     const files = await archiveTexts(file.content);
-    expect(Object.keys(files)).toEqual(['Untitled 1.yaml']);
+    expect(sortedNames(files)).toEqual(['Untitled 1.yaml']);
     expect(
       files['Untitled 1.yaml'],
       'the archive holds the stored configuration, which is the pasted one'
@@ -177,7 +169,7 @@ test('downloads the outputs and configurations that the user chooses', async ({
     ).toBeHidden();
     journey.observe('storedConfigurations', {
       name: file.name,
-      files: Object.keys(files),
+      files: sortedNames(files),
     });
   });
 });
