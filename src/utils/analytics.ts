@@ -1,4 +1,10 @@
 import guiPkg from '../../package.json';
+import { diagnosticCatalog, type DiagnosticCode } from '../diagnostics/catalog';
+import {
+  DiagnosticError,
+  formatDiagnostic,
+  type DiagnosticLocation,
+} from '../diagnostics/diagnostic';
 import { getFullErgogenVersion } from './version';
 
 interface NavigatorStandalone extends Navigator {
@@ -376,23 +382,31 @@ export const trackEvent = (
 };
 
 /**
- * Tracks a client-side exception or error via GA4.
+ * Prints an error to the console with its diagnostic code, and sends it to GA4
+ * as an `exception` event.
  * @param error - The Error object or message
  * @param fatal - Whether the error is fatal / crashed the app/component
- * @param context - Additional context/location where the error occurred
+ * @param location - The place in the app that reports the error
+ * @param fallbackCode - The code of an error that is not a DiagnosticError
  */
 export const trackError = (
   error: Error | string,
-  fatal: boolean = false,
-  context?: string
+  fatal: boolean,
+  location: DiagnosticLocation,
+  fallbackCode: DiagnosticCode = 'UNCLASSIFIED'
 ): void => {
   const message = error instanceof Error ? error.message : error;
   const stack = error instanceof Error ? error.stack : undefined;
+  const code = error instanceof DiagnosticError ? error.code : fallbackCode;
 
+  console.error(formatDiagnostic(code, location, message));
   trackEvent('exception', {
-    description: context ? `[${context}] ${message}` : message,
+    description: `[${location}] ${message}`,
     fatal,
     error_stack: stack,
+    error_code: code,
+    error_kind: diagnosticCatalog[code].kind,
+    error_location: location,
   });
 };
 
