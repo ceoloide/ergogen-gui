@@ -12,7 +12,7 @@ import {
   ConfigContextProvider,
   useConfigContext,
 } from './context/ConfigContext';
-import { getConfigFromHash } from './utils/share';
+import { getConfigFromHash, type ShareableConfig } from './utils/share';
 import ConflictResolutionDialog from './molecules/ConflictResolutionDialog';
 import { useInjectionConflictResolution } from './hooks/useInjectionConflictResolution';
 import BulkDownloadDialog from './molecules/BulkDownloadDialog';
@@ -51,7 +51,17 @@ const App = () => {
 
   const initialInjectionInput: string[][] = [];
   let hashError: string | null = null;
-  const pendingSharedConfig = hashResult?.success ? hashResult.config : null;
+  const initialSharedConfig = hashResult?.success ? hashResult.config : null;
+
+  // ConfigContextProvider starts the Ergogen worker in its mount effect, and
+  // React runs the effects of a child before those of its parent. This effect
+  // hands the shared config to AppContent after the worker has started, so
+  // that AppContent can generate it.
+  const [pendingSharedConfig, setPendingSharedConfig] =
+    useState<ShareableConfig | null>(null);
+  useEffect(() => {
+    setPendingSharedConfig(initialSharedConfig);
+  }, [initialSharedConfig]);
 
   if (hashResult) {
     if (hashResult.success) {
@@ -83,7 +93,10 @@ const App = () => {
       initialInjectionInput={initialInjectionInput}
       hashError={hashError}
     >
-      <AppContent pendingSharedConfig={pendingSharedConfig} />
+      <AppContent
+        hasInitialSharedConfig={initialSharedConfig !== null}
+        pendingSharedConfig={pendingSharedConfig}
+      />
     </ConfigContextProvider>
   );
 };
@@ -274,14 +287,11 @@ function usePwaInstallPrompt(): PwaState {
  * Inner component that has access to the config context.
  */
 const AppContent = ({
+  hasInitialSharedConfig,
   pendingSharedConfig,
 }: {
-  pendingSharedConfig?: {
-    config: string;
-    injections?: string[][];
-    guiVersion?: string;
-    ergogenVersion?: string;
-  } | null;
+  hasInitialSharedConfig: boolean;
+  pendingSharedConfig: ShareableConfig | null;
 }) => {
   const configContext = useConfigContext();
   // Get configInput from context to ensure we have the latest value
@@ -305,10 +315,11 @@ const AppContent = ({
 
   // Track if we've already processed the initial pending shared config
   const hasProcessedInitialSharedConfig = useRef(false);
-  // The ref stops the second effect run of StrictMode. The state renders the
-  // route / again once the effect below has processed the shared config.
+  // The ref stops the second effect run of StrictMode. The state holds the
+  // route / from the first render until the effect below has processed the
+  // shared config, which App passes only after its first commit.
   const [initialSharedConfigPending, setInitialSharedConfigPending] = useState(
-    Boolean(pendingSharedConfig)
+    hasInitialSharedConfig
   );
 
   // Use the injection conflict resolution hook
