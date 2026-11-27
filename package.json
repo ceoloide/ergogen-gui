@@ -56,6 +56,7 @@
     "queue:claim": "node scripts/queue/claim.mts",
     "queue:next": "node scripts/queue/next.mts",
     "queue:quota": "node scripts/queue/quota.mts",
+    "verify": "node scripts/verify/verify.mts",
     "test": "pnpm test:unit && pnpm test:e2e",
     "format": "prettier --write .",
     "lint:js": "eslint --max-warnings 0 .",

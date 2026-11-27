@@ -41,6 +41,9 @@ These commands run validation and tests:
 - `pnpm test:contract` runs only the
   [engine contract tests](#engine-contract-tests) with the installed engine and
   writes `reports/contract.xml`.
+- `pnpm verify [<feature>...]` builds and serves the app, drives the journey
+  of each feature in Chromium, and keeps screenshots and a JSON result in
+  `reports/verify/`, as [Verification](#verification) describes.
 - `pnpm fix` applies Prettier and supported ESLint and markdownlint fixes.
 - `pnpm exec vitest run <path> --reporter=verbose` runs one test file with
   per-test output. `pnpm test:unit --verbose` is not a valid form.
@@ -120,6 +123,8 @@ Follow this sequence while you develop and before handoff:
    Knip, types, and unit tests.
 3. For root UI changes, run a targeted browser test with
    `pnpm test:e2e:root e2e/<name>.spec.ts`.
+   To prove a change that a user sees, run `pnpm verify <feature>` and read its
+   proof.
 4. Before handoff, run `pnpm validate` to check the production build. Run
    `pnpm validate:extended` or `pnpm test:e2e` to check the root, subpath, and
    service-worker update browser tests.
@@ -793,6 +798,18 @@ credentials in this order:
 
 `CHANGELOG.md` holds user-facing changes, newest first. Follow the conventions
 in the [changelog skill](.agents/skills/ergogen-gui-changelog/SKILL.md).
+
+## Verification
+
+`pnpm verify <feature>` proves that a feature works the way a user reaches it.
+It builds the production app, serves it on a free loopback port, and runs the
+journey of the feature, `e2e/journeys/<feature>.journey.ts`, in Chromium. It
+keeps a screenshot and an ARIA snapshot after each step and a `result.json`
+in `reports/verify/<feature>/`, also after it stops the server. The
+[verify skill](.agents/skills/verify-ergogen-gui/SKILL.md) tells an agent how
+to run a journey, read its proof, and add a journey, and its
+[feature map](.agents/skills/verify-ergogen-gui/features/README.md) describes
+each feature. `pnpm test:e2e` does not run the journeys.
 
 ## Weekly quota
 

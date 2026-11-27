@@ -17,6 +17,7 @@
     "scripts/ci/**/*.ts",
     "scripts/ci/**/*.mts",
     "scripts/queue/**/*.mts",
+    "scripts/verify/**/*.mts",
     "e2e/**/*.ts",
     "*.config.ts",
     "*.config.mts",
