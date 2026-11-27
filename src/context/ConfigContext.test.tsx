@@ -40,6 +40,7 @@ vi.mock('../workers/workerFactory', () => ({
 
 import {
   trackEvent,
+  trackError,
   initAnalytics,
   setSendUsageMetricsEnabled,
 } from '../utils/analytics';
@@ -2486,6 +2487,12 @@ pcbs:
       expect(capturedContext.isGenerating).toBe(false);
       expect(capturedContext.isJscadConverting).toBe(false);
       expect(capturedContext.error).toContain('Worker crashed');
+      expect(trackError).toHaveBeenCalledWith(
+        'Worker crashed',
+        false,
+        'ergogen_worker',
+        'GENERATION_WORKER_FAILED'
+      );
 
       // Same config can be retried after a worker crash even with skipIfCurrent
       mockErgogenWorker.postMessage.mockClear();

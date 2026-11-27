@@ -12,7 +12,7 @@
     "message": "Keep the value in a useLocalStorage hook from react-use, as src/context/ConfigContext.tsx does for the settings."
   },
   "console": {
-    "ceiling": 79,
+    "ceiling": 78,
     "message": "Show an error to the user with setError from ConfigContext, or throw it to the caller. Delete debug output before you commit."
   },
   "eslint_disable": {

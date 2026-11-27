@@ -1053,13 +1053,17 @@ const ConfigContextProvider = ({
       worker.onmessage = (event) =>
         handleErgogenWorkerMessageRef.current(event);
       worker.onerror = (e) => {
-        console.error('Ergogen worker error:', e);
         const errorMessage = e.message || 'Ergogen worker error';
         failActiveGeneration(generationSessionRef.current);
         setError(errorMessage);
         setIsGenerating(false);
         setIsJscadConverting(false);
-        trackError(e.message || 'Worker crash', false, 'ergogen_worker');
+        trackError(
+          e.message || 'Worker crash',
+          false,
+          'ergogen_worker',
+          'GENERATION_WORKER_FAILED'
+        );
       };
       ergogenWorkerRef.current = worker;
       setWorkerReady(true);
@@ -1084,10 +1088,14 @@ const ConfigContextProvider = ({
         jscadWorker.onmessage = (event) =>
           handleJscadWorkerMessageRef.current(event);
         jscadWorker.onerror = (e) => {
-          console.error('JSCAD worker error:', e);
           setIsJscadConverting(false);
           setIsGenerating(false);
-          trackError(e.message || 'Worker crash', false, 'jscad_worker');
+          trackError(
+            e.message || 'Worker crash',
+            false,
+            'jscad_worker',
+            'STL_WORKER_FAILED'
+          );
         };
         jscadWorkerRef.current = jscadWorker;
       } else {

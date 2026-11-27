@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { anchorsOf, withoutCodeBlocks } from './markdown';
 
 /**
  * Checks the relative links in every Markdown file that Git lists. Each target
@@ -14,67 +15,11 @@ import { describe, expect, it } from 'vitest';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Blanks front matter and fenced code blocks, keeping line numbers.
-const withoutCodeBlocks = (text: string): string => {
-  const lines = text.split('\n');
-  let fence: string | undefined;
-  return lines
-    .map((line, index) => {
-      if (index === 0 && line === '---') {
-        fence = '---';
-        return '';
-      }
-      if (fence === '---') {
-        if (line === '---') fence = undefined;
-        return '';
-      }
-      const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
-      if (fence === undefined) {
-        if (marker !== undefined) fence = marker;
-        return marker === undefined ? line : '';
-      }
-      if (
-        marker !== undefined &&
-        marker[0] === fence[0] &&
-        marker.length >= fence.length &&
-        /^\s*[`~]+\s*$/.test(line)
-      ) {
-        fence = undefined;
-      }
-      return '';
-    })
-    .join('\n');
-};
-
 // Blanks inline code spans, keeping offsets and line breaks.
 const withoutInlineCode = (text: string): string =>
   text.replace(/(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g, (span) =>
     span.replace(/[^\n]/g, ' ')
   );
-
-// The anchor GitHub gives a heading, before duplicates get a numeric suffix.
-const headingSlug = (heading: string): string =>
-  heading
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/<[^>]+>/g, '')
-    .toLowerCase()
-    .replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu, '')
-    .replace(/ /g, '-');
-
-const anchorsOf = (text: string): Set<string> => {
-  const anchors = new Set<string>();
-  for (const line of withoutCodeBlocks(text).split('\n')) {
-    const heading = /^ {0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
-    if (heading === null) continue;
-    const base = headingSlug(heading[1]);
-    let anchor = base;
-    for (let suffix = 1; anchors.has(anchor); suffix += 1) {
-      anchor = `${base}-${suffix}`;
-    }
-    anchors.add(anchor);
-  }
-  return anchors;
-};
 
 const linkPatterns = [
   // Inline links and images: [text](target "title"), with a title in double

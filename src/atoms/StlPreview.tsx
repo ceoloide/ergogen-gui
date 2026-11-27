@@ -47,7 +47,7 @@ class CanvasErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Canvas error:', error, errorInfo);
-    trackError(error, false, 'canvas_renderer');
+    trackError(error, false, 'canvas_renderer', 'STL_PREVIEW_FAILED');
   }
 
   render() {
