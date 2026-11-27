@@ -133,8 +133,10 @@ These handles are stable. An element that has a label but no role needs
 | Output file, which selects its preview | text of the file name, such as `board.dxf`                                 |
 | Download of one output                 | label `Download board.dxf`. It has no role                                 |
 | SVG preview                            | img `Ergogen SVG Output preview`. Its `src` holds the SVG                  |
+| Text preview                           | role `code` inside the label `YAML preview for points-<n>`                 |
 | Error banner                           | button `Close error message`                                               |
 | Settings                               | button `Show settings panel`                                               |
+| A setting, such as Debug               | checkbox `Enable debug mode`. Choose the text `Debug` to switch it         |
 | Share                                  | button `Share configuration`                                               |
 | Archive of all outputs                 | button `Download archive of all generated files`                           |
 
@@ -220,10 +222,14 @@ stop processes by name.
 ## Feature map
 
 [features/README.md](features/README.md) lists the features and their
-journeys. Read the file of a feature before you drive or change it. When you
-add a journey, add its feature file in the same pull request. When a change
-alters a user path, change the feature file and the journey in the same pull
-request.
+journeys:
+
+- [Generate](features/generate.md): `pnpm verify generate`.
+- [Preview](features/preview.md): `pnpm verify preview`.
+
+Read the file of a feature before you drive or change it. When you add a
+journey, add its feature file in the same pull request. When a change alters a
+user path, change the feature file and the journey in the same pull request.
 
 These traps apply to every journey:
 
