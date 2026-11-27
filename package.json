@@ -72,6 +72,7 @@
     "typecheck:tooling": "tsc --project tsconfig.tooling.json",
     "typecheck:declarations": "node scripts/ci/check-declarations.mts tsconfig.json tsconfig.tooling.json",
     "validate:fast": "node scripts/ci/validate.mts format:check lint typecheck test:unit",
+    "validate:changed": "node scripts/ci/validate-changed.mts",
     "validate": "node scripts/ci/validate.mts",
     "typecheck": "tsc --project tsconfig.json && pnpm typecheck:tooling && pnpm typecheck:declarations",
     "validate:extended": "pnpm validate:fast && pnpm test:e2e && pnpm test:reports",
