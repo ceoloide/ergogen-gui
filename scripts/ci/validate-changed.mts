@@ -17,26 +17,33 @@
 //
 // - build-ergogen runs as in `pnpm validate:fast`.
 // - format:check runs Prettier on the changed files that exist.
-// - lint runs ESLint on the changed files that exist, and the other steps of
-//   `pnpm lint` on the whole repository.
-// - The three steps of `pnpm typecheck` always run in full, because a change
-//   in one file can break the types of every file that uses it. They run as
-//   three stages at the same time: typecheck checks tsconfig.json, and
-//   typecheck:tooling and typecheck:declarations run those scripts.
+// - lint runs ESLint on the changed files that exist, and knip and
+//   lint:budgets on the whole repository. `scopedLintSteps` lists the files
+//   that each other step of `pnpm lint` reads. Such a step runs when one of
+//   its files changed and is skipped otherwise.
+// - typecheck and typecheck:tooling run the first two steps of
+//   `pnpm typecheck` in full, because a change in one file can break the
+//   types of every file that uses it. They run as two stages at the same time.
+// - typecheck:declarations runs when a change can alter its result, as
+//   `declarationCheckInputs` and `touchesGlobalScope` say, and is skipped
+//   otherwise.
 // - test:unit runs `vitest related` on the changed files, which runs the test
 //   files that import them, directly or through other modules.
 //
-// A stage runs in full when a changed file can change its result for files
-// that did not change. `fullRunTriggers` lists these files for each tool,
-// from what the tool reads for every file it checks. vitest related follows
-// only imports, and a test can also read a file, list the files that Git
-// lists, or run a script. So test:unit also runs in full when a file was
-// deleted, because no import leads to a file that is gone, and when a changed
-// file is neither a TypeScript module in src/ nor a test file.
+// Every scoped or skipped stage assumes that the merge base passes
+// `pnpm validate:fast`. A stage runs in full when a changed file can change
+// its result for files that did not change. `fullRunTriggers` lists these
+// files for each tool, from what the tool reads for every file it checks.
+// vitest related follows only imports, and a test can also read a file, list
+// the files that Git lists, or run a script. So test:unit also runs in full
+// when a file was deleted, because no import leads to a file that is gone,
+// and when a changed file is neither a TypeScript module in src/ nor a test
+// file.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { matchesGlob } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
 import {
   passed,
   runStages,
@@ -110,11 +117,35 @@ export function listChanges(directory: string): {
   };
 }
 
-/** A changed file that makes a stage run in full, and why. */
+/** A changed file that makes a stage or a step run, and why. */
 interface Trigger {
-  /** Matched against the path with `path.matchesGlob`. */
+  /** Matched against the path with `matches`. */
   pattern: string;
   because: string;
+}
+
+const withoutLeadingDots = (path: string) => path.replace(/(^|\/)\./g, '$1');
+
+/**
+ * Whether a trigger's pattern matches the path. In `path.matchesGlob`, `*`
+ * and `**` skip a name that starts with a dot, such as .agents, so the path
+ * and the pattern are also compared without the leading dot of each name.
+ * That can only add matches, and a match only makes a stage or a step run.
+ */
+const matches = (path: string, pattern: string) =>
+  matchesGlob(path, pattern) ||
+  matchesGlob(withoutLeadingDots(path), withoutLeadingDots(pattern));
+
+/** Why the first changed file that matches a trigger makes it run. */
+function firstTrigger(
+  changes: readonly ChangedFile[],
+  triggers: readonly Trigger[]
+): string | undefined {
+  for (const { path } of changes) {
+    const trigger = triggers.find(({ pattern }) => matches(path, pattern));
+    if (trigger) return `${path} changed, and ${trigger.because}`;
+  }
+  return undefined;
 }
 
 // pnpm reads these files to choose the version of each tool and of every
@@ -167,6 +198,115 @@ const fullRunTriggers = {
   ],
 } satisfies Record<string, readonly Trigger[]>;
 
+const ciTools: Trigger = {
+  pattern: 'scripts/install-ci-tools.sh',
+  because: 'it installs actionlint, ShellCheck and zizmor',
+};
+
+/**
+ * The steps of `pnpm lint` that read only some files, as the lint script of
+ * package.json writes them. Each runs when a changed file is one of its
+ * files, and is skipped otherwise. A step that is not listed always runs in
+ * full, such as knip, which follows the imports of every module, or
+ * lint:budgets, which counts patterns in every source file.
+ */
+const scopedLintSteps: Readonly<Record<string, readonly Trigger[]>> = {
+  'pnpm lint:md': [
+    { pattern: '**/*.md', because: 'markdownlint checks it' },
+    {
+      pattern: '**/.markdownlint*',
+      because: 'markdownlint reads it for every file',
+    },
+  ],
+  'pnpm lint:workflows': [
+    {
+      pattern: '.github/**',
+      because: 'actionlint checks the workflows and reads .github',
+    },
+    ciTools,
+  ],
+  'pnpm lint:security': [
+    { pattern: '.github/**', because: 'zizmor checks .github' },
+    { pattern: '**/zizmor.*', because: 'zizmor reads its configuration' },
+    ciTools,
+  ],
+  'pnpm lint:shell': [
+    ...['scripts/*.sh', 'patch/*.sh', '.husky/pre-commit'].map((pattern) => ({
+      pattern,
+      because: 'ShellCheck checks it',
+    })),
+    { pattern: '**/.shellcheckrc', because: 'ShellCheck reads it' },
+    ciTools,
+  ],
+};
+
+/**
+ * The files that typecheck:declarations reads besides the modules of its two
+ * projects: our declaration files, the projects, the declarations of the
+ * dependencies, the script itself, and the ignore file that decides which
+ * declaration files are ours.
+ */
+const declarationCheckInputs: readonly Trigger[] = [
+  ...packageFiles,
+  {
+    pattern: '**/*.d.{ts,mts,cts}',
+    because:
+      'it is a declaration file, which only the declaration check checks',
+  },
+  {
+    pattern: '**/tsconfig*.json',
+    because: 'the declaration check builds its projects from it',
+  },
+  {
+    pattern: 'scripts/ci/check-declarations.mts',
+    because: 'it is the declaration check',
+  },
+  {
+    pattern: '**/.gitignore',
+    because: 'the declaration check reads it to find our declaration files',
+  },
+];
+
+/**
+ * Why a changed module can break one of our declaration files, if it can.
+ * Our declaration files declare globals and add to modules such as react.
+ * A module can conflict with them when it adds to the global scope or to a
+ * module, and TypeScript can report that conflict in our declaration file,
+ * which tsc skips under skipLibCheck. A file adds to the global scope when it
+ * has statements but no import or export, and adds to a module with
+ * `declare global` or `declare module 'name'`. A file that is gone may have
+ * declared a global that our declaration files use.
+ */
+function touchesGlobalScope(
+  changes: readonly ChangedFile[],
+  readText: (path: string) => string
+): string | undefined {
+  for (const { path, status } of changes) {
+    if (!matches(path, '**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}')) continue;
+    if (status === 'deleted') {
+      return `${path} is gone, and it may have declared a global that a declaration file uses`;
+    }
+    const file = ts.createSourceFile(
+      path,
+      readText(path),
+      ts.ScriptTarget.Latest
+    );
+    const addsToAModule = file.statements.some(
+      (statement) =>
+        ts.isModuleDeclaration(statement) &&
+        (ts.isStringLiteral(statement.name) ||
+          (statement.flags & ts.NodeFlags.GlobalAugmentation) !== 0)
+    );
+    if (addsToAModule) {
+      return `${path} changed, and it declares a global or adds to a module, which can conflict with a declaration file`;
+    }
+    if (!ts.isExternalModule(file) && file.statements.length > 0) {
+      return `${path} changed, and with no import or export its names are global, where they can conflict with a declaration file`;
+    }
+  }
+  return undefined;
+}
+
 /** The `include` of vitest.config.mts: the files that Vitest runs. */
 export const testFilePatterns = [
   'src/**/*.test.{ts,tsx}',
@@ -190,11 +330,23 @@ const changedFiles = (count: number) =>
 /** A path that no tool reads as an option. */
 const argument = (path: string) => `./${path}`;
 
+/** Joins names as English does: "a", "a and b", "a, b and c". */
+const listOf = (names: readonly string[]) =>
+  names.length <= 1
+    ? names.join('')
+    : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+
 /**
- * The command that runs the steps of `pnpm lint`, with ESLint on the files
- * only. Without a file, ESLint does not run.
+ * The command that runs the steps of `pnpm lint` for these changes, and what
+ * it runs and skips. ESLint checks the files that exist, and does not run
+ * without one. A step of `scopedLintSteps` runs only when one of its files
+ * changed. Every other step runs in full.
  */
-function lintCommand(lintScript: string, files: readonly string[]): string[] {
+function lintPlan(
+  lintScript: string,
+  changes: readonly ChangedFile[],
+  files: readonly string[]
+): { command: string[]; lines: string[] } {
   const steps = lintScript.split(' && ');
   if (!steps.includes('pnpm lint:js')) {
     throw new Error(
@@ -204,21 +356,55 @@ function lintCommand(lintScript: string, files: readonly string[]): string[] {
   // The flags of `pnpm lint:js`. --no-warn-ignored skips a file that ESLint
   // ignores or has no configuration for, as `eslint .` does.
   const eslint = 'pnpm exec eslint --max-warnings 0 --no-warn-ignored "$@"';
-  const script = steps
-    .flatMap((step) =>
-      step !== 'pnpm lint:js' ? [step] : files.length > 0 ? [eslint] : []
-    )
-    .join(' && ');
-  return ['sh', '-c', script, 'sh', ...files.map(argument)];
+  const run: string[] = [];
+  const inFull: string[] = [];
+  const skipped: string[] = [];
+  const triggeredLines: string[] = [];
+  for (const step of steps) {
+    const name = step.replace(/^pnpm /, '');
+    const inputs = scopedLintSteps[step];
+    if (step === 'pnpm lint:js') {
+      if (files.length > 0) run.push(eslint);
+    } else if (inputs === undefined) {
+      run.push(step);
+      inFull.push(name);
+    } else {
+      const reason = firstTrigger(changes, inputs);
+      if (reason) {
+        run.push(step);
+        triggeredLines.push(`lint runs ${name}: ${reason}.`);
+      } else skipped.push(name);
+    }
+  }
+  const lines = [
+    files.length > 0
+      ? `lint runs ESLint on ${changedFiles(files.length)}.`
+      : 'lint does not run ESLint: every changed file is gone.',
+    ...(inFull.length > 0
+      ? [`lint runs ${listOf(inFull)} in full: they read the whole project.`]
+      : []),
+    ...triggeredLines,
+    ...(skipped.length > 0
+      ? [
+          `lint skips ${listOf(skipped)}: no changed file is one that they read.`,
+        ]
+      : []),
+  ];
+  return {
+    command: ['sh', '-c', run.join(' && '), 'sh', ...files.map(argument)],
+    lines,
+  };
 }
 
 /**
  * The stages that check these changes. The lint stage reads the steps of
- * `pnpm lint` from `scripts`, the scripts of package.json.
+ * `pnpm lint` from `scripts`, the scripts of package.json. `readText` reads
+ * a changed file that exists.
  */
 export function planStages(
   changes: readonly ChangedFile[],
-  scripts: Readonly<Record<string, string>>
+  scripts: Readonly<Record<string, string>>,
+  readText: (path: string) => string = (path) => readFileSync(path, 'utf8')
 ): Plan {
   const plan: Plan = { stages: [validationStage('build-ergogen')], lines: [] };
   const runInFull = (name: string, reason: string) => {
@@ -229,15 +415,8 @@ export function planStages(
     plan.stages.push({ ...validationStage(name), command });
     plan.lines.push(line);
   };
-  const triggered = (triggers: readonly Trigger[]) => {
-    for (const { path } of changes) {
-      const trigger = triggers.find(({ pattern }) =>
-        matchesGlob(path, pattern)
-      );
-      if (trigger) return `${path} changed, and ${trigger.because}`;
-    }
-    return undefined;
-  };
+  const triggered = (triggers: readonly Trigger[]) =>
+    firstTrigger(changes, triggers);
   const present = changes
     .filter(({ status }) => status !== 'deleted')
     .map(({ path }) => path);
@@ -262,13 +441,9 @@ export function planStages(
   const lint = triggered(fullRunTriggers.lint);
   if (lint) runInFull('lint', lint);
   else {
-    runOnChanges(
-      'lint',
-      lintCommand(scripts.lint, present),
-      present.length > 0
-        ? `lint runs ESLint on ${changedFiles(present.length)} and the other steps of pnpm lint in full.`
-        : 'lint runs the steps of pnpm lint other than ESLint in full: every changed file is gone.'
-    );
+    const { command, lines } = lintPlan(scripts.lint, changes, present);
+    plan.stages.push({ ...validationStage('lint'), command });
+    plan.lines.push(...lines);
   }
 
   // Each step of `pnpm typecheck` takes one core. As one stage, they run one
@@ -279,17 +454,33 @@ export function planStages(
       command: ['pnpm', 'exec', 'tsc', '--project', 'tsconfig.json'],
       after: [],
     },
-    ...['typecheck:tooling', 'typecheck:declarations'].map((name) => ({
-      name,
-      command: ['pnpm', 'run', name],
+    {
+      name: 'typecheck:tooling',
+      command: ['pnpm', 'run', 'typecheck:tooling'],
       after: [],
-    }))
+    }
   );
   plan.lines.push(
-    'typecheck, typecheck:tooling and typecheck:declarations run the steps of pnpm typecheck in full: a change in one file can break the types of every file that uses it.'
+    'typecheck and typecheck:tooling run the first two steps of pnpm typecheck in full: a change in one file can break the types of every file that uses it.'
   );
+  const declarations =
+    triggered(declarationCheckInputs) ?? touchesGlobalScope(changes, readText);
+  if (declarations) {
+    plan.stages.push({
+      name: 'typecheck:declarations',
+      command: ['pnpm', 'run', 'typecheck:declarations'],
+      after: [],
+    });
+    plan.lines.push(`typecheck:declarations runs in full: ${declarations}.`);
+  } else {
+    plan.lines.push(
+      'typecheck:declarations does not run: no changed file is a declaration file or one of its inputs, and no changed module adds to the global scope or to a module.'
+    );
+  }
 
   const deleted = changes.find(({ status }) => status === 'deleted');
+  // Here a match scopes the stage, so `matchesGlob` keeps skipping a name that
+  // starts with a dot. A file it does not match runs every test.
   const untraced = present.find(
     (path) =>
       !matchesGlob(path, 'src/**/*.{ts,tsx}') &&

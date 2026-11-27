@@ -208,15 +208,20 @@ const modified = (path: string): ChangedFile => ({ path, status: 'modified' });
 const added = (path: string): ChangedFile => ({ path, status: 'added' });
 const deleted = (path: string): ChangedFile => ({ path, status: 'deleted' });
 
-const plan = (...changes: ChangedFile[]) => planStages(changes, scripts);
+/** Each changed file that exists is a module that adds nothing global. */
+const plan = (...changes: ChangedFile[]) =>
+  planStages(changes, scripts, () => 'export const value = 1;\n');
 const commandOf = (changes: ChangedFile[], name: string) =>
   plan(...changes).stages.find((stage) => stage.name === name)?.command;
 const full = (name: string) => ['pnpm', 'run', name];
 
 describe('planStages', () => {
   it('runs the stages of validate:fast in their order, with each step of typecheck as a stage', () => {
-    // Act
-    const { stages } = plan(modified('src/utils/object.ts'));
+    // Act: a changed declaration file runs the declaration check.
+    const { stages } = plan(
+      modified('src/utils/object.ts'),
+      modified('src/gtag.d.ts')
+    );
 
     // Assert
     expect(stages.map(({ name, after }) => ({ name, after }))).toEqual([
@@ -230,31 +235,36 @@ describe('planStages', () => {
     ]);
   });
 
-  it('checks a changed file in src/utils with each tool and runs the type checks in full', () => {
+  it('checks a changed module in src/utils with each tool, runs two type checks in full and skips the declaration check', () => {
     // Arrange
     const changes = [modified('src/utils/object.ts')];
 
     // Act
-    const { lines } = plan(...changes);
+    const { stages, lines } = plan(...changes);
 
     // Assert
     expect(commandOf(changes, 'format:check')).toEqual([
       ...['pnpm', 'exec', 'prettier', '--check', '--ignore-unknown'],
       './src/utils/object.ts',
     ]);
-    expect(commandOf(changes, 'lint')?.slice(-1)).toEqual([
+    expect(commandOf(changes, 'lint')).toEqual([
+      'sh',
+      '-c',
+      'pnpm exec eslint --max-warnings 0 --no-warn-ignored "$@" && pnpm knip && pnpm lint:budgets',
+      'sh',
       './src/utils/object.ts',
     ]);
     expect(
       commandOf(changes, 'typecheck')?.concat(
-        commandOf(changes, 'typecheck:tooling')!,
-        commandOf(changes, 'typecheck:declarations')!
+        commandOf(changes, 'typecheck:tooling')!
       )
     ).toEqual([
       ...['pnpm', 'exec', 'tsc', '--project', 'tsconfig.json'],
       ...full('typecheck:tooling'),
-      ...full('typecheck:declarations'),
     ]);
+    expect(stages.map(({ name }) => name)).not.toContain(
+      'typecheck:declarations'
+    );
     expect(commandOf(changes, 'test:unit')).toEqual([
       ...['pnpm', 'exec', 'vitest', 'related', '--run', '--passWithNoTests'],
       '--reporter=default',
@@ -262,23 +272,29 @@ describe('planStages', () => {
     ]);
     expect(lines).toEqual([
       'format:check runs Prettier on 1 changed file.',
-      'lint runs ESLint on 1 changed file and the other steps of pnpm lint in full.',
-      'typecheck, typecheck:tooling and typecheck:declarations run the steps of pnpm typecheck in full: a change in one file can break the types of every file that uses it.',
+      'lint runs ESLint on 1 changed file.',
+      'lint runs knip and lint:budgets in full: they read the whole project.',
+      'lint skips lint:md, lint:workflows, lint:security and lint:shell: no changed file is one that they read.',
+      'typecheck and typecheck:tooling run the first two steps of pnpm typecheck in full: a change in one file can break the types of every file that uses it.',
+      'typecheck:declarations does not run: no changed file is a declaration file or one of its inputs, and no changed module adds to the global scope or to a module.',
       'test:unit runs the tests that import 1 changed file.',
     ]);
   });
 
-  it('runs every step of pnpm lint, with ESLint on the changed files only', () => {
+  it('runs every step of pnpm lint in its order when each has a changed file to read', () => {
     // Arrange: a file name with a space stays one argument.
-    const changes = [modified('src/utils/a b.ts'), added('src/utils/c.ts')];
+    const changes = [
+      modified('src/utils/a b.ts'),
+      added('src/utils/c.ts'),
+      modified('README.md'),
+      modified('.github/workflows/ci.yaml'),
+      modified('scripts/install-ci-tools.sh'),
+    ];
 
     // Act
     const command = commandOf(changes, 'lint')!;
 
     // Assert
-    const otherSteps = scripts.lint
-      .split(' && ')
-      .filter((step) => step !== 'pnpm lint:js');
     expect(command).toEqual([
       'sh',
       '-c',
@@ -289,49 +305,127 @@ describe('planStages', () => {
       'sh',
       './src/utils/a b.ts',
       './src/utils/c.ts',
+      './README.md',
+      './.github/workflows/ci.yaml',
+      './scripts/install-ci-tools.sh',
     ]);
-    expect(otherSteps.length).toBeGreaterThan(0);
-    otherSteps.forEach((step) => expect(command[2]).toContain(step));
   });
 
-  it('passes no deleted file to a tool and runs every test after a deletion or a rename', () => {
-    // Arrange: a rename is a deletion and an addition.
-    const changes = [
-      deleted('src/utils/old.ts'),
-      added('src/utils/new.ts'),
-      deleted('src/utils/gone.ts'),
-    ];
+  it.each([
+    ['README.md', ['lint:md']],
+    ['.agents/skills/a/SKILL.md', ['lint:md']],
+    ['.markdownlint.json', ['lint:md']],
+    ['.markdownlintignore', ['lint:md']],
+    ['.github/workflows/ci.yaml', ['lint:workflows', 'lint:security']],
+    ['.github/actionlint.yaml', ['lint:workflows', 'lint:security']],
+    ['zizmor.yml', ['lint:security']],
+    [
+      'scripts/install-ci-tools.sh',
+      ['lint:workflows', 'lint:security', 'lint:shell'],
+    ],
+    ['patch/patch_ergogen.sh', ['lint:shell']],
+    ['.husky/pre-commit', ['lint:shell']],
+    ['.shellcheckrc', ['lint:shell']],
+  ])('runs the lint steps that read %s and says why', (path, steps) => {
+    // Arrange
+    const changes = [modified('src/utils/object.ts'), modified(path)];
+    const scoped = ['lint:md', 'lint:workflows', 'lint:security', 'lint:shell'];
 
     // Act
-    const { stages, lines } = plan(...changes);
+    const { lines } = plan(...changes);
 
     // Assert
-    const commands = stages.map(({ command }) => command.join(' '));
-    commands.forEach((command) => {
-      expect(command).not.toContain('old.ts');
-      expect(command).not.toContain('gone.ts');
-    });
-    expect(commandOf(changes, 'format:check')).toContain('./src/utils/new.ts');
-    expect(commandOf(changes, 'lint')).toContain('./src/utils/new.ts');
-    expect(commandOf(changes, 'test:unit')).toEqual(full('test:unit'));
-    expect(lines).toContain(
-      'test:unit runs in full: src/utils/old.ts is gone, and vitest related cannot find the tests that imported it.'
+    const script = commandOf(changes, 'lint')![2];
+    scoped.forEach((step) =>
+      expect(script.includes(`pnpm ${step}`)).toBe(steps.includes(step))
+    );
+    steps.forEach((step) =>
+      expect(
+        lines.filter((line) =>
+          line.startsWith(`lint runs ${step}: ${path} changed, and `)
+        )
+      ).toHaveLength(1)
     );
   });
 
-  it('skips Prettier and ESLint when every changed file is gone', () => {
+  it.each([
+    ['src/gtag.d.ts', 'it is a declaration file'],
+    ['scripts/ci/jsdom.d.ts', 'it is a declaration file'],
+    ['tsconfig.json', 'the declaration check builds its projects from it'],
+    [
+      'tsconfig.tooling.json',
+      'the declaration check builds its projects from it',
+    ],
+    ['scripts/ci/check-declarations.mts', 'it is the declaration check'],
+    ['package.json', 'it sets the version and the settings of the tools'],
+    ['pnpm-lock.yaml', 'pnpm reads it to install the tools'],
+    ['.gitignore', 'the declaration check reads it'],
+  ])(
+    'runs the declaration check in full and says why when %s changes',
+    (path, because) => {
+      // Arrange
+      const changes = [modified('src/utils/object.ts'), modified(path)];
+
+      // Act
+      const { lines } = plan(...changes);
+
+      // Assert
+      expect(commandOf(changes, 'typecheck:declarations')).toEqual(
+        full('typecheck:declarations')
+      );
+      expect(lines).toContainEqual(
+        expect.stringContaining(
+          `typecheck:declarations runs in full: ${path} changed, and ${because}`
+        )
+      );
+    }
+  );
+
+  it.each([
+    [
+      'declares a global',
+      'declare global {\n  interface Window {\n    gtag?: number;\n  }\n}\nexport {};\n',
+    ],
+    [
+      'adds to a module',
+      "export {};\ndeclare module 'react' {\n  interface Attributes {\n    probe?: string;\n  }\n}\n",
+    ],
+    ['has no import or export', 'interface Window {\n  gtag?: number;\n}\n'],
+  ])(
+    'runs the declaration check in full when a changed module %s',
+    (_, text) => {
+      // Arrange: TypeScript can report such a conflict in src/gtag.d.ts,
+      // which tsc skips under skipLibCheck.
+      const changes = [modified('src/utils/object.ts')];
+
+      // Act
+      const { stages, lines } = planStages(changes, scripts, () => text);
+
+      // Assert
+      expect(stages.map(({ name }) => name)).toContain(
+        'typecheck:declarations'
+      );
+      expect(lines).toContainEqual(
+        expect.stringMatching(
+          /^typecheck:declarations runs in full: src\/utils\/object\.ts changed, and .* conflict with a declaration file\.$/
+        )
+      );
+    }
+  );
+
+  it('runs the declaration check in full when a module is gone, without reading it', () => {
     // Arrange
     const changes = [deleted('src/utils/gone.ts')];
+    const read = (path: string): string => {
+      throw new Error(`read ${path}`);
+    };
 
     // Act
-    const { stages, lines } = plan(...changes);
+    const { lines } = planStages(changes, scripts, read);
 
     // Assert
-    expect(stages.map(({ name }) => name)).not.toContain('format:check');
-    expect(commandOf(changes, 'lint')?.[2]).not.toContain('eslint');
-    expect(commandOf(changes, 'lint')).toHaveLength(4);
     expect(lines).toContain(
-      'format:check does not run: every changed file is gone.'
+      'typecheck:declarations runs in full: src/utils/gone.ts is gone, and it may have declared a global that a declaration file uses.'
     );
   });
 
@@ -348,6 +442,9 @@ describe('planStages', () => {
     ['vite.config.mts', ['test:unit']],
     ['tsconfig.json', ['test:unit']],
     ['src/setupTests.tsx', ['test:unit']],
+    // `**` in a pattern also reaches a folder whose name starts with a dot.
+    ['.agents/tool/package.json', ['format:check', 'lint', 'test:unit']],
+    ['.github/.prettierrc', ['format:check', 'test:unit']],
   ])(
     'runs a stage in full and says why when %s changes',
     (path, fullStages) => {
@@ -420,6 +517,21 @@ describe('the commands of validate:changed', () => {
     expect(scripts['test:unit']).toBe('vitest run');
     expect(scripts.typecheck).toBe(
       'tsc --project tsconfig.json && pnpm typecheck:tooling && pnpm typecheck:declarations'
+    );
+  });
+
+  it('know the files that the scoped steps read', () => {
+    // Assert: scopedLintSteps and declarationCheckInputs list these files.
+    expect(scripts['lint:md']).toBe('markdownlint "**/*.md" ".agents/**/*.md"');
+    expect(scripts['lint:workflows']).toBe(
+      'actionlint -shellcheck=shellcheck -pyflakes='
+    );
+    expect(scripts['lint:security']).toBe('zizmor --offline .github');
+    expect(scripts['lint:shell']).toBe(
+      'shellcheck scripts/*.sh patch/*.sh .husky/pre-commit'
+    );
+    expect(scripts['typecheck:declarations']).toBe(
+      'node scripts/ci/check-declarations.mts tsconfig.json tsconfig.tooling.json'
     );
   });
 
