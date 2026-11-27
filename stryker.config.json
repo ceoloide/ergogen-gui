@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "mutate": [
+    "src/utils/share.ts",
+    "src/utils/zip.ts",
+    "src/utils/injections.ts",
+    "src/utils/configAnalyzer.ts"
+  ],
+  "reporters": ["clear-text", "progress", "html", "json"],
+  "tempDirName": "reports/stryker-tmp",
+  "ignorePatterns": [
+    "/reports",
+    "/dist*",
+    "/.tools",
+    "/.generated",
+    "/coverage",
+    "/playwright-report",
+    "/test-results",
+    "/e2e/screenshots"
+  ]
+}

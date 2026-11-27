@@ -47,6 +47,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:contract": "vitest run --mode contract tests/engine-contract",
+    "test:mutation": "stryker run",
     "test:e2e": "playwright test",
     "test:e2e:root": "PLAYWRIGHT_ROOT_ONLY=1 playwright test",
     "test:reports": "node scripts/ci/check-reports.mts",
@@ -97,6 +98,8 @@
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@playwright/test": "^1.65.0",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^15.0.2",
     "@testing-library/user-event": "^14.5.2",

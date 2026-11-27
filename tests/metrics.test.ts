@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   countPatterns,
+  renderTable,
+  summarizeMutation,
   summarizeRounds,
   summarizeUnitTests,
+  type Metrics,
   type SourceFile,
 } from '../scripts/ci/metrics.mts';
 import {
@@ -158,5 +161,127 @@ describe('stage times', () => {
       passed: false,
     });
     expect(totalMilliseconds).toBe(500);
+  });
+});
+
+describe('mutation score', () => {
+  /** A Stryker JSON report with one mutant for each status. */
+  const report = (files: Record<string, string[]>) =>
+    JSON.stringify({
+      schemaVersion: '2',
+      thresholds: { high: 80, low: 60 },
+      files: Object.fromEntries(
+        Object.entries(files).map(([path, statuses]) => [
+          path,
+          {
+            language: 'typescript',
+            source: 'export const a = true;\n',
+            mutants: statuses.map((status, index) => ({
+              id: String(index),
+              mutatorName: 'BooleanLiteral',
+              replacement: 'false',
+              location: {
+                start: { line: 1, column: 18 },
+                end: { line: 1, column: 22 },
+              },
+              status,
+            })),
+          },
+        ])
+      ),
+    });
+
+  it('scores detected mutants against detected and undetected ones, as Stryker does', () => {
+    // Arrange: share.ts has 3 detected and 1 undetected mutants, and one of
+    // each status that the score leaves out. zip.ts has 1 and 2.
+    const json = report({
+      'src/utils/share.ts': [
+        'Killed',
+        'Killed',
+        'Timeout',
+        'Survived',
+        'CompileError',
+        'RuntimeError',
+        'Ignored',
+        'Pending',
+      ],
+      'src/utils/zip.ts': ['Killed', 'NoCoverage', 'Survived'],
+    });
+
+    // Act
+    const mutation = summarizeMutation(json);
+
+    // Assert: 4 of 7, 3 of 4 and 1 of 3 detected.
+    expect(mutation).toEqual({
+      score: 57.14,
+      detected: 4,
+      undetected: 3,
+      files: {
+        'src/utils/share.ts': { score: 75, detected: 3, undetected: 1 },
+        'src/utils/zip.ts': { score: 33.33, detected: 1, undetected: 2 },
+      },
+    });
+  });
+
+  it('gives no score to a file without a detected or undetected mutant', () => {
+    // Act
+    const mutation = summarizeMutation(
+      report({
+        'src/utils/share.ts': ['Killed'],
+        'src/utils/zip.ts': ['Ignored', 'CompileError'],
+      })
+    );
+
+    // Assert
+    expect(mutation.score).toBe(100);
+    expect(mutation.files['src/utils/zip.ts']).toEqual({
+      score: null,
+      detected: 0,
+      undetected: 0,
+    });
+  });
+
+  it('fails on a status that the score does not know', () => {
+    // Arrange
+    const json = report({ 'src/utils/share.ts': ['Killed', 'Equivalent'] });
+
+    // Act and assert
+    expect(() => summarizeMutation(json)).toThrow(
+      'Unknown mutant status Equivalent'
+    );
+  });
+
+  it('prints the score in the table, or that none was recorded', () => {
+    // Arrange
+    const metrics: Metrics = {
+      schema: 2,
+      commit: 'a'.repeat(40),
+      dirty: false,
+      counts: countPatterns(files),
+      unitTests: null,
+      bundle: null,
+      mutation: summarizeMutation(
+        report({ 'src/utils/share.ts': ['Killed', 'Killed', 'Survived'] })
+      ),
+      stages: [],
+      totalMilliseconds: 0,
+      machine: {
+        node: 'v24.0.0',
+        platform: 'linux',
+        cpus: 4,
+        cpuModel: 'test',
+        loadAverage: 0,
+      },
+    };
+
+    // Act
+    const withScore = renderTable(metrics);
+    const withoutScore = renderTable({ ...metrics, mutation: null });
+
+    // Assert
+    expect(withScore).toContain(
+      '| Mutation score | 66.67%, 1 of 3 mutants undetected |'
+    );
+    expect(withoutScore).toContain('| Mutation score | not recorded |');
   });
 });
