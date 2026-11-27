@@ -1,7 +1,8 @@
 // Records the baseline that later roadmap tasks compare against. `pnpm metrics`
 // runs the stages of `pnpm validate` through scripts/ci/validate.mts, which
 // starts independent stages at the same time, and times each stage. It reads
-// the unit test report and the bundle that those stages produce, counts
+// the unit test report and the bundle that those stages produce, and the
+// mutation report of an earlier `pnpm test:mutation` when one exists. It counts
 // patterns in the source, writes reports/metrics.json and prints a table.
 //
 // The counts port source/measure.sh from the 2027 roadmap report and keep its
@@ -35,6 +36,8 @@ import {
 
 export const metricsPath = 'reports/metrics.json';
 const unitReportPath = 'reports/unit.xml';
+/** The jsonReporter default of Stryker, which stryker.config.json keeps. */
+const mutationReportPath = 'reports/mutation/mutation.json';
 const bundleDirectory = 'dist';
 
 export interface SourceFile {
@@ -288,6 +291,72 @@ export function summarizeUnitTests(xml: string): UnitTests {
   return { files: suites, tests, failures, errors, skipped };
 }
 
+/**
+ * How the mutation score counts each mutant status, as Stryker computes it in
+ * mutation-testing-metrics. A detected mutant failed a test or timed out. An
+ * undetected mutant passed every test or ran in none. The score leaves out the
+ * other statuses.
+ */
+const scoredStatuses = {
+  Killed: 'detected',
+  Timeout: 'detected',
+  Survived: 'undetected',
+  NoCoverage: 'undetected',
+  CompileError: null,
+  RuntimeError: null,
+  Ignored: null,
+  Pending: null,
+} as const;
+
+/** The part of a Stryker JSON report that the score reads. */
+interface MutationReport {
+  files: Record<string, { mutants: { status: string }[] }>;
+}
+
+export interface MutationScore {
+  /**
+   * Detected mutants as a percentage of detected and undetected ones, to 2
+   * decimals. Null when there are neither.
+   */
+  score: number | null;
+  detected: number;
+  undetected: number;
+}
+
+export interface Mutation extends MutationScore {
+  /** Keyed by the mutated file, relative to the repository root. */
+  files: Record<string, MutationScore>;
+}
+
+function scoreMutants(mutants: readonly { status: string }[]): MutationScore {
+  const counted = mutants.map(({ status }) => {
+    if (!Object.hasOwn(scoredStatuses, status)) {
+      throw new Error(`Unknown mutant status ${status} in the Stryker report`);
+    }
+    return scoredStatuses[status as keyof typeof scoredStatuses];
+  });
+  const detected = counted.filter((kind) => kind === 'detected').length;
+  const undetected = counted.filter((kind) => kind === 'undetected').length;
+  const scored = detected + undetected;
+  return {
+    score: scored === 0 ? null : Math.round((detected / scored) * 10000) / 100,
+    detected,
+    undetected,
+  };
+}
+
+/** Scores the JSON report of `pnpm test:mutation`, in total and per file. */
+export function summarizeMutation(json: string): Mutation {
+  const { files } = JSON.parse(json) as MutationReport;
+  const entries = Object.entries(files);
+  return {
+    ...scoreMutants(entries.flatMap(([, { mutants }]) => mutants)),
+    files: Object.fromEntries(
+      entries.map(([path, { mutants }]) => [path, scoreMutants(mutants)])
+    ),
+  };
+}
+
 export interface StageResult {
   name: string;
   /** The median of the samples, which are in round order. */
@@ -348,6 +417,8 @@ export interface Metrics {
   unitTests: UnitTests | null;
   /** The files in dist. Null unless build passed in every round. */
   bundle: Bundle | null;
+  /** Null unless pnpm test:mutation wrote its report before this run. */
+  mutation: Mutation | null;
   stages: StageResult[];
   /** The median time of a round, in which stages run at the same time. */
   totalMilliseconds: number;
@@ -366,6 +437,9 @@ export interface Metrics {
 const formatSeconds = (milliseconds: number) =>
   (milliseconds / 1000).toFixed(1);
 
+const formatMutation = ({ score, detected, undetected }: Mutation) =>
+  `${score === null ? 'none' : `${score}%`}, ${undetected} of ${detected + undetected} mutants undetected`;
+
 export function renderTable(metrics: Metrics): string {
   const state = metrics.dirty ? ' with uncommitted changes' : '';
   const lines = [
@@ -383,6 +457,7 @@ export function renderTable(metrics: Metrics): string {
     '| ------- | ----: |',
     `| Unit tests | ${metrics.unitTests ? `${metrics.unitTests.tests} in ${metrics.unitTests.files} files` : 'not recorded'} |`,
     `| Bundle bytes | ${metrics.bundle ? `${metrics.bundle.bytes} in ${metrics.bundle.files} files` : 'not recorded'} |`,
+    `| Mutation score | ${metrics.mutation ? formatMutation(metrics.mutation) : 'not recorded'} |`,
     ...Object.entries(countDefinitions).map(
       ([name, { description }]) =>
         `| ${description} (\`${name}\`) | ${metrics.counts[name as keyof Counts]} |`
@@ -471,6 +546,9 @@ async function main() {
         ? summarizeUnitTests(readFileSync(unitReportPath, 'utf8'))
         : null,
     bundle: passed('build') ? measureBundle() : null,
+    mutation: existsSync(mutationReportPath)
+      ? summarizeMutation(readFileSync(mutationReportPath, 'utf8'))
+      : null,
     stages,
     totalMilliseconds,
     machine: {

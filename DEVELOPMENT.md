@@ -28,7 +28,8 @@ These commands run validation and tests:
   that differ from `origin/main`, as the paragraph after this list describes.
   It does not replace `pnpm precommit`.
 - `pnpm metrics` runs the same checks and writes their times, test counts,
-  bundle size, and pattern counts to `reports/metrics.json`.
+  bundle size, and pattern counts to `reports/metrics.json`, with the
+  [mutation score](#mutation-testing) when a mutation report exists.
 - `pnpm validate:extended` runs `pnpm validate:fast`, a fresh production build,
   all Playwright tests, and `pnpm test:reports`.
 - `pnpm test:reports` checks the JUnit reports against the
@@ -41,6 +42,8 @@ These commands run validation and tests:
 - `pnpm test:contract` runs only the
   [engine contract tests](#engine-contract-tests) with the installed engine and
   writes `reports/contract.xml`.
+- `pnpm test:mutation` runs [mutation testing](#mutation-testing) and writes
+  `reports/mutation/`.
 - `pnpm verify [<feature>...]` builds and serves the app, drives the journey
   of each feature in Chromium, and keeps screenshots and a JSON result in
   `reports/verify/`, as [Verification](#verification) describes.
@@ -193,6 +196,31 @@ build-time settings:
 - `tests/analytics-tag-id.test.ts` checks the build-time analytics tag ID.
 - `tests/markdown-links.test.ts` checks that every relative link in Markdown
   files reaches an existing file and heading.
+
+### Mutation testing
+
+`pnpm test:mutation` runs Stryker with `stryker.config.json`. Stryker changes
+`share.ts`, `zip.ts`, `injections.ts`, and `configAnalyzer.ts` in `src/utils/`
+in small ways, one change at a time, and runs the unit tests that import the
+changed file, directly or through other modules. Stryker calls each change a
+mutant. A mutant that makes a test
+fail or time out is detected. A mutant that passes every test, or that no test
+runs, is undetected. The score is the percentage of detected mutants. Stryker
+copies the project to `reports/stryker-tmp/` and deletes the copy after a run
+that succeeds. It writes `reports/mutation/mutation.html`, which shows each
+undetected mutant, and `reports/mutation/mutation.json`.
+
+`pnpm metrics` reads `reports/mutation/mutation.json` when it exists and writes
+the score of each file and of all four files to `mutation` in
+`reports/metrics.json`. Without the report, `mutation` is `null`. It does not
+check which commit the report comes from, so run `pnpm test:mutation` again or
+delete `reports/mutation/` before `pnpm metrics`.
+
+A run takes about 25 minutes on 4 CPU cores, so pull request CI does not run
+it. `mutation.yaml` runs `pnpm test:mutation` and then `pnpm metrics` each
+night on `main`, and on demand from the **Actions** tab. It has a read-only
+token and uses no secret. It uploads `reports/metrics.json` and
+`reports/mutation/` as an artifact of the run, which GitHub keeps for 30 days.
 
 ### Engine contract tests
 
@@ -535,9 +563,12 @@ GitHub Actions runs validation and deployment under these rules:
   `repository_dispatch`, and never on pull requests. Its `build`, `deploy`, and
   `smoke` jobs build once and publish that exact build, as
   [Releases and rollback](#releases-and-rollback) describes.
+- `mutation.yaml` runs each night and on manual dispatch with a read-only
+  token, as [Mutation testing](#mutation-testing) describes.
 - Build variables come from repository variables as listed in
-  [Configuration in README.md](README.md#configuration). Both workflows and
-  `vite.config.mts` read the analytics tag ID only from `VITE_GTAG_ID`.
+  [Configuration in README.md](README.md#configuration). `ci.yaml`,
+  `deploy.yaml`, and `vite.config.mts` read the analytics tag ID only from
+  `VITE_GTAG_ID`.
 - Actions are pinned by commit SHA and updated by Dependabot with a seven-day
   cooldown. Update `tests/workflow-security.test.ts` with any workflow change.
   [CI background](docs/records/background.md#ci-and-deployment) lists what it
