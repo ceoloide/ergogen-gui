@@ -56,3 +56,9 @@ observable proof. Keep details of the code out of the map.
 - [Generate](./generate.md): a configuration in the editor generates outputs
   and their preview, after an edit, with Generate, and with the shortcut.
   Journey: `pnpm verify generate`.
+- [Preview](./preview.md): the preview shows the output that the user chooses
+  in Outputs, as an SVG drawing or, with Debug on, as text, and falls back to
+  `demo.svg`. Journey: `pnpm verify preview`.
+- [Downloads and bulk export](./download.md): the user saves one output, the
+  configuration, an archive of all outputs, and an archive of the stored
+  configurations. Journey: `pnpm verify download`.
