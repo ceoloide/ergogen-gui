@@ -10,7 +10,10 @@ import { migrateConfigStorage, type StoredConfigs } from './configStorage';
 const runs = { numRuns: 200 };
 
 const now = '2026-11-27T12:00:00.000Z';
-const newId = 'new-id';
+const newIds = (prefix: string) => {
+  let count = 0;
+  return () => `${prefix}-${++count}`;
+};
 
 const timestamp = fc
   .date({
@@ -64,11 +67,31 @@ const isJson = (text: string) => {
 // which stores it as JSON. The migration also reads text that is not JSON.
 const storeLegacyText = (text: string, asPlainText: boolean) =>
   asPlainText && !isJson(text) ? text : JSON.stringify(text);
+// No known release stored JSON that is not a string, such as 123 or {}.
+const nonStringJson = fc
+  .jsonValue()
+  .filter((value) => typeof value !== 'string')
+  .map((value) => JSON.stringify(value));
 const legacyKeyText = fc.option(
-  fc
-    .tuple(fc.oneof(configText, blankText), fc.boolean())
-    .map(([text, asPlainText]) => storeLegacyText(text, asPlainText)),
+  fc.oneof(
+    fc
+      .tuple(fc.oneof(configText, blankText), fc.boolean())
+      .map(([text, asPlainText]) => storeLegacyText(text, asPlainText)),
+    nonStringJson
+  ),
   { nil: null }
+);
+const legacyKeyWithText = fc.oneof(
+  fc.tuple(filledText, fc.boolean()).map(([text, asPlainText]) => ({
+    value: storeLegacyText(text, asPlainText),
+    text,
+  })),
+  nonStringJson.map((value) => ({ value, text: value }))
+);
+const emptyLegacyKey = fc.oneof(
+  fc.constant(null),
+  blankText.map((text) => JSON.stringify(text)),
+  blankText
 );
 
 // Any storage: a container, JSON without a version, unreadable text, or
@@ -90,11 +113,11 @@ describe('storage migration properties', () => {
   it('gives the same result when applied to its own result', () => {
     fc.assert(
       fc.property(storedConfigs, (stored) => {
-        const once = migrateConfigStorage(stored, now, 'first-id');
+        const once = migrateConfigStorage(stored, now, newIds('first'));
 
-        // The second run gets another id, so a legacy configuration that it
+        // The second run gets other ids, so a legacy configuration that it
         // added again would differ.
-        const twice = migrateConfigStorage(once.stored, now, 'second-id');
+        const twice = migrateConfigStorage(once.stored, now, newIds('second'));
 
         expect(twice.stored).toEqual(once.stored);
         expect(twice.container).toEqual(once.container);
@@ -113,7 +136,7 @@ describe('storage migration properties', () => {
           const { container: loaded } = migrateConfigStorage(
             { multiConfig: JSON.stringify(stored), legacyConfig, singleConfig },
             now,
-            newId
+            newIds('new')
           );
 
           expect(loaded.configs.slice(0, stored.configs.length)).toEqual(
@@ -129,37 +152,36 @@ describe('storage migration properties', () => {
     );
   });
 
-  it('turns the text of a legacy key into the active "Legacy Config", stores it as version 2, and clears both legacy keys', () => {
+  it('turns the text of a legacy key into the active "Legacy Config", stores it as version 2, and clears both legacy keys, when the other key holds no text', () => {
     fc.assert(
       fc.property(
         containerWithoutLegacyConfig,
-        filledText,
+        legacyKeyWithText,
+        emptyLegacyKey,
         fc.boolean(),
-        fc.constantFrom('legacyConfig', 'singleConfig'),
-        (stored, text, asPlainText, key) => {
+        (stored, { value, text }, emptyValue, textInSingleConfig) => {
           const { container: loaded, stored: migrated } = migrateConfigStorage(
             {
               multiConfig: JSON.stringify(stored),
-              legacyConfig: null,
-              singleConfig: null,
-              [key]: storeLegacyText(text, asPlainText),
+              legacyConfig: textInSingleConfig ? emptyValue : value,
+              singleConfig: textInSingleConfig ? value : emptyValue,
             },
             now,
-            newId
+            () => 'new-id'
           );
 
           expect(loaded.configs).toHaveLength(stored.configs.length + 1);
           expect(loaded.configs.at(-1)).toEqual({
-            id: newId,
+            id: 'new-id',
             name: 'Legacy Config',
             config: text,
             createdAt: now,
             updatedAt: now,
           });
-          expect(loaded.activeConfigId).toBe(newId);
+          expect(loaded.activeConfigId).toBe('new-id');
           expect(JSON.parse(migrated.multiConfig ?? 'null')).toEqual({
             version: 2,
-            activeConfigId: newId,
+            activeConfigId: 'new-id',
             configs: loaded.configs,
           });
           expect(migrated.legacyConfig).toBeNull();
@@ -170,12 +192,44 @@ describe('storage migration properties', () => {
     );
   });
 
-  it('changes no storage and keeps the active configuration when no legacy key holds text', () => {
-    const emptyLegacyKey = fc.oneof(
-      fc.constant(null),
-      blankText.map((text) => JSON.stringify(text))
-    );
+  it('makes the ergogen:config text active and keeps a different LOCAL_STORAGE_CONFIG text as "Legacy Config (older)", when both keys hold text', () => {
+    fc.assert(
+      fc.property(
+        containerWithoutLegacyConfig,
+        legacyKeyWithText,
+        legacyKeyWithText,
+        (stored, legacy, single) => {
+          const { container: loaded, stored: migrated } = migrateConfigStorage(
+            {
+              multiConfig: JSON.stringify(stored),
+              legacyConfig: legacy.value,
+              singleConfig: single.value,
+            },
+            now,
+            newIds('new')
+          );
 
+          const added = loaded.configs.slice(stored.configs.length);
+          const older =
+            legacy.text === single.text
+              ? []
+              : [{ name: 'Legacy Config (older)', config: legacy.text }];
+          expect(added.map(({ name, config }) => ({ name, config }))).toEqual([
+            ...older,
+            { name: 'Legacy Config', config: single.text },
+          ]);
+          expect(loaded.activeConfigId).toBe(added.at(-1)?.id);
+          expect(new Set(added.map(({ id }) => id)).size).toBe(added.length);
+          expect(JSON.parse(migrated.multiConfig ?? 'null')).toEqual(loaded);
+          expect(migrated.legacyConfig).toBeNull();
+          expect(migrated.singleConfig).toBeNull();
+        }
+      ),
+      runs
+    );
+  });
+
+  it('changes no storage and keeps the active configuration when no legacy key holds text', () => {
     fc.assert(
       fc.property(
         container,
@@ -191,7 +245,7 @@ describe('storage migration properties', () => {
           const { container: loaded, stored: after } = migrateConfigStorage(
             before,
             now,
-            newId
+            newIds('new')
           );
 
           expect(after).toEqual(before);
