@@ -26,8 +26,9 @@ engine of the build, and the address can force them with `?ff_outlines=` and
   off, the app hides the tab, skips those injections, and shows the warning
   `Custom outlines were skipped because the respective feature flags are disabled in settings.`,
   or the same warning for templates.
-- `settings-metrics` and `settings-offline` are the features of analytics
-  consent and of offline use.
+- `settings-metrics` and `settings-offline` are the features
+  [Analytics consent](./analytics.md) and
+  [Offline use and updates](./offline.md).
 
 ## How to get to it (user POV)
 

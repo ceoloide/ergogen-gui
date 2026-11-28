@@ -7,7 +7,8 @@ feature as the recipe. [SKILL.md](../SKILL.md) explains how to run a journey.
 ## Baseline preconditions
 
 - `pnpm verify <feature>` builds the app and serves it at a free loopback
-  port. The run checks that the server answers with its own build ID.
+  port. The run checks that the server answers with its own build ID. The
+  build has the analytics tag ID `G-TESTJOURNEY`.
 - Each journey starts in a new Chromium context at 1280 × 720, with empty
   storage, at `/`, which opens the Welcome page at `/new`.
 - The shared fixture of `e2e/fixtures.ts` blocks every request to another
@@ -87,3 +88,9 @@ observable proof. Keep details of the code out of the map.
 - [Local files and archives](./local-files.md): the user opens a
   configuration file or an archive with footprints from the computer. Journey:
   `pnpm verify local-files`.
+- [Offline use and updates](./offline.md): the app opens and generates
+  without a network after the first visit, and a new deployment waits behind
+  `Update Available` until the user applies it. Journey: `pnpm verify offline`.
+- [Analytics consent](./analytics.md): a browser tab sends usage metrics until
+  the user turns them off in the settings, and an installed app sends none.
+  Journey: `pnpm verify analytics`.
