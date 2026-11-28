@@ -36,23 +36,28 @@ One run does these steps:
 
 1. It removes the old proof of the features that it runs.
 2. It builds the app with `pnpm build`, which also prepares the engine, with a
-   new build ID, into a new folder `ergogen-gui-verify-<build ID>` in the
-   temporary folder of the system.
+   new build ID and the analytics tag ID `G-TESTJOURNEY`, into a new folder
+   `ergogen-gui-verify-<build ID>` in the temporary folder of the system.
 3. It serves the build with `vite preview` on a free loopback port.
-4. It checks that the server answers `/build-id.txt` with the build ID of the
+4. When the `offline` journey runs, it also builds the next version of the app
+   with another build ID into the same folder, and serves a copy of the first
+   build on a second free port. That journey deploys the next version over the
+   copy.
+5. It checks that each server answers `/build-id.txt` with the build ID of the
    run, before any journey. `e2e/global-setup.ts` makes this check.
-5. It runs each journey in a new Chromium context at 1280 × 720, one at a
+6. It runs each journey in a new Chromium context at 1280 × 720, one at a
    time, without retries.
-6. It stops the server and removes the build.
+7. It stops the servers and removes the builds.
 
 The app is ready when Playwright prints `Running 1 test using 1 worker`. A
 journey still waits for each state that it needs, because the app starts its
 workers after the page loads.
 
 On a machine with 4 CPUs, `pnpm verify generate` takes about 40 seconds, of
-which the build takes about 30. The exit status is 0 when every journey
-passed, 1 when a journey failed or did not run, and 2 when the arguments are
-wrong.
+which the build takes about 30. A run with the `offline` journey also builds
+the next version of the app, and a run without it skips that build. The exit
+status is 0 when every journey passed, 1 when a journey failed or did not run,
+and 2 when the arguments are wrong.
 
 Each run has its own port, build ID, and build folder, so runs in separate
 worktrees can run at the same time. Runs in one checkout share
@@ -162,6 +167,9 @@ These handles are stable. An element that has a label but no role needs
 | Choose File on `/new`                  | button `Select local file to load`, which opens the file dialog            |
 | Repository field on `/new`             | textbox `Repository URL or path`                                           |
 | Load from the repository field         | button `Load configuration from repository`                                |
+| Send Usage Metrics, in the settings    | checkbox `Send usage metrics`. Choose the text `Send Usage Metrics`        |
+| Update of the app, in the header       | button `Update available — click to reload and apply`                      |
+| Build that runs in the page            | `meta[name="ergogen-build-id"]`, whose `content` is the build ID           |
 
 Text that you type in the editor gets the automatic indentation of the editor
 on each new line, which breaks YAML. Paste the text through the clipboard with
@@ -265,6 +273,8 @@ journeys:
 - [Repository loading](features/repository.md): `pnpm verify repository`.
 - [Local files and archives](features/local-files.md):
   `pnpm verify local-files`.
+- [Offline use and updates](features/offline.md): `pnpm verify offline`.
+- [Analytics consent](features/analytics.md): `pnpm verify analytics`.
 
 Read the file of a feature before you drive or change it. When you add a
 journey, add its feature file in the same pull request. When a change alters a
@@ -276,5 +286,8 @@ These traps apply to every journey:
   blocks. Screenshots show the name of an icon as a word, such as `download`
   or `settings`. Accessible names do not change.
 - Each journey starts with empty storage, so `/` opens the Welcome page.
+- The build has the analytics tag ID `G-TESTJOURNEY`, so each page asks for
+  gtag.js, which the fixture blocks unless the journey routes it, and the
+  settings show `Send Usage Metrics` on.
 - Auto-generate is on by default. An edit in the editor generates after about
   one second, without a click.
