@@ -1,4 +1,9 @@
+import { createHash } from 'node:crypto';
 import { analyzeConfiguration, sha256 } from './configAnalyzer';
+
+/** The first 12 hex digits of the SHA-256 digest, as config_id holds them. */
+const configIdOf = (hashInput: string) =>
+  createHash('sha256').update(hashInput).digest('hex').slice(0, 12);
 
 describe('sha256 utility', () => {
   it('should generate correct SHA-256 hash', () => {
@@ -6,6 +11,26 @@ describe('sha256 utility', () => {
     expect(sha256('hello world')).toBe(
       'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9'
     );
+  });
+
+  it('gives the SHA-256 digest of the UTF-8 bytes for inputs of up to four blocks', () => {
+    // Arrange: SHA-256 pads a message to whole blocks of 64 bytes, and a last
+    // block with 56 to 63 bytes of the message needs one more block.
+    const inputs = [
+      ...Array.from({ length: 200 }, (_, length) =>
+        'ergogen|'.repeat(25).slice(0, length)
+      ),
+      'é',
+      'キーボード',
+      '⌨️ 42 keys',
+    ];
+
+    // Act and assert
+    for (const input of inputs) {
+      expect(sha256(input)).toBe(
+        createHash('sha256').update(input, 'utf8').digest('hex')
+      );
+    }
   });
 });
 
@@ -260,6 +285,330 @@ pt_a:
     // Since names are pt_a then pt_b:
     // Output string should have two identical coordinates, but the order of sorting should be deterministic.
     expect(payload.config_id).toBeDefined();
+  });
+
+  it('hashes the meta name, the author, and each point as its type, x, y and r rounded to hundredths', () => {
+    // Arrange
+    const canonical = `
+meta:
+  name: sweep
+  author: david
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+    thumb:
+      anchor:
+        shift: [0, 0]
+`;
+    const points = `
+matrix_pinky:
+  x: 1.005
+  y: -2.5
+  r: 15
+  meta:
+    zone:
+      name: matrix
+thumb:
+  x: 30
+  y: 4
+  r: 0
+  meta:
+    zone:
+      name: thumb
+`;
+
+    // Act
+    const payload = analyzeConfiguration(canonical, points, 0);
+
+    // Assert
+    expect(payload.config_id).toBe(
+      configIdOf('sweep|david|K1.01;-2.5;15|A30;4;0')
+    );
+  });
+
+  it('hashes a configuration without meta under the names no_name and no_author', () => {
+    // Arrange
+    const points = `
+thumb:
+  x: 1
+  y: 2
+  r: 0
+  meta:
+    zone:
+      name: thumb
+`;
+
+    // Act
+    const payload = analyzeConfiguration('points: {}', points, 0);
+
+    // Assert
+    expect(payload.config_id).toBe(configIdOf('no_name|no_author|A1;2;0'));
+  });
+
+  it('hashes a point without data or metadata as a point outside every zone', () => {
+    // Arrange
+    const points = `
+empty: null
+bare:
+  x: 1
+  y: 2
+  r: 0
+no_meta:
+  x: 3
+  y: 4
+  r: 0
+  meta: null
+`;
+
+    // Act
+    const payload = analyzeConfiguration('', points, 0);
+
+    // Assert
+    expect(payload.config_id).toBe(
+      configIdOf('no_name|no_author|A0;0;0|A1;2;0|A3;4;0')
+    );
+  });
+
+  it('counts the outlines whose names do not start with an underscore', () => {
+    // Arrange
+    const canonical = `
+outlines:
+  board: {}
+  plate: {}
+  _cutout: {}
+`;
+
+    // Act
+    const payload = analyzeConfiguration(canonical, '{}', 0);
+
+    // Assert
+    expect(payload.count_outlines).toBe(2);
+    expect(payload.count_raw_outlines).toBe(3);
+  });
+
+  it('reports a PCB as reversible when a footprint sets reverse: true', () => {
+    // Arrange
+    const canonical = `
+pcbs:
+  main:
+    footprints:
+      mcu:
+        what: promicro
+        params:
+          reverse: true
+`;
+
+    // Act
+    const payload = analyzeConfiguration(canonical, '{}', 0);
+
+    // Assert
+    expect(payload.is_reversible).toBe(true);
+  });
+
+  it('counts a zone with columns, rows, or both as a matrix zone', () => {
+    // Arrange
+    const canonical = `
+points:
+  zones:
+    thumbs:
+      columns:
+        near:
+    pinkies:
+      rows:
+        home:
+    alphas:
+      columns:
+        a:
+      rows:
+        b:
+    logo:
+      anchor:
+        shift: [0, 0]
+`;
+
+    // Act
+    const payload = analyzeConfiguration(canonical, '{}', 0);
+
+    // Assert
+    expect(payload.count_zones).toBe(4);
+    expect(payload.matrix_zones).toBe(3);
+  });
+
+  it('lists the counts in alphabetical zone order, not in the order of the configuration', () => {
+    // Arrange
+    const canonical = `
+points:
+  zones:
+    thumb:
+      columns:
+        near:
+    matrix:
+      columns:
+        pinky:
+        ring:
+`;
+
+    // Act
+    const payload = analyzeConfiguration(canonical, '{}', 0);
+
+    // Assert
+    expect(payload.matrix_col_counts).toBe('2,1');
+  });
+
+  it('reads a zone that a point names as a string', () => {
+    // Arrange
+    const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+`;
+    const points = `
+matrix_pinky:
+  x: 0
+  y: 0
+  r: 0
+  meta:
+    zone: matrix
+`;
+
+    // Act
+    const payload = analyzeConfiguration(canonical, points, 0);
+
+    // Assert
+    expect(payload.matrix_key_counts).toBe('1');
+  });
+
+  describe('mirrored keys', () => {
+    const pinky = `
+matrix_pinky:
+  x: 0
+  y: 0
+  r: 0
+  meta:
+    zone:
+      name: matrix
+    mirrored: false
+`;
+    const pinkyAndItsMirror = `${pinky}
+mirror_matrix_pinky:
+  x: 200
+  y: 0
+  r: 0
+  meta:
+    zone:
+      name: matrix
+    mirrored: true
+`;
+
+    it('counts every key twice when the zone has its own mirror', () => {
+      // Arrange: the engine accepts a mirror as an object or a number.
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      mirror:
+        ref: matrix_pinky
+        distance: 200
+`;
+
+      // Act
+      const payload = analyzeConfiguration(canonical, pinkyAndItsMirror, 0);
+
+      // Assert
+      expect(payload.matrix_key_counts).toBe('2');
+    });
+
+    it('counts every key twice when all points have a mirror', () => {
+      // Arrange
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+  mirror:
+    ref: matrix_pinky
+    distance: 200
+`;
+
+      // Act
+      const payload = analyzeConfiguration(canonical, pinkyAndItsMirror, 0);
+
+      // Assert
+      expect(payload.matrix_key_counts).toBe('2');
+    });
+
+    it.each([
+      [
+        'the zone',
+        `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+      mirror: null
+`,
+      ],
+      [
+        'the points',
+        `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+  mirror: null
+`,
+      ],
+    ])('counts each key once when %s has a null mirror', (_, canonical) => {
+      // Act
+      const payload = analyzeConfiguration(canonical, pinky, 0);
+
+      // Assert
+      expect(payload.matrix_key_counts).toBe('1');
+    });
+
+    it('leaves out a point that the engine marks as mirrored, whatever its name', () => {
+      // Arrange
+      const canonical = `
+points:
+  zones:
+    matrix:
+      columns:
+        pinky:
+`;
+      const points = `
+matrix_pinky:
+  x: 0
+  y: 0
+  r: 0
+  meta:
+    zone:
+      name: matrix
+    mirrored: false
+copy_of_pinky:
+  x: 200
+  y: 0
+  r: 0
+  meta:
+    zone:
+      name: matrix
+    mirrored: true
+`;
+
+      // Act
+      const payload = analyzeConfiguration(canonical, points, 0);
+
+      // Assert
+      expect(payload.matrix_key_counts).toBe('1');
+    });
   });
 
   describe('keyboard_keys metric calculation', () => {

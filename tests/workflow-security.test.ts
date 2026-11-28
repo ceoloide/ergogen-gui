@@ -450,6 +450,24 @@ describe('nightly mutation testing', () => {
     ]);
   });
 
+  it('checks the undetected mutants after pnpm metrics, and the check can fail the run', () => {
+    // Arrange
+    const commands = job.steps.map((step) => step.run);
+    const step = job.steps.find(
+      (candidate) => candidate.run === 'pnpm check:survivors'
+    );
+
+    // Assert
+    expect(packageJson.scripts['check:survivors']).toBe(
+      'node scripts/ci/check-survivors.mts'
+    );
+    expect(commands.indexOf('pnpm check:survivors')).toBeGreaterThan(
+      commands.indexOf('pnpm metrics')
+    );
+    expect(step?.if).toBeUndefined();
+    expect(step?.['continue-on-error']).not.toBe(true);
+  });
+
   it('keeps Stryker out of pull request CI', () => {
     // Assert: pnpm metrics runs only the stages that tests/validate.test.ts
     // lists, and none of them is test:mutation.
