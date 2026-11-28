@@ -1,13 +1,13 @@
-// Records the baseline that later roadmap tasks compare against. `pnpm metrics`
+// Records the baseline that later changes compare against. `pnpm metrics`
 // runs the stages of `pnpm validate` through scripts/ci/validate.mts, which
 // starts independent stages at the same time, and times each stage. It reads
 // the unit test report and the bundle that those stages produce, and the
 // mutation report of an earlier `pnpm test:mutation` when one exists. It counts
 // patterns in the source, writes reports/metrics.json and prints a table.
 //
-// The counts port source/measure.sh from the 2027 roadmap report and keep its
-// names, so both give the same numbers on one commit. They read only the files
-// that Git tracks or would track, so they do not depend on the machine.
+// The counts port an earlier measurement script and keep its names, so both
+// give the same numbers on one commit. They read only the files that Git
+// tracks or would track, so they do not depend on the machine.
 //
 // Stage times do depend on the machine, and on the stages that run at the same
 // time. With --repeat <n>, the script runs all stages n times, one round after
