@@ -38,6 +38,7 @@ interface ConfigStorageMigration {
 }
 
 const LEGACY_CONFIG_NAME = 'Legacy Config';
+const OLDER_LEGACY_CONFIG_NAME = 'Legacy Config (older)';
 
 const emptyContainer = (): MultiConfigContainer => ({
   version: 2,
@@ -69,34 +70,40 @@ const readContainer = (
   return { container: emptyContainer() };
 };
 
-/**
- * Releases before the container stored the editor text as JSON. Text that is
- * not JSON is read as it is.
- */
-const readLegacyText = (value: string): string => {
+/** Releases before the container stored the editor text as a JSON string. */
+const readLegacyText = (value: string | null): string => {
+  if (value === null) return '';
+  let parsed: unknown;
   try {
-    return JSON.parse(value);
+    parsed = JSON.parse(value);
   } catch {
     return value;
   }
+  return typeof parsed === 'string' ? parsed : value;
 };
+
+const isBlank = (text: string) => text.trim() === '';
 
 /**
  * Turns the stored text of the configuration keys into the container that the
- * app loads. It reads the editor text from `legacyConfig`, or from
- * `singleConfig` when `legacyConfig` is missing. Text that is not blank becomes
- * the active configuration "Legacy Config" unless one exists, and both keys are
- * cleared. Applied to its own `stored` result, it returns the same result.
+ * app loads. The editor text of `singleConfig` is newer, so it becomes the
+ * active configuration "Legacy Config" when it is not blank. Otherwise the text
+ * of `legacyConfig` does. A `legacyConfig` text that is not blank and differs
+ * from the active one becomes "Legacy Config (older)". When any text is copied,
+ * or a "Legacy Config" exists, both keys are cleared. `newId` gives the id of
+ * each added configuration. Applied to its own `stored` result, it returns the
+ * same result.
  */
 export const migrateConfigStorage = (
   stored: StoredConfigs,
   now: string,
-  newId: string
+  newId: () => string
 ): ConfigStorageMigration => {
   const { container, readError } = readContainer(stored.multiConfig, now);
-  const legacyValue = stored.legacyConfig || stored.singleConfig;
-  const legacyText = legacyValue ? readLegacyText(legacyValue) : '';
-  if (!legacyText || legacyText.trim() === '') {
+  const legacyText = readLegacyText(stored.legacyConfig);
+  const singleText = readLegacyText(stored.singleConfig);
+  const activeText = isBlank(singleText) ? legacyText : singleText;
+  if (isBlank(activeText)) {
     return { container, stored, readError };
   }
 
@@ -109,17 +116,22 @@ export const migrateConfigStorage = (
     return { container, stored: withoutLegacyKeys, readError };
   }
 
-  const legacyConfig: SavedConfig = {
-    id: newId,
-    name: LEGACY_CONFIG_NAME,
-    config: legacyText,
+  const newConfig = (name: string, config: string): SavedConfig => ({
+    id: newId(),
+    name,
+    config,
     createdAt: now,
     updatedAt: now,
-  };
+  });
+  const olderConfigs =
+    isBlank(legacyText) || legacyText === activeText
+      ? []
+      : [newConfig(OLDER_LEGACY_CONFIG_NAME, legacyText)];
+  const activeConfig = newConfig(LEGACY_CONFIG_NAME, activeText);
   const migrated: MultiConfigContainer = {
     version: 2,
-    activeConfigId: newId,
-    configs: [...container.configs, legacyConfig],
+    activeConfigId: activeConfig.id,
+    configs: [...container.configs, ...olderConfigs, activeConfig],
   };
   return {
     container: migrated,

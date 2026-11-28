@@ -376,7 +376,7 @@ const migrateLegacyConfig = (): MultiConfigContainer => {
   const migration = migrateConfigStorage(
     stored,
     new Date().toISOString(),
-    generateUUID()
+    generateUUID
   );
   if (migration.readError) {
     console.error('Failed to parse multi-config storage:', migration.readError);
