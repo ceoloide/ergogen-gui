@@ -17,7 +17,7 @@ Prettier and ESLint cover the files that
 these checks on each group of maintained files:
 
 - `src/`: TypeScript with the strict `tsconfig.json`.
-- `tests/`, `e2e/`, `scripts/ci/`, `scripts/queue/`, and root `*.config.mts`:
+- `tests/`, `e2e/`, `scripts/ci/`, and root `*.config.mts`:
   TypeScript with `tsconfig.tooling.json`. JavaScript files are not
   type-checked.
 - `scripts/*.sh`, `patch/*.sh`, and `.husky/pre-commit`: ShellCheck.
